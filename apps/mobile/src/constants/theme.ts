@@ -1,65 +1,304 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * theme.ts — design tokens for the Word Poker / Four-in-a-Row app (Expo / React Native).
+ * Derived from the existing casino-felt prototypes: deep felt greens, gold, parchment cream.
+ *
+ * import { theme } from '@/constants/theme';
+ * or cherry-pick: import { colors, spacing, radius, type } from '@/constants/theme';
  */
 
-import '@/global.css';
+import { Platform, TextStyle, ViewStyle } from 'react-native';
 
-import { Platform } from 'react-native';
+/* ── palette (raw ramps) ─────────────────────────────────────────── */
 
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+export const palette = {
+  felt900: '#020a07',
+  felt800: '#051410',
+  felt700: '#060d06',
+  felt600: '#0a1d17',
+  felt500: '#0e3422',
+  felt400: '#1a4a35',
+  felt300: '#2f5418',
+
+  gold600: '#7e5e16',
+  gold500: '#9c7620',
+  gold400: '#c79a2e',
+  gold300: '#d4af37',
+  gold200: '#e7c75a',
+  gold100: '#f7df7a',
+  gold050: '#fbe6a6',
+
+  cream100: '#f4e4c1',
+  cream200: '#e8dcc0',
+  cream300: '#d9c392',
+  cream400: '#c4b48a',
+
+  red400: '#ff6b6b',
+  red500: '#ff5d4e',
+  green300: '#7ee7c0',
+  green400: '#4caf88',
+  green500: '#9ec27a',
+  blue400: '#7ec4cf',
+  amber400: '#e6b450',
+  violet400: '#a78bfa',
+  pink400: '#f0a8c0',
+
+  tileInk: '#2b1810',
+  onGold: '#1a1208',
+} as const;
+
+/* ── semantic colors ─────────────────────────────────────────────── */
+
+export const colors = {
+  // surfaces
+  bg: palette.felt700,
+  bgElevated: palette.felt600,
+  surface: 'rgba(0,0,0,0.25)',
+  surfaceStrong: 'rgba(0,0,0,0.35)',
+  felt: palette.felt500,
+  feltHi: palette.felt400,
+  scrim: 'rgba(2,10,7,0.7)',
+
+  // ink
+  text: palette.cream200,
+  textBright: palette.cream100,
+  textDim: 'rgba(232,220,192,0.6)',
+  textFaint: 'rgba(232,220,192,0.3)',
+  onGold: palette.onGold,
+  onTile: palette.tileInk,
+
+  // brand
+  gold: palette.gold300,
+  goldHi: palette.gold100,
+  goldDeep: palette.gold600,
+
+  // borders
+  border: 'rgba(212,175,55,0.18)',
+  borderFaint: 'rgba(212,175,55,0.08)',
+  borderStrong: 'rgba(212,175,55,0.45)',
+
+  // status / accents
+  success: palette.green400,
+  successHi: palette.green300,
+  danger: palette.red400,
+  warning: palette.amber400,
+  info: palette.blue400,
+  chipUp: palette.green400,
+  chipDown: palette.red400,
+
+  // player accent wheel (assign by index for avatars, seats, rows)
+  players: [
+    palette.amber400,
+    palette.blue400,
+    palette.green500,
+    palette.violet400,
+    palette.pink400,
+    '#e07a5f',
+    '#81b29a',
+    '#a8d0f0',
+  ],
+} as const;
+
+/* ── gradients (expo-linear-gradient: {...gradients.felt}) ───────── */
+
+export const gradients = {
+  felt: {
+    colors: [palette.felt600, palette.felt800] as const,
+    start: { x: 0.5, y: 0 },
+    end: { x: 0.5, y: 1 },
   },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+  goldButton: {
+    colors: [palette.gold200, palette.gold300, palette.gold500] as const,
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+  },
+  tile: {
+    colors: ['#fff3d1', palette.cream100, palette.cream300] as const,
+    start: { x: 0.15, y: 0 },
+    end: { x: 0.85, y: 1 },
+  },
+  tileDim: {
+    colors: [palette.cream400, '#a8987a', '#8a7a5e'] as const,
+    start: { x: 0.15, y: 0 },
+    end: { x: 0.85, y: 1 },
+  },
+  table: {
+    colors: [palette.felt300, '#1d3711', '#0e1d09'] as const,
+    start: { x: 0.5, y: 0 },
+    end: { x: 0.5, y: 1 },
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+/* ── spacing — 4pt base ──────────────────────────────────────────── */
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
+export const spacing = {
+  none: 0,
+  xxs: 2,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  huge: 48,
+  gutter: 20, // standard screen side padding
+} as const;
+
+export const radius = {
+  none: 0,
+  xs: 4,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 20,
+  tile: 4,
+  card: 12,
+  sheet: 24,
+  pill: 999,
+} as const;
+
+export const border = {
+  hairline: 1,
+  thin: 1.5,
+  thick: 2,
+} as const;
+
+/* ── typography ──────────────────────────────────────────────────── */
+
+/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono}. */
+export const fonts = {
+  sans: Platform.select({ ios: 'Inter_400Regular', android: 'Inter_400Regular', default: 'system-ui' })!,
+  sansMedium: 'Inter_500Medium',
+  sansBold: 'Inter_700Bold',
+  sansBlack: 'Inter_800ExtraBold',
+  serif: 'NotoSerif_400Regular',
+  serifBold: 'NotoSerif_700Bold',
+  mono: 'JetBrainsMono_400Regular',
+  monoBold: 'JetBrainsMono_600SemiBold',
+} as const;
+
+export const fontSize = {
+  micro: 9,
+  caption: 11,
+  small: 13,
+  body: 15,
+  bodyLg: 17,
+  title: 20,
+  h3: 24,
+  h2: 30,
+  h1: 38,
+  display: 52,
+} as const;
+
+/** Ready-to-spread text styles. */
+export const type = {
+  /** Small caps monospace stamp — labels, kickers, timestamps. */
+  kicker: {
+    fontFamily: fonts.mono,
+    fontSize: fontSize.micro,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: colors.gold,
+  } as TextStyle,
+  label: {
+    fontFamily: fonts.mono,
+    fontSize: fontSize.caption,
+    letterSpacing: 1.4,
+    color: colors.textDim,
+  } as TextStyle,
+  body: { fontFamily: fonts.sans, fontSize: fontSize.body, lineHeight: 22, color: colors.text } as TextStyle,
+  bodyDim: { fontFamily: fonts.sans, fontSize: fontSize.small, lineHeight: 19, color: colors.textDim } as TextStyle,
+  button: { fontFamily: fonts.sansBold, fontSize: 14, letterSpacing: 0.5 } as TextStyle,
+  title: { fontFamily: fonts.sansBold, fontSize: fontSize.title, color: colors.textBright } as TextStyle,
+  /** Editorial serif headline — screen titles, showdown results. */
+  headline: { fontFamily: fonts.serifBold, fontSize: fontSize.h2, lineHeight: 34, color: colors.textBright } as TextStyle,
+  display: { fontFamily: fonts.serifBold, fontSize: fontSize.display, lineHeight: 56, color: colors.gold } as TextStyle,
+  /** Tabular figures for chip counts and pots. */
+  numeric: { fontFamily: fonts.monoBold, fontSize: fontSize.bodyLg, letterSpacing: 0.5, color: colors.goldHi } as TextStyle,
+} as const;
+
+/* ── elevation ───────────────────────────────────────────────────── */
+
+const shadow = (y: number, blur: number, opacity: number, elevation: number): ViewStyle => ({
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: y },
+  shadowRadius: blur,
+  shadowOpacity: opacity,
+  elevation,
 });
 
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+export const elevation = {
+  none: shadow(0, 0, 0, 0),
+  tile: shadow(2, 3, 0.45, 2),
+  card: shadow(4, 10, 0.35, 4),
+  sheet: shadow(-4, 24, 0.5, 12),
+  modal: shadow(8, 32, 0.55, 16),
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+/** Gold glow for winning tiles, CTAs, live dots. */
+export const glow = (color: string = colors.gold, radius = 12): ViewStyle => ({
+  shadowColor: color,
+  shadowOffset: { width: 0, height: 0 },
+  shadowRadius: radius,
+  shadowOpacity: 0.8,
+  elevation: 6,
+});
+
+/* ── motion ──────────────────────────────────────────────────────── */
+
+export const duration = {
+  instant: 90,
+  fast: 160,
+  base: 240,
+  slow: 380,
+  deal: 520,
+  celebrate: 900,
+} as const;
+
+export const easing = {
+  standard: [0.2, 0, 0, 1] as const,
+  decelerate: [0, 0, 0.2, 1] as const,
+  accelerate: [0.4, 0, 1, 1] as const,
+  spring: { damping: 16, stiffness: 180, mass: 0.9 },
+  springSnappy: { damping: 22, stiffness: 320, mass: 0.7 },
+} as const;
+
+/* ── layout ──────────────────────────────────────────────────────── */
+
+export const layout = {
+  hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
+  minTouch: 44,
+  headerHeight: 56,
+  tabBarHeight: 60,
+  maxContentWidth: 520,
+  tileSize: { sm: 24, md: 32, lg: 44, rack: 48 },
+  boardGap: 4,
+} as const;
+
+export const opacity = { disabled: 0.4, pressed: 0.75, muted: 0.6 } as const;
+
+/* ── the theme object ────────────────────────────────────────────── */
+
+export const theme = {
+  palette,
+  colors,
+  gradients,
+  spacing,
+  radius,
+  border,
+  fonts,
+  fontSize,
+  type,
+  elevation,
+  glow,
+  duration,
+  easing,
+  layout,
+  opacity,
+} as const;
+
+export type Theme = typeof theme;
+export type ThemeColor = keyof typeof colors;
+export type Spacing = keyof typeof spacing;
+
+export default theme;
