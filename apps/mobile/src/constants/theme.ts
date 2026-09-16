@@ -6,63 +6,63 @@
  * or cherry-pick: import { colors, spacing, radius, type } from '@/constants/theme';
  */
 
-import { Platform, TextStyle, ViewStyle } from 'react-native';
+import { Platform, TextStyle, ViewStyle } from "react-native";
 
 /* ── palette (raw ramps) ─────────────────────────────────────────── */
 
 export const palette = {
-  felt900: '#020a07',
-  felt800: '#051410',
-  felt700: '#060d06',
-  felt600: '#0a1d17',
-  felt500: '#0e3422',
-  felt400: '#1a4a35',
-  felt300: '#2f5418',
+  felt900: "#020a07",
+  felt800: "#051410",
+  felt700: "#060d06",
+  felt600: "#0a1d17",
+  felt500: "#0d3b2e",
+  felt400: "#1a4a35",
+  felt300: "#2f5418",
 
-  gold600: '#7e5e16',
-  gold500: '#9c7620',
-  gold400: '#c79a2e',
-  gold300: '#d4af37',
-  gold200: '#e7c75a',
-  gold100: '#f7df7a',
-  gold050: '#fbe6a6',
+  gold600: "#7e5e16",
+  gold500: "#9c7620",
+  gold400: "#c79a2e",
+  gold300: "#d4a54a",
+  gold200: "#e7c75a",
+  gold100: "#f7df7a",
+  gold050: "#fbe6a6",
 
-  cream100: '#f4e4c1',
-  cream200: '#e8dcc0',
-  cream300: '#d9c392',
-  cream400: '#c4b48a',
+  cream100: "#f4e4c1",
+  cream200: "#e8dcc0",
+  cream300: "#d9c392",
+  cream400: "#c4b48a",
 
-  red400: '#ff6b6b',
-  red500: '#ff5d4e',
-  green300: '#7ee7c0',
-  green400: '#4caf88',
-  green500: '#9ec27a',
-  blue400: '#7ec4cf',
-  amber400: '#e6b450',
-  violet400: '#a78bfa',
-  pink400: '#f0a8c0',
+  red400: "#ff6b6b",
+  red500: "#ff5d4e",
+  green300: "#7ee7c0",
+  green400: "#4caf88",
+  green500: "#9ec27a",
+  blue400: "#7ec4cf",
+  amber400: "#e6b450",
+  violet400: "#a78bfa",
+  pink400: "#f0a8c0",
 
-  tileInk: '#2b1810',
-  onGold: '#1a1208',
+  tileInk: "#2b1810",
+  onGold: "#1a1208",
 } as const;
 
 /* ── semantic colors ─────────────────────────────────────────────── */
 
 export const colors = {
   // surfaces
-  bg: palette.felt700,
+  bg: palette.felt500,
   bgElevated: palette.felt600,
-  surface: 'rgba(0,0,0,0.25)',
-  surfaceStrong: 'rgba(0,0,0,0.35)',
+  surface: "rgba(0,0,0,0.25)",
+  surfaceStrong: "rgba(0,0,0,0.35)",
   felt: palette.felt500,
   feltHi: palette.felt400,
-  scrim: 'rgba(2,10,7,0.7)',
+  scrim: "rgba(2,10,7,0.7)",
 
   // ink
   text: palette.cream200,
   textBright: palette.cream100,
-  textDim: 'rgba(232,220,192,0.6)',
-  textFaint: 'rgba(232,220,192,0.3)',
+  textDim: "rgba(232,220,192,0.6)",
+  textFaint: "rgba(232,220,192,0.3)",
   onGold: palette.onGold,
   onTile: palette.tileInk,
 
@@ -72,9 +72,9 @@ export const colors = {
   goldDeep: palette.gold600,
 
   // borders
-  border: 'rgba(212,175,55,0.18)',
-  borderFaint: 'rgba(212,175,55,0.08)',
-  borderStrong: 'rgba(212,175,55,0.45)',
+  border: "rgba(212,175,55,0.18)",
+  borderFaint: "rgba(212,175,55,0.08)",
+  borderStrong: "rgba(212,175,55,0.45)",
 
   // status / accents
   success: palette.green400,
@@ -92,9 +92,9 @@ export const colors = {
     palette.green500,
     palette.violet400,
     palette.pink400,
-    '#e07a5f',
-    '#81b29a',
-    '#a8d0f0',
+    "#e07a5f",
+    "#81b29a",
+    "#a8d0f0",
   ],
 } as const;
 
@@ -112,17 +112,17 @@ export const gradients = {
     end: { x: 1, y: 1 },
   },
   tile: {
-    colors: ['#fff3d1', palette.cream100, palette.cream300] as const,
+    colors: ["#fff3d1", palette.cream100, palette.cream300] as const,
     start: { x: 0.15, y: 0 },
     end: { x: 0.85, y: 1 },
   },
   tileDim: {
-    colors: [palette.cream400, '#a8987a', '#8a7a5e'] as const,
+    colors: [palette.cream400, "#a8987a", "#8a7a5e"] as const,
     start: { x: 0.15, y: 0 },
     end: { x: 0.85, y: 1 },
   },
   table: {
-    colors: [palette.felt300, '#1d3711', '#0e1d09'] as const,
+    colors: [palette.felt300, "#1d3711", "#0e1d09"] as const,
     start: { x: 0.5, y: 0 },
     end: { x: 0.5, y: 1 },
   },
@@ -165,16 +165,28 @@ export const border = {
 
 /* ── typography ──────────────────────────────────────────────────── */
 
+/** CSS font-family fallback stack for monospace (web). */
+export const monoFamily =
+  "JetBrains Mono,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace";
+
 /** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono}. */
 export const fonts = {
-  sans: Platform.select({ ios: 'Inter_400Regular', android: 'Inter_400Regular', default: 'system-ui' })!,
-  sansMedium: 'Inter_500Medium',
-  sansBold: 'Inter_700Bold',
-  sansBlack: 'Inter_800ExtraBold',
-  serif: 'NotoSerif_400Regular',
-  serifBold: 'NotoSerif_700Bold',
-  mono: 'JetBrainsMono_400Regular',
-  monoBold: 'JetBrainsMono_600SemiBold',
+  sans: Platform.select({
+    ios: "Inter_400Regular",
+    android: "Inter_400Regular",
+    default: "system-ui",
+  })!,
+  sansMedium: "Inter_500Medium",
+  sansBold: "Inter_700Bold",
+  sansBlack: "Inter_800ExtraBold",
+  serif: "NotoSerif_400Regular",
+  serifBold: "NotoSerif_700Bold",
+  mono: Platform.select({
+    ios: "JetBrainsMono_400Regular",
+    android: "JetBrainsMono_400Regular",
+    default: monoFamily,
+  })!,
+  monoBold: "JetBrainsMono_600SemiBold",
 } as const;
 
 export const fontSize = {
@@ -197,7 +209,7 @@ export const type = {
     fontFamily: fonts.mono,
     fontSize: fontSize.micro,
     letterSpacing: 2.2,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     color: colors.gold,
   } as TextStyle,
   label: {
@@ -206,21 +218,59 @@ export const type = {
     letterSpacing: 1.4,
     color: colors.textDim,
   } as TextStyle,
-  body: { fontFamily: fonts.sans, fontSize: fontSize.body, lineHeight: 22, color: colors.text } as TextStyle,
-  bodyDim: { fontFamily: fonts.sans, fontSize: fontSize.small, lineHeight: 19, color: colors.textDim } as TextStyle,
-  button: { fontFamily: fonts.sansBold, fontSize: 14, letterSpacing: 0.5 } as TextStyle,
-  title: { fontFamily: fonts.sansBold, fontSize: fontSize.title, color: colors.textBright } as TextStyle,
+  body: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.body,
+    lineHeight: 22,
+    color: colors.text,
+  } as TextStyle,
+  bodyDim: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.small,
+    lineHeight: 19,
+    color: colors.textDim,
+  } as TextStyle,
+  button: {
+    fontFamily: fonts.sansBold,
+    fontSize: 14,
+    letterSpacing: 0.5,
+  } as TextStyle,
+  title: {
+    fontFamily: fonts.sansBold,
+    fontSize: fontSize.title,
+    color: colors.textBright,
+  } as TextStyle,
   /** Editorial serif headline — screen titles, showdown results. */
-  headline: { fontFamily: fonts.serifBold, fontSize: fontSize.h2, lineHeight: 34, color: colors.textBright } as TextStyle,
-  display: { fontFamily: fonts.serifBold, fontSize: fontSize.display, lineHeight: 56, color: colors.gold } as TextStyle,
+  headline: {
+    fontFamily: fonts.serifBold,
+    fontSize: fontSize.h2,
+    lineHeight: 34,
+    color: colors.textBright,
+  } as TextStyle,
+  display: {
+    fontFamily: fonts.serifBold,
+    fontSize: fontSize.display,
+    lineHeight: 56,
+    color: colors.gold,
+  } as TextStyle,
   /** Tabular figures for chip counts and pots. */
-  numeric: { fontFamily: fonts.monoBold, fontSize: fontSize.bodyLg, letterSpacing: 0.5, color: colors.goldHi } as TextStyle,
+  numeric: {
+    fontFamily: fonts.monoBold,
+    fontSize: fontSize.bodyLg,
+    letterSpacing: 0.5,
+    color: colors.goldHi,
+  } as TextStyle,
 } as const;
 
 /* ── elevation ───────────────────────────────────────────────────── */
 
-const shadow = (y: number, blur: number, opacity: number, elevation: number): ViewStyle => ({
-  shadowColor: '#000',
+const shadow = (
+  y: number,
+  blur: number,
+  opacity: number,
+  elevation: number,
+): ViewStyle => ({
+  shadowColor: "#000",
   shadowOffset: { width: 0, height: y },
   shadowRadius: blur,
   shadowOpacity: opacity,
@@ -251,7 +301,8 @@ export const duration = {
   fast: 160,
   base: 240,
   slow: 380,
-  deal: 520,
+  flip: 640,
+  deal: 450,
   celebrate: 900,
 } as const;
 
@@ -259,6 +310,8 @@ export const easing = {
   standard: [0.2, 0, 0, 1] as const,
   decelerate: [0, 0, 0.2, 1] as const,
   accelerate: [0.4, 0, 1, 1] as const,
+  flip: [0.45, 0, 0.2, 1] as const,
+  deal: [0.34, 1.56, 0.64, 1] as const,
   spring: { damping: 16, stiffness: 180, mass: 0.9 },
   springSnappy: { damping: 22, stiffness: 320, mass: 0.7 },
 } as const;
