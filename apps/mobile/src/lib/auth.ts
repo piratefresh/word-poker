@@ -49,8 +49,31 @@ export const authPool = new Pool({
   ssl: true,
 });
 
+// Better Auth ranks a configured base URL over the request origin, but this
+// server must answer on several: localhost (browser), the LAN address (device),
+// and the deploy origin (production). A dynamic base URL keeps that per-request
+// derivation while pinning it to an allowlist — and, unlike leaving `baseURL`
+// unset, it does not warn that callbacks and redirects "may not work". An empty
+// `allowedHosts` throws, so production without an explicit list falls back to
+// the bare request-derived mode rather than crashing.
+const authAllowedHosts = [
+  ...(process.env.NODE_ENV === "development"
+    ? ["localhost:8081", "127.0.0.1:8081", "192.168.*.*:*"]
+    : []),
+  ...(process.env.AUTH_ALLOWED_HOSTS?.split(",")
+    .map((host) => host.trim())
+    .filter(Boolean) ?? []),
+];
+
 export const auth = betterAuth({
   database: authPool,
+  baseURL:
+    authAllowedHosts.length > 0
+      ? {
+          allowedHosts: authAllowedHosts,
+          protocol: process.env.NODE_ENV === "production" ? "https" : "http",
+        }
+      : undefined,
   trustedOrigins: [
     "wordpoker://*", // Deep links back into the native app after auth.
     ...(process.env.NODE_ENV === "development"
