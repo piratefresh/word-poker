@@ -7,7 +7,7 @@ import {
   Field,
   FooterLine,
   GoldButton,
-} from "@/components/auth/auth-shell";
+} from "@/components/screens/auth/auth-shell";
 import { colors, theme } from "@/constants/theme";
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 import { authClient } from "@/lib/auth-client";

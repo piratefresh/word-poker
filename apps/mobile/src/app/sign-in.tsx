@@ -1,1 +1,1 @@
-export { SignInScreen as default } from '@/components/auth/auth-screen';
+export { SignInScreen as default } from '@/components/screens/auth/auth-screen';

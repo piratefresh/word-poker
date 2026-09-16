@@ -1,1 +1,1 @@
-export { ResetPasswordScreen as default } from '@/components/auth/password-reset-screen';
+export { ResetPasswordScreen as default } from '@/components/screens/auth/password-reset-screen';
