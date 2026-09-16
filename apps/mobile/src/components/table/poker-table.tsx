@@ -1,0 +1,348 @@
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
+
+import { border, colors } from "@/constants/theme";
+
+/** Rosewood table rail — one-off from the felt prototype, not a theme token. */
+const RAIL_WOOD = "#3a2815";
+import {
+  computeTableLayout,
+  dealerButtonAnchor,
+  resolvePoint,
+  type CommunityAnchor,
+  type NormPoint,
+  type SeatAnchor,
+  type SeatCount,
+  type TableLayout,
+  type TableLayoutConfig,
+} from "./table-layout";
+
+export type PixelSize = { width: number; height: number };
+
+/**
+ * The resolved geometry shared with descendants. Child animations read this to
+ * target stable pixel coordinates without measuring laid-out views.
+ */
+export interface TableLayoutContextValue {
+  layout: TableLayout;
+  /** Pixel size of the felt box (not the outer container). */
+  size: PixelSize;
+  /** Offset of the felt box within the outer container. */
+  origin: { x: number; y: number };
+  /** Resolve a normalized point to felt-box pixels. */
+  resolve: (point: NormPoint) => { x: number; y: number };
+  /** Resolve a normalized point to outer-container pixels. */
+  resolveContainer: (point: NormPoint) => { x: number; y: number };
+}
+
+const TableLayoutContext = createContext<TableLayoutContextValue | null>(null);
+
+/** Read the current table geometry from inside the table (e.g. for animations). */
+export function useTableLayout(): TableLayoutContextValue {
+  const value = useContext(TableLayoutContext);
+  if (!value) {
+    throw new Error("useTableLayout must be used within a <PokerTable>");
+  }
+  return value;
+}
+
+/** Metadata handed to every slot renderer. */
+export interface SlotMeta {
+  size: PixelSize;
+  /** A responsive scale factor derived from felt size (phone ≈ 0.7, tablet ≈ 1.2). */
+  scale: number;
+}
+
+export interface SeatSlot<TSeat> extends SlotMeta {
+  anchor: SeatAnchor;
+  seat: TSeat | null;
+  isDealer: boolean;
+}
+
+export interface CommunitySlot<TCard> extends SlotMeta {
+  anchor: CommunityAnchor;
+  card: TCard | null;
+}
+
+export interface PokerTableProps<TSeat, TCard> {
+  seatCount: SeatCount;
+  /** Seat data indexed by seat index; missing/nullish entries render empty. */
+  seats?: readonly (TSeat | null | undefined)[];
+  /** Community cards by slot index; missing/nullish entries render empty. */
+  community?: readonly (TCard | null | undefined)[];
+  /** Seat index currently holding the dealer button, or null to hide it. */
+  dealerSeat?: number | null;
+  /** Geometry overrides (seat radius, community span, etc.). */
+  layoutConfig?: Partial<Omit<TableLayoutConfig, "seatCount">>;
+
+  renderSeat: (slot: SeatSlot<TSeat>) => ReactNode;
+  renderCommunity: (slot: CommunitySlot<TCard>) => ReactNode;
+  renderPot?: (meta: SlotMeta) => ReactNode;
+  renderDealerButton?: (meta: SlotMeta & { anchor: NormPoint }) => ReactNode;
+
+  /** Overlay drawn above the felt; laid out box-none so seats stay tappable. */
+  hud?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  /** Rail thickness in px. Defaults to a size-relative value. */
+  railWidth?: number;
+  /** Space reserved around the felt for seat labels and badges. */
+  chromeInset?: number;
+  testID?: string;
+}
+
+/** Preferred felt aspect ratio (width / height) before clamping to the box. */
+const FELT_ASPECT = 320 / 220;
+
+/** Fit a felt ellipse of the preferred aspect inside the available box. */
+function fitFelt(box: PixelSize, inset: number): { size: PixelSize; origin: { x: number; y: number } } {
+  const availW = Math.max(0, box.width - inset * 2);
+  const availH = Math.max(0, box.height - inset * 2);
+  let width = Math.min(availW, availH * FELT_ASPECT);
+  let height = width / FELT_ASPECT;
+  if (height > availH) {
+    height = availH;
+    width = height * FELT_ASPECT;
+  }
+  return {
+    size: { width, height },
+    origin: { x: (box.width - width) / 2, y: (box.height - height) / 2 },
+  };
+}
+
+/**
+ * Presentational poker table. Owns no game state: seats, community cards, pot,
+ * and dealer position all arrive as props and render through the supplied slot
+ * renderers. Geometry is deterministic and exposed via context so overlays and
+ * animations can target stable anchors.
+ */
+export function PokerTable<TSeat, TCard>({
+  seatCount,
+  seats,
+  community,
+  dealerSeat = null,
+  layoutConfig,
+  renderSeat,
+  renderCommunity,
+  renderPot,
+  renderDealerButton,
+  hud,
+  style,
+  railWidth,
+  chromeInset,
+  testID,
+}: PokerTableProps<TSeat, TCard>) {
+  const [box, setBox] = useState<PixelSize>({ width: 0, height: 0 });
+
+  const layout = useMemo(
+    () => computeTableLayout({ seatCount, ...layoutConfig }),
+    [seatCount, layoutConfig],
+  );
+
+  const shortSide = Math.min(box.width, box.height);
+  const rail = railWidth ?? Math.max(14, Math.round(shortSide * 0.05));
+  const inset = chromeInset ?? rail + 8;
+  const { size: felt, origin } = useMemo(
+    () => fitFelt(box, inset),
+    [box, inset],
+  );
+
+  const scale = felt.width > 0 ? felt.width / 640 : 1;
+
+  const ctx = useMemo<TableLayoutContextValue>(() => {
+    const resolve = (p: NormPoint) => resolvePoint(p, felt);
+    return {
+      layout,
+      size: felt,
+      origin,
+      resolve,
+      resolveContainer: (p) => {
+        const r = resolve(p);
+        return { x: r.x + origin.x, y: r.y + origin.y };
+      },
+    };
+  }, [layout, felt, origin]);
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setBox((prev) =>
+      prev.width === width && prev.height === height ? prev : { width, height },
+    );
+  };
+
+  const ready = felt.width > 0 && felt.height > 0;
+  const meta: SlotMeta = { size: felt, scale };
+
+  return (
+    <View style={[styles.container, style]} onLayout={onLayout} testID={testID}>
+      {ready ? (
+        <TableLayoutContext.Provider value={ctx}>
+          {/* Wood rail + felt ellipse, centered in the container. */}
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.feltBox,
+              {
+                left: origin.x,
+                top: origin.y,
+                width: felt.width,
+                height: felt.height,
+                borderRadius: felt.height / 2,
+              },
+            ]}>
+            <Svg
+              pointerEvents="none"
+              preserveAspectRatio="none"
+              style={StyleSheet.absoluteFill}
+              viewBox={`0 0 ${felt.width} ${felt.height}`}>
+              <Defs>
+                <RadialGradient id="felt" cx="50%" cy="46%" rx="58%" ry="58%">
+                  <Stop offset="0%" stopColor="#1a4a35" />
+                  <Stop offset="60%" stopColor="#0e3422" />
+                  <Stop offset="100%" stopColor="#08291b" />
+                </RadialGradient>
+              </Defs>
+              <Ellipse
+                cx={felt.width / 2}
+                cy={felt.height / 2}
+                fill={RAIL_WOOD}
+                rx={felt.width / 2}
+                ry={felt.height / 2}
+              />
+              <Ellipse
+                cx={felt.width / 2}
+                cy={felt.height / 2}
+                fill="url(#felt)"
+                rx={Math.max(0, felt.width / 2 - rail)}
+                ry={Math.max(0, felt.height / 2 - rail)}
+              />
+              <Ellipse
+                cx={felt.width / 2}
+                cy={felt.height / 2}
+                fill="none"
+                rx={Math.max(0, felt.width / 2 - rail - 7)}
+                ry={Math.max(0, felt.height / 2 - rail - 7)}
+                stroke={colors.border}
+                strokeWidth={border.hairline}
+              />
+            </Svg>
+          </View>
+
+          {/* Anchored chrome lives in the felt coordinate space. */}
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.anchorLayer,
+              { left: origin.x, top: origin.y, width: felt.width, height: felt.height },
+            ]}>
+            {/* Pot */}
+            {renderPot ? (
+              <AnchoredSlot point={ctx.resolve(layout.pot)}>
+                {renderPot(meta)}
+              </AnchoredSlot>
+            ) : null}
+
+            {/* Community cards */}
+            {layout.community.map((anchor) => (
+              <AnchoredSlot key={anchor.key} point={ctx.resolve(anchor)}>
+                {renderCommunity({
+                  ...meta,
+                  anchor,
+                  card: community?.[anchor.index] ?? null,
+                })}
+              </AnchoredSlot>
+            ))}
+
+            {/* Seats */}
+            {layout.seats.map((anchor) => (
+              <AnchoredSlot key={anchor.key} point={ctx.resolve(anchor)}>
+                {renderSeat({
+                  ...meta,
+                  anchor,
+                  seat: seats?.[anchor.index] ?? null,
+                  isDealer: dealerSeat === anchor.index,
+                })}
+              </AnchoredSlot>
+            ))}
+
+            {/* Dealer button */}
+            {renderDealerButton && dealerSeat != null && layout.seats[dealerSeat]
+              ? (() => {
+                  const anchor = dealerButtonAnchor(layout.seats[dealerSeat]);
+                  return (
+                    <AnchoredSlot point={ctx.resolve(anchor)}>
+                      {renderDealerButton({ ...meta, anchor })}
+                    </AnchoredSlot>
+                  );
+                })()
+              : null}
+          </View>
+
+          {/* HUD overlay — above the felt, does not swallow seat taps. */}
+          {hud ? (
+            <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+              {hud}
+            </View>
+          ) : null}
+        </TableLayoutContext.Provider>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Centers its child on a pixel point. Zero-size + centered children means the
+ * anchor stays put regardless of the child's measured size, so a seat growing
+ * (chips, name) never nudges the anchor and never reflows its neighbours.
+ */
+function AnchoredSlot({
+  point,
+  children,
+}: {
+  point: { x: number; y: number };
+  children: ReactNode;
+}) {
+  return (
+    <View pointerEvents="box-none" style={[styles.anchor, { left: point.x, top: point.y }]}>
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgElevated,
+    overflow: "hidden",
+  },
+  feltBox: {
+    position: "absolute",
+    backgroundColor: "transparent",
+    // Wood rail. Not a theme token — lifted straight from the felt prototype.
+    // "50%" gives a true ellipse (numeric radius clamps to a stadium on wide boxes).
+    overflow: "hidden",
+  },
+  anchorLayer: {
+    position: "absolute",
+    zIndex: 1,
+  },
+  anchor: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 0,
+    height: 0,
+  },
+});
