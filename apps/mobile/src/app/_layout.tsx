@@ -40,6 +40,7 @@ export default function RootLayout() {
         </Stack.Protected>
         <Stack.Protected guard={!!session}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="table-demo" />
         </Stack.Protected>
         {/* Outside the guards: the emailed reset link may land while a stale
             session is still on the device, and the reset has to win. */}
