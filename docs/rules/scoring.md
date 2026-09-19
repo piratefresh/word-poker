@@ -57,17 +57,17 @@ builds; the bag is shuffled with an injected seed, so the same seed deals the sa
 
 **Total: 100 tiles** (98 single-letter + 2 two-letter).
 
-Because the two-letter tiles are bag members like any other, a hand can show at most two
-of them, which satisfies the "never more than three" rule in
-[Two-Letter Tiles](tiles.md) without a separate placement rule.
+The bag holds the two two-letter **choice** tiles and no fixed-sequence tiles: those are
+placed by the deal, and the combined cap of three two-letter tiles in a hand is enforced
+there — [Two-Letter Tiles](tiles.md) §10.
 
 <!-- Contract status: the fixed-sequence tile shape and the letter-multiplier field exist on
      the tile contract (`packages/contracts/src/tiles.ts`: `SequenceTile`, `LetterMultiplier`);
      word-building honours §10 (`packages/game-rules/src/building.ts`, STO-301/STO-329) and
      §6–§9 scoring is implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's
      per-letter breakdown), with §6's values pinned to the table above by a drift-guard test.
-     Deal-time generation and placement of those tiles is still open — see the Two-Letter Tiles
-     section above and STO-325. -->
+     Deal-time generation is implemented in `packages/game-rules/src/special-tiles.ts`
+     (STO-325): §10's sequence placement and §9's multiplier rolls. -->
 
 ---
 
@@ -196,6 +196,23 @@ Recommended starting configuration:
 - High-value letters may receive a slightly higher chance of becoming special tiles
 
 The final probabilities should be configurable for balance testing.
+
+### How the deal rolls them
+
+Every physical tile the deal puts on the table is eligible — private or community, single,
+choice, or sequence — and the roll happens once per tile at deal time, on the deal's seeded
+generator (`packages/game-rules/src/special-tiles.ts`). A tile carries at most one
+multiplier: §9 does not stack them.
+
+The defaults, which put numbers on the recommended configuration above:
+
+- **Double Letter**: 15% per tile. A high-value tile — its highest printed face worth 8
+  points or more (§6: J, X, Q, Z) — rolls its double at 20% instead.
+- **Triple Letter**: 3% per tile, read first, so a tile that triples never also doubles.
+- Tiles that stay in the deck are not rolled: a multiplier belongs to a tile on the table.
+- Every number here — the two chances and the high-value bump, together with §10's
+  placement pool and target weights — is a table setting, so balance testing changes the
+  configuration and never the code.
 
 ## Multiplier Rules
 
