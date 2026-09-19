@@ -34,7 +34,7 @@ import {
 } from "@/constants/theme";
 
 const COMMUNITY_TILES: readonly TileData[] = [
-  { id: "tutorial-community-ae", letter: "A", alternativeLetter: "E", points: 1 },
+  { id: "tutorial-community-ae", letter: "A", alternativeLetter: "E", points: 1, alternativePoints: 1 },
   { id: "tutorial-community-n", letter: "N", points: 2 },
   { id: "tutorial-community-o", letter: "O", points: 1 },
   { id: "tutorial-community-t", letter: "T", points: 1 },

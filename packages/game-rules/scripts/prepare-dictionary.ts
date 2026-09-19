@@ -20,7 +20,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DICTIONARIES, type DictionaryId } from "../src/dictionary";
+import { DICTIONARIES } from "../src/dictionary";
+import type { DictionaryId } from "@wordpoker/contracts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");

@@ -69,16 +69,23 @@ const SINGLE_LETTER_TILES: readonly (readonly [letter: string, copies: number, p
 ];
 
 /**
- * The two two-letter choice tiles, as `[letter, alternativeLetter, points]`.
+ * The two two-letter choice tiles, as
+ * `[letter, alternativeLetter, points, alternativePoints]`.
  *
- * A choice tile plays as either of its letters, so it is worth the higher of the two —
- * `A`/`E` are both 1, `T`/`S` are both 2 — and it carries the second letter in
- * `alternativeLetter` for the word check (`@wordpoker/contracts`'s `Tile`). They are bag
- * members like any other, which is what caps a hand at two of them.
+ * A choice tile plays as either of its faces, and the face the player picked is the one
+ * that scores (§10), so each face carries its own value rather than a single number for
+ * the tile. Both pairs shipped here happen to be equal-valued — A/E are 1 and 1, T/S are
+ * 2 and 2 — and the rules' other pairs (Q/K) are not, which is why the field exists. They
+ * are bag members like any other, which is what caps a hand at two of them.
  */
-const TWO_LETTER_TILES: readonly (readonly [letter: string, alternativeLetter: string, points: number])[] = [
-  ["A", "E", 1],
-  ["T", "S", 2],
+const TWO_LETTER_TILES: readonly (readonly [
+  letter: string,
+  alternativeLetter: string,
+  points: number,
+  alternativePoints: number,
+])[] = [
+  ["A", "E", 1, 1],
+  ["T", "S", 2, 2],
 ];
 
 /**
@@ -102,8 +109,14 @@ export function createTileBag(): Tile[] {
     }
   }
 
-  for (const [letter, alternativeLetter, points] of TWO_LETTER_TILES) {
-    bag.push({ id: `${letter}${alternativeLetter}-1`, letter, alternativeLetter, points });
+  for (const [letter, alternativeLetter, points, alternativePoints] of TWO_LETTER_TILES) {
+    bag.push({
+      id: `${letter}${alternativeLetter}-1`,
+      letter,
+      points,
+      alternativeLetter,
+      alternativePoints,
+    });
   }
 
   return bag;

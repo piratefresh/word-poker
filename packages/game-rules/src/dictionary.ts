@@ -16,15 +16,15 @@
  * the artifact's sorted words, which needs no second copy of 141,962 strings.
  */
 
+import { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "@wordpoker/contracts";
+
 /**
  * The dictionaries this build ships. One today, and the id is the seam: a second prepared
  * artifact (TWL, SOWPODS) joins this list and `loadDictionary("…")` takes its name, with no
- * change to any caller's shape.
+ * change to any caller's shape. The ids themselves are wire vocabulary and live in
+ * `@wordpoker/contracts`; this table is the engine's half — the label a mode displays and
+ * the artifact each id loads.
  */
-const DICTIONARY_IDS = ["en_US-large"] as const;
-
-/** Names a dictionary the engine can load. */
-export type DictionaryId = (typeof DICTIONARY_IDS)[number];
 
 /** What a mode shows before play: which words count, in the player's terms. */
 export interface DictionaryInfo {
@@ -94,11 +94,6 @@ const MIN_WORD_LETTERS = 2;
 
 /** A word as the artifact stores it: two or more A–Z letters, nothing else. */
 const WORD_INPUT = /^[A-Za-z]{2,}$/;
-
-/** Whether an untrusted id names one of the shipped dictionaries. */
-function isDictionaryId(id: string): id is DictionaryId {
-  return (DICTIONARY_IDS as readonly string[]).includes(id);
-}
 
 /**
  * Whether `word` is in a sorted word list, by binary search.

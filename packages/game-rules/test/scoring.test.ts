@@ -6,14 +6,20 @@ import type { Tile } from "@wordpoker/contracts";
 import { NoPlayersError, pickWinner, scoreHand, type ScoredPlayer } from "../src/scoring";
 
 /**
- * Builds a tile the way the bag deals one. `alternativeLetter` is only set for the
- * two-letter choice tiles, which is exactly the shape `@wordpoker/contracts` pins.
+ * Builds a tile the way the bag deals one: a single letter, or — when a second face is
+ * given — the choice tile shape `@wordpoker/contracts` pins, with both faces valued.
  */
 function tile(letter: string, points: number, alternativeLetter?: string): Tile {
   if (alternativeLetter === undefined) {
     return { id: letter, letter, points };
   }
-  return { id: `${letter}/${alternativeLetter}`, letter, points, alternativeLetter };
+  return {
+    id: `${letter}/${alternativeLetter}`,
+    letter,
+    points,
+    alternativeLetter,
+    alternativePoints: points,
+  };
 }
 
 describe("scoreHand", () => {
@@ -26,8 +32,8 @@ describe("scoreHand", () => {
   });
 
   it("counts a two-letter choice tile once at its printed value, not as both letters", () => {
-    // The choice tile is worth the higher of A/E (1) and T/S (2); the unused alternative
-    // must not be added on top, and both letters must not be scored separately.
+    // The choice tile is worth the face printed first (A/E are 1, T/S are 2); the unused
+    // alternative must not be added on top, and both letters must not be scored separately.
     assert.equal(scoreHand([tile("A", 1, "E"), tile("T", 2, "S")], []), 3);
   });
 

@@ -49,10 +49,11 @@ export class NoPlayersError extends Error {
  * Totals the printed point value of every tile a player is showing.
  *
  * Private and community tiles both count, and each physical tile counts once — a
- * two-letter choice tile contributes its own `points` (the value of its higher letter,
- * per docs/FINAL_RULES.md), not the sum of the letters it can stand for. The
- * `alternativeLetter` is carried through for display and the future word check; it has
- * no effect on this placeholder arithmetic.
+ * two-letter choice tile contributes its own `points`, the value of the face printed
+ * first, not the sum of the letters it can stand for. Both choice pairs in the bag are
+ * equal-valued (A/E, T/S) so the face that would be chosen makes no difference yet; the
+ * per-face values and the face actually played arrive with real scoring
+ * (`alternativePoints`, STO-302).
  *
  * @param privateTiles The tiles dealt to this player.
  * @param community The shared tiles, the same for every player at the table.
