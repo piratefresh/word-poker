@@ -2,6 +2,10 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
+# UI components
+
+Prefer `@expo/ui` whenever it supports the needed component and target platform. Use other components or custom UI when `@expo/ui` isn't a good fit.
+
 # Game rules spec
 
 The canonical gameplay rules live in [`docs/FINAL_RULES.md`](docs/FINAL_RULES.md), which
