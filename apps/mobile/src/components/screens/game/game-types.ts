@@ -1,7 +1,8 @@
+import type { RoundPhase } from "@wordpoker/contracts";
+
 import type { TileData } from "@/components/game";
 import type { SeatCount } from "@/components/table";
 
-export type GamePhase = "preflop" | "flop" | "turn" | "river" | "payout";
 export type PlayerStatus =
   | "waiting"
   | "your-turn"
@@ -40,7 +41,7 @@ export interface BettingState {
 
 export interface GameScreenState {
   id: string;
-  phase: GamePhase;
+  phase: RoundPhase;
   phaseNumber: number;
   secondsRemaining: number;
   seatCount: SeatCount;
