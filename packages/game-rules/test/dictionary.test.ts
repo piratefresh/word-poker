@@ -60,13 +60,14 @@ describe("the shipped dictionary artifact", () => {
 });
 
 describe("loadDictionary", () => {
-  it("answers the pinned vocabulary, case-insensitively", async () => {
+  it("answers the pinned vocabulary, however the caller spells it", async () => {
     const dictionary = await loadDictionary();
 
     assert.equal(dictionary.size, ENTRY_COUNT);
     for (const word of PRESENT) {
-      assert.ok(dictionary.has(word), `expected "${word}" to be a word`);
-      assert.ok(dictionary.has(word.toLowerCase()), `expected "${word}" lowercase to match`);
+      assert.ok(dictionary.isWord(word), `expected "${word}" to be a word`);
+      assert.ok(dictionary.isWord(word.toLowerCase()), `expected "${word}" lowercase to match`);
+      assert.ok(dictionary.isWord(`  ${word.toLowerCase()} `), `expected " ${word} " to match`);
     }
   });
 
@@ -74,11 +75,11 @@ describe("loadDictionary", () => {
     const dictionary = await loadDictionary();
 
     for (const word of ABSENT) {
-      assert.ok(!dictionary.has(word), `expected "${word}" not to be a word`);
+      assert.ok(!dictionary.isWord(word), `expected "${word}" not to be a word`);
     }
     // Upper-casing would turn these into words the tiles could never spell.
-    assert.ok(!dictionary.has("ß"));
-    assert.ok(!dictionary.has("straße"));
+    assert.ok(!dictionary.isWord("ß"));
+    assert.ok(!dictionary.isWord("straße"));
   });
 });
 

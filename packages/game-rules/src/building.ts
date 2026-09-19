@@ -196,7 +196,7 @@ export function evaluateWord({ available, submission, dictionary }: EvaluateWord
     return { valid: false, reason: resolution.reason };
   }
 
-  if (!dictionary.has(resolution.word)) {
+  if (!dictionary.isWord(resolution.word)) {
     return { valid: false, reason: "not-in-dictionary" };
   }
 

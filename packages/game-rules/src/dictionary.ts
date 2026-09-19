@@ -69,8 +69,13 @@ export interface Dictionary extends DictionaryInfo {
   readonly source: DictionarySource;
   /** How many words the list holds — the artifact's pinned `count`, re-checked against it. */
   readonly size: number;
-  /** Whether `word` is in the list; case-insensitive, and `false` for anything not A–Z. */
-  has(word: string): boolean;
+  /**
+   * Whether `word` is in the list. The check normalises what it is handed — surrounding
+   * whitespace trimmed, letters upper-cased — so a draft, a typed guess, and a tile row
+   * all reach the list as the same word, and anything that is not an A–Z run of at least
+   * two letters is `false` rather than normalised into a word it never was.
+   */
+  isWord(word: string): boolean;
 }
 
 /**
@@ -98,20 +103,23 @@ const WORD_INPUT = /^[A-Za-z]{2,}$/;
 /**
  * Whether `word` is in a sorted word list, by binary search.
  *
- * The input is checked against what the artifact can hold before it is searched: anything
- * shorter than two letters, or carrying a character outside A–Z, is refused outright rather
- * than normalised into a match it never was — `toUpperCase` alone would turn `ß` into `SS`.
+ * The shape test runs on the *trimmed* input, before any upper-casing, so nothing outside
+ * the words the artifact can hold is searched for: `toUpperCase` alone would turn `ß` into
+ * `SS`, inventing a two-letter match the caller never wrote. Trimming first is what lets a
+ * caller hand over whatever it has — a draft with stray spaces, a lowercase guess — and get
+ * the same answer the list would give the bare word.
  *
  * @param words The artifact's words, strictly ascending.
- * @param word The candidate, whatever its case.
+ * @param word The candidate, whatever its case and surrounding whitespace.
  */
-function hasWord(words: readonly string[], word: string): boolean {
-  if (!WORD_INPUT.test(word)) {
+function isWord(words: readonly string[], word: string): boolean {
+  const trimmed = word.trim();
+  if (!WORD_INPUT.test(trimmed)) {
     return false;
   }
 
   // ASCII-only input, so upper-casing is a per-character map: no length surprises.
-  const wanted = word.toUpperCase();
+  const wanted = trimmed.toUpperCase();
   let low = 0;
   let high = words.length - 1;
 
@@ -184,7 +192,7 @@ export function createDictionary(artifact: DictionaryArtifact): Dictionary {
     label: info.label,
     source: artifact.source,
     size: words.length,
-    has: (word: string) => hasWord(words, word),
+    isWord: (word: string) => isWord(words, word),
   };
 }
 
