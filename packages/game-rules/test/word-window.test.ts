@@ -12,6 +12,7 @@ import {
   type OfflineState,
   type WordSlot,
 } from "../src/offline";
+import { TEST_DICTIONARY, cloneState } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
@@ -25,7 +26,7 @@ const TURNS_TO_RIVER_END = SEATS.length * 4;
  * window opens. `wordBuilding` is the table's §19 configuration.
  */
 function atWindow(nowMs = NOW, wordBuilding: { autoSubmitDrafts?: boolean } = {}): OfflineState {
-  let state = startHand({ seed: SEED, players: SEATS, nowMs, wordBuilding });
+  let state = startHand({ seed: SEED, players: SEATS, nowMs, wordBuilding, dictionary: TEST_DICTIONARY });
 
   for (let turn = 0; turn < TURNS_TO_RIVER_END; turn += 1) {
     state = reduce(state, { type: "advance" }, nowMs + turn);
@@ -50,6 +51,15 @@ function firstTile(state: OfflineState, seatIndex: number): Tile {
   const tile = state.seats[seatIndex]?.privateTiles[0];
   assert.ok(tile, `seat ${seatIndex} holds a private tile`);
   return tile;
+}
+
+/** A tile of the hand that plays one letter — what a one-letter draft is made of (§10). */
+function singleLetterTile(state: OfflineState, seatIndex: number): Tile {
+  const found = (state.seats[seatIndex]?.privateTiles ?? []).find(
+    (tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile),
+  );
+  assert.ok(found, `seat ${seatIndex} holds a single-letter tile`);
+  return found;
 }
 
 /** The slot a seat holds in the window. */
@@ -259,9 +269,32 @@ describe("the word window — §19, between the river and the payout", () => {
     assert.equal(next.autoSubmitDrafts, true);
   });
 
+  it("takes a one-letter draft, because §12's floor is about the word a seat stands behind", () => {
+    const state = atWindow();
+    const one: WordSubmission = { plays: [play(singleLetterTile(state, 0))] };
+
+    const drafted = reduce(state, { type: "draftWord", playerId: "hero", submission: one }, NOW);
+    assert.deepEqual(slotOf(drafted, 0), { playerId: "hero", status: "drafting", draft: one });
+
+    // The floor waits for the confirm, which is the moment the draft becomes the seat's word.
+    assert.throws(
+      () => reduce(drafted, { type: "confirmWord", playerId: "hero", submission: one }, NOW),
+      (error: unknown) => error instanceof WordRejectionError && error.reason === "too-short",
+    );
+  });
+
+  it("clears the draft when a seat asks for an empty one", () => {
+    const state = atWindow();
+    const drafted = reduce(state, { type: "draftWord", playerId: "hero", submission: twoTiles(state, 0) }, NOW);
+
+    const cleared = reduce(drafted, { type: "draftWord", playerId: "hero", submission: { plays: [] } }, NOW);
+
+    assert.deepEqual(slotOf(cleared, 0), { playerId: "hero", status: "drafting", draft: null });
+  });
+
   it("never mutates the state it was handed", () => {
     const opened = atWindow();
-    const before = structuredClone(opened);
+    const before = cloneState(opened);
 
     reduce(opened, { type: "confirmWord", playerId: "hero", submission: twoTiles(opened, 0) }, opened.endsAtMs - 1);
     reduce(opened, { type: "timeoutWords" }, opened.endsAtMs);

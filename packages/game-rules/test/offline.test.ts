@@ -12,13 +12,14 @@ import {
   startHand,
   type OfflineState,
 } from "../src/offline";
+import { TEST_DICTIONARY, cloneState } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
 const NOW = 1_000_000;
 
 function dealHand(nowMs = NOW): OfflineState {
-  return startHand({ seed: SEED, players: SEATS, nowMs });
+  return startHand({ seed: SEED, players: SEATS, nowMs, dictionary: TEST_DICTIONARY });
 }
 
 /** Passes `turns` turns, one seat at a time, each a millisecond after the last. */
@@ -88,7 +89,10 @@ describe("startHand", () => {
 
   it("replays the same hand for the same seed", () => {
     assert.deepEqual(dealHand(), dealHand());
-    assert.notDeepEqual(dealHand(), startHand({ seed: SEED + 1, players: SEATS, nowMs: NOW }));
+    assert.notDeepEqual(
+      dealHand(),
+      startHand({ seed: SEED + 1, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY }),
+    );
   });
 
   it("seats the players in the order it was given", () => {
@@ -216,7 +220,7 @@ describe("reduce — illegal actions", () => {
 
   it("never mutates the state it was handed", () => {
     const state = dealHand();
-    const before = structuredClone(state);
+    const before = cloneState(state);
 
     reduce(state, { type: "advance" }, NOW + 1);
 

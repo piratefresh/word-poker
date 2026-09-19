@@ -6,6 +6,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 Prefer `@expo/ui` whenever it supports the needed component and target platform. Use other components or custom UI when `@expo/ui` isn't a good fit.
 
+# Drag and drop
+
+Use **`react-native-reanimated-dnd`** (https://github.com/entropyconquers/react-native-reanimated-dnd) for
+any drag-and-drop interaction — tiles into a word, chips into a pot, reorderable lists. Do not hand-roll pan
+gestures or a custom DnD layer on top of Reanimated. The app mounts `GestureHandlerRootView` once at the root
+(`apps/mobile/src/app/_layout.tsx`); wrap the surface that drags in the library's `DropProvider`, make the
+sources `Draggable` and the targets `Droppable`, and keep a tap path for accessibility and tests.
+
 # Game rules spec
 
 The canonical gameplay rules live in [`docs/FINAL_RULES.md`](docs/FINAL_RULES.md), which
