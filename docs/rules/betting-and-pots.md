@@ -39,6 +39,40 @@ Drawn tiles are discarded after the tie-breaker.
 
 If the draw is still tied, repeat until there is a winner.
 
+## When No Word Is Valid
+
+A seat whose submission is invalid or missing has no word, and §11 scores it 0. Such seats
+stay in the showdown, so several of them can tie on 0:
+
+- Tie-breakers 1 and 2 both read a word — its length, then its highest printed letter — and a
+  seat with no word has neither, so both steps pass over a group of them.
+- The high-value tile draw (3) separates them, exactly as it separates any other tie.
+
+Nothing is carried or refunded: the pot goes to the seat the draw picks, and every pot is
+settled by the same ladder (§25).
+
+If only one seat remains because the others folded, §26 awards that seat the pot without a
+showdown — there is no tie to break, and no tile is drawn.
+
+## The Draw's Pool
+
+Tie-breaker 3 draws from a freshly shuffled tile bag:
+
+- One tile per still-tied seat each round. The highest printed value wins the round, and the
+  seats that shared it draw again — until one seat is left.
+- A two-letter tile is worth both of its printed faces together (A/E is 2, T/S is 4, TH would
+  be 7). A choice tile has no chosen face in a draw — nothing is played — so both faces count.
+- Drawn tiles are discarded and never return to the pool, so the only way to run out of tiles
+  is to draw the whole bag, which is refused rather than reusing one.
+- A table configuration may disable two-letter tiles in tie-break draws, leaving the
+  single-letter bag as the pool.
+
+<!-- Contract status: the ladder is implemented in `packages/game-rules/src/showdown.ts`
+     (`rankShowdown`, STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values
+     behind `showdownDrawPool` / `showdownDrawValue`; the ranking's wire shape is
+     `packages/contracts/src/showdown.ts`. The no-valid-word case above was resolved by
+     STO-326 before the ranking was written. -->
+
 ---
 
 # 22. Betting and Table Stack Rules
