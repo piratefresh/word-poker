@@ -1,0 +1,178 @@
+/**
+ * The tile bag: what a Word Poker set contains, and how tiles come out of it.
+ *
+ * Every number here is transcribed from docs/FINAL_RULES.md — counts from §"Tile Bag
+ * Distribution", values from §"Letter Point Values" — because the bag is the one piece of
+ * shared state both sides must agree on down to the last tile: the server deals from it,
+ * the client replays the same seed, and an extra `A` on one side is a hand that
+ * reconciles to nothing. The module is pure: the bag comes from a constant table, and the
+ * only randomness in a draw is the caller's injected `rng` (AGENTS.md) — never
+ * `Math.random`, never a clock.
+ */
+
+import type { Tile } from "@wordpoker/contracts";
+
+/** How many tiles a fresh bag holds: 98 single letters plus the two two-letter tiles. */
+export const TILE_BAG_SIZE = 100;
+
+/**
+ * Raised when a draw asks for more tiles than the bag still holds.
+ *
+ * A named class rather than a bare `Error` so a caller can catch exactly this and let
+ * everything else keep propagating: running out mid-deal is a table-level condition
+ * (there is no such thing as a partial hand), while a `TypeError` from the same call is a
+ * bug. Both numbers ride along in the message because by the time the error surfaces, the
+ * bag it was thrown from is usually out of scope.
+ */
+export class NotEnoughTilesError extends Error {
+  constructor(requested: number, available: number) {
+    super(`cannot draw ${requested} tiles: the bag holds ${available}`);
+    this.name = "NotEnoughTilesError";
+  }
+}
+
+/**
+ * The single-letter half of the bag, one entry per letter, in alphabetical order.
+ *
+ * Each entry is `[letter, copies, points]`. Both columns come from the rules doc, and
+ * they are transcribed into one table on purpose: a tile needs its count and its value
+ * together, and two parallel lists are exactly how a bag ends up summing to 101, or
+ * valuing `Z` at the wrong tier.
+ */
+const SINGLE_LETTER_TILES: readonly (readonly [letter: string, copies: number, points: number])[] = [
+  ["A", 9, 1],
+  ["B", 2, 4],
+  ["C", 2, 4],
+  ["D", 4, 3],
+  ["E", 12, 1],
+  ["F", 2, 5],
+  ["G", 3, 3],
+  ["H", 2, 5],
+  ["I", 9, 1],
+  ["J", 1, 8],
+  ["K", 1, 5],
+  ["L", 4, 2],
+  ["M", 2, 4],
+  ["N", 6, 2],
+  ["O", 8, 1],
+  ["P", 2, 4],
+  ["Q", 1, 10],
+  ["R", 6, 2],
+  ["S", 4, 2],
+  ["T", 6, 2],
+  ["U", 4, 1],
+  ["V", 2, 5],
+  ["W", 2, 5],
+  ["X", 1, 8],
+  ["Y", 2, 5],
+  ["Z", 1, 10],
+];
+
+/**
+ * The two two-letter choice tiles, as `[letter, alternativeLetter, points]`.
+ *
+ * A choice tile plays as either of its letters, so it is worth the higher of the two —
+ * `A`/`E` are both 1, `T`/`S` are both 2 — and it carries the second letter in
+ * `alternativeLetter` for the word check (`@wordpoker/contracts`'s `Tile`). They are bag
+ * members like any other, which is what caps a hand at two of them.
+ */
+const TWO_LETTER_TILES: readonly (readonly [letter: string, alternativeLetter: string, points: number])[] = [
+  ["A", "E", 1],
+  ["T", "S", 2],
+];
+
+/**
+ * Builds a fresh, unshuffled bag of {@link TILE_BAG_SIZE} tiles.
+ *
+ * Single letters come out A–Z, each letter's copies numbered from 1 (`A-1` … `A-9`), then
+ * the two two-letter tiles (`AE-1`, `TS-1`). The bag's order is therefore a property of
+ * the table, not of when tiles were built, and the ids are built from the letter rather
+ * than a running counter so a tile stays identifiable in a log, a test failure, or a
+ * serialize-and-inspect: `#37` would say nothing about what it is.
+ *
+ * @returns A new array of new tile objects every call — two tables must never share tile
+ *   objects, because a bag is mutable state in the hands of whoever receives it.
+ */
+export function createTileBag(): Tile[] {
+  const bag: Tile[] = [];
+
+  for (const [letter, copies, points] of SINGLE_LETTER_TILES) {
+    for (let copy = 1; copy <= copies; copy += 1) {
+      bag.push({ id: `${letter}-${copy}`, letter, points });
+    }
+  }
+
+  for (const [letter, alternativeLetter, points] of TWO_LETTER_TILES) {
+    bag.push({ id: `${letter}${alternativeLetter}-1`, letter, alternativeLetter, points });
+  }
+
+  return bag;
+}
+
+/**
+ * Exchanges two slots of an array in place and returns whatever landed in the first slot.
+ *
+ * The bounds check is not decoration and it is not a guess: `noUncheckedIndexedAccess`
+ * widens every index read to `T | undefined`, so a swap cannot be written without
+ * narrowing the two reads first. Both callers — `draw` here and `shuffle` in `./deal` —
+ * derive their indices from the array's own length, so no index is ever out of range.
+ * Shared from this module rather than duplicated, so the two shuffles cannot drift.
+ */
+export function swapAt<T>(items: T[], first: number, second: number): T {
+  const atFirst = items[first];
+  const atSecond = items[second];
+  if (atFirst === undefined || atSecond === undefined) {
+    throw new RangeError(`cannot swap slots ${first} and ${second} of a ${items.length}-element array`);
+  }
+
+  items[first] = atSecond;
+  items[second] = atFirst;
+  return atSecond;
+}
+
+/**
+ * Takes `count` tiles out of a bag at random, leaving the bag itself untouched.
+ *
+ * The pick is a partial Fisher–Yates over a private copy: at step `i` one tile is chosen
+ * uniformly from the tiles not yet taken and swapped into slot `i`, so every subset of
+ * `count` tiles is equally likely and the order within `drawn` is random too — a partial
+ * pass, not a full shuffle, because drawing 2 of 100 has no reason to pay for 100 swaps.
+ * Exactly one `rng` call per tile drawn, which is what makes the draw reproducible from a
+ * seed, and which callers rely on when they draw twice in a row from one generator.
+ *
+ * The bag is copied, never reordered: the caller keeps it as the record of what the table
+ * still holds. `rest` is returned in the *bag's* order rather than the order the swaps
+ * happen to leave behind, so the remainder of a draw depends only on which tiles left,
+ * not on how the sampler is implemented.
+ *
+ * @param bag The tiles to draw from; not modified.
+ * @param count How many tiles to take, an integer in `[0, bag.length]`.
+ * @param rng The seeded generator to draw with, as built by `createRng`.
+ * @throws {RangeError} When `count` is negative or not an integer.
+ * @throws {NotEnoughTilesError} When `count` is more tiles than `bag` holds.
+ */
+export function draw(bag: readonly Tile[], count: number, rng: () => number): { drawn: Tile[]; rest: Tile[] } {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new RangeError(`draw count must be a non-negative integer, received ${count}`);
+  }
+  if (count > bag.length) {
+    throw new NotEnoughTilesError(count, bag.length);
+  }
+
+  // `pool` holds the tiles and `positions` holds where each one sat in `bag`; the two are
+  // swapped in lockstep, so after `count` passes the taken input positions are known and
+  // `rest` can be picked straight out of the untouched input.
+  const pool = bag.slice();
+  const positions = bag.map((_, index) => index);
+  const drawn: Tile[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const j = i + Math.floor(rng() * (pool.length - i));
+    drawn.push(swapAt(pool, i, j));
+    swapAt(positions, i, j);
+  }
+
+  const taken = new Set(positions.slice(0, count));
+
+  return { drawn, rest: bag.filter((_, index) => !taken.has(index)) };
+}
