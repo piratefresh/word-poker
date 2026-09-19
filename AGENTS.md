@@ -14,6 +14,20 @@ gestures or a custom DnD layer on top of Reanimated. The app mounts `GestureHand
 (`apps/mobile/src/app/_layout.tsx`); wrap the surface that drags in the library's `DropProvider`, make the
 sources `Draggable` and the targets `Droppable`, and keep a tap path for accessibility and tests.
 
+# End-to-end (web)
+
+UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
+
+```bash
+pnpm --filter @wordpoker/mobile web                 # in one terminal
+maestro test --platform web .maestro/offline-hand.yaml
+```
+
+Headed is the default (`--headless` hides the browser; headless also takes `--screen-size`). Keep a Chrome
+whose version matches the `chromedriver` on `PATH`. Routes behind the auth guard need a signed-in session or
+`guard={true}` on the `(tabs)` group in `apps/mobile/src/app/_layout.tsx` for the run. Each flow's header
+documents its own selectors and what it needs.
+
 # Game rules spec
 
 The canonical gameplay rules live in [`docs/FINAL_RULES.md`](docs/FINAL_RULES.md), which
