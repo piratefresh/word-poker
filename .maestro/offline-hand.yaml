@@ -1,0 +1,94 @@
+# The offline hand, played end to end against the web build:
+# deal → four taps to the river → §19's window opens → build a word from the rack →
+# confirm → §11 judges it against the real dictionary → §21 names a winner → next hand.
+#
+# Run it with the CLI (headed by default; add `--headless` to hide the browser):
+#   maestro test --platform web .maestro/offline-hand.yaml
+#
+# `url:` (not `appId:`) because this is a web flow: Maestro drives Chrome through the
+# chromedriver it finds on PATH, so that driver has to match the installed Chrome.
+#
+# Two things this CLI is picky about, both learned the hard way:
+#   - Selector commands take the mapping form (`- tapOn:\n    text: …`); the bare scalar
+#     form (`- tapOn: "…"`) is a parse error, whatever the cheat sheet's examples show.
+#   - Match elements with `id:` — the values the hierarchy exposes (a view's test id, or
+#     an element's accessibility label). A `css:` selector never settles on this page and
+#     the step hangs without failing.
+#
+# The route sits behind the app's auth guard, so the run needs one of:
+#   - a signed-in session in Maestro's Chrome profile (sign in once, then rerun), or
+#   - `guard={true}` for the (tabs) group in apps/mobile/src/app/_layout.tsx, which is
+#     the dev-only way to reach the table with no account.
+# Without either, the first assertion fails on the sign-in screen rather than silently.
+url: http://localhost:8081/offline
+name: Offline hand — build a word and pay out
+tags:
+  - web
+  - offline
+---
+- openLink: http://localhost:8081/offline
+
+# The table holds until the dictionary has loaded (§11 wants it named before play).
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 90000
+- assertVisible:
+    text: "COMMUNITY · 0/5"
+
+# Tap the table forward until §19's window opens. The number of taps depends on the deal and
+# on how the bots take their turns, and a tap can be swallowed mid-re-render, so the flow waits
+# for the builder instead of counting: the dictionary label is the first thing it renders.
+- repeat:
+    while:
+      notVisible:
+        text: "Words must be in this list to count"
+    commands:
+      - tapOn:
+          text: "Advance"
+      - waitForAnimationToEnd
+
+# The river's close opens §19's window, and the band becomes the word builder.
+- assertVisible:
+    text: "PHASE 5 · THE RIVER"
+- assertVisible:
+    text: "en_US-large \\(broad English\\)"
+- assertVisible:
+    text: "Words must be in this list to count"
+- assertVisible:
+    text: "Drag a tile into this band, or tap it to play it"
+
+# Build the word out of the hero's two private tiles, in rack order, then confirm.
+#
+# The tiles carry their accessibility label rather than their test id in the hierarchy
+# ("N, 2 points"), and the felt draws the same two tiles above the builder, so the tap is
+# anchored on the tray's own heading. Those two tiles are the deal's first two for
+# OFFLINE_SEED — the seed the app deals with — so a changed seed or table configuration
+# fails here, loudly, instead of silently playing some other word.
+- tapOn:
+    id: "N, 2 points"
+    below:
+      text: "Your tiles"
+- tapOn:
+    id: "R, 2 points"
+    below:
+      text: "Your tiles"
+- assertVisible:
+    text: "NR"
+- tapOn:
+    id: "word-builder-confirm"
+- waitForAnimationToEnd
+
+# Every seat has answered, so the window closes and the hand pays out on the real judging.
+- extendedWaitUntil:
+    visible: "PHASE 6 · PAYOUT"
+    timeout: 70000
+- assertVisible:
+    text: "WINNER"
+
+# And the table deals again.
+- tapOn:
+    text: "Deal"
+- assertVisible:
+    text: "PHASE 2 · PRE-FLOP"
+- assertVisible:
+    text: "COMMUNITY · 0/5"
