@@ -1,8 +1,8 @@
 import type { GameScreenState } from "./game-types";
 
 /**
- * Deterministic STO-282 reference state. Shared by the table demo and the
- * tutorial so both render the same hand instead of drifting apart.
+ * The tutorial's reference hand: one deterministic state, so the lesson's felt, seats,
+ * and tiles all render the same board instead of drifting apart.
  */
 export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
   id: "demo-hand-flop",
