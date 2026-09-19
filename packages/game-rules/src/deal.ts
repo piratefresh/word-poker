@@ -4,15 +4,16 @@
  * A hand is a fixed deal order — every seat's private tiles in seat order, then the
  * community — and that order is what makes a seed mean anything. The server and every
  * client run this same function with the same seed, so the contract is "shuffle the bag,
- * cut it in one documented place", and nothing else: the first seat's first private tile
- * is the first tile of the shuffle, the community is the next five, and the remainder
- * stays in the bag. Pure like the rest of the engine — the seed is the only randomness,
- * and it arrives as an argument (`AGENTS.md`).
+ * cut it in one documented place, then apply the table's special tiles", and nothing else:
+ * the first seat's first private tile is the first tile of the shuffle, the community is
+ * the next five, and the remainder stays in the bag. Pure like the rest of the engine — the
+ * seed is the only randomness, and it arrives as an argument (`AGENTS.md`).
  */
 
 import type { Tile } from "@wordpoker/contracts";
 
 import { createRng } from "./rng";
+import { applySpecialTiles, DEFAULT_SPECIAL_TILES, type SpecialTilesConfig } from "./special-tiles";
 import { createTileBag, NotEnoughTilesError, swapAt, TILE_BAG_SIZE } from "./tiles";
 
 /**
@@ -59,10 +60,25 @@ export function shuffle(bag: readonly Tile[], rng: () => number): Tile[] {
  * rather than keyed by player id on purpose: the caller knows the seating, and the same
  * seed must reproduce the same table no matter who ends up sitting in which seat.
  *
- * @param options The `seed` every participant replays, and the number of seated players.
+ * The cut is then handed to the table's special tiles: §10's fixed-sequence tiles are
+ * placed into it and §9's multipliers rolled onto it, from the same seeded generator
+ * (`./special-tiles`). A table that plays none passes {@link NO_SPECIAL_TILES} and gets
+ * the bare cut back. `rest` is the shuffle's remainder followed by the tiles the
+ * placements replaced, in the order they were replaced — the deck a hand did not show.
+ *
+ * @param options The `seed` every participant replays, the number of seated players, and
+ *   the table's special-tile configuration.
  * @throws {RangeError} When `playerCount` is not a positive integer.
  */
-export function dealHand({ seed, playerCount }: { seed: number; playerCount: number }): {
+export function dealHand({
+  seed,
+  playerCount,
+  specialTiles = DEFAULT_SPECIAL_TILES,
+}: {
+  seed: number;
+  playerCount: number;
+  specialTiles?: SpecialTilesConfig;
+}): {
   privateTiles: Tile[][];
   community: Tile[];
   rest: Tile[];
@@ -78,7 +94,8 @@ export function dealHand({ seed, playerCount }: { seed: number; playerCount: num
     throw new NotEnoughTilesError(required, TILE_BAG_SIZE);
   }
 
-  const bag = shuffle(createTileBag(), createRng(seed));
+  const rng = createRng(seed);
+  const bag = shuffle(createTileBag(), rng);
   const privateTileCount = playerCount * PRIVATE_TILES_PER_PLAYER;
 
   // One contiguous run of the shuffled bag, cut three ways: hands, community, remainder.
@@ -87,10 +104,13 @@ export function dealHand({ seed, playerCount }: { seed: number; playerCount: num
     const from = seat * PRIVATE_TILES_PER_PLAYER;
     privateTiles.push(bag.slice(from, from + PRIVATE_TILES_PER_PLAYER));
   }
+  const community = bag.slice(privateTileCount, privateTileCount + COMMUNITY_TILE_COUNT);
+
+  const special = applySpecialTiles({ privateTiles, community, rng, config: specialTiles });
 
   return {
-    privateTiles,
-    community: bag.slice(privateTileCount, privateTileCount + COMMUNITY_TILE_COUNT),
-    rest: bag.slice(privateTileCount + COMMUNITY_TILE_COUNT),
+    privateTiles: special.privateTiles,
+    community: special.community,
+    rest: [...bag.slice(privateTileCount + COMMUNITY_TILE_COUNT), ...special.displaced],
   };
 }

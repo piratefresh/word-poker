@@ -5,6 +5,7 @@ import type { Tile } from "@wordpoker/contracts";
 
 import {
   COMMUNITY_TILE_COUNT,
+  NO_SPECIAL_TILES,
   NotEnoughTilesError,
   PRIVATE_TILES_PER_PLAYER,
   TILE_BAG_SIZE,
@@ -80,7 +81,11 @@ describe("shuffle", () => {
 describe("dealHand", () => {
   it("deals the private tiles per seat and the community tiles after them", () => {
     for (const playerCount of [1, 2, 4, 6]) {
-      const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount });
+      const { privateTiles, community, rest } = dealHand({
+        seed: SEED,
+        playerCount,
+        specialTiles: NO_SPECIAL_TILES,
+      });
       const dealt = playerCount * PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;
 
       assert.equal(privateTiles.length, playerCount);
@@ -93,7 +98,7 @@ describe("dealHand", () => {
   });
 
   it("deals every tile of the bag exactly once and never twice", () => {
-    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount: 6 });
+    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount: 6, specialTiles: NO_SPECIAL_TILES });
     const shown = [...privateTiles.flat(), ...community];
     const all = [...shown, ...rest];
 
@@ -113,7 +118,7 @@ describe("dealHand", () => {
   it("cuts the shuffled bag at one fixed point, so a seed alone redraws the table", () => {
     const playerCount = 4;
     const shuffled = shuffle(createTileBag(), createRng(SEED));
-    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount });
+    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount, specialTiles: NO_SPECIAL_TILES });
     const privateTileCount = playerCount * PRIVATE_TILES_PER_PLAYER;
 
     assert.deepEqual(privateTiles, [
@@ -127,7 +132,7 @@ describe("dealHand", () => {
   });
 
   it("hands back independent collections, so mutating one leaves the others alone", () => {
-    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount: 3 });
+    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount: 3, specialTiles: NO_SPECIAL_TILES });
     const restBefore = ids(rest);
 
     privateTiles[0]?.splice(0, PRIVATE_TILES_PER_PLAYER);
@@ -157,7 +162,7 @@ describe("dealHand", () => {
   it("refuses a table the bag cannot serve rather than dealing a short hand", () => {
     // 100 tiles = 2 per seat + 5 community, so 47 seats fits exactly and 48 does not.
     const seated = 47;
-    const dealt = dealHand({ seed: SEED, playerCount: seated });
+    const dealt = dealHand({ seed: SEED, playerCount: seated, specialTiles: NO_SPECIAL_TILES });
 
     assert.equal(dealt.privateTiles.length, seated);
     assert.ok(dealt.privateTiles.every((hand) => hand.length === PRIVATE_TILES_PER_PLAYER));

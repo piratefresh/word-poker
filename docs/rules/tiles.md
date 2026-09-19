@@ -62,6 +62,26 @@ Recommended distribution:
 
 The exact placement is controlled by the game system and may vary each hand.
 
+### Where the two-letter tiles come from
+
+The 100-tile bag ([Letter Values, Scoring & Multipliers](scoring.md) §6) holds the two
+two-letter **choice** tiles (A/E, T/S) as ordinary members, so a shuffle can show either,
+both, or neither of them. Fixed-sequence tiles are **not** bag members: the deal places
+them, which is what "controlled by the game system" means here.
+
+The placement is the deal-time pass in `packages/game-rules/src/special-tiles.ts`:
+
+- The deal draws a hand-level target for two-letter tiles and places sequence tiles until
+  the hand reaches it, counting the choice tiles the shuffle already dealt. The default
+  target is two — usually one private and one community — with a third occasionally.
+- §10's cap of three is never crossed, counted across every seat and the board together.
+- A placement replaces the tile in the slot it lands on and the replaced tile returns to
+  the deck, so a seat still holds exactly two private tiles and the board still five.
+- The pair pool is a table setting — the default is TH, ER, IN, ED, one copy each — as are
+  the target weights, so a table can change its two-letter tiles without touching the bag.
+- Placement runs on the deal's seeded generator, so the same seed and configuration deal
+  the same tiles, server and client alike.
+
 ## Example Choice Tiles
 
 ### Vowel Choices
