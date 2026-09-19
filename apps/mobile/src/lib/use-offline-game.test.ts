@@ -20,8 +20,13 @@ async function advanceStreet(result: Table) {
   });
 }
 
+/**
+ * Taps through the four streets and then through §19's word window: the river's last tap
+ * opens the window and the tap after it closes the window with the clock run out, which is
+ * where the hand pays out.
+ */
 async function advanceToPayout(result: Table) {
-  for (let street = 0; street < ROUNDS; street += 1) await advanceStreet(result);
+  for (let tap = 0; tap < ROUNDS + 1; tap += 1) await advanceStreet(result);
 }
 
 describe("useOfflineGame", () => {
@@ -76,6 +81,21 @@ describe("useOfflineGame", () => {
     await advanceStreet(result);
 
     expect(result.current.game.id).not.toBe(first);
+  });
+
+  test("opens §19's word window after the river, and pays out when the next tap closes it", async () => {
+    const result = await table();
+
+    for (let street = 0; street < ROUNDS; street += 1) await advanceStreet(result);
+
+    // The window is the table's, not a seat's: nobody is to act, and the HUD counts its
+    // sixty seconds rather than a turn's thirty.
+    expect(result.current.game.phase).toBe("river");
+    expect(result.current.game.secondsRemaining).toBe(60);
+
+    await advanceStreet(result);
+
+    expect(result.current.game.phase).toBe("payout");
   });
 
   test("pays out with a winner and the winning score", async () => {

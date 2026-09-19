@@ -27,14 +27,7 @@ import type {
 import type { Dictionary } from "./dictionary";
 
 /** What a submission is checked against: the tiles in play, and the words that count. */
-export interface EvaluateWordOptions {
-  /**
-   * Every physical tile the seat may play — its private tiles plus the community board.
-   * Tiles outside this list are not merely unknown, they are unplayable.
-   */
-  readonly available: readonly Tile[];
-  /** The seat's word, as submitted. */
-  readonly submission: WordSubmission;
+export interface EvaluateWordOptions extends ResolveSubmissionOptions {
   /** The configured word list (§11); its id is reported back in the result. */
   readonly dictionary: Dictionary;
 }
@@ -110,21 +103,48 @@ function resolvePlay(tile: Tile, play: TilePlay): Resolution {
   };
 }
 
+/** What a submission resolves to, before any word list is consulted. */
+export type SubmissionResolution =
+  | {
+      readonly ok: true;
+      /** The word the played tiles spell, in submission order. */
+      readonly word: string;
+      /** The played tiles in word order, each with the letter(s) it contributed. */
+      readonly tiles: readonly TilePlayResolution[];
+    }
+  | { readonly ok: false; readonly reason: WordRejectionReason };
+
+/** What a submission is resolved against when there is no word list to consult. */
+export interface ResolveSubmissionOptions {
+  /**
+   * Every physical tile the seat may play — its private tiles plus the community board.
+   * Tiles outside this list are not merely unknown, they are unplayable.
+   */
+  readonly available: readonly Tile[];
+  /** The seat's word, as submitted. */
+  readonly submission: WordSubmission;
+}
+
 /**
- * Evaluates one submission: the word it spells, the tile behind every letter, or the §11
- * reason it was refused.
+ * Resolves a submission against the tiles in play: the word the plays spell, the tile behind
+ * every letter, or the §10–§12 reason it cannot be built at all.
  *
- * The plays are resolved in submission order, which is the word's order, and a sequence
- * tile puts both of its letters where it sits. A play naming a tile that is not in
- * `available`, or the same tile twice, is refused before anything is spelled — a word built
- * on a tile the seat does not hold is not a word, whatever the dictionary says about the
- * letters.
+ * This is the half of evaluation that needs no word list, and it is where the whole of §10's
+ * face and order rules live. The word window (offline.ts) refuses an unbuildable submission
+ * with these reasons while the seat still has time to fix it; `evaluateWord` adds §11's list
+ * check on top for the showdown, so the two can never disagree about what is buildable.
  *
- * @param options The seat's tiles, the submission, and the configured dictionary.
+ * The plays are resolved in submission order, which is the word's order, and a sequence tile
+ * puts both of its letters where it sits. A play naming a tile that is not in `available`, or
+ * the same tile twice, is refused before anything is spelled — a word built on a tile the
+ * seat does not hold is not a word, whatever the dictionary says about the letters.
  */
-export function evaluateWord({ available, submission, dictionary }: EvaluateWordOptions): WordEvaluation {
+export function resolveSubmission({
+  available,
+  submission,
+}: ResolveSubmissionOptions): SubmissionResolution {
   if (submission.plays.length === 0) {
-    return { valid: false, reason: "empty-submission" };
+    return { ok: false, reason: "empty-submission" };
   }
 
   const tiles: TilePlayResolution[] = [];
@@ -133,18 +153,18 @@ export function evaluateWord({ available, submission, dictionary }: EvaluateWord
 
   for (const play of submission.plays) {
     if (played.has(play.tileId)) {
-      return { valid: false, reason: "tile-reused" };
+      return { ok: false, reason: "tile-reused" };
     }
     // Seven tiles at most in a hand, so the lookup is a scan rather than a Map that would
     // be rebuilt on every submission.
     const tile = available.find((candidate) => candidate.id === play.tileId);
     if (tile === undefined) {
-      return { valid: false, reason: "uses-unavailable-letters" };
+      return { ok: false, reason: "uses-unavailable-letters" };
     }
 
     const resolution = resolvePlay(tile, play);
     if (!resolution.ok) {
-      return { valid: false, reason: resolution.reason };
+      return { ok: false, reason: resolution.reason };
     }
 
     played.add(play.tileId);
@@ -155,11 +175,30 @@ export function evaluateWord({ available, submission, dictionary }: EvaluateWord
   }
 
   if (word.length < MIN_WORD_LETTERS) {
-    return { valid: false, reason: "too-short" };
+    return { ok: false, reason: "too-short" };
   }
-  if (!dictionary.has(word)) {
+
+  return { ok: true, word, tiles };
+}
+
+/**
+ * Evaluates one submission: the word it spells, the tile behind every letter, or the §11
+ * reason it was refused.
+ *
+ * §10–§12 are {@link resolveSubmission}'s; what is left here is §11's list check, so a
+ * submission cannot be buildable in one place and not in the other.
+ *
+ * @param options The seat's tiles, the submission, and the configured dictionary.
+ */
+export function evaluateWord({ available, submission, dictionary }: EvaluateWordOptions): WordEvaluation {
+  const resolution = resolveSubmission({ available, submission });
+  if (!resolution.ok) {
+    return { valid: false, reason: resolution.reason };
+  }
+
+  if (!dictionary.has(resolution.word)) {
     return { valid: false, reason: "not-in-dictionary" };
   }
 
-  return { valid: true, word, dictionary: dictionary.id, tiles };
+  return { valid: true, word: resolution.word, dictionary: dictionary.id, tiles: resolution.tiles };
 }

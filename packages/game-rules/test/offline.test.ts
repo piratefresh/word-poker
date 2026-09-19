@@ -39,8 +39,21 @@ const REVEALS = [
   { phase: "payout", revealed: 5 },
 ] as const;
 
-/** Every seat acts once on each street before it rolls, so a hand is `seats × streets` passes. */
-const TURNS_TO_PAYOUT = SEATS.length * (REVEALS.length - 1);
+/**
+ * Every seat acts once on each street before it rolls, so the river closes — and §19's word
+ * window opens — after `seats × streets` passes.
+ */
+const TURNS_TO_RIVER_END = SEATS.length * (REVEALS.length - 1);
+
+/** A hand walked to the river's close, where §19's word window opens. */
+function atWordWindow(nowMs = NOW): OfflineState {
+  return passTurns(dealHand(nowMs), TURNS_TO_RIVER_END, nowMs);
+}
+
+/** §19's window closed with the clock run out, which is how a hand reaches its payout. */
+function payOut(state: OfflineState): OfflineState {
+  return reduce(state, { type: "timeoutWords" }, state.endsAtMs);
+}
 
 describe("startHand", () => {
   it("deals two private tiles per seat and the whole five-tile board", () => {
@@ -115,6 +128,12 @@ describe("reduce — streets", () => {
     let state = dealHand();
 
     for (const { phase, revealed } of REVEALS) {
+      // The last street's pass opens §19's window rather than paying out, so the hand
+      // reaches its payout by closing that window.
+      if (phase === "payout") {
+        state = payOut(state);
+      }
+
       assert.equal(state.phase, phase);
       assert.equal(state.revealed, revealed);
       assert.equal(state.revealed, revealedCount(phase));
@@ -127,7 +146,7 @@ describe("reduce — streets", () => {
   });
 
   it("has nobody to act once the hand has paid out", () => {
-    const payout = passTurns(dealHand(), TURNS_TO_PAYOUT);
+    const payout = payOut(atWordWindow());
 
     assert.equal(payout.phase, "payout");
     assert.equal(payout.toActIndex, null);
@@ -151,7 +170,7 @@ describe("reduce — streets", () => {
 });
 
 describe("reduce — rollover", () => {
-  const payout = passTurns(dealHand(), TURNS_TO_PAYOUT);
+  const payout = payOut(atWordWindow());
 
   it("deals a fresh hand past payout, on a seed derived from the last one", () => {
     const next = reduce(payout, { type: "deal" }, NOW);
@@ -175,7 +194,7 @@ describe("reduce — rollover", () => {
   it("keeps replaying the run from the first seed", () => {
     const next = reduce(payout, { type: "deal" }, NOW);
 
-    assert.deepEqual(next, reduce(passTurns(dealHand(), TURNS_TO_PAYOUT), { type: "deal" }, NOW));
+    assert.deepEqual(next, reduce(payOut(atWordWindow()), { type: "deal" }, NOW));
   });
 });
 

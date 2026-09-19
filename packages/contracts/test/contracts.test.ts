@@ -22,15 +22,19 @@ import {
 const OFFLINE_ACTIONS: readonly OfflineAction[] = [
   { type: "deal" },
   { type: "advance" },
-  { type: "submitWord", submission: { plays: [{ tileId: "M-1" }] } },
+  { type: "draftWord", playerId: "hero", submission: { plays: [{ tileId: "M-1" }] } },
+  { type: "confirmWord", playerId: "hero", submission: { plays: [{ tileId: "M-1" }] } },
+  { type: "timeoutWords" },
 ];
 
-/** Fails to compile if a fourth action joins the union, or one of the three is renamed. */
+/** Fails to compile if an action joins the union, or one of them is renamed. */
 function actionType(action: OfflineAction): string {
   switch (action.type) {
     case "deal":
     case "advance":
-    case "submitWord":
+    case "draftWord":
+    case "confirmWord":
+    case "timeoutWords":
       return action.type;
     default: {
       const unhandled: never = action;
@@ -104,7 +108,13 @@ describe("wire shapes", () => {
   });
 
   it("names every offline action", () => {
-    assert.deepEqual(OFFLINE_ACTIONS.map(actionType), ["deal", "advance", "submitWord"]);
+    assert.deepEqual(OFFLINE_ACTIONS.map(actionType), [
+      "deal",
+      "advance",
+      "draftWord",
+      "confirmWord",
+      "timeoutWords",
+    ]);
   });
 });
 
