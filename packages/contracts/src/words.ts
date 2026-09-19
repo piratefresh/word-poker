@@ -96,25 +96,47 @@ export const WORD_REJECTION_REASONS = [
 /** Why a submission was refused. */
 export type WordRejectionReason = (typeof WORD_REJECTION_REASONS)[number];
 
+/** One letter a played tile contributes, with the value printed beside it (§6). */
+export interface TileLetter {
+  readonly letter: string;
+  readonly points: number;
+}
+
 /** What one played tile resolved to, once the engine accepted the play. */
 export interface TilePlayResolution {
   readonly tileId: string;
-  /** The letter(s) this tile contributes, in word order: one, or both of a sequence tile. */
-  readonly letters: readonly string[];
-  /** The printed value of those letters, before any multiplier (§6). */
-  readonly points: number;
+  /**
+   * The letters this tile contributes, in word order: one, or both of a sequence tile,
+   * each with its own printed value. A sequence tile's two faces need not be worth the
+   * same, and scoring adds them letter by letter (§6, §7).
+   */
+  readonly letters: readonly TileLetter[];
   /** The tile's printed multiplier, when it has one (§7, §9). */
   readonly multiplier?: LetterMultiplier;
+}
+
+/** One letter's contribution to a word's score (docs/rules/scoring.md §7). */
+export interface WordLetterScore {
+  readonly letter: string;
+  /** The letter's printed value before any multiplier (§6). */
+  readonly baseValue: number;
+  /** The multiplier this letter's tile applied, when it has one (§7.2, §9); never stacked. */
+  readonly multiplier?: LetterMultiplier;
+  /** What the letter adds: `baseValue`, doubled or tripled when a multiplier applies. */
+  readonly value: number;
 }
 
 /**
  * A word's score (docs/rules/scoring.md §7): `total = letterScore + fullRackBonus`.
  *
- * The letters themselves are not repeated here — the evaluation's `tiles` already resolve
- * each letter to the tile that printed it, and one copy of that is enough for the UI, the
- * server, and the scoring step to agree on.
+ * The breakdown is per letter and in word order, so it lines up with the evaluation's
+ * `tiles` flattened: those already resolve each letter to the physical tile that printed
+ * it, and one copy of that is enough for the UI, the server, and the scoring step to agree
+ * on. What the letters do not carry — the rack bonus, and the totals — is what is here.
  */
 export interface WordScore {
+  /** Every letter of the word, with its multiplier already applied to its value. */
+  readonly letters: readonly WordLetterScore[];
   /** §7 steps 1–2: the letters' values after any tile multipliers, before the rack bonus. */
   readonly letterScore: number;
   /** §7 step 3: `+10` when all seven physical tiles were used; never multiplied. */

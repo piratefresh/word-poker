@@ -65,8 +65,10 @@ function resolvePlay(tile: Tile, play: TilePlay): Resolution {
         ok: true,
         play: {
           tileId: tile.id,
-          letters: [tile.letter, tile.sequenceLetter],
-          points: tile.points + tile.sequencePoints,
+          letters: [
+            { letter: tile.letter, points: tile.points },
+            { letter: tile.sequenceLetter, points: tile.sequencePoints },
+          ],
           ...(tile.multiplier === undefined ? {} : { multiplier: tile.multiplier }),
         },
       };
@@ -89,8 +91,7 @@ function resolvePlay(tile: Tile, play: TilePlay): Resolution {
       ok: true,
       play: {
         tileId: tile.id,
-        letters: [face],
-        points,
+        letters: [{ letter: face, points }],
         ...(tile.multiplier === undefined ? {} : { multiplier: tile.multiplier }),
       },
     };
@@ -103,8 +104,7 @@ function resolvePlay(tile: Tile, play: TilePlay): Resolution {
     ok: true,
     play: {
       tileId: tile.id,
-      letters: [tile.letter],
-      points: tile.points,
+      letters: [{ letter: tile.letter, points: tile.points }],
       ...(tile.multiplier === undefined ? {} : { multiplier: tile.multiplier }),
     },
   };
@@ -149,7 +149,9 @@ export function evaluateWord({ available, submission, dictionary }: EvaluateWord
 
     played.add(play.tileId);
     tiles.push(resolution.play);
-    word += resolution.play.letters.join("");
+    for (const letter of resolution.play.letters) {
+      word += letter.letter;
+    }
   }
 
   if (word.length < MIN_WORD_LETTERS) {

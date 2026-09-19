@@ -1,5 +1,7 @@
 /** The pure, deterministic engine: no I/O, no framework, no ambient clock or randomness. */
 
+export { LETTER_VALUES } from "./letters";
+export type { Letter } from "./letters";
 export { createRng } from "./rng";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
@@ -26,5 +28,5 @@ export {
   startHand,
 } from "./offline";
 export type { OfflineSeat, OfflineState, StartHandOptions } from "./offline";
-export { NoPlayersError, pickWinner, scoreHand } from "./scoring";
+export { NoPlayersError, pickWinner, scoreHand, scoreWord } from "./scoring";
 export type { ScoredPlayer } from "./scoring";

@@ -12,9 +12,11 @@ export type {
 export {
   WORD_REJECTION_REASONS,
   isWordSubmission,
+  type TileLetter,
   type TilePlay,
   type TilePlayResolution,
   type WordEvaluation,
+  type WordLetterScore,
   type WordRejectionReason,
   type WordScore,
   type WordSubmission,

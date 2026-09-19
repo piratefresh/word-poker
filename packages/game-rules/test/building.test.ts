@@ -74,7 +74,7 @@ describe("evaluateWord — accepted words", () => {
     assert.equal(evaluation.word, "MARKET");
     assert.equal(evaluation.dictionary, "en_US-large");
     assert.deepEqual(
-      evaluation.tiles.map((tile) => [tile.tileId, tile.letters]),
+      evaluation.tiles.map((tile) => [tile.tileId, tile.letters.map((letter) => letter.letter)]),
       [
         ["M-1", ["M"]],
         ["A-1", ["A"]],
@@ -125,7 +125,7 @@ describe("evaluateWord — choice tiles (§10)", () => {
 
     assert.ok(evaluation.valid);
     assert.equal(evaluation.word, "TEN");
-    assert.deepEqual(evaluation.tiles[1]?.letters, ["E"]);
+    assert.deepEqual(evaluation.tiles[1]?.letters, [{ letter: "E", points: 1 }]);
   });
 
   it("refuses a face the tile does not print, and both faces at once", () => {
@@ -167,7 +167,7 @@ describe("evaluateWord — choice tiles (§10)", () => {
 
     assert.ok(asKing.valid);
     assert.equal(asKing.word, "KA");
-    assert.deepEqual(asKing.tiles[0], { tileId: "QK-1", letters: ["K"], points: 5 });
+    assert.deepEqual(asKing.tiles[0], { tileId: "QK-1", letters: [{ letter: "K", points: 5 }] });
 
     const asQueen = evaluateWord({
       available: [Q_K, SINGLE.a],
@@ -177,7 +177,7 @@ describe("evaluateWord — choice tiles (§10)", () => {
 
     assert.ok(asQueen.valid);
     assert.equal(asQueen.word, "QA");
-    assert.deepEqual(asQueen.tiles[0], { tileId: "QK-1", letters: ["Q"], points: 10 });
+    assert.deepEqual(asQueen.tiles[0], { tileId: "QK-1", letters: [{ letter: "Q", points: 10 }] });
   });
 });
 
@@ -191,8 +191,10 @@ describe("evaluateWord — fixed-sequence tiles (§10)", () => {
 
     assert.ok(evaluation.valid);
     assert.equal(evaluation.word, "THE");
-    assert.deepEqual(evaluation.tiles[0]?.letters, ["T", "H"]);
-    assert.equal(evaluation.tiles[0]?.points, 7);
+    assert.deepEqual(evaluation.tiles[0]?.letters, [
+      { letter: "T", points: 2 },
+      { letter: "H", points: 5 },
+    ]);
   });
 
   it("accepts the name of the printed pair, and of its first letter", () => {

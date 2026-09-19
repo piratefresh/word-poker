@@ -61,11 +61,13 @@ Because the two-letter tiles are bag members like any other, a hand can show at 
 of them, which satisfies the "never more than three" rule in
 [Two-Letter Tiles](tiles.md) without a separate placement rule.
 
-<!-- Contract status: the fixed-sequence tile shape and the letter-multiplier field now exist
-     on the tile contract (`packages/contracts/src/tiles.ts`: `SequenceTile`, `LetterMultiplier`);
-     decomposition and word-building behaviour land in `packages/game-rules` (building.ts,
-     STO-301/STO-329). Deal-time generation and placement of those tiles is still open — see
-     the Two-Letter Tiles section above and STO-325. -->
+<!-- Contract status: the fixed-sequence tile shape and the letter-multiplier field exist on
+     the tile contract (`packages/contracts/src/tiles.ts`: `SequenceTile`, `LetterMultiplier`);
+     word-building honours §10 (`packages/game-rules/src/building.ts`, STO-301/STO-329) and
+     §6–§9 scoring is implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's
+     per-letter breakdown), with §6's values pinned to the table above by a drift-guard test.
+     Deal-time generation and placement of those tiles is still open — see the Two-Letter Tiles
+     section above and STO-325. -->
 
 ---
 
