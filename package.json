@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "pnpm --filter @wordpoker/mobile start",
+    "dev:server": "pnpm --filter @wordpoker/server start",
     "typecheck": "pnpm -r --if-present typecheck"
   }
 }
