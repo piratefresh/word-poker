@@ -20,14 +20,16 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DICTIONARIES, type DictionaryId } from "../src/dictionary";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const defaultSourcePath = resolve(repoRoot, "en_US-large.txt");
 const outPath = resolve(here, "../data/en_US-large.json");
 
 /** Stable identity of the prepared set; `label` is what the client shows before play. */
-const DICTIONARY_ID = "en_US-large";
-const DICTIONARY_LABEL = "en_US-large (broad English)";
+const DICTIONARY_ID: DictionaryId = "en_US-large";
+const DICTIONARY_LABEL = DICTIONARIES[DICTIONARY_ID].label;
 
 /** A word the engine can accept: at least two A–Z letters, nothing else. */
 const LEGAL_WORD = /^[A-Z]{2,}$/;

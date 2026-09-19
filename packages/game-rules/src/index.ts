@@ -3,6 +3,19 @@
 export { createRng } from "./rng";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
+export {
+  DICTIONARIES,
+  DictionaryArtifactError,
+  createDictionary,
+  loadDictionary,
+} from "./dictionary";
+export type {
+  Dictionary,
+  DictionaryArtifact,
+  DictionaryId,
+  DictionaryInfo,
+  DictionarySource,
+} from "./dictionary";
 export { decideOfflineMove } from "./bot";
 export {
   OFFLINE_TURN_MS,
