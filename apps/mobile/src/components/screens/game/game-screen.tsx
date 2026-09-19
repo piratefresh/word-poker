@@ -12,13 +12,21 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { PokerTable } from "@/components/table";
+import {
+  Hud,
+  HUD_CHROME_HEIGHT,
+  TurnClockProvider,
+  useToastQueue,
+  useTurnClock,
+  useTurnTimer,
+  type BalanceView,
+} from "@/components/hud";
+import { PokerTable, type SeatSlot } from "@/components/table";
 import {
   border,
   colors,
   elevation,
   fonts,
-  gradients,
   layout,
   opacity,
   palette,
@@ -33,33 +41,69 @@ import {
   PlayerSeat,
   Pot,
 } from "./game-primitives";
-import type { BettingState, GameScreenState } from "./game-types";
+import {
+  DEVICE_CLOCK_SAMPLE,
+  heroTurnPhrase,
+  openTurn,
+  turnKey,
+} from "./game-screen-hud";
+import type { BettingState, GamePlayer, GameScreenState } from "./game-types";
 
 export interface GameScreenProps {
   game: GameScreenState;
   onBack?: () => void;
   onHelp?: () => void;
   onChat?: () => void;
+  onSettings?: () => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
   onRaise?: (amount: number) => void;
   onRaiseAmountChange?: (amount: number) => void;
+  /** Seat tap, for a caller that opens a player view. Without it a seat is not a control. */
+  onSeatPress?: (player: GamePlayer) => void;
 }
 
-export function GameScreen({
+/** No wallet is wired into the hand yet, so the HUD says so instead of painting `$0`. */
+const BALANCE_UNAVAILABLE: BalanceView = { state: "unavailable" };
+
+export function GameScreen(props: GameScreenProps) {
+  return (
+    <TurnClockProvider sample={DEVICE_CLOCK_SAMPLE}>
+      <GameScreenBody {...props} />
+    </TurnClockProvider>
+  );
+}
+
+/** The body reads the clock, so it has to sit inside the provider rather than beside it. */
+function GameScreenBody({
   game,
   onBack,
   onHelp,
   onChat,
+  onSettings,
   onFold,
   onCheckOrCall,
   onRaise,
   onRaiseAmountChange,
+  onSeatPress,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const compact = height - insets.top - insets.bottom < 690;
   const [raiseAmount, setRaiseAmount] = useState(game.betting.raiseAmount);
+  const queue = useToastQueue();
+  // The shared clock's reading, not a fresh clock read: a deadline derived from a new
+  // sample during render would land on a slightly different timeline than the one the
+  // countdown resolves against.
+  const { nowMs } = useTurnClock();
+
+  // `game.secondsRemaining` is a budget, not a deadline, so the turn is opened once per
+  // value and held. Adjusting state during the render that sees a new value is what makes
+  // that hold exact — a deadline derived during every render would move forward with each
+  // render and the countdown would never move at all.
+  const [turn, setTurn] = useState(() => openTurn(game, nowMs));
+  if (turn.key !== turnKey(game)) setTurn(openTurn(game, nowMs));
+  const view = useTurnTimer(turn.timing);
 
   const changeRaise = useCallback(
     (next: number) => {
@@ -72,26 +116,47 @@ export function GameScreen({
     [game.betting, onRaiseAmountChange],
   );
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     if (onBack) onBack();
     else if (router.canGoBack()) router.back();
     else router.replace("/");
-  };
+  }, [onBack]);
+
+  /**
+   * Report an action, then hand it on. The queue lives here because this is where the
+   * game events are, and a toast that claims an action nobody was told about would be a
+   * lie — hence the guard. One key for all three, so a second action replaces the first
+   * instead of stacking a column of stale reports over the felt.
+   */
+  const report = useCallback(
+    (message: string, run?: () => void) => {
+      if (!run) return;
+      queue.push({ key: "player-action", severity: "info", message });
+      run();
+    },
+    [queue],
+  );
+
+  const callMessage = game.betting.canCheck
+    ? "You checked"
+    : `You called $${game.betting.callAmount ?? 0}`;
 
   return (
-    <LinearGradient
-      colors={["#0a1d17", "#051410"]}
-      style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <View style={[styles.content, { maxWidth: Math.min(520, width) }]}>
-        <GameHeader
-          phaseLabel={`PHASE ${game.phaseNumber} · ${game.phase.toUpperCase()}`}
-          secondsRemaining={game.secondsRemaining}
-          onBack={goBack}
-          onHelp={onHelp}
-          onChat={onChat}
-        />
+    <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
+      <View
+        style={[
+          styles.content,
+          {
+            maxWidth: Math.min(520, width),
+            paddingBottom: insets.bottom,
+            paddingTop: insets.top + HUD_CHROME_HEIGHT,
+          },
+        ]}
+      >
         <CommunityStrip tiles={game.community} />
-        <View style={[styles.tableRegion, compact && styles.tableRegionCompact]}>
+        <View
+          style={[styles.tableRegion, compact && styles.tableRegionCompact]}
+        >
           <PokerTable
             chromeInset={compact ? 36 : 42}
             community={[]}
@@ -99,7 +164,7 @@ export function GameScreen({
             railWidth={3}
             renderCommunity={() => null}
             renderPot={() => <Pot amount={game.pot} />}
-            renderSeat={PlayerSeat}
+            renderSeat={(slot) => <Seat onPress={onSeatPress} slot={slot} />}
             seatCount={game.seatCount}
             seats={game.players}
             style={styles.table}
@@ -111,81 +176,76 @@ export function GameScreen({
           score={game.bestScore}
           word={game.bestWord}
         />
-        <PlayerRack community={game.community} privateTiles={game.privateTiles} />
+        <PlayerRack
+          community={game.community}
+          privateTiles={game.privateTiles}
+        />
         <BettingControls
           amount={raiseAmount}
           onAmountChange={changeRaise}
-          onCheckOrCall={onCheckOrCall}
-          onFold={onFold}
-          onRaise={() => onRaise?.(raiseAmount)}
+          onCheckOrCall={() => report(callMessage, onCheckOrCall)}
+          onFold={() => report("You folded", onFold)}
+          onRaise={() =>
+            report(
+              `You raised $${raiseAmount}`,
+              onRaise ? () => onRaise(raiseAmount) : undefined,
+            )
+          }
           state={game.betting}
         />
       </View>
-      <ChatButton bottom={insets.bottom + (compact ? 60 : 68)} onPress={onChat} />
+      <ChatButton
+        bottom={insets.bottom + (compact ? 60 : 68)}
+        onPress={onChat}
+      />
+      <Hud
+        balance={BALANCE_UNAVAILABLE}
+        onHelp={onHelp}
+        onLeave={goBack}
+        onSettings={onSettings}
+        phase={game.phase}
+        style={{ top: insets.top }}
+        toastQueue={queue}
+        turn={view}
+        turnPhrase={heroTurnPhrase(game)}
+      />
     </LinearGradient>
   );
 }
 
-function GameHeader({
-  phaseLabel,
-  secondsRemaining,
-  onBack,
-  onHelp,
-  onChat,
-}: {
-  phaseLabel: string;
-  secondsRemaining: number;
-  onBack: () => void;
-  onHelp?: () => void;
-  onChat?: () => void;
-}) {
-  const time = Math.max(0, secondsRemaining);
-  const timer = `${Math.floor(time / 60).toString().padStart(2, "0")}:${(time % 60)
-    .toString()
-    .padStart(2, "0")}`;
-  return (
-    <View style={styles.header}>
-      <RoundButton label="Go back" onPress={onBack}>
-        <Text style={styles.backIcon}>9</Text>
-      </RoundButton>
-      <View style={styles.phase}>
-        <Text style={styles.phaseLabel}>{phaseLabel}</Text>
-        <Text style={styles.timer}>{timer}</Text>
-      </View>
-      <View style={styles.headerActions}>
-        <RoundButton label="How to play" onPress={onHelp}>
-          <Text style={styles.helpIcon}>?</Text>
-        </RoundButton>
-        <RoundButton label="Open chat" onPress={onChat}>
-          <ChatGlyph small />
-        </RoundButton>
-      </View>
-    </View>
-  );
-}
-
-function RoundButton({
-  label,
+/**
+ * A seat as the table draws it, with the screen's optional tap layered around it. With no
+ * handler this is exactly the presentational seat: a seat that looks tappable but goes
+ * nowhere is worse than one that never was.
+ */
+function Seat({
+  slot,
   onPress,
-  children,
 }: {
-  label: string;
-  onPress?: () => void;
-  children: React.ReactNode;
+  slot: SeatSlot<GamePlayer>;
+  onPress?: (player: GamePlayer) => void;
 }) {
+  const player = slot.seat;
+  if (!player || !onPress) return <PlayerSeat {...slot} />;
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={`${player.name}'s seat`}
       accessibilityRole="button"
       hitSlop={layout.hitSlop}
-      onPress={onPress}
-      style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}>
-      {children}
+      onPress={() => onPress(player)}
+    >
+      <PlayerSeat {...slot} />
     </Pressable>
   );
 }
 
-function ChatButton({ bottom, onPress }: { bottom: number; onPress?: () => void }) {
+function ChatButton({
+  bottom,
+  onPress,
+}: {
+  bottom: number;
+  onPress?: () => void;
+}) {
   return (
     <Pressable
       accessibilityLabel="Open table chat, 1 unread message"
@@ -196,7 +256,8 @@ function ChatButton({ bottom, onPress }: { bottom: number; onPress?: () => void 
         styles.chatButton,
         { bottom },
         pressed && styles.pressed,
-      ]}>
+      ]}
+    >
       <ChatGlyph />
       <View style={styles.unread}>
         <Text style={styles.unreadText}>1</Text>
@@ -224,7 +285,9 @@ function BettingControls({
   const range = Math.max(1, state.maxRaise - state.minRaise);
   const progress = (amount - state.minRaise) / range;
   const fromEvent = (event: GestureResponderEvent) => {
-    onAmountChange(state.minRaise + (event.nativeEvent.locationX / trackWidth) * range);
+    onAmountChange(
+      state.minRaise + (event.nativeEvent.locationX / trackWidth) * range,
+    );
   };
   const callLabel = state.canCheck ? "CHECK" : `CALL $${state.callAmount ?? 0}`;
   return (
@@ -259,14 +322,20 @@ function BettingControls({
           onResponderGrant={fromEvent}
           onResponderMove={fromEvent}
           onStartShouldSetResponder={() => state.canRaise}
-          style={styles.slider}>
+          style={styles.slider}
+        >
           <View style={[styles.sliderFill, { width: `${progress * 100}%` }]} />
           <View style={[styles.sliderThumb, { left: `${progress * 100}%` }]} />
         </View>
         <Text style={styles.raiseAmount}>{`$${amount}`}</Text>
       </View>
       <View style={styles.actionRow}>
-        <ActionButton danger disabled={!state.canFold} label="FOLD" onPress={onFold} />
+        <ActionButton
+          danger
+          disabled={!state.canFold}
+          label="FOLD"
+          onPress={onFold}
+        />
         <ActionButton
           disabled={!state.canCheck && state.callAmount == null}
           label={callLabel}
@@ -287,48 +356,16 @@ function BettingControls({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { alignSelf: "center", flex: 1, width: "100%" },
-  header: {
-    alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: border.hairline,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  phase: { alignItems: "center", flex: 1 },
-  phaseLabel: {
-    color: colors.gold,
-    fontFamily: fonts.mono,
-    fontSize: 8,
-    letterSpacing: 1.8,
-  },
-  timer: {
-    color: palette.green500,
-    fontFamily: fonts.monoBold,
-    fontSize: 18,
-    letterSpacing: 1,
-    lineHeight: 20,
-  },
-  headerActions: { flexDirection: "row", gap: 6 },
-  roundButton: {
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderColor: "rgba(212,175,55,0.25)",
-    borderRadius: radius.pill,
-    borderWidth: border.hairline,
-    height: 30,
-    justifyContent: "center",
-    width: 30,
-  },
-  backIcon: { color: colors.gold, fontFamily: fonts.sans, fontSize: 25, lineHeight: 27 },
-  helpIcon: { color: colors.gold, fontFamily: fonts.monoBold, fontSize: 11 },
   tableRegion: { flex: 1, minHeight: 272, paddingHorizontal: 8 },
   tableRegionCompact: { minHeight: 234 },
   table: { backgroundColor: "transparent", flex: 1 },
   betting: { paddingBottom: 7, paddingHorizontal: 18 },
-  raiseRow: { alignItems: "center", flexDirection: "row", gap: 10, minHeight: 30 },
+  raiseRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 30,
+  },
   raiseLabel: {
     color: colors.textDim,
     fontFamily: fonts.mono,
@@ -389,5 +426,9 @@ const styles = StyleSheet.create({
     top: -3,
     width: 16,
   },
-  unreadText: { color: colors.onGold, fontFamily: fonts.sansBlack, fontSize: 8 },
+  unreadText: {
+    color: colors.onGold,
+    fontFamily: fonts.sansBlack,
+    fontSize: 8,
+  },
 });
