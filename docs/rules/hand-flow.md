@@ -225,3 +225,7 @@ Each submission displays:
 The valid word with the highest final score wins the pot.
 
 Folded players do not participate in the showdown.
+
+The showdown produces an ordered ranking, not only a winner: every remaining seat is placed by
+final score, and equal scores are broken by the tie-breaker ladder in
+[Betting, Pots & Tie-Breakers](betting-and-pots.md) §21.

@@ -129,6 +129,10 @@ The player receives 0 points when:
 
 A player with an invalid word may still lose chips already committed to the pot.
 
+A player with no valid word stays in the showdown and is ranked at 0 points: the tie-breaker
+ladder places every seat, and the high-value draw settles the seats that all have none
+([Betting, Pots & Tie-Breakers](betting-and-pots.md) §21).
+
 ---
 
 # 12. Word Length
