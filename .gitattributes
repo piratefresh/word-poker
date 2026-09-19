@@ -1,0 +1,3 @@
+# The dictionary artifact is pinned by tests (entry count, source hash, byte-stability):
+# always check it out with LF, whatever the platform's autocrlf setting says.
+packages/game-rules/data/*.json text eol=lf
