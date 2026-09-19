@@ -51,9 +51,12 @@ const MODES: Mode[] = [
   },
   {
     key: "offline",
+    // Temporary: the picker routes straight to the game. STO-269's landing screen owns
+    // this entry (and the rows around it) when it lands.
+    href: "/offline",
     glyph: "🤖",
     label: "Offline Mode",
-    description: "Play vs. bots, no signup",
+    description: "Play a hand vs. bots, no stakes",
     tone: "warm",
   },
   {
