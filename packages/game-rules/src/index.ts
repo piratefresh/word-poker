@@ -5,8 +5,8 @@ export type { Letter } from "./letters";
 export { createRng } from "./rng";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
-export { evaluateWord } from "./building";
-export type { EvaluateWordOptions } from "./building";
+export { evaluateWord, resolveSubmission } from "./building";
+export type { EvaluateWordOptions, ResolveSubmissionOptions, SubmissionResolution } from "./building";
 export {
   DICTIONARIES,
   DictionaryArtifactError,
@@ -26,7 +26,9 @@ export {
   reduce,
   revealedCount,
   startHand,
+  WORD_WINDOW_MS,
+  WordRejectionError,
 } from "./offline";
-export type { OfflineSeat, OfflineState, StartHandOptions } from "./offline";
+export type { OfflineSeat, OfflineState, StartHandOptions, WordSlot, WordWindow } from "./offline";
 export { NoPlayersError, pickWinner, scoreHand, scoreWord } from "./scoring";
 export type { ScoredPlayer } from "./scoring";

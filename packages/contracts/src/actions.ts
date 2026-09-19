@@ -1,16 +1,21 @@
 /**
  * What the offline game can be told to do: deal a fresh hand, hand the table to the next
- * round, or submit a word for the seat whose turn it is. Deliberately narrow — betting is
- * out of scope for offline play, so a betting action is absent from the union rather than
- * accepted and ignored.
+ * round, work on a word during §19's window, or close that window when its clock runs out.
+ * Deliberately narrow — betting is out of scope for offline play, so a betting action is
+ * absent from the union rather than accepted and ignored.
  *
- * `submitWord` names no seat: the engine knows whose turn it is, and a payload that could
- * name someone else is a payload a cheating client would send.
+ * A word action names its seat, where a betting action would not: §19's window is shared by
+ * every remaining seat, so there is no turn to read the seat off, and the caller is the table
+ * itself. The engine refuses a seat that is not in the window, has already confirmed, or is
+ * out of time — naming a seat is a claim, not an authority.
  */
 
+import type { PlayerId } from "./players";
 import type { WordSubmission } from "./words";
 
 export type OfflineAction =
   | { type: "deal" }
   | { type: "advance" }
-  | { type: "submitWord"; submission: WordSubmission };
+  | { type: "draftWord"; playerId: PlayerId; submission: WordSubmission }
+  | { type: "confirmWord"; playerId: PlayerId; submission: WordSubmission }
+  | { type: "timeoutWords" };

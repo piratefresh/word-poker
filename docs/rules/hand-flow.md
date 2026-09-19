@@ -32,9 +32,16 @@ The offline game plays one hand on the client, with no server in the loop:
   change how many are face up (Flop / Turn / River).
 - The streets run `preflop → flop → turn → river → payout` and reveal **0 / 3 / 4 / 5**
   community tiles respectively.
-- Betting, word building, and showdown are out of this slice, so the walk from street to
-  street is the whole round: every seat takes its turn in order, and the last seat's turn
-  rolls the street. `payout` scores the tiles by total points — no dictionary yet.
+- Betting and showdown are out of this slice, so the walk from street to street is the whole
+  round: every seat takes its turn in order, and the last seat's turn rolls the street.
+- The river's last turn opens **Word Building** (§19) instead of paying out: every remaining
+  seat shares one 60-second window to draft and confirm a word, and the hand pays out once
+  every seat has confirmed or run out of time.
+- There is no word builder on screen yet, so tapping through the window runs its clock out —
+  no seat confirms, every seat is out of time, and each is scored 0 (§11). A confirmed word
+  is checked for whether it can be *built* (§10–§12) and nothing else: the dictionary and the
+  scoring arrive with the engine's consumers.
+- `payout` still scores the tiles by total points — the placeholder showdown, no dictionary.
 
 ---
 
@@ -195,6 +202,17 @@ The player may edit their submission until:
 - The 60-second timer expires
 
 There is no bonus for submitting early.
+
+The window is shared: every remaining seat has the same sixty seconds, not sixty of its own.
+The hand moves on to the showdown once every remaining seat has either confirmed a word or run
+out of time — and it moves as soon as every seat has confirmed, without waiting the clock out.
+
+A submission is accepted for what it plays, not for what it spells. A word that can be built
+from the seat's tiles is locked once the seat confirms it, even when it is not in the
+dictionary: that word scores 0 (§11) rather than unlocking the seat. A submission that cannot
+be built from those tiles — a tile the seat does not hold, a split two-letter tile, the same
+tile twice, fewer than two letters — is refused outright, and the seat may fix it until its
+time runs out.
 
 ## Timeout
 

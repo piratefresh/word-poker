@@ -90,6 +90,13 @@ describe("<OfflineGameScreen />", () => {
       await fireEvent.press(roundButton(view, "Advance"));
     }
 
+    // §19's window stands between the river and the payout: the tap that would have paid
+    // out opens it, and the next one closes it with the clock run out.
+    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
+    expectBoard(view, 5);
+
+    await fireEvent.press(roundButton(view, "Advance"));
+
     expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
     expect(view.getAllByText("WINNER")).toHaveLength(1);
 

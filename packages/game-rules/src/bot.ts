@@ -20,7 +20,9 @@ import { OfflineActionError, type OfflineState } from "./offline";
  * What `botId` plays on its turn.
  *
  * At `payout` the hand is over and there is no turn left, so the only move that keeps the
- * table moving is a fresh deal. Everywhere else the bot passes its turn, which is what
+ * table moving is a fresh deal. During §19's word window there is no turn at all — the bots
+ * confirm words of their own, which STO-305 gives them — so asking is a caller bug that gets
+ * named rather than silently answered. Everywhere else the bot passes its turn, which is what
  * walks the round.
  *
  * Throws when the bot is not the seat to act — a caller that skipped the turn order has a
@@ -28,6 +30,12 @@ import { OfflineActionError, type OfflineState } from "./offline";
  */
 export function decideOfflineMove(state: OfflineState, botId: PlayerId): OfflineAction {
   if (state.phase === "payout") return { type: "deal" };
+
+  // The window is shared and has no seat to act, so a bot that is asked for one has nothing
+  // to answer with: its slot runs out with the clock, like any seat that never confirmed.
+  if (state.wordWindow?.status === "open") {
+    throw new OfflineActionError(`${botId} has no word to play: the table is in its word window`);
+  }
 
   const acting = state.toActIndex === null ? undefined : state.seats[state.toActIndex];
   if (acting === undefined) {

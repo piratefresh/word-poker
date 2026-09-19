@@ -50,11 +50,28 @@ describe("decideOfflineMove", () => {
   it("deals once the hand has paid out", () => {
     let state = dealHand();
     while (state.phase !== "payout") {
-      state = reduce(state, decideOfflineMove(state, actingSeatId(state)), NOW);
+      // §19's window has no turn for a bot to take, so the table's clock closes it and the
+      // bot's next real move is the deal that follows.
+      state =
+        state.wordWindow?.status === "open"
+          ? reduce(state, { type: "timeoutWords" }, state.endsAtMs)
+          : reduce(state, decideOfflineMove(state, actingSeatId(state)), NOW);
     }
 
     assert.deepEqual(decideOfflineMove(state, "ellis"), { type: "deal" });
     assert.equal(reduce(state, decideOfflineMove(state, "ellis"), NOW).hand, 2);
+  });
+
+  it("has no move while the word window is open", () => {
+    let state = dealHand();
+    while (state.wordWindow?.status !== "open") {
+      state = reduce(state, decideOfflineMove(state, actingSeatId(state)), NOW);
+    }
+
+    assert.throws(
+      () => decideOfflineMove(state, "ellis"),
+      (error: unknown) => error instanceof OfflineActionError && error.message.includes("word window"),
+    );
   });
 
   it("only ever asks for a legal transition", () => {
@@ -62,6 +79,11 @@ describe("decideOfflineMove", () => {
     let moves = 0;
 
     while (state.phase !== "payout") {
+      if (state.wordWindow?.status === "open") {
+        state = reduce(state, { type: "timeoutWords" }, state.endsAtMs);
+        continue;
+      }
+
       state = reduce(state, decideOfflineMove(state, actingSeatId(state)), NOW + moves);
       moves += 1;
       assert.ok(moves <= SEATS.length * 4, "a hand is at most four streets of turns");

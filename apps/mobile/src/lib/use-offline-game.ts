@@ -20,6 +20,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { PlayerId } from "@wordpoker/contracts";
 import {
   OFFLINE_TURN_MS,
+  WORD_WINDOW_MS,
   decideOfflineMove,
   pickWinner,
   reduce,
@@ -84,7 +85,10 @@ export interface OfflineGame {
   game: GameScreenState;
   /** Starts the next hand. Only legal once the current hand has paid out. */
   deal: () => void;
-  /** Passes the hero's turn; the bots take theirs on their own. */
+  /**
+   * Passes the hero's turn — or, while §19's word window is open, closes the window with the
+   * clock run out. The bots take their turns on their own.
+   */
   advance: () => void;
 }
 
@@ -100,6 +104,14 @@ export function useOfflineGame({ seed = OFFLINE_SEED }: { seed?: number } = {}):
 
   const apply = useCallback((action: "deal" | "advance") => {
     setState((current) => {
+      // §19's window is shared and has no turn to pass: a tap during it means the table is
+      // done building, so the slice runs the clock to the window's deadline and lets the
+      // timeout rule settle it — every seat that never confirmed is out of time. The word
+      // builder itself is STO-304/STO-305, and it will replace this.
+      if (current.wordWindow?.status === "open") {
+        return reduce(current, { type: "timeoutWords" }, current.endsAtMs);
+      }
+
       const next = reduce(current, { type: action }, Date.now());
       return resolveBotTurns(next);
     });
@@ -111,7 +123,7 @@ export function useOfflineGame({ seed = OFFLINE_SEED }: { seed?: number } = {}):
   return { game: useMemo(() => toScreenState(state), [state]), deal, advance };
 }
 
-/** Passes every consecutive bot turn, stopping at the hero or at payout. */
+/** Passes every consecutive bot turn, stopping at the hero, at §19's window, or at payout. */
 function resolveBotTurns(state: OfflineState): OfflineState {
   let next = state;
 
@@ -144,10 +156,10 @@ function toScreenState(state: OfflineState): GameScreenState {
   return {
     // One turn, one identity: the HUD re-anchors its countdown when this changes, so it
     // has to name the seat and the street, not just the hand.
-    id: `offline-${state.hand}-${state.phase}-${state.toActIndex ?? "done"}`,
+    id: `offline-${state.hand}-${state.phase}-${state.toActIndex ?? state.wordWindow?.status ?? "done"}`,
     phase: state.phase,
     phaseNumber: PHASE_NUMBER[state.phase],
-    secondsRemaining: OFFLINE_TURN_MS / 1_000,
+    secondsRemaining: (state.wordWindow?.status === "open" ? WORD_WINDOW_MS : OFFLINE_TURN_MS) / 1_000,
     seatCount: toSeatCount(state.seats.length),
     players: state.seats.map((seat, index) => player(seat, index, state, winner)),
     pot: 0,
