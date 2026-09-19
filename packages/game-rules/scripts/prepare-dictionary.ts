@@ -13,7 +13,7 @@
  * (drops `A's`, single letters, digits, punctuation, accents), dedupe, sort. Sorting is
  * what makes the artifact byte-identical for byte-identical input, whatever the row order.
  *
- * Usage: pnpm --filter @wordpoker/game-rules dictionary:prepare [path/to/en_US-large.txt]
+ * Usage: pnpm run dictionary:prepare [path/to/en_US-large.txt]  (from the repo root)
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";

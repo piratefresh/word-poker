@@ -3,7 +3,7 @@
  * (docs/rules/tiles.md §11 — a word must appear in the configured dictionary).
  *
  * The engine never reads files or the network (AGENTS.md), so the words arrive as data, in
- * two steps: a build step — `pnpm --filter @wordpoker/game-rules dictionary:prepare` — turns
+ * two steps: a build step — `pnpm run dictionary:prepare` from the repo root — turns
  * the raw word list into the checked-in artifact `data/<id>.json`, and this module turns that
  * artifact into a lookup. `createDictionary` takes an artifact a caller already holds;
  * `loadDictionary` fetches the shipped one. Neither reads a clock, the environment, or

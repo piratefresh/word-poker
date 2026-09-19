@@ -6,6 +6,7 @@
     "start": "pnpm --filter @wordpoker/mobile start",
     "dev:server": "pnpm --filter @wordpoker/server start",
     "typecheck": "pnpm -r --if-present typecheck",
-    "check:boundaries": "node scripts/check-boundaries.mjs"
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "dictionary:prepare": "pnpm --filter @wordpoker/game-rules dictionary:prepare"
   }
 }
