@@ -13,7 +13,7 @@ export {
   applySpecialTiles,
 } from "./special-tiles";
 export type { SpecialTilesConfig, SpecialTilesResult } from "./special-tiles";
-export { evaluateWord, resolveSubmission } from "./building";
+export { evaluateWord, resolveSubmission, spellSubmission } from "./building";
 export type { EvaluateWordOptions, ResolveSubmissionOptions, SubmissionResolution } from "./building";
 export {
   DICTIONARIES,

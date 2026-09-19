@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { Tile, WordEvaluation, WordSubmission } from "@wordpoker/contracts";
 
-import { evaluateWord } from "../src/building";
+import { evaluateWord, spellSubmission } from "../src/building";
 import { DICTIONARIES, createDictionary, loadDictionary, type Dictionary } from "../src/dictionary";
 
 /**
@@ -53,6 +53,35 @@ function refusal(evaluation: WordEvaluation): string {
   assert.ok(!evaluation.valid, `expected a refusal, received ${JSON.stringify(evaluation)}`);
   return evaluation.reason;
 }
+
+describe("spellSubmission — the letters typed so far", () => {
+  it("spells a draft §12 will not call a word yet", () => {
+    const available = [SINGLE.m, SINGLE.a];
+
+    assert.equal(spellSubmission({ available, submission: { plays: [play(SINGLE.m)] } }), "M");
+    assert.equal(
+      spellSubmission({ available, submission: { plays: [play(SINGLE.m), play(SINGLE.a)] } }),
+      "MA",
+    );
+  });
+
+  it("spells a sequence tile as both of its letters, and a choice tile as the face it played", () => {
+    const available = [T_H, A_E, Q_K];
+
+    assert.equal(spellSubmission({ available, submission: { plays: [play(T_H)] } }), "TH");
+    assert.equal(spellSubmission({ available, submission: { plays: [play(A_E, "E")] } }), "E");
+    assert.equal(spellSubmission({ available, submission: { plays: [play(Q_K, "K")] } }), "K");
+  });
+
+  it("spells nothing for a play the seat cannot name", () => {
+    const available = [SINGLE.m];
+
+    assert.equal(spellSubmission({ available, submission: { plays: [{ tileId: "Z-9" }] } }), "");
+    assert.equal(spellSubmission({ available, submission: { plays: [] } }), "");
+    // A face the tile does not print contributes nothing rather than guessing one.
+    assert.equal(spellSubmission({ available, submission: { plays: [play(SINGLE.m, "Z")] } }), "");
+  });
+});
 
 describe("evaluateWord — accepted words", () => {
   it("spells the word from the played tiles and resolves every letter back to its tile", () => {

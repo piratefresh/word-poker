@@ -31,6 +31,7 @@ import {
   decideOfflineMove,
   reduce,
   resolveSubmission,
+  spellSubmission,
   startHand,
   type Dictionary,
   type OfflineSeat,
@@ -322,7 +323,9 @@ function wordsOf(state: OfflineState, refusal: WordRejectionReason | null): Offl
 
   return {
     plays,
-    word: resolution.ok ? resolution.word : "",
+    // The letters the seat has typed, not the word it can stand behind: a one-tile draft has
+    // a letter to show even though §12 refuses to call it a word yet.
+    word: spellSubmission({ available: availableTiles(state, index), submission: { plays: [...plays] } }),
     reason: refusal ?? previewReason(plays.length, resolution, state.dictionary),
     confirmed: slot?.status === "confirmed",
     open: window.status === "open" && slot?.status === "drafting",
@@ -342,12 +345,6 @@ function previewReason(
   return dictionary.isWord(resolution.word) ? null : "not-in-dictionary";
 }
 
-/** Everyone's standing at payout, and who it awards. */
-function winnerOf(state: OfflineState): { id: PlayerId; score: number } | null {
-  const best = state.result?.standings[0];
-  return best === undefined ? null : { id: best.playerId, score: best.score };
-}
-
 /**
  * Everything the felt needs, mapped off the engine state.
  *
@@ -359,7 +356,8 @@ function winnerOf(state: OfflineState): { id: PlayerId; score: number } | null {
  */
 function toScreenState(state: OfflineState): GameScreenState {
   const hero = state.seats.find((seat) => seat.id === HERO_ID);
-  const winner = state.phase === "payout" ? winnerOf(state) : null;
+  const best = state.result?.standings[0];
+  const winner = state.phase === "payout" && best !== undefined ? { id: best.playerId, score: best.score } : null;
 
   return {
     // One turn, one identity: the HUD re-anchors its countdown when this changes, so it
@@ -374,6 +372,10 @@ function toScreenState(state: OfflineState): GameScreenState {
     community: state.community.map((tile, index) => (index < state.revealed ? tile : null)),
     privateTiles: hero?.privateTiles ?? [],
     bestScore: winner?.score,
+    // The felt's "winning word" line: the ladder's top place is the word that took the pot,
+    // and §11's reasons mean a seat can top the table without one (the §21.3 draw) — then
+    // there is no word to show and the line stays as the felt draws it.
+    bestWord: best?.word ?? undefined,
     betting: NO_BETS,
   };
 }

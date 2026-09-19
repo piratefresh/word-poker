@@ -325,6 +325,9 @@ function TrayTile({
       <Draggable<DraggedPlay>
         data={choice === null ? { tileId: tile.id } : { tileId: tile.id, chosenFace: choice.letter }}
         dragDisabled={!playable}
+        // The kit parks a dropped view where it landed; a tile stays in its tray, so the key
+        // changes with `spent` and the element remounts where it belongs, dimmed in place.
+        key={`${tile.id}-${spent ? "spent" : "live"}`}
         preDragDelay={120}
       >
         <Tile
@@ -383,10 +386,10 @@ function FaceChip({
 }
 
 const styles = StyleSheet.create({
-  // A panel over the felt rather than a band of it: the draft is the hero's own work, and
-  // the seat it belongs to is under it.
+  // A sheet under the felt rather than a panel floating over it: the draft is the hero's own
+  // work, and the seat it belongs to sits above it. Opaque, because the felt is still behind.
   builder: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bgElevated,
     borderColor: colors.border,
     borderRadius: radius.card,
     borderWidth: border.hairline,

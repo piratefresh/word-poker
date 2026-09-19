@@ -25,11 +25,16 @@ function playOf(tile: Tile): { tileId: string; chosenFace?: string } {
     : { tileId: tile.id };
 }
 
-/** The word the hero's plays spell (§10): a sequence tile contributes both of its letters. */
-function heroWord(seed = SEED): string {
-  return heroTiles(seed)
+/** The word a list of the hero's tiles spells (§10): a sequence tile prints both letters. */
+function spells(tiles: readonly Tile[]): string {
+  return tiles
     .map((tile) => ("sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter))
     .join("");
+}
+
+/** The hero's own two tiles, as the deal will give them for this seed, spelled as one word. */
+function heroWord(seed = SEED): string {
+  return spells(heroTiles(seed));
 }
 
 /**
@@ -180,8 +185,10 @@ describe("useOfflineGame", () => {
     });
 
     // The draft is the engine's slot, not a local mirror: one tap is one play, and the word
-    // is the letters those tiles print.
+    // is the letters those tiles print — including a draft of one tile, which §12 will not
+    // call a word yet.
     expect(result.current.words?.plays).toHaveLength(1);
+    expect(result.current.words?.word).toBe(spells(heroTiles().slice(0, 1)));
     expect(result.current.words?.open).toBe(true);
 
     await act(async () => {
@@ -203,6 +210,8 @@ describe("useOfflineGame", () => {
 
     expect(result.current.game.phase).toBe("payout");
     expect(result.current.game.bestScore).toBeGreaterThanOrEqual(expectedScore(heroTiles()));
+    // The winner's own word is what the felt's reveal line shows.
+    expect(result.current.game.bestWord).toBe(heroWord());
     expect(result.current.game.players.filter((player) => player?.status === "winner")).toHaveLength(1);
   });
 
