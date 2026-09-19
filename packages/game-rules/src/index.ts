@@ -19,6 +19,14 @@ export type {
   DictionaryInfo,
   DictionarySource,
 } from "./dictionary";
+export {
+  DrawPoolExhaustedError,
+  NoContestantsError,
+  rankShowdown,
+  showdownDrawPool,
+  showdownDrawValue,
+} from "./showdown";
+export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
 export { decideOfflineMove } from "./bot";
 export {
   OFFLINE_TURN_MS,
