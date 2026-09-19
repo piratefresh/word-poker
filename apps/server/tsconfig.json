@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "outDir": "build",
+    "target": "ESNext",
+    // tsx (the server's runtime) resolves like a bundler: the shared packages are
+    // consumed as TypeScript source, and their internal imports carry no extensions,
+    // which node16/nodenext resolution rejects.
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "allowJs": true,
+    "strictNullChecks": false,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "useDefineForClassFields": false
+  },
+  "include": [
+    "src",
+    "test"
+  ]
+}

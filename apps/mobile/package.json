@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.4",
+    "@colyseus/sdk": "0.18.2",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/noto-serif": "^0.4.2",
