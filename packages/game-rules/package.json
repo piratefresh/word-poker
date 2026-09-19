@@ -12,7 +12,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"test/**/*.test.ts\""
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "dictionary:prepare": "tsx scripts/prepare-dictionary.ts"
   },
   "dependencies": {
     "@wordpoker/contracts": "workspace:*"
