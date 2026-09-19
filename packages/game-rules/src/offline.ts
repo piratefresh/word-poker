@@ -10,10 +10,11 @@
  * Past the payout, the next `deal` (or `advance`) rolls into a fresh hand whose seed is
  * derived from the one before, so a table's whole run replays from the seed it started with.
  *
- * Betting and scoring are deliberately absent: this slice walks the round and the word
- * window, and nothing else. Betting lands with the real table, scoring with the dictionary —
- * so a seat's confirmed word is checked here for whether it can be *built* (§10–§12), never
- * for whether it is a word (§11) or what it is worth (§7).
+ * The payout is where the shared engine's other half lands: every confirmed word is judged
+ * against the table's dictionary (§11), scored by §7, and the whole table is ranked by §21's
+ * ladder — including a seat that never confirmed, which §11 places at 0 points and §21.3's
+ * draw can still separate from its equals. Betting is what is still absent: no chips move,
+ * and the hand simply names the seat that took the top place.
  */
 
 import {
@@ -21,13 +22,19 @@ import {
   type OfflineAction,
   type PlayerId,
   type RoundPhase,
+  type ShowdownComparison,
+  type ShowdownStanding,
   type Tile,
   type WordRejectionReason,
   type WordSubmission,
 } from "@wordpoker/contracts";
 
-import { resolveSubmission } from "./building";
+import { evaluateWord, resolveSubmission } from "./building";
 import { dealHand } from "./deal";
+import type { Dictionary } from "./dictionary";
+import { createRng } from "./rng";
+import { scoreWord } from "./scoring";
+import { rankShowdown } from "./showdown";
 
 /**
  * How long a seat's turn lasts on the injected clock. The server gives a betting round
@@ -40,6 +47,21 @@ export const OFFLINE_TURN_MS = 30_000;
  * seats sixty seconds between them, not sixty each.
  */
 export const WORD_WINDOW_MS = 60_000;
+
+/**
+ * The seed the current hand replays from: the table's seed stepped once per hand, so the
+ * first hand is dealt from `seed` and every later one from `seed + hand - 1`.
+ */
+function handSeed(state: OfflineState): number {
+  return state.seed + state.hand - 1;
+}
+
+/**
+ * Salt for §21.3's draw. The draw is its own stream of rolls, derived from the hand's seed
+ * rather than continuing the deal's: a hand that reaches the draw has to replay the same way,
+ * and a draw must not be able to disturb the tiles a later hand deals.
+ */
+const DRAW_SEED_SALT = 0x5eed_21;
 
 /**
  * How many community tiles each phase has face up. E5 deals the whole five-tile board
@@ -94,6 +116,32 @@ export type WordWindow =
   | { readonly status: "open"; readonly slots: readonly WordSlot[] }
   | { readonly status: "settled"; readonly slots: readonly WordSlot[] };
 
+/**
+ * One seat's word at the reveal: §21's place, plus what the seat actually submitted and why
+ * it scored nothing when it did. The word and the reason are what a reveal shows beside the
+ * score; the place and the comparison come straight off the ladder.
+ */
+export interface OfflineStanding extends ShowdownStanding {
+  /** The word the seat's tiles spelled, uppercase; `null` when it confirmed none. */
+  readonly word: string | null;
+  /**
+   * §11's reason this seat scored nothing, or `null` when its word was valid. A seat whose
+   * clock ran out never confirmed a word at all, which is `timer-expired` — the rules score
+   * both cases 0, so the reveal says which happened.
+   */
+  readonly reason: WordRejectionReason | null;
+}
+
+/** A settled hand: every seat's word and place (§21), and the passes that ordered them. */
+export interface HandResult {
+  /** Every seat, best first — the ladder places all of them, ties included. */
+  readonly standings: readonly OfflineStanding[];
+  /** §21's passes, in the order the ladder made them, for the reveal to narrate. */
+  readonly comparisons: readonly ShowdownComparison[];
+  /** The seat on the top place: who the hand awards its pot to. */
+  readonly winner: PlayerId;
+}
+
 /** The whole offline table: one hand's deal, the street it is on, and whose turn it is. */
 export interface OfflineState {
   /** Which hand this is, 1-based. */
@@ -119,6 +167,17 @@ export interface OfflineState {
   autoSubmitDrafts: boolean;
   /** §19's window: `null` until the river closes, then open, then settled. */
   wordWindow: WordWindow | null;
+  /**
+   * The word list this hand is judged against, held for the whole hand so the payout and a
+   * replayed action sequence cannot disagree about which words count (§11). A table displays
+   * it before play, so it is a setting rather than something the payout goes looking for.
+   */
+  dictionary: Dictionary;
+  /**
+   * §21's settled reveal, `null` until §19's window closes. It outlives the window because
+   * the felt and the pot are read off it after the hand has paid out.
+   */
+  result: HandResult | null;
 }
 
 /** What `startHand` needs: a seed, the seats, the caller's clock reading, and the table's rules. */
@@ -126,6 +185,12 @@ export interface StartHandOptions {
   seed: number;
   players: readonly PlayerId[];
   nowMs: number;
+  /**
+   * The word list the hand is judged against at the payout (§11). Required, because a hand
+   * whose words nothing can judge is not a hand: it is the same setting the table displays
+   * before play, and it rides on the state so every later action judges against it.
+   */
+  dictionary: Dictionary;
   /**
    * §19's word-building options. Absent means the rules' default: a seat that never confirms
    * has no word, whatever it had typed.
@@ -176,7 +241,7 @@ export function revealedCount(phase: RoundPhase): number {
  * is not opened here — it belongs to the river, and a hand that never reaches it never builds
  * a word.
  */
-export function startHand({ seed, players, nowMs, wordBuilding }: StartHandOptions): OfflineState {
+export function startHand({ seed, players, nowMs, dictionary, wordBuilding }: StartHandOptions): OfflineState {
   const dealt = dealHand({ seed, playerCount: players.length });
 
   return {
@@ -192,6 +257,8 @@ export function startHand({ seed, players, nowMs, wordBuilding }: StartHandOptio
     endsAtMs: nowMs + OFFLINE_TURN_MS,
     autoSubmitDrafts: wordBuilding?.autoSubmitDrafts ?? false,
     wordWindow: null,
+    dictionary,
+    result: null,
   };
 }
 
@@ -307,19 +374,32 @@ function applyWord(
     throw new OfflineActionError(`${action.playerId} is out of time; the window does not reopen`);
   }
 
-  const resolution = resolveSubmission({
-    available: availableTiles(state, index),
-    submission: action.submission,
-  });
-  if (!resolution.ok) {
-    throw new WordRejectionError(resolution.reason);
-  }
-
   const slots = [...window.slots];
-  slots[index] =
-    action.type === "confirmWord"
-      ? { playerId: slot.playerId, status: "confirmed", submission: action.submission }
-      : { playerId: slot.playerId, status: "drafting", draft: action.submission };
+
+  // §19's draft is a sliding one, and clearing it is part of editing it: an empty submission
+  // is how a seat says it has typed nothing. §11 refuses an empty *word*, and that refusal
+  // still lands on a confirm below — a seat that confirms nothing never confirms at all.
+  if (action.type === "draftWord" && action.submission.plays.length === 0) {
+    slots[index] = { playerId: slot.playerId, status: "drafting", draft: null };
+  } else {
+    const resolution = resolveSubmission({
+      available: availableTiles(state, index),
+      submission: action.submission,
+    });
+
+    // §12's floor is a rule about the word a seat stands behind, not about what it is typing:
+    // a draft of one tile is a word in progress, and the floor is applied again at the confirm
+    // — the moment the submission becomes the seat's word, and the moment `slots` is built.
+    const typing = action.type === "draftWord" && !resolution.ok && resolution.reason === "too-short";
+    if (!resolution.ok && !typing) {
+      throw new WordRejectionError(resolution.reason);
+    }
+
+    slots[index] =
+      action.type === "confirmWord"
+        ? { playerId: slot.playerId, status: "confirmed", submission: action.submission }
+        : { playerId: slot.playerId, status: "drafting", draft: action.submission };
+  }
 
   const next: OfflineState = { ...state, wordWindow: { status: "open", slots } };
 
@@ -356,7 +436,8 @@ function timeoutWords(state: OfflineState, nowMs: number): OfflineState {
 /**
  * Closes §19's window: seats that never confirmed are out of time — or, when the table opted
  * into auto-submit, have the draft they left behind confirmed for them — and the hand moves
- * on to the payout. The slots outlive the close because the reveal and the pot read them.
+ * on to the payout, judged. The slots outlive the close because the reveal and the pot read
+ * them.
  */
 function settleWindow(state: OfflineState): OfflineState {
   const window = state.wordWindow;
@@ -364,7 +445,69 @@ function settleWindow(state: OfflineState): OfflineState {
 
   const slots = window.slots.map((slot, index) => closeSlot(slot, state, index));
 
-  return { ...state, phase: "payout", toActIndex: null, wordWindow: { status: "settled", slots } };
+  return {
+    ...state,
+    phase: "payout",
+    toActIndex: null,
+    wordWindow: { status: "settled", slots },
+    result: judgeWindow(state, slots),
+  };
+}
+
+/**
+ * Judges the settled window: what each seat's word was, what it scored, and where §21's
+ * ladder places the whole table.
+ *
+ * A seat is judged against its own tiles plus the board, exactly the tiles it built from, so
+ * a submission cannot be re-judged against tiles the seat never held. The ladder needs
+ * randomness only for §21.3's draw — the seats that are still tied with nothing left to
+ * compare — and that draw replays from the hand's own seed, so settling a hand twice ranks
+ * it the same way.
+ */
+function judgeWindow(state: OfflineState, slots: readonly WordSlot[]): HandResult {
+  const judged = slots.map((slot, seat) => {
+    if (slot.status !== "confirmed") {
+      // §11: no word is 0 points. The clock, not the dictionary, is what refused this seat.
+      return { playerId: slot.playerId, seat, word: null, score: null, reason: "timer-expired" as WordRejectionReason };
+    }
+
+    const evaluation = evaluateWord({
+      available: availableTiles(state, seat),
+      submission: slot.submission,
+      dictionary: state.dictionary,
+    });
+    if (!evaluation.valid) {
+      return { playerId: slot.playerId, seat, word: null, score: null, reason: evaluation.reason };
+    }
+
+    return { playerId: slot.playerId, seat, word: evaluation.word, score: scoreWord(evaluation.tiles), reason: null };
+  });
+
+  const ranking = rankShowdown({
+    entries: judged.map(({ playerId, seat, score }) => ({
+      playerId,
+      seat,
+      ...(score === null ? {} : { word: score }),
+    })),
+    rng: createRng(handSeed(state) + DRAW_SEED_SALT),
+  });
+
+  // The ladder's standings carry the seat, and both lists are seat-ordered, so a seat's word
+  // and reason come from the same index the ranking read its score from.
+  const standings = ranking.standings.map((standing) => {
+    const entry = judged[standing.seat];
+    return {
+      ...standing,
+      word: entry?.word ?? null,
+      reason: entry?.reason ?? null,
+    } satisfies OfflineStanding;
+  });
+
+  return {
+    standings,
+    comparisons: ranking.comparisons,
+    winner: standings[0]?.playerId ?? "",
+  };
 }
 
 /** How one seat's slot ends when the window closes (§19). */
@@ -388,8 +531,11 @@ function isBuildable(state: OfflineState, seatIndex: number, submission: WordSub
  * Every tile a seat may build from: its private tiles plus the whole community board (§12).
  * The seat is looked up by index because the window's slots are index-aligned with `seats`;
  * `?? []` is unreachable for a seat in the window, and is spelled out rather than cast.
+ *
+ * Exported because a caller that picks words for a seat — the offline bot, the felt's word
+ * builder — must choose from exactly the tiles the engine will judge that seat against.
  */
-function availableTiles(state: OfflineState, seatIndex: number): readonly Tile[] {
+export function availableTiles(state: OfflineState, seatIndex: number): readonly Tile[] {
   const seat = state.seats[seatIndex];
   return seat === undefined ? [] : [...seat.privateTiles, ...state.community];
 }
@@ -409,15 +555,17 @@ function nextPhase(phase: RoundPhase): RoundPhase {
 }
 
 /**
- * The hand after this one. A fresh deal from a seed derived from the hand before
- * (`seed + hand`), so the run stays reproducible without ever reshuffling tiles that
- * were already on the felt.
+ * The hand after this one. A fresh deal from the hand's own seed stepped forward, so the run
+ * stays reproducible without ever reshuffling tiles that were already on the felt — and the
+ * same table settings, dictionary included, because a table does not change its rules between
+ * hands.
  */
 function nextHand(state: OfflineState, nowMs: number): OfflineState {
   const fresh = startHand({
-    seed: state.seed + state.hand,
+    seed: handSeed(state) + 1,
     players: state.seats.map((seat) => seat.id),
     nowMs,
+    dictionary: state.dictionary,
     wordBuilding: { autoSubmitDrafts: state.autoSubmitDrafts },
   });
 

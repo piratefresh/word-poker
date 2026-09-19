@@ -32,16 +32,22 @@ The offline game plays one hand on the client, with no server in the loop:
   change how many are face up (Flop / Turn / River).
 - The streets run `preflop → flop → turn → river → payout` and reveal **0 / 3 / 4 / 5**
   community tiles respectively.
-- Betting and showdown are out of this slice, so the walk from street to street is the whole
-  round: every seat takes its turn in order, and the last seat's turn rolls the street.
+- Betting is out of this slice, so the walk from street to street is the whole round: every
+  seat takes its turn in order, and the last seat's turn rolls the street.
 - The river's last turn opens **Word Building** (§19) instead of paying out: every remaining
   seat shares one 60-second window to draft and confirm a word, and the hand pays out once
   every seat has confirmed or run out of time.
-- There is no word builder on screen yet, so tapping through the window runs its clock out —
-  no seat confirms, every seat is out of time, and each is scored 0 (§11). A confirmed word
-  is checked for whether it can be *built* (§10–§12) and nothing else: the dictionary and the
-  scoring arrive with the engine's consumers.
-- `payout` still scores the tiles by total points — the placeholder showdown, no dictionary.
+- The word builder is on screen: a seat drags or taps tiles from its rack and the board into
+  the word band, reads §11's reason when the draft cannot stand, and confirms. The bots build
+  words the same way, searching their tiles against the table's dictionary; a bot whose tiles
+  spell nothing the table counts confirms nothing, and that window ends on its clock.
+- Before play the mode names the dictionary it judges against (§11), and the table does not
+  deal until that list has loaded.
+- `payout` is the real showdown over those words: every confirmed word is judged against the
+  dictionary (§11) and scored by §7, the whole table is ranked by §21's ladder — word length,
+  then highest printed letter, then the §21.3 draw for seats with nothing left to compare —
+  and the winner is the seat on the top place. A seat with no valid word is ranked at 0
+  points, exactly as §11 says.
 
 ---
 

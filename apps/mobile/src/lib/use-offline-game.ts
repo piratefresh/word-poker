@@ -1,33 +1,41 @@
 /**
  * use-offline-game.ts — the offline adapter: engine state in, `GameScreenState` out.
  *
- * This is the thin seam between `@wordpoker/game-rules` (which knows nothing about
- * screens) and the existing `GameScreen` (which knows nothing about the engine). It owns
- * one `OfflineState`, runs the fixed bot on the bots' turns, computes the winner at
- * payout, and maps the whole thing into the shape the felt already renders.
+ * This is the thin seam between `@wordpoker/game-rules` (which knows nothing about screens)
+ * and the existing `GameScreen` (which knows nothing about the engine). It owns one
+ * `OfflineState`, runs the fixed bot on the bots' turns *and* on their words, maps the settled
+ * hand into the felt's winner, and maps everything else into the shape the felt already
+ * renders.
  *
- * Deliberately minimal: `deal()`, `advance()`, and the mapped state. The general form of
- * this — selectors, an animation-event stream, adapter lifecycle, and a source that can
- * be swapped between offline, tutorial, and the online room — is STO-277's store, and is
- * where this goes when the second adapter needs it.
+ * The dictionary arrives as an injected setting (`useDictionary` loads it one screen up), so
+ * the hand is judged against exactly the list the table displays before play.
+ *
+ * Deliberately minimal: the hand's controls and the mapped state. The general form of this —
+ * selectors, an animation-event stream, adapter lifecycle, and a source that can be swapped
+ * between offline, tutorial, and the online room — is STO-277's store, and is where this goes
+ * when the second adapter needs it.
  *
  * No server, no socket, no import from either: the screen this feeds has to work with the
  * server stopped and the device in airplane mode.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { PlayerId } from "@wordpoker/contracts";
+import type { PlayerId, TilePlay, WordRejectionReason } from "@wordpoker/contracts";
 import {
   OFFLINE_TURN_MS,
   WORD_WINDOW_MS,
+  WordRejectionError,
+  availableTiles,
+  chooseOfflineWord,
   decideOfflineMove,
-  pickWinner,
   reduce,
-  scoreHand,
+  resolveSubmission,
   startHand,
+  type Dictionary,
   type OfflineSeat,
   type OfflineState,
+  type SubmissionResolution,
 } from "@wordpoker/game-rules";
 
 import { PHASE_NUMBER } from "@/components/hud";
@@ -80,50 +88,178 @@ const NO_BETS = {
   canRaise: false,
 } as const;
 
+/** What the word builder renders while §19's window is open (docs/rules/hand-flow.md §19). */
+export interface OfflineWords {
+  /** The hero's draft in word order; the confirmed word once the hero has confirmed. */
+  readonly plays: readonly TilePlay[];
+  /** The letters those plays spell, uppercase; "" while nothing is played. */
+  readonly word: string;
+  /** Why the draft would be refused if confirmed now, or null while it would stand (§11). */
+  readonly reason: WordRejectionReason | null;
+  /** True once the hero confirmed: the word is locked and no control is live (§19). */
+  readonly confirmed: boolean;
+  /** True while the hero may still play tiles, take them back, and confirm. */
+  readonly open: boolean;
+}
+
 export interface OfflineGame {
   /** The mapped state: exactly what `GameScreen` renders. */
   game: GameScreenState;
+  /** The word builder's view, or null outside §19's window. */
+  words: OfflineWords | null;
   /** Starts the next hand. Only legal once the current hand has paid out. */
   deal: () => void;
   /**
-   * Passes the hero's turn — or, while §19's word window is open, closes the window with the
-   * clock run out. The bots take their turns on their own.
+   * Passes the hero's turn — or, while §19's window is open, closes the window with the clock
+   * run out, which is how the hero skips building a word. The bots take their turns, and
+   * their words, on their own.
    */
   advance: () => void;
+  /** Appends a play to the hero's draft; a choice tile names the face it plays (§10). */
+  play: (tileId: string, chosenFace?: string) => void;
+  /** Takes back the hero's play at `index`. */
+  removePlay: (index: number) => void;
+  /** Clears the hero's draft. */
+  clearDraft: () => void;
+  /** Confirms the hero's draft as its word (§19). */
+  confirmWord: () => void;
 }
 
 /**
- * Owns the offline hand. A turn that belongs to a bot resolves inside the same state
- * transition that reached it, so the table never sits waiting on a seat that has nobody
- * behind it — the hero taps once per street and watches the board fill.
+ * Owns the offline hand. Everything the table decides for itself — the bots' turns, the bots'
+ * words, §19's clock running out — resolves inside the same state transition that reached it,
+ * so the screen never sits waiting on a seat that has nobody behind it.
  */
-export function useOfflineGame({ seed = OFFLINE_SEED }: { seed?: number } = {}): OfflineGame {
+export function useOfflineGame({
+  seed = OFFLINE_SEED,
+  dictionary,
+}: {
+  seed?: number;
+  dictionary: Dictionary;
+}): OfflineGame {
   const [state, setState] = useState<OfflineState>(() =>
-    startHand({ seed, players: ROSTER.map((player) => player.id), nowMs: Date.now() }),
+    startHand({ seed, players: ROSTER.map((player) => player.id), nowMs: Date.now(), dictionary }),
+  );
+  const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
+
+  /**
+   * Runs one change, then lets the bots answer it. A word the engine refused leaves the table
+   * where it was and reports §11's reason instead: the payload never became the hero's word,
+   * and the next tap is the hero's to make.
+   */
+  const act = useCallback(
+    (change: (current: OfflineState) => OfflineState) => {
+      try {
+        setState(settleBots(change(state), Date.now()));
+        setRefusal(null);
+      } catch (error) {
+        if (error instanceof WordRejectionError) {
+          setRefusal(error.reason);
+          return;
+        }
+        throw error;
+      }
+    },
+    [state],
   );
 
-  const apply = useCallback((action: "deal" | "advance") => {
-    setState((current) => {
-      // §19's window is shared and has no turn to pass: a tap during it means the table is
-      // done building, so the slice runs the clock to the window's deadline and lets the
-      // timeout rule settle it — every seat that never confirmed is out of time. The word
-      // builder itself is STO-304/STO-305, and it will replace this.
-      if (current.wordWindow?.status === "open") {
-        return reduce(current, { type: "timeoutWords" }, current.endsAtMs);
-      }
+  const plays = editablePlays(state);
 
-      const next = reduce(current, { type: action }, Date.now());
-      return resolveBotTurns(next);
-    });
-  }, []);
+  const deal = useCallback(() => act((current) => reduce(current, { type: "deal" }, Date.now())), [act]);
 
-  const deal = useCallback(() => apply("deal"), [apply]);
-  const advance = useCallback(() => apply("advance"), [apply]);
+  const advance = useCallback(
+    () =>
+      act((current) =>
+        current.wordWindow?.status === "open"
+          ? // The window has no turn to pass: a tap here means the hero is done building, so
+            // the slice runs §19's clock to its deadline and lets the timeout rule settle it.
+            reduce(current, { type: "timeoutWords" }, current.endsAtMs)
+          : reduce(current, { type: "advance" }, Date.now()),
+      ),
+    [act],
+  );
 
-  return { game: useMemo(() => toScreenState(state), [state]), deal, advance };
+  const draft = useCallback(
+    (next: readonly TilePlay[]) =>
+      act((current) =>
+        reduce(
+          current,
+          { type: "draftWord", playerId: HERO_ID, submission: { plays: [...next] } },
+          Date.now(),
+        ),
+      ),
+    [act],
+  );
+
+  const play = useCallback(
+    (tileId: string, chosenFace?: string) => {
+      if (plays === null) return;
+      draft([...plays, chosenFace === undefined ? { tileId } : { tileId, chosenFace }]);
+    },
+    [draft, plays],
+  );
+
+  const removePlay = useCallback(
+    (index: number) => {
+      if (plays === null) return;
+      draft(plays.filter((_, at) => at !== index));
+    },
+    [draft, plays],
+  );
+
+  const clearDraft = useCallback(() => {
+    if (plays === null) return;
+    draft([]);
+  }, [draft, plays]);
+
+  const confirmWord = useCallback(() => {
+    if (plays === null || plays.length === 0) return;
+    act((current) =>
+      reduce(current, { type: "confirmWord", playerId: HERO_ID, submission: { plays: [...plays] } }, Date.now()),
+    );
+  }, [act, plays]);
+
+  // §19's clock belongs to the table, not to the hero's taps: a window that runs out with a
+  // seat still drafting settles on its own, a beat after the deadline so the engine reads the
+  // clock as run out rather than a millisecond early.
+  useEffect(() => {
+    if (state.wordWindow?.status !== "open") return;
+
+    const timer = setTimeout(() => {
+      setState((current) =>
+        current.wordWindow?.status === "open"
+          ? settleBots(reduce(current, { type: "timeoutWords" }, Math.max(Date.now(), current.endsAtMs)), Date.now())
+          : current,
+      );
+    }, Math.max(state.endsAtMs - Date.now(), 0) + 25);
+
+    return () => clearTimeout(timer);
+  }, [state.wordWindow, state.endsAtMs]);
+
+  return {
+    game: useMemo(() => toScreenState(state), [state]),
+    words: useMemo(() => wordsOf(state, refusal), [state, refusal]),
+    deal,
+    advance,
+    play,
+    removePlay,
+    clearDraft,
+    confirmWord,
+  };
 }
 
-/** Passes every consecutive bot turn, stopping at the hero, at §19's window, or at payout. */
+/** The hero's plays while it can still edit them, or null when the window is closed or locked. */
+function editablePlays(state: OfflineState): readonly TilePlay[] | null {
+  const window = state.wordWindow;
+  if (window === null || window.status !== "open") return null;
+
+  const slot = window.slots.find((candidate) => candidate.playerId === HERO_ID);
+  return slot?.status === "drafting" ? slot.draft?.plays ?? [] : null;
+}
+
+/**
+ * Passes every consecutive bot turn, stopping at the hero, at §19's window, or at payout.
+ */
 function resolveBotTurns(state: OfflineState): OfflineState {
   let next = state;
 
@@ -136,8 +272,80 @@ function resolveBotTurns(state: OfflineState): OfflineState {
   return next;
 }
 
-function actingSeat(state: OfflineState): OfflineSeat | undefined {
-  return state.toActIndex === null ? undefined : state.seats[state.toActIndex];
+/**
+ * Plays every bot's word for it: §19's window is shared and has no turn to take, so a seat
+ * with nobody behind it answers through this instead.
+ *
+ * A bot whose tiles spell nothing the table counts confirms nothing and runs out with the
+ * clock, which §11 scores 0 — the same as any seat that never confirmed.
+ */
+function settleBots(state: OfflineState, nowMs: number): OfflineState {
+  let next = resolveBotTurns(state);
+
+  for (const [index, seat] of next.seats.entries()) {
+    if (seat.id === HERO_ID || next.wordWindow?.status !== "open") continue;
+
+    const slot = next.wordWindow.slots[index];
+    if (slot?.status !== "drafting") continue;
+
+    const submission = chooseOfflineWord({ available: availableTiles(next, index), dictionary: next.dictionary });
+    if (submission === null) continue;
+
+    next = reduce(next, { type: "confirmWord", playerId: seat.id, submission }, nowMs);
+  }
+
+  return next;
+}
+
+/**
+ * What the word builder shows: the hero's plays, the word they spell, and whether §11 would
+ * take it — the engine's own answer, computed here for the instant preview the client is
+ * allowed to give itself (AGENTS.md). The payout re-judges the same submission authoritatively.
+ */
+function wordsOf(state: OfflineState, refusal: WordRejectionReason | null): OfflineWords | null {
+  const window = state.wordWindow;
+  if (window === null) return null;
+
+  const index = state.seats.findIndex((seat) => seat.id === HERO_ID);
+  const slot = window.slots[index];
+  const plays =
+    slot?.status === "confirmed"
+      ? slot.submission.plays
+      : slot?.status === "drafting"
+        ? slot.draft?.plays ?? []
+        : [];
+
+  const resolution = resolveSubmission({
+    available: availableTiles(state, index),
+    submission: { plays: [...plays] },
+  });
+
+  return {
+    plays,
+    word: resolution.ok ? resolution.word : "",
+    reason: refusal ?? previewReason(plays.length, resolution, state.dictionary),
+    confirmed: slot?.status === "confirmed",
+    open: window.status === "open" && slot?.status === "drafting",
+  };
+}
+
+/** §11's answer for a draft that has not been confirmed yet; an empty or partial draft is not a refusal. */
+function previewReason(
+  played: number,
+  resolution: SubmissionResolution,
+  dictionary: Dictionary,
+): WordRejectionReason | null {
+  if (played === 0) return null;
+  // A one-letter draft is a word in progress, exactly as the window treats it: the floor
+  // belongs to the confirm, not to the typing.
+  if (!resolution.ok) return resolution.reason === "too-short" ? null : resolution.reason;
+  return dictionary.isWord(resolution.word) ? null : "not-in-dictionary";
+}
+
+/** Everyone's standing at payout, and who it awards. */
+function winnerOf(state: OfflineState): { id: PlayerId; score: number } | null {
+  const best = state.result?.standings[0];
+  return best === undefined ? null : { id: best.playerId, score: best.score };
 }
 
 /**
@@ -170,18 +378,6 @@ function toScreenState(state: OfflineState): GameScreenState {
   };
 }
 
-/** Everyone's standing at payout, and who it awards. */
-function winnerOf(state: OfflineState): { id: PlayerId; score: number } {
-  const standings = state.seats.map((seat, index) => ({
-    id: seat.id,
-    score: scoreHand(seat.privateTiles, state.community),
-    seat: index,
-  }));
-  const id = pickWinner(standings);
-
-  return { id, score: standings.find((entry) => entry.id === id)?.score ?? 0 };
-}
-
 function player(
   seat: OfflineSeat,
   index: number,
@@ -210,6 +406,10 @@ function seatStatus(
   if (actingSeat(state)?.id !== seat.id) return "waiting";
 
   return seat.id === HERO_ID ? "your-turn" : "thinking";
+}
+
+function actingSeat(state: OfflineState): OfflineSeat | undefined {
+  return state.toActIndex === null ? undefined : state.seats[state.toActIndex];
 }
 
 /**

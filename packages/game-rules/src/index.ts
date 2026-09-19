@@ -35,16 +35,25 @@ export {
   showdownDrawValue,
 } from "./showdown";
 export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
-export { decideOfflineMove } from "./bot";
+export { decideOfflineMove, chooseOfflineWord } from "./bot";
+export type { ChooseWordOptions } from "./bot";
 export {
   OFFLINE_TURN_MS,
   OfflineActionError,
+  availableTiles,
   reduce,
   revealedCount,
   startHand,
   WORD_WINDOW_MS,
   WordRejectionError,
 } from "./offline";
-export type { OfflineSeat, OfflineState, StartHandOptions, WordSlot, WordWindow } from "./offline";
-export { NoPlayersError, pickWinner, scoreHand, scoreWord } from "./scoring";
-export type { ScoredPlayer } from "./scoring";
+export type {
+  HandResult,
+  OfflineSeat,
+  OfflineStanding,
+  OfflineState,
+  StartHandOptions,
+  WordSlot,
+  WordWindow,
+} from "./offline";
+export { scoreWord } from "./scoring";

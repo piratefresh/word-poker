@@ -1,4 +1,10 @@
-import { fireEvent, render, type RenderResult } from "@testing-library/react-native";
+import { act, fireEvent, render, type RenderResult } from "@testing-library/react-native";
+
+import type { Tile } from "@wordpoker/contracts";
+import { WORD_WINDOW_MS, dealHand, type Dictionary } from "@wordpoker/game-rules";
+
+import { testDictionary } from "@/lib/dictionary-fixtures";
+import { OFFLINE_SEED } from "@/lib/use-offline-game";
 
 import { OfflineGameScreen } from "./offline-game-screen";
 
@@ -20,6 +26,23 @@ jest.mock("expo-router", () => ({
 jest.mock("react-native-reanimated", () => ({
   ...jest.requireActual<Record<string, unknown>>("react-native-reanimated/mock"),
   useReducedMotion: () => false,
+}));
+
+/**
+ * The hero's own two tiles, as the offline deal will give them, and the word they spell.
+ * The screen deals for itself, so the fixture has to read the same deal the hook makes.
+ */
+const HERO_TILES: readonly Tile[] = dealHand({ seed: OFFLINE_SEED, playerCount: 4 }).privateTiles[0] ?? [];
+
+const HERO_WORD = HERO_TILES.map((tile) =>
+  "sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter,
+).join("");
+
+/** The table's vocabulary, injected: the drawer this screen loads holds the hero's word. */
+let mockDictionary: Dictionary | null = testDictionary([HERO_WORD]);
+
+jest.mock("@/lib/use-dictionary", () => ({
+  useDictionary: () => mockDictionary,
 }));
 
 /**
@@ -53,7 +76,38 @@ function expectBoard(view: RenderResult, dealt: number) {
   expect(view.getByText(`COMMUNITY · ${dealt}/5`)).toBeOnTheScreen();
 }
 
+/** Four taps walk preflop → flop → turn → river; the river's close opens §19's window. */
+async function advanceToWordWindow(view: RenderResult) {
+  for (let street = 0; street < 4; street += 1) {
+    await fireEvent.press(roundButton(view, "Advance"));
+  }
+}
+
+/** The hero plays both of its tiles and confirms the word they spell. */
+async function buildHeroWord(view: RenderResult) {
+  for (const tile of HERO_TILES) {
+    await fireEvent.press(view.getByTestId(`word-builder-tile-${tile.id}`));
+  }
+  await fireEvent.press(view.getByTestId("word-builder-confirm"));
+}
+
 describe("<OfflineGameScreen />", () => {
+  beforeEach(() => {
+    mockDictionary = testDictionary([HERO_WORD]);
+  });
+
+  test("holds the table until the dictionary is in hand", async () => {
+    mockDictionary = null;
+
+    // No felt to measure yet: this is the state the screen is in before the list arrives.
+    const view = await render(<OfflineGameScreen />);
+
+    // §11 wants the word list on screen before play, and the hand is judged against it, so
+    // the felt does not draw until it has arrived.
+    expect(view.getByText("Setting the table…")).toBeOnTheScreen();
+    expect(view.queryByText("PHASE 2 · PRE-FLOP")).toBeNull();
+  });
+
   test("deals a hand and puts the hero on the clock", async () => {
     const view = await renderTable();
 
@@ -83,19 +137,34 @@ describe("<OfflineGameScreen />", () => {
     }
   });
 
-  test("shows the winner at payout, then deals the next hand", async () => {
+  test("hands the band to the word builder when §19's window opens", async () => {
     const view = await renderTable();
 
-    for (let street = 0; street < 4; street += 1) {
-      await fireEvent.press(roundButton(view, "Advance"));
-    }
+    expect(view.queryByTestId("word-builder")).toBeNull();
 
-    // §19's window stands between the river and the payout: the tap that would have paid
-    // out opens it, and the next one closes it with the clock run out.
-    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
-    expectBoard(view, 5);
+    await advanceToWordWindow(view);
 
-    await fireEvent.press(roundButton(view, "Advance"));
+    // The draft is the hero's own work now: the builder owns the band, the round's tap is
+    // gone, and §11's vocabulary is named above the tiles.
+    expect(view.getByTestId("word-builder")).toBeOnTheScreen();
+    expect(view.queryByText("Advance")).toBeNull();
+    expect(view.getByText(/en_US-large/)).toBeOnTheScreen();
+  });
+
+  test("plays a word from the rack, then pays out and deals the next hand", async () => {
+    // §19's window is a clock, and a clock is what this test has to own: a seat that never
+    // confirms — here, a bot whose tiny vocabulary holds nothing it can spell — leaves the
+    // window to run out, and the hook's own timer is what settles it.
+    jest.useFakeTimers();
+
+    const view = await renderTable();
+    await advanceToWordWindow(view);
+
+    await buildHeroWord(view);
+
+    await act(async () => {
+      jest.advanceTimersByTime(WORD_WINDOW_MS + 100);
+    });
 
     expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
     expect(view.getAllByText("WINNER")).toHaveLength(1);
@@ -104,6 +173,8 @@ describe("<OfflineGameScreen />", () => {
 
     expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
     expectBoard(view, 0);
+
+    jest.useRealTimers();
   });
 
   test("leaves the round where it was when a disabled betting control is pressed", async () => {

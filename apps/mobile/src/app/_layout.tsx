@@ -4,11 +4,20 @@ import { NotoSerif_400Regular, NotoSerif_700Bold } from '@expo-google-fonts/noto
 import { useFonts } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { authClient } from '@/lib/auth-client';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Gesture Handler's root, because the app now owns gestures: the word builder's tiles are
+ * dragged with `react-native-reanimated-dnd`, which rides on this view the same way every
+ * Gesture Handler app does. Above the theme provider, so nothing inside has to know.
+ */
+const styles = StyleSheet.create({ root: { flex: 1 } });
 
 export default function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
@@ -31,23 +40,25 @@ export default function RootLayout() {
   if (isPending || !fontsLoaded) return null;
 
   return (
-    <ThemeProvider value={DarkTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Protected guard={!session}>
-          <Stack.Screen name="sign-in" />
-          <Stack.Screen name="sign-up" />
-          <Stack.Screen name="forgot-password" />
-        </Stack.Protected>
-        <Stack.Protected guard={!!session}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="tutorial" />
-          <Stack.Screen name="offline" />
-        </Stack.Protected>
-        {/* Outside the guards: the emailed reset link may land while a stale
-            session is still on the device, and the reset has to win. */}
-        <Stack.Screen name="reset-password" />
-      </Stack>
-      <AnimatedSplashOverlay />
-    </ThemeProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <ThemeProvider value={DarkTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Protected guard={!session}>
+            <Stack.Screen name="sign-in" />
+            <Stack.Screen name="sign-up" />
+            <Stack.Screen name="forgot-password" />
+          </Stack.Protected>
+          <Stack.Protected guard={!!session}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="tutorial" />
+            <Stack.Screen name="offline" />
+          </Stack.Protected>
+          {/* Outside the guards: the emailed reset link may land while a stale
+              session is still on the device, and the reset has to win. */}
+          <Stack.Screen name="reset-password" />
+        </Stack>
+        <AnimatedSplashOverlay />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
