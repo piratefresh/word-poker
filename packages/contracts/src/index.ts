@@ -21,5 +21,13 @@ export {
   type WordScore,
   type WordSubmission,
 } from "./words";
+export {
+  SHOWDOWN_DECIDERS,
+  type ShowdownComparison,
+  type ShowdownComparisonValue,
+  type ShowdownDecider,
+  type ShowdownRanking,
+  type ShowdownStanding,
+} from "./showdown";
 export type { PlayerId } from "./players";
 export type { OfflineAction } from "./actions";

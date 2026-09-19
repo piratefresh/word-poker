@@ -9,9 +9,11 @@
  * letters of a sequence tile are already pinned by the time anything is added up: scoring
  * never re-reads a tile, and cannot disagree with building about what was spelled.
  *
- * `pickWinner` and `ScoredPlayer` are the table's half of the module: "highest score, ties to
- * the lowest seat" is a property of the table, not of how a score was computed, so the same
- * functions serve the real path and the placeholder below.
+ * `pickWinner` and `ScoredPlayer` are the offline slice's half of the module, and they are
+ * placeholders: the showdown a real hand ends in is §21's ladder over everyone's scores,
+ * which is `./showdown`'s `rankShowdown` — an ordered ranking, ties broken by word length,
+ * then by the highest printed letter, then by drawn tiles, never by seat. These two stay
+ * only until STO-305 gives the slice a word to submit, and go with it.
  *
  * Everything here is deterministic and pure: same tiles in, same numbers out, no clock and no
  * ambient randomness — it reads nothing outside its arguments, so the client can recompute a
@@ -92,9 +94,9 @@ export function scoreWord(tiles: readonly TilePlayResolution[]): WordScore {
 /**
  * One player's standing at the table, reduced to what awarding the pot needs.
  *
- * `seat` is the seat index the player occupies, and it is the only tie-breaker: seating
- * is fixed when the hand starts, so two players on equal scores always resolve the same
- * way no matter what order the engine happens to hand them over in.
+ * PLACEHOLDER — the real showdown ranks every seat by §21's ladder (`./showdown`), where the
+ * lower seat number is not a tie-break at all. This shape carries the seat because the
+ * offline slice's placeholder below uses it as one.
  */
 export interface ScoredPlayer {
   id: PlayerId;
