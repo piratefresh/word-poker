@@ -6,7 +6,7 @@ import type { Dictionary } from "@wordpoker/game-rules";
 
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { WordBuilder } from "@/components/screens/offline/word-builder";
-import { colors, palette, spacing, type } from "@/constants/theme";
+import { border, colors, palette, spacing, type } from "@/constants/theme";
 import { useDictionary } from "@/lib/use-dictionary";
 import { useOfflineGame } from "@/lib/use-offline-game";
 
@@ -109,8 +109,16 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: palette.felt800, flex: 1 },
   loading: { alignItems: "center", flex: 1, justifyContent: "center" },
   loadingText: { ...type.bodyDim },
-  table: { flex: 1 },
-  controls: { alignItems: "center", paddingTop: spacing.sm * 2 },
+  table: { flex: 1, overflow: "hidden" },
+  // §19's builder is a sheet under the felt, not a floating panel: it paints the felt's own
+  // colour so nothing shows through it, and the felt above is clipped to the room it has.
+  controls: {
+    alignItems: "center",
+    backgroundColor: palette.felt800,
+    borderTopColor: colors.borderFaint,
+    borderTopWidth: border.hairline,
+    paddingTop: spacing.sm * 2,
+  },
   // `@expo/ui`'s host hugs its parent's start edge by default, so the pill asks for the
   // centre itself rather than relying on the row's alignment.
   host: { alignSelf: "center" },

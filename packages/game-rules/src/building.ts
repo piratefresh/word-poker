@@ -126,6 +126,41 @@ export interface ResolveSubmissionOptions {
 }
 
 /**
+ * The letters a submission spells, tile by tile, before §12's floor and §11's list are
+ * applied.
+ *
+ * This is what a seat has *typed*: a draft of one tile has a letter, even though no word of
+ * one letter can stand. The word window and the felt's word builder both show it, so the
+ * seat sees the letters it has played while `resolveSubmission` still refuses to call it a
+ * word. A play naming a tile that is not held, or a face the tile does not print, contributes
+ * nothing here rather than throwing: it is display, and the refusal is the caller's to read
+ * off `resolveSubmission`.
+ *
+ * @param options The seat's tiles and the submission to spell.
+ */
+export function spellSubmission({ available, submission }: ResolveSubmissionOptions): string {
+  let word = "";
+
+  for (const play of submission.plays) {
+    const tile = available.find((candidate) => candidate.id === play.tileId);
+    if (tile === undefined) {
+      continue;
+    }
+
+    const resolution = resolvePlay(tile, play);
+    if (!resolution.ok) {
+      continue;
+    }
+
+    for (const letter of resolution.play.letters) {
+      word += letter.letter;
+    }
+  }
+
+  return word;
+}
+
+/**
  * Resolves a submission against the tiles in play: the word the plays spell, the tile behind
  * every letter, or the §10–§12 reason it cannot be built at all.
  *
