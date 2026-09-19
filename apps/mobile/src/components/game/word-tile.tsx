@@ -1,3 +1,4 @@
+import type { Tile as WireTile } from "@wordpoker/contracts";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -32,13 +33,12 @@ import {
   palette,
 } from "@/constants/theme";
 
-export type TileId = string;
 export type TileMultiplier = "double-letter" | "triple-letter";
-export interface TileData {
-  id: TileId;
-  letter: string;
-  points: number;
-  alternativeLetter?: string;
+/**
+ * The tile this component draws: the wire shape (contracts' `Tile`, aliased here
+ * because this module's own `Tile` is the renderer) plus the UI-only badge.
+ */
+export interface TileData extends WireTile {
   multiplier?: TileMultiplier;
 }
 export type TileSide = "front" | "back";

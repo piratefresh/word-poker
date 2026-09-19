@@ -19,6 +19,7 @@
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/noto-serif": "^0.4.2",
     "@expo/ui": "~57.0.18",
+    "@wordpoker/contracts": "workspace:*",
     "better-auth": "^1.7.4",
     "dotenv": "17.4.2",
     "expo": "~57.0.21",
