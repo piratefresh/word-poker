@@ -52,8 +52,8 @@ builds; the bag is shuffled with an injected seed, so the same seed deals the sa
 | X    | X       |     1 |      8 |                                                                      |
 | Y    | Y       |     2 |      5 |                                                                      |
 | Z    | Z       |     1 |     10 |                                                                      |
-| A/E  | A or E  |     1 |      1 | Two-letter choice tile — plays as A or E, worth the higher letter    |
-| T/S  | T or S  |     1 |      2 | Two-letter choice tile — plays as T or S, worth the higher letter    |
+| A/E  | A or E  |     1 |      1 | Two-letter choice tile — plays as A or E, scores the value of the chosen face |
+| T/S  | T or S  |     1 |      2 | Two-letter choice tile — plays as T or S, scores the value of the chosen face |
 
 **Total: 100 tiles** (98 single-letter + 2 two-letter).
 
@@ -61,11 +61,13 @@ Because the two-letter tiles are bag members like any other, a hand can show at 
 of them, which satisfies the "never more than three" rule in
 [Two-Letter Tiles](tiles.md) without a separate placement rule.
 
-<!-- TBD: the tiles doc also describes fixed two-letter sequence tiles (TH, ER) and lets the
-     two-letter placement vary per hand ("usually one private, usually one community,
-     occasionally a third"). A fixed-sequence tile needs a second field on the tile
-     contract, and the placement policy needs a generation step; both land with the
-     word-scoring epic, not this slice. -->
+<!-- Contract status: the fixed-sequence tile shape and the letter-multiplier field exist on
+     the tile contract (`packages/contracts/src/tiles.ts`: `SequenceTile`, `LetterMultiplier`);
+     word-building honours §10 (`packages/game-rules/src/building.ts`, STO-301/STO-329) and
+     §6–§9 scoring is implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's
+     per-letter breakdown), with §6's values pinned to the table above by a drift-guard test.
+     Deal-time generation and placement of those tiles is still open — see the Two-Letter Tiles
+     section above and STO-325. -->
 
 ---
 

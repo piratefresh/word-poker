@@ -1,4 +1,4 @@
-import type { Tile as WireTile } from "@wordpoker/contracts";
+import type { LetterMultiplier, Tile as WireTile } from "@wordpoker/contracts";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -33,14 +33,13 @@ import {
   palette,
 } from "@/constants/theme";
 
-export type TileMultiplier = "double-letter" | "triple-letter";
 /**
- * The tile this component draws: the wire shape (contracts' `Tile`, aliased here
- * because this module's own `Tile` is the renderer) plus the UI-only badge.
+ * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
+ * this module's own `Tile` is the renderer). A tile is one of three shapes — a single
+ * letter, a choice pair (A/E), or a printed sequence (TH) — and the component reads the
+ * second face from whichever the tile carries.
  */
-export interface TileData extends WireTile {
-  multiplier?: TileMultiplier;
-}
+export type TileData = WireTile;
 export type TileSide = "front" | "back";
 export type TileSize = "small" | "medium" | "large";
 export type TileOwnership = "private" | "community" | "neutral";
@@ -116,16 +115,45 @@ const OWNERSHIP_BORDER: Record<TileOwnership, string> = {
   community: "#76955f",
   neutral: "rgba(120,80,20,0.34)",
 };
-const MULTIPLIER_LABEL: Record<TileMultiplier, string> = {
+const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
   "double-letter": "2L",
   "triple-letter": "3L",
 };
 
+/**
+ * The second face a tile prints, with the mark that says how the two play together: a
+ * slash means either face (`A/E`), nothing means both in order (`TH`). Absent on a
+ * single-letter tile.
+ */
+function secondFace(tile: TileData): { letter: string; separator: string } | null {
+  if ("sequenceLetter" in tile) return { letter: tile.sequenceLetter, separator: "" };
+  if ("alternativeLetter" in tile) return { letter: tile.alternativeLetter, separator: "/" };
+  return null;
+}
+
+/**
+ * What the face shows as the tile's value: both letters of a sequence (they always play
+ * together), the one value of a single letter, and a choice tile's separate values only
+ * when its faces disagree — A/E showing `1`, a hypothetical Q/K showing `10/5`.
+ */
+function facePoints(tile: TileData): readonly number[] {
+  if ("sequenceLetter" in tile) return [tile.points + tile.sequencePoints];
+  if ("alternativeLetter" in tile && tile.alternativePoints !== tile.points) {
+    return [tile.points, tile.alternativePoints];
+  }
+  return [tile.points];
+}
+
 export function getTileAccessibilityLabel(tile: TileData): string {
-  const letters = tile.alternativeLetter
-    ? `${tile.letter} or ${tile.alternativeLetter}`
-    : tile.letter;
-  const points = `${tile.points} ${tile.points === 1 ? "point" : "points"}`;
+  const second = secondFace(tile);
+  const letters =
+    second === null
+      ? tile.letter
+      : "sequenceLetter" in tile
+        ? `${tile.letter} then ${second.letter}`
+        : `${tile.letter} or ${second.letter}`;
+  const values = facePoints(tile);
+  const points = values.length === 1 && values[0] === 1 ? "1 point" : `${values.join(" or ")} points`;
   return `${letters}, ${points}${tile.multiplier ? `, ${tile.multiplier.replace("-", " ")}` : ""}`;
 }
 
@@ -147,6 +175,7 @@ export function Tile({
   testID,
 }: TileProps) {
   const metrics = TILE_METRICS[size];
+  const second = secondFace(tile);
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -458,27 +487,29 @@ export function Tile({
                 style={[
                   styles.letter,
                   {
-                    fontSize: tile.alternativeLetter
-                      ? metrics.alternateSize
-                      : metrics.letterSize,
+                    fontSize: second === null
+                      ? metrics.letterSize
+                      : metrics.alternateSize,
                   },
                 ]}
               >
                 {tile.letter}
               </Text>
-              {tile.alternativeLetter ? (
+              {second === null ? null : (
                 <>
-                  <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>
-                    /
-                  </Text>
+                  {second.separator === "" ? null : (
+                    <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>
+                      {second.separator}
+                    </Text>
+                  )}
                   <Text
                     maxFontSizeMultiplier={1.2}
                     style={[styles.letter, { fontSize: metrics.alternateSize }]}
                   >
-                    {tile.alternativeLetter}
+                    {second.letter}
                   </Text>
                 </>
-              ) : null}
+              )}
             </View>
             <Text
               maxFontSizeMultiplier={1.2}
@@ -491,7 +522,7 @@ export function Tile({
                 },
               ]}
             >
-              {tile.points}
+              {facePoints(tile).join("/")}
             </Text>
           </LinearGradient>
         </Animated.View>

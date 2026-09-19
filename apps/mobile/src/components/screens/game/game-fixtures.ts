@@ -53,7 +53,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
     },
   ],
   community: [
-    { id: "community-ae", letter: "A", alternativeLetter: "E", points: 1 },
+    { id: "community-ae", letter: "A", alternativeLetter: "E", points: 1, alternativePoints: 1 },
     { id: "community-n", letter: "N", points: 2 },
     { id: "community-o", letter: "O", points: 1 },
     null,

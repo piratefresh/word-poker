@@ -1,16 +1,18 @@
 /**
  * The tile bag: what a Word Poker set contains, and how tiles come out of it.
  *
- * Every number here is transcribed from docs/FINAL_RULES.md — counts from §"Tile Bag
- * Distribution", values from §"Letter Point Values" — because the bag is the one piece of
- * shared state both sides must agree on down to the last tile: the server deals from it,
- * the client replays the same seed, and an extra `A` on one side is a hand that
- * reconciles to nothing. The module is pure: the bag comes from a constant table, and the
- * only randomness in a draw is the caller's injected `rng` (AGENTS.md) — never
- * `Math.random`, never a clock.
+ * The counts here are transcribed from docs/FINAL_RULES.md §"Tile Bag Distribution", and
+ * the values come from §6 through `./letters`, which owns the package's one letter→value
+ * table. The bag is the one piece of shared state both sides must agree on down to the
+ * last tile: the server deals from it, the client replays the same seed, and an extra `A`
+ * on one side is a hand that reconciles to nothing. The module is pure: the bag comes from
+ * a constant table, and the only randomness in a draw is the caller's injected `rng`
+ * (AGENTS.md) — never `Math.random`, never a clock.
  */
 
 import type { Tile } from "@wordpoker/contracts";
+
+import { LETTER_VALUES, type Letter } from "./letters";
 
 /** How many tiles a fresh bag holds: 98 single letters plus the two two-letter tiles. */
 export const TILE_BAG_SIZE = 100;
@@ -32,53 +34,61 @@ export class NotEnoughTilesError extends Error {
 }
 
 /**
- * The single-letter half of the bag, one entry per letter, in alphabetical order.
+ * The single-letter half of the bag, one entry per letter, in alphabetical order: the
+ * counts of §"Tile Bag Distribution", which the rules document states per tile.
  *
- * Each entry is `[letter, copies, points]`. Both columns come from the rules doc, and
- * they are transcribed into one table on purpose: a tile needs its count and its value
- * together, and two parallel lists are exactly how a bag ends up summing to 101, or
- * valuing `Z` at the wrong tier.
+ * Values are deliberately absent. A letter's worth lives in {@link LETTER_VALUES} (§6) and
+ * nowhere else, so the two facts stay in the two tables the rules document keeps them in —
+ * "how many A tiles" here, "what an A is worth" there — instead of one table restating the
+ * other and eventually disagreeing with it.
  */
-const SINGLE_LETTER_TILES: readonly (readonly [letter: string, copies: number, points: number])[] = [
-  ["A", 9, 1],
-  ["B", 2, 4],
-  ["C", 2, 4],
-  ["D", 4, 3],
-  ["E", 12, 1],
-  ["F", 2, 5],
-  ["G", 3, 3],
-  ["H", 2, 5],
-  ["I", 9, 1],
-  ["J", 1, 8],
-  ["K", 1, 5],
-  ["L", 4, 2],
-  ["M", 2, 4],
-  ["N", 6, 2],
-  ["O", 8, 1],
-  ["P", 2, 4],
-  ["Q", 1, 10],
-  ["R", 6, 2],
-  ["S", 4, 2],
-  ["T", 6, 2],
-  ["U", 4, 1],
-  ["V", 2, 5],
-  ["W", 2, 5],
-  ["X", 1, 8],
-  ["Y", 2, 5],
-  ["Z", 1, 10],
+const SINGLE_LETTER_TILES: readonly (readonly [letter: Letter, copies: number])[] = [
+  ["A", 9],
+  ["B", 2],
+  ["C", 2],
+  ["D", 4],
+  ["E", 12],
+  ["F", 2],
+  ["G", 3],
+  ["H", 2],
+  ["I", 9],
+  ["J", 1],
+  ["K", 1],
+  ["L", 4],
+  ["M", 2],
+  ["N", 6],
+  ["O", 8],
+  ["P", 2],
+  ["Q", 1],
+  ["R", 6],
+  ["S", 4],
+  ["T", 6],
+  ["U", 4],
+  ["V", 2],
+  ["W", 2],
+  ["X", 1],
+  ["Y", 2],
+  ["Z", 1],
 ];
 
 /**
- * The two two-letter choice tiles, as `[letter, alternativeLetter, points]`.
+ * The two two-letter choice tiles, as
+ * `[letter, alternativeLetter, points, alternativePoints]`.
  *
- * A choice tile plays as either of its letters, so it is worth the higher of the two —
- * `A`/`E` are both 1, `T`/`S` are both 2 — and it carries the second letter in
- * `alternativeLetter` for the word check (`@wordpoker/contracts`'s `Tile`). They are bag
- * members like any other, which is what caps a hand at two of them.
+ * A choice tile plays as either of its faces, and the face the player picked is the one
+ * that scores (§10), so each face carries its own value rather than a single number for
+ * the tile. Both pairs shipped here happen to be equal-valued — A/E are 1 and 1, T/S are
+ * 2 and 2 — and the rules' other pairs (Q/K) are not, which is why the field exists. They
+ * are bag members like any other, which is what caps a hand at two of them.
  */
-const TWO_LETTER_TILES: readonly (readonly [letter: string, alternativeLetter: string, points: number])[] = [
-  ["A", "E", 1],
-  ["T", "S", 2],
+const TWO_LETTER_TILES: readonly (readonly [
+  letter: string,
+  alternativeLetter: string,
+  points: number,
+  alternativePoints: number,
+])[] = [
+  ["A", "E", 1, 1],
+  ["T", "S", 2, 2],
 ];
 
 /**
@@ -96,14 +106,21 @@ const TWO_LETTER_TILES: readonly (readonly [letter: string, alternativeLetter: s
 export function createTileBag(): Tile[] {
   const bag: Tile[] = [];
 
-  for (const [letter, copies, points] of SINGLE_LETTER_TILES) {
+  for (const [letter, copies] of SINGLE_LETTER_TILES) {
+    const points = LETTER_VALUES[letter];
     for (let copy = 1; copy <= copies; copy += 1) {
       bag.push({ id: `${letter}-${copy}`, letter, points });
     }
   }
 
-  for (const [letter, alternativeLetter, points] of TWO_LETTER_TILES) {
-    bag.push({ id: `${letter}${alternativeLetter}-1`, letter, alternativeLetter, points });
+  for (const [letter, alternativeLetter, points, alternativePoints] of TWO_LETTER_TILES) {
+    bag.push({
+      id: `${letter}${alternativeLetter}-1`,
+      letter,
+      points,
+      alternativeLetter,
+      alternativePoints,
+    });
   }
 
   return bag;

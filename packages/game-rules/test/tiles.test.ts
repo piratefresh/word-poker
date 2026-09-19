@@ -51,13 +51,13 @@ const PINNED_POINTS: Readonly<Record<number, string>> = {
 };
 
 /**
- * The single-letter tiles of one letter, in bag order. The `alternativeLetter` test is
- * the point of naming this at all: the two choice tiles carry `letter` `A` and `T`, so a
- * plain `letter` filter would count them as another copy of those letters and quietly
+ * The single-letter tiles of one letter, in bag order. Telling the two-letter tiles apart
+ * is the point of naming this at all: the two choice tiles carry `letter` `A` and `T`, so
+ * a plain `letter` filter would count them as another copy of those letters and quietly
  * make every count below wrong.
  */
 function letterTiles(bag: readonly Tile[], letter: string): Tile[] {
-  return bag.filter((tile) => tile.letter === letter && tile.alternativeLetter === undefined);
+  return bag.filter((tile) => tile.letter === letter && !("alternativeLetter" in tile));
 }
 
 describe("createTileBag", () => {
@@ -104,8 +104,8 @@ describe("createTileBag", () => {
 
   it("accounts for the whole bag in the table plus the two choice tiles", () => {
     const bag = createTileBag();
-    const singleLetters = bag.filter((tile) => tile.alternativeLetter === undefined);
-    const choiceTiles = bag.filter((tile) => tile.alternativeLetter !== undefined);
+    const singleLetters = bag.filter((tile) => !("alternativeLetter" in tile));
+    const choiceTiles = bag.filter((tile) => "alternativeLetter" in tile);
     const counted = Object.values(PINNED_DISTRIBUTION).reduce((total, [copies]) => total + copies, 0);
 
     assert.equal(counted, 98);
@@ -114,10 +114,10 @@ describe("createTileBag", () => {
     assert.equal(singleLetters.length + choiceTiles.length, TILE_BAG_SIZE);
   });
 
-  it("ends the bag with the two two-letter choice tiles", () => {
+  it("ends the bag with the two two-letter choice tiles, each face valued", () => {
     assert.deepEqual(createTileBag().slice(-2), [
-      { id: "AE-1", letter: "A", alternativeLetter: "E", points: 1 },
-      { id: "TS-1", letter: "T", alternativeLetter: "S", points: 2 },
+      { id: "AE-1", letter: "A", alternativeLetter: "E", points: 1, alternativePoints: 1 },
+      { id: "TS-1", letter: "T", alternativeLetter: "S", points: 2, alternativePoints: 2 },
     ]);
   });
 
