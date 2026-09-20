@@ -1,6 +1,7 @@
 # The offline hand, played end to end against the web build:
-# deal → four taps to the river → §19's window opens → build a word from the rack →
-# confirm → §11 judges it against the real dictionary → §21 names a winner → next hand.
+# deal → real betting rounds to the river → a hero BET → §19's window opens → build a word
+# from the rack → confirm → §11 judges it against the real dictionary → §21 names a winner →
+# next hand.
 #
 # Run it with the CLI (headed by default; add `--headless` to hide the browser):
 #   maestro test --platform web .maestro/offline-hand.yaml
@@ -22,13 +23,23 @@
 # Postgres (scripts/seed-test-user.mjs; see sign-in.yaml for the recipe).
 # `guard={true}` on the (tabs) group in apps/mobile/src/app/_layout.tsx remains
 # the dev-only way to reach the table with no account at all.
-url: http://localhost:8081/offline
-name: Offline hand — build a word and pay out
+# A table draws its own seed when the URL pins none, and a drawn hand is not a hand this
+# flow can name the tiles of — the deal below taps them by id. `?seed=` pins it: the tiles
+# the flow plays are the ones that hand holds, and every run plays the same hand.
+#
+# The pinned seed's line, as the engine plays it (the bots are deterministic too):
+#   preflop mira bets 60 → the hero calls; flop jay bets 40 → the hero calls; turn ellis
+#   bets 20 → the hero calls; river everyone checks to the hero, who opens for the minimum
+#   (the slider seeds at `BET $20`) and is called around, which closes the river's round and
+#   opens §19's window. A different seed means different tiles and different bots, and the
+#   assertions below are the ones that would fail first.
+url: http://localhost:8081/offline?seed=20260919
+name: Offline hand — bet, build a word and pay out
 tags:
   - web
   - offline
 ---
-- openLink: http://localhost:8081/offline
+- openLink: http://localhost:8081/offline?seed=20260919
 
 # If the guard bounced a fresh profile to the sign-in screen, sign in as the
 # E2E user and come back to the table. The wait is optional: a profile that is
@@ -41,7 +52,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline
+- openLink: http://localhost:8081/offline?seed=20260919
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
@@ -50,36 +61,57 @@ tags:
 - assertVisible:
     text: "COMMUNITY · 0/5"
 
-# Tap the table forward to the river. The number of taps depends on the deal and on how the
-# bots take their turns, and a tap can be swallowed mid-re-render, so the flow waits for the
-# river rather than counting. The row's check is the tap that walks the round: it takes the
-# seat's turn and the bots' answers roll the street.
+# The opening bot's bet is on the felt before the hero's first tap: the row states the call
+# the engine says is owed, not a placeholder. This is the seed's line, so a changed seed or
+# table configuration fails here, loudly.
+- assertVisible:
+    text: "CALL $60"
+
+# Play the hero's turns to the river. Which control the row arms depends on the bot line —
+# the check when nothing is owed, the call when a bot has bet — so each pass taps whichever
+# of the two is on screen, and the flow waits for the river rather than counting turns.
 - repeat:
     while:
       notVisible:
         text: "PHASE 5 · THE RIVER"
     commands:
-      - tapOn:
-          text: "CHECK"
+      - runFlow:
+          when:
+            visible: "CHECK"
+          commands:
+            - tapOn:
+                text: "CHECK"
+      - runFlow:
+          when:
+            notVisible: "CHECK"
+          commands:
+            - tapOn:
+                text: "CALL \\$[0-9,]+"
       - waitForAnimationToEnd
 
-# The river's close opens §19's window: one more tap, and the band under the felt — the
-# draft line and the strip of tiles the seat sorts — is what the flow builds its word
-# through. The phase stays the river while the window is open.
+# On the river the bots check to the hero, so the row arms the bet: the slider seeds at the
+# table's minimum bet, and the tap opens the round with it. Real chips move: the bots call,
+# the pot the felt draws grows, and the round's close opens §19's window.
+- assertVisible:
+    text: "BET $20"
 - tapOn:
-    text: "CHECK"
+    text: "BET $20"
 - waitForAnimationToEnd
 - assertVisible:
     text: "PHASE 5 · THE RIVER"
 
+# The river's close opened §19's window: the band under the felt — the draft line and the
+# strip of tiles the seat sorts — is what the flow builds its word through. The phase stays
+# the river while the window is open.
+#
 # Build the word out of the seat's two private tiles, in the order they are tapped.
 #
 # The tiles carry their accessibility label and their state — the felt above draws the same two
 # tiles, and its labels carry the state alone — so a tap can only land in the strip, and the
 # strip's order is the word's order: a tap appends the tile to the word rather than dropping it
-# wherever it sits. Those two are the deal's first two for OFFLINE_SEED, so a changed seed or
-# table configuration fails here, loudly, instead of silently playing some other word; §7 makes
-# their word 4 points.
+# wherever it sits. Those two are the deal's first two for the seed the URL pins, so a changed
+# seed or table configuration fails here, loudly, instead of silently playing some other word;
+# §7 makes their word 4 points.
 - tapOn:
     id: "N, 2 points, tap to play it"
 - tapOn:
@@ -105,7 +137,8 @@ tags:
     text: "CHECK"
 - waitForAnimationToEnd
 
-# Every seat has answered, so the window closes and the hand pays out on the real judging.
+# Every seat has answered, so the window closes and the hand pays out on the real judging:
+# immediately when the bots found words, or on the window's clock when they did not.
 - extendedWaitUntil:
     visible: "PHASE 6 · PAYOUT"
     timeout: 70000

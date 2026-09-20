@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import type { Tile, TilePlay, WordSubmission } from "@wordpoker/contracts";
 
 import {
+  BettingRejectionError,
   OfflineActionError,
   reduce,
   startHand,
@@ -18,21 +19,34 @@ const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
 const NOW = 1_000_000;
 
-/** How many turns a hand takes to reach the river's close: four streets, every seat each. */
-const TURNS_TO_RIVER_END = SEATS.length * 4;
+/** How many actions a checked hand takes to reach the river's close: four streets, every seat. */
+const CHECKS_TO_RIVER_END = SEATS.length * 4;
+
+/** Checks every seat through every street: §19's window opens on the river's last check. */
+function checkAround(state: OfflineState, fromMs = NOW): OfflineState {
+  let next = state;
+  let step = 0;
+
+  while (next.wordWindow?.status !== "open" && next.phase !== "payout") {
+    const index = next.toActIndex;
+    assert.ok(index !== null, "a seat is to act");
+    const seat = next.seats[index];
+    assert.ok(seat, `seat ${index}`);
+    next = reduce(next, { type: "check", playerId: seat.id }, fromMs + step);
+    step += 1;
+    assert.ok(step <= CHECKS_TO_RIVER_END, "a checked hand is four streets of checks");
+  }
+
+  return next;
+}
 
 /**
  * A hand dealt at `nowMs` and walked past its streets to the river's close, where §19's word
  * window opens. `wordBuilding` is the table's §19 configuration.
  */
 function atWindow(nowMs = NOW, wordBuilding: { autoSubmitDrafts?: boolean } = {}): OfflineState {
-  let state = startHand({ seed: SEED, players: SEATS, nowMs, wordBuilding, dictionary: TEST_DICTIONARY });
-
-  for (let turn = 0; turn < TURNS_TO_RIVER_END; turn += 1) {
-    state = reduce(state, { type: "advance" }, nowMs + turn);
-  }
-
-  return state;
+  const dealt = startHand({ seed: SEED, players: SEATS, nowMs, wordBuilding, dictionary: TEST_DICTIONARY });
+  return checkAround(dealt, nowMs);
 }
 
 /** One tile played: a choice tile must name the face it plays (§10), the others may not. */
@@ -62,9 +76,9 @@ function singleLetterTile(state: OfflineState, seatIndex: number): Tile {
   return found;
 }
 
-/** The slot a seat holds in the window. */
+/** The slot a seat holds in the window; the test names the seat, the slot names itself. */
 function slotOf(state: OfflineState, seatIndex: number): WordSlot {
-  const slot = (state.wordWindow?.slots ?? [])[seatIndex];
+  const slot = (state.wordWindow?.slots ?? []).find((candidate) => candidate.seat === seatIndex);
   assert.ok(slot, `seat ${seatIndex} has a slot in the window`);
   return slot;
 }
@@ -76,17 +90,23 @@ function confirmedWord(state: OfflineState, seatIndex: number): WordSubmission |
 }
 
 describe("the word window — §19, between the river and the payout", () => {
-  it("opens on the river's last turn: a slot per seat, on one shared clock", () => {
+  it("opens on the river's last check: a slot per seat, on one shared clock", () => {
     const state = atWindow();
 
     assert.equal(state.phase, "river");
     assert.equal(state.revealed, 5);
     assert.equal(state.toActIndex, null);
-    assert.equal(state.endsAtMs, NOW + TURNS_TO_RIVER_END - 1 + WORD_WINDOW_MS);
+    assert.equal(state.betting, null);
+    assert.equal(state.endsAtMs, NOW + CHECKS_TO_RIVER_END - 1 + WORD_WINDOW_MS);
     assert.equal(state.wordWindow?.status, "open");
     assert.deepEqual(
-      (state.wordWindow?.slots ?? []).map((slot) => slot.playerId),
-      [...SEATS],
+      (state.wordWindow?.slots ?? []).map((slot) => [slot.seat, slot.playerId]),
+      [
+        [0, "hero"],
+        [1, "ellis"],
+        [2, "jay"],
+        [3, "mira"],
+      ],
     );
     assert.ok(
       (state.wordWindow?.slots ?? []).every((slot) => slot.status === "drafting" && slot.draft === null),
@@ -219,10 +239,13 @@ describe("the word window — §19, between the river and the payout", () => {
     assert.throws(() => reduce(payout, { type: "timeoutWords" }, payout.endsAtMs + 1), OfflineActionError);
   });
 
-  it("refuses a turn-order advance while the window is open, and a word for a seat outside it", () => {
+  it("refuses a betting action while the window is open, and a word for a seat outside it", () => {
     const opened = atWindow();
 
-    assert.throws(() => reduce(opened, { type: "advance" }, opened.endsAtMs - 1), OfflineActionError);
+    assert.throws(
+      () => reduce(opened, { type: "check", playerId: "hero" }, opened.endsAtMs - 1),
+      (error: unknown) => error instanceof BettingRejectionError && error.reason === "hand-over",
+    );
     assert.throws(
       () =>
         reduce(
@@ -274,7 +297,7 @@ describe("the word window — §19, between the river and the payout", () => {
     const one: WordSubmission = { plays: [play(singleLetterTile(state, 0))] };
 
     const drafted = reduce(state, { type: "draftWord", playerId: "hero", submission: one }, NOW);
-    assert.deepEqual(slotOf(drafted, 0), { playerId: "hero", status: "drafting", draft: one });
+    assert.deepEqual(slotOf(drafted, 0), { seat: 0, playerId: "hero", status: "drafting", draft: one });
 
     // The floor waits for the confirm, which is the moment the draft becomes the seat's word.
     assert.throws(
@@ -289,7 +312,7 @@ describe("the word window — §19, between the river and the payout", () => {
 
     const cleared = reduce(drafted, { type: "draftWord", playerId: "hero", submission: { plays: [] } }, NOW);
 
-    assert.deepEqual(slotOf(cleared, 0), { playerId: "hero", status: "drafting", draft: null });
+    assert.deepEqual(slotOf(cleared, 0), { seat: 0, playerId: "hero", status: "drafting", draft: null });
   });
 
   it("never mutates the state it was handed", () => {

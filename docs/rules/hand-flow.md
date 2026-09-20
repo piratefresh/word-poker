@@ -32,22 +32,34 @@ The offline game plays one hand on the client, with no server in the loop:
   change how many are face up (Flop / Turn / River).
 - The streets run `preflop → flop → turn → river → payout` and reveal **0 / 3 / 4 / 5**
   community tiles respectively.
-- Betting is out of this slice, so the walk from street to street is the whole round: every
-  seat takes its turn in order, and the last seat's turn rolls the street.
-- The river's last turn opens **Word Building** (§19) instead of paying out: every remaining
-  seat shares one 60-second window to draft and confirm a word, and the hand pays out once
-  every seat has confirmed or run out of time.
-- The word builder is on screen: a seat drags or taps tiles from its rack and the board into
-  the word band, reads §11's reason when the draft cannot stand, and confirms. The bots build
-  words the same way, searching their tiles against the table's dictionary; a bot whose tiles
-  spell nothing the table counts confirms nothing, and that window ends on its clock.
+- Each street runs a **real betting round** (§15, §22–§23): seats fold, check, bet, call,
+  raise or shove, and the street rolls only when the round closes. Betting is from the Table
+  Stack alone; the offline table seats every player on a fixed 1,000-chip stack with a
+  20-chip minimum bet (ADR 0002), and hands carry their stacks into the next hand.
+- The river's round closes into **Word Building** (§19) instead of paying out: every seat
+  still in the hand shares one 60-second window to draft and confirm a word, and the hand
+  pays out once every seat has confirmed or run out of time.
+- A fold-out (§26) ends the hand at the pot: no window opens, no word is judged, and the
+  surviving seat is paid in the same beat as the fold that left it alone.
+- An all-in run-out shows no betting rounds on the streets left to come — with nobody able
+  to act, the hand rolls straight to §19's window once the last round closes.
+- A seat whose stack reaches zero sits the session out: it is dealt no more hands, keeps its
+  seat at $0 with a BUSTED marker, and the session ends when the hero busts or fewer than two
+  seats can still play — New game restarts with fresh stacks and a fresh seed (ADR 0002).
+- The word builder is on screen the whole hand: a seat drags or taps tiles from its rack and
+  the board into the word band, reads §11's reason when the draft cannot stand, and confirms
+  inside §19's window. The felt's own row is the whole control surface — fold, check/call,
+  the bet/raise slider, and all-in behind its confirmation — and the check doubles as the
+  window's confirm. The bots build words the same way, searching their tiles against the
+  table's dictionary; a bot whose tiles spell nothing the table counts confirms nothing, and
+  that window ends on its clock.
 - Before play the mode names the dictionary it judges against (§11), and the table does not
   deal until that list has loaded.
 - `payout` is the real showdown over those words: every confirmed word is judged against the
-  dictionary (§11) and scored by §7, the whole table is ranked by §21's ladder — word length,
-  then highest printed letter, then the §21.3 draw for seats with nothing left to compare —
-  and the winner is the seat on the top place. A seat with no valid word is ranked at 0
-  points, exactly as §11 says.
+  dictionary (§11) and scored by §7, each pot is settled by ranking its own eligible seats
+  with §21's ladder — word length, then highest printed letter, then the §21.3 draw for seats
+  with nothing left to compare (§25) — and the chips move into the winners' Table Stacks. A
+  seat with no valid word is ranked at 0 points, exactly as §11 says.
 
 ---
 
