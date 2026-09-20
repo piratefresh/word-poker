@@ -181,6 +181,7 @@ export const fonts = {
   sansBlack: "Inter_800ExtraBold",
   serif: "NotoSerif_400Regular",
   serifBold: "NotoSerif_700Bold",
+  serifBoldItalic: "NotoSerif_700Bold_Italic",
   mono: Platform.select({
     ios: "JetBrainsMono_400Regular",
     android: "JetBrainsMono_400Regular",
