@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import type { Tile, TilePlay, WordSubmission } from "@wordpoker/contracts";
 
+import { bettingBounds } from "../src/betting";
 import { dealHand, reduce, startHand, type OfflineState } from "../src/index";
 import { testDictionary } from "./fixtures";
 
@@ -10,13 +11,13 @@ const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
 const NOW = 1_000_000;
 
-/** How many turns a hand takes to reach the river's close: four streets, every seat each. */
-const TURNS_TO_RIVER_END = SEATS.length * 4;
+/** The opening bet every seat calls: enough for a real pot without changing the deal. */
+const OPENING_BET = 20;
 
 /**
  * The deal `startHand` will make for this seed. Read here so the fixture knows the letters
  * before it builds the dictionary — the same seed and the same default table settings deal
- * the same tiles, so the two never disagree.
+ * the same tiles, and betting consumes no randomness, so the two never disagree.
  */
 const DEAL = dealHand({ seed: SEED, playerCount: SEATS.length });
 
@@ -71,7 +72,11 @@ function expectedScore(tiles: readonly Tile[]): number {
   }, 0);
 }
 
-/** A hand walked to the river's close, where §19's window opens. */
+/**
+ * A hand walked to the river's close, where §19's window opens: the first actor opens for the
+ * minimum, every seat calls it, and the streets after it are checked around. Every seat ends
+ * the hand on the same 20-chip commitment, so the hand has one 80-chip pot to award.
+ */
 function atWindow(wordBuilding?: { autoSubmitDrafts?: boolean }): OfflineState {
   let state = startHand({
     seed: SEED,
@@ -81,8 +86,27 @@ function atWindow(wordBuilding?: { autoSubmitDrafts?: boolean }): OfflineState {
     ...(wordBuilding === undefined ? {} : { wordBuilding }),
   });
 
-  for (let turn = 0; turn < TURNS_TO_RIVER_END; turn += 1) {
-    state = reduce(state, { type: "advance" }, NOW + turn);
+  let step = 0;
+  while (state.wordWindow?.status !== "open") {
+    const index = state.toActIndex;
+    assert.ok(index !== null, "a seat is to act");
+    const seat = state.seats[index];
+    const round = state.betting;
+    assert.ok(seat, `seat ${index}`);
+    assert.ok(round, "a betting round is open");
+
+    const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
+    assert.ok(bounds, `seat ${index} can act`);
+    const action =
+      step === 0
+        ? ({ type: "bet", playerId: seat.id, amount: OPENING_BET } as const)
+        : bounds.canCheck
+          ? ({ type: "check", playerId: seat.id } as const)
+          : ({ type: "call", playerId: seat.id } as const);
+
+    state = reduce(state, action, NOW + step);
+    step += 1;
+    assert.ok(step <= SEATS.length * 8, "the polite line is a bounded walk");
   }
 
   return state;
@@ -128,6 +152,31 @@ describe("payout — §11's judging and §21's ladder", () => {
     );
   });
 
+  it("moves the pot into the winner's stack, and conserves the table's chips (§24, §25)", () => {
+    const paid = payOut(confirm(atWindow(), 0, HERO_WORD.submission));
+    const payout = paid.result?.payout;
+
+    assert.ok(payout !== undefined);
+    assert.deepEqual(
+      payout.pots.map((pot) => [pot.amount, pot.winners]),
+      [[OPENING_BET * SEATS.length, ["hero"]]],
+    );
+    assert.equal(paid.seats[0]?.stack, 1_000 - OPENING_BET + OPENING_BET * SEATS.length);
+    // Every other seat paid its call and lost it.
+    assert.deepEqual(
+      paid.seats.slice(1).map((seat) => seat.stack),
+      [1_000 - OPENING_BET, 1_000 - OPENING_BET, 1_000 - OPENING_BET],
+    );
+    assert.equal(
+      paid.seats.reduce((total, seat) => total + seat.stack, 0),
+      SEATS.length * 1_000,
+    );
+    assert.equal(
+      payout.stackDeltas.reduce((total, delta) => total + (delta.end - delta.start), 0),
+      0,
+    );
+  });
+
   it("scores a word the table does not count at 0, with the reason §11 gave", () => {
     const paid = payOut(confirm(atWindow(), 2, REFUSED_WORD.submission));
     const refused = paid.result?.standings.find((standing) => standing.playerId === "jay");
@@ -152,6 +201,9 @@ describe("payout — §11's judging and §21's ladder", () => {
       "four seats on 0 points have nothing to compare but the draw",
     );
     assert.equal(result.winner, result.standings[0]?.playerId);
+    // The pot's ladder runs from the same seed as the reveal's, so the seat the reveal put
+    // first is the seat the pot paid.
+    assert.deepEqual(result.payout.pots[0]?.winners, [result.winner]);
   });
 
   it("judges a draft the table confirmed for a seat at the deadline", () => {
@@ -175,12 +227,17 @@ describe("payout — §11's judging and §21's ladder", () => {
     assert.deepEqual(once.result, twice.result);
   });
 
-  it("clears the result with the next hand", () => {
+  it("clears the result with the next hand, carrying what the last one left", () => {
     const paid = payOut(confirm(atWindow(), 0, HERO_WORD.submission));
     const next = reduce(paid, { type: "deal" }, NOW);
 
     assert.equal(next.hand, 2);
     assert.equal(next.result, null);
     assert.equal(next.wordWindow, null);
+    assert.equal(next.dealerSeat, 1);
+    assert.deepEqual(
+      next.seats.map((seat) => seat.stack),
+      [1_060, 980, 980, 980],
+    );
   });
 });

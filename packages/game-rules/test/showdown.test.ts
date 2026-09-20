@@ -5,6 +5,7 @@ import type { LetterMultiplier, WordScore } from "@wordpoker/contracts";
 
 import { createRng } from "../src/rng";
 import {
+  DrawPoolExhaustedError,
   NoContestantsError,
   rankShowdown,
   showdownDrawPool,
@@ -242,6 +243,15 @@ describe("rankShowdown — §21.3: the high-value tile draw", () => {
 
     assert.deepEqual(ranking.comparisons.at(-1)?.values.map((value) => value.value), [3, 1]);
   });
+
+  it("ranks a served tie identically under both exhausted-draw policies", () => {
+    // `"tie"` is §25's fallback for a pool that cannot serve the draw; a table the pool
+    // serves must not be able to tell which policy was asked for.
+    const under = (exhaustedDrawPolicy: "throw" | "tie") =>
+      rankShowdown({ entries: identical(), rng: createRng(7), exhaustedDrawPolicy });
+
+    assert.deepEqual(under("tie"), under("throw"));
+  });
 });
 
 describe("rankShowdown — §21 with no valid word anywhere (STO-326)", () => {
@@ -285,6 +295,31 @@ describe("rankShowdown — §21 with no valid word anywhere (STO-326)", () => {
         ["tile-draw", 1],
         ["tile-draw", 2],
       ],
+    );
+  });
+});
+
+describe("rankShowdown — the exhausted-draw fallback (§25)", () => {
+  /** More tied seats than the draw pool can serve: the one field the pool cannot reach. */
+  const tooMany = (): ShowdownEntry[] =>
+    Array.from({ length: TILE_BAG_SIZE + 1 }, (_, seat) => entry(`seat-${seat}`, seat));
+
+  it("shares one place among the still-tied seats instead of throwing", () => {
+    const ranking = rankShowdown({ entries: tooMany(), rng: createRng(5), exhaustedDrawPolicy: "tie" });
+
+    assert.equal(ranking.standings.length, TILE_BAG_SIZE + 1);
+    assert.ok(ranking.standings.every((standing) => standing.place === 1));
+    assert.ok(
+      ranking.standings.every((standing) => standing.decidedBy === "tile-draw" && standing.compared === null),
+    );
+    // The pool could not serve a single round, so no draw round is recorded as a decision.
+    assert.ok(ranking.comparisons.every((comparison) => comparison.step !== "tile-draw"));
+  });
+
+  it("still refuses the field under the default policy", () => {
+    assert.throws(
+      () => rankShowdown({ entries: tooMany(), rng: createRng(5) }),
+      (error: unknown) => error instanceof DrawPoolExhaustedError,
     );
   });
 });

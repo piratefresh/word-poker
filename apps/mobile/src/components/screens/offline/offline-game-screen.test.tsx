@@ -3,10 +3,20 @@ import { act, fireEvent, render, type RenderResult } from "@testing-library/reac
 import type { Tile } from "@wordpoker/contracts";
 import { WORD_WINDOW_MS, dealHand, type Dictionary } from "@wordpoker/game-rules";
 
+import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
 import { testDictionary } from "@/lib/dictionary-fixtures";
-import { OFFLINE_SEED } from "@/lib/use-offline-game";
+import { useOfflineGame, type OfflineGame } from "@/lib/use-offline-game";
 
 import { OfflineGameScreen } from "./offline-game-screen";
+
+// The session's end-state is a property of the state the hook maps, and a real session only
+// reaches it by busting the hero — a hand the tests cannot deal without rigging the deck. The
+// one test that needs it injects the mapped state; every other test runs the hook for real,
+// which is why the mock delegates to it by default.
+jest.mock("@/lib/use-offline-game", () => {
+  const actual = jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/lib/use-offline-game");
+  return { ...actual, useOfflineGame: jest.fn(actual.useOfflineGame) };
+});
 
 // `useSafeAreaInsets` throws without a provider, and the shipped provider needs native
 // views. The library's own mock stands in, with zero insets.
@@ -15,10 +25,12 @@ jest.mock("react-native-safe-area-context", () =>
     .default,
 );
 
-// expo-router reaches a navigation package Jest cannot parse. The screen only touches
-// `router` from the HUD's leave handler.
+// expo-router reaches a navigation package Jest cannot parse. The screen reads `router` from
+// the HUD's leave handler, and the table's seed from the route's params — the URL is the one
+// thing that can pin the hand it plays.
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => false), replace: jest.fn() },
+  useLocalSearchParams: () => ({ seed: mockSeedParam }),
 }));
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
@@ -29,10 +41,32 @@ jest.mock("react-native-reanimated", () => ({
 }));
 
 /**
- * The hero's own two tiles, as the offline deal will give them, and the word they spell.
- * The screen deals for itself, so the fixture has to read the same deal the hook makes.
+ * The seed the URL pins, and the hero's own two tiles under it: `mockSeedParam` below is what
+ * the screen reads, so this is the hand every test but the unpinned one plays. A table the URL
+ * does not pin draws its own seed (`@/lib/offline-seed`), and a drawn seed is not knowable in
+ * advance, so the draw is stood in for with {@link DRAWN_SEED}.
  */
-const HERO_TILES: readonly Tile[] = dealHand({ seed: OFFLINE_SEED, playerCount: 4 }).privateTiles[0] ?? [];
+const SEED = 20_260_919;
+
+const HERO_TILES: readonly Tile[] = dealHand({ seed: SEED, playerCount: 4 }).privateTiles[0] ?? [];
+
+/** The seed the app's own randomness hands an unpinned table — a different hand. */
+const DRAWN_SEED = 12_345;
+
+const DRAWN_TILES: readonly Tile[] =
+  dealHand({ seed: DRAWN_SEED, playerCount: 4 }).privateTiles[0] ?? [];
+
+/** What the route's params say, when they say anything: an absent seed is what a draw is for. */
+let mockSeedParam: string | undefined = String(SEED);
+
+const mockRandomSeed = jest.fn(() => DRAWN_SEED);
+
+// The port is the real one — a pinned seed has to parse for the pinned hand to be dealt — and
+// only the draw is stood in for.
+jest.mock("@/lib/offline-seed", () => ({
+  ...jest.requireActual<Record<string, unknown>>("@/lib/offline-seed"),
+  randomSeed: () => mockRandomSeed(),
+}));
 
 const HERO_WORD = HERO_TILES.map((tile) =>
   "sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter,
@@ -76,11 +110,39 @@ function expectBoard(view: RenderResult, dealt: number) {
   expect(view.getByText(`COMMUNITY · ${dealt}/5`)).toBeOnTheScreen();
 }
 
-/** Four taps walk preflop → flop → turn → river; the river's close opens §19's window. */
-async function advanceToWordWindow(view: RenderResult) {
-  for (let street = 0; street < 4; street += 1) {
-    await fireEvent.press(view.getByText("CHECK"));
+/** The ids of the tiles the strip is holding, in the order it holds them. */
+function stripTiles(view: RenderResult): string[] {
+  return view
+    .getAllByTestId(/^word-builder-tile-/)
+    .map((tile) => String(tile.props.testID).replace("word-builder-tile-", ""));
+}
+
+/**
+ * Takes the hero's turn the way the felt's row offers it: the check when nothing is owed, the
+ * call when a bot has bet. The row arms exactly one of the two, and which one it is comes from
+ * the engine's own bounds — never from the test's guess about the seed.
+ */
+async function takeTurn(view: RenderResult) {
+  const check = view.queryByText("CHECK");
+  if (check) {
+    await fireEvent.press(check);
+    return;
   }
+  await fireEvent.press(view.getByText(/^CALL \$[\d,]+$/));
+}
+
+/**
+ * Taps the hero's turn until the river's close opens §19's window. The room between the two
+ * is read off the row itself: while a betting round is open the hero holds either a check or
+ * a call worth taking, and once the window opens the row goes dark (its call button falls
+ * back to `CALL $0`) until there is a word to confirm.
+ */
+async function advanceToWordWindow(view: RenderResult) {
+  for (let step = 0; step < 30; step += 1) {
+    if (!view.queryByText("CHECK") && !view.queryByText(/^CALL \$[1-9][\d,]*$/)) return;
+    await takeTurn(view);
+  }
+  throw new Error("the window never opened");
 }
 
 /** The hero plays both of its tiles and locks the word in — §19's window turns check into confirm. */
@@ -94,6 +156,7 @@ async function buildHeroWord(view: RenderResult) {
 describe("<OfflineGameScreen />", () => {
   beforeEach(() => {
     mockDictionary = testDictionary([HERO_WORD]);
+    mockSeedParam = String(SEED);
   });
 
   test("holds the table until the dictionary is in hand", async () => {
@@ -108,7 +171,7 @@ describe("<OfflineGameScreen />", () => {
     expect(view.queryByText("PHASE 2 · PRE-FLOP")).toBeNull();
   });
 
-  test("deals a hand and puts the hero on the clock", async () => {
+  test("deals a hand and puts the hero on the clock, with the row the engine armed", async () => {
     const view = await renderTable();
 
     expectBoard(view, 0);
@@ -116,9 +179,27 @@ describe("<OfflineGameScreen />", () => {
     expect(view.getByText("YOUR TURN")).toBeOnTheScreen();
     // The badge only lands on the felt if the mapped state flags the hero's seat.
     expect(view.getByText(/· YOU/)).toBeOnTheScreen();
+
+    // The pinned hand's first bot opens for 60, so the felt states a real call and a real pot
+    // — the numbers the engine counted, not a placeholder row.
+    expect(view.getByText("CALL $60")).toBeOnTheScreen();
+    expect(view.getByTestId("pot")).toHaveTextContent(/\$60/);
+    expect(view.getByText("ALL IN · $1,000")).toBeOnTheScreen();
   });
 
-  test("fills the board a street per tap, the bots acting without one", async () => {
+  test("deals its own drawn hand for a table the URL does not pin", async () => {
+    mockSeedParam = undefined;
+
+    const view = await renderTable();
+
+    // The felt's rack is the strip, so the seat's tiles are the deal the app drew — not the
+    // hand every visit was handed while the seed was a constant. The two fixtures are
+    // different hands, so this is the draw and not the pinned deal wearing other tiles.
+    expect(stripTiles(view)).toEqual(DRAWN_TILES.map((tile) => tile.id));
+    expect(DRAWN_TILES.map((tile) => tile.id)).not.toEqual(HERO_TILES.map((tile) => tile.id));
+  });
+
+  test("fills the board a street per hero action, the bots acting without one", async () => {
     const view = await renderTable();
 
     const streets: [dealt: number, phase: string][] = [
@@ -128,10 +209,10 @@ describe("<OfflineGameScreen />", () => {
     ];
 
     for (const [dealt, phase] of streets) {
-      await fireEvent.press(view.getByText("CHECK"));
+      await takeTurn(view);
 
-      // The hero taps their own turn; the bots' turns and the street roll that follows
-      // are in the same transition, so one tap is one street.
+      // The hero takes their own turn; the bots' turns and the street roll that follows
+      // are in the same transition, so one action is one street.
       expectBoard(view, dealt);
       expect(view.getByText(phase)).toBeOnTheScreen();
     }
@@ -141,11 +222,14 @@ describe("<OfflineGameScreen />", () => {
     const view = await renderTable();
 
     // The builder brings no buttons of its own, and nothing of its drawing either until the
-    // strip spells something: the row is fold, check and the bet with the shuffle at its head.
+    // strip spells something: the row is fold, the call, the wager and the all-in, with the
+    // shuffle at its head. No second row of word or round buttons exists.
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
     expect(view.getByText("FOLD")).toBeOnTheScreen();
-    expect(view.getByText("CHECK")).toBeOnTheScreen();
+    expect(view.getByText("CALL $60")).toBeOnTheScreen();
+    expect(view.getByText("RAISE $120")).toBeOnTheScreen();
+    expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
     expect(view.queryByText("Clear")).toBeNull();
@@ -189,12 +273,64 @@ describe("<OfflineGameScreen />", () => {
     jest.useRealTimers();
   });
 
-  test("leaves the round where it was when a disabled betting control is pressed", async () => {
+  test("leaves the table where it was when a disabled control is pressed in the window", async () => {
+    jest.useFakeTimers();
+
+    const view = await renderTable();
+    await advanceToWordWindow(view);
+
+    // The window is open and the hero has nothing to confirm yet, so the row is the table's
+    // own controls gone quiet: the call button falls back to `CALL $0` and does nothing.
+    await fireEvent.press(view.getByText("CALL $0"));
+
+    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
+    expect(view.queryByText("PHASE 6 · PAYOUT")).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
+    expect(view.queryByText("PHASE 6 · PAYOUT")).toBeNull();
+
+    jest.useRealTimers();
+  });
+
+  test("shows the session's end-state over the felt, and New game restarts it", async () => {
+    const newGame = jest.fn();
+    const over: OfflineGame = {
+      game: {
+        ...FOUR_PLAYER_FLOP_FIXTURE,
+        id: "offline-9-payout-done",
+        phase: "payout",
+        phaseNumber: 6,
+        sessionOver: true,
+      },
+      words: null,
+      deal: jest.fn(),
+      fold: jest.fn(),
+      check: jest.fn(),
+      bet: jest.fn(),
+      call: jest.fn(),
+      raiseTo: jest.fn(),
+      allIn: jest.fn(),
+      setDraft: jest.fn(),
+      confirmWord: jest.fn(),
+      sessionOver: true,
+      newGame,
+    };
+    jest.mocked(useOfflineGame).mockReturnValueOnce(over);
+
     const view = await renderTable();
 
-    await fireEvent.press(view.getByText("FOLD"));
+    expect(view.getByTestId("session-over")).toBeOnTheScreen();
+    expect(view.getByText("SESSION OVER")).toBeOnTheScreen();
+    // Every seat's final Table Stack, not just the winner's.
+    expect(view.getByText("Magnus · $980")).toBeOnTheScreen();
+    expect(view.getByText("Mira · $980")).toBeOnTheScreen();
 
-    expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
-    expectBoard(view, 0);
+    await fireEvent.press(view.getByTestId("new-game-button"));
+
+    expect(newGame).toHaveBeenCalledTimes(1);
   });
 });

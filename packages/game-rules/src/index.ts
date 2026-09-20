@@ -28,6 +28,7 @@ export type {
   DictionarySource,
 } from "./dictionary";
 export {
+  DRAW_SEED_SALT,
   DrawPoolExhaustedError,
   NoContestantsError,
   rankShowdown,
@@ -36,11 +37,19 @@ export {
 } from "./showdown";
 export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
 export { decideOfflineMove, chooseOfflineWord } from "./bot";
+export {
+  BOT_BET_FREQUENCY,
+  BOT_BET_SIZES,
+  BOT_CALL_THRESHOLD,
+  BOT_RAISE_FREQUENCY,
+} from "./bot";
 export type { ChooseWordOptions } from "./bot";
 export {
+  BettingRejectionError,
   OFFLINE_TURN_MS,
   OfflineActionError,
   availableTiles,
+  handSeed,
   reduce,
   revealedCount,
   startHand,
@@ -57,3 +66,17 @@ export type {
   WordWindow,
 } from "./offline";
 export { scoreWord } from "./scoring";
+export { awardChips, commitChips } from "./chips";
+export type { ChipSeat, CommitResult } from "./chips";
+export { DEFAULT_STAKES, applyBettingAction, bettingBounds, nextActor } from "./betting";
+export type {
+  BettingApply,
+  BettingBounds,
+  BettingRoundState,
+  BettingSeatState,
+  BettingStep,
+  BettingStepStatus,
+  Stakes,
+} from "./betting";
+export { buildPots, resolvePayout, splitAward } from "./pots";
+export type { JudgedSeat, PotContest, ResolvePayoutOptions, ResolvedPayout } from "./pots";

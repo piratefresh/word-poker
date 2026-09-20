@@ -29,5 +29,18 @@ export {
   type ShowdownRanking,
   type ShowdownStanding,
 } from "./showdown";
+export {
+  BETTING_ACTIONS,
+  BETTING_REJECTION_REASONS,
+  isBettingAction,
+  type BettingAction,
+  type BettingActionType,
+  type BettingRejectionReason,
+  type PayoutResult,
+  type PotResult,
+  type RoundChips,
+  type SeatChips,
+  type StackDelta,
+} from "./betting";
 export type { PlayerId } from "./players";
 export type { OfflineAction } from "./actions";

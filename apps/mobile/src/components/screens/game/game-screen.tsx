@@ -2,6 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useCallback, useState, type ReactNode } from "react";
 import {
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -21,13 +22,7 @@ import {
   type BalanceView,
 } from "@/components/hud";
 import { PokerTable, type SeatSlot } from "@/components/table";
-import {
-  colors,
-  fonts,
-  layout,
-  opacity,
-  radius,
-} from "@/constants/theme";
+import { colors, fonts, layout, opacity, palette, radius, border } from "@/constants/theme";
 import {
   ActionButton,
   BestWord,
@@ -65,6 +60,8 @@ export interface GameScreenProps {
   onCheckOrCall?: () => void;
   onRaise?: (amount: number) => void;
   onRaiseAmountChange?: (amount: number) => void;
+  /** Commits the seat's whole Table Stack (§22). The felt asks for confirmation first. */
+  onAllIn?: () => void;
   /** Seat tap, for a caller that opens a player view. Without it a seat is not a control. */
   onSeatPress?: (player: GamePlayer) => void;
 }
@@ -92,12 +89,23 @@ function GameScreenBody({
   onCheckOrCall,
   onRaise,
   onRaiseAmountChange,
+  onAllIn,
   onSeatPress,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const compact = height - insets.top - insets.bottom < 690;
-  const [raiseAmount, setRaiseAmount] = useState(game.betting.raiseAmount);
+  // The slider's amount belongs to the round, not to the screen: a new street — or a bet the
+  // hero has to answer — moves the raise floor, and an amount left over from the last round
+  // would offer a raise the engine refuses. Keying on the bounds re-seeds the amount exactly
+  // when they move, not while the seat is dragging.
+  const boundsKey = `${game.betting.minRaise}:${game.betting.maxRaise}`;
+  const [raise, setRaise] = useState({ key: boundsKey, amount: game.betting.raiseAmount });
+  if (raise.key !== boundsKey) setRaise({ key: boundsKey, amount: game.betting.raiseAmount });
+  const raiseAmount = Math.max(
+    game.betting.minRaise,
+    Math.min(Math.max(game.betting.maxRaise, game.betting.minRaise), raise.amount),
+  );
   // The shared clock's reading, not a fresh clock read: a deadline derived from a new
   // sample during render would land on a slightly different timeline than the one the
   // countdown resolves against.
@@ -116,10 +124,10 @@ function GameScreenBody({
       const { minRaise, maxRaise, raiseStep } = game.betting;
       const stepped = Math.round(next / raiseStep) * raiseStep;
       const value = Math.max(minRaise, Math.min(maxRaise, stepped));
-      setRaiseAmount(value);
+      setRaise({ key: boundsKey, amount: value });
       onRaiseAmountChange?.(value);
     },
-    [game.betting, onRaiseAmountChange],
+    [boundsKey, game.betting, onRaiseAmountChange],
   );
 
   const goBack = useCallback(() => {
@@ -150,7 +158,7 @@ function GameScreenBody({
             layoutConfig={{ seatRadius: { x: 0.98, y: 0.96 }, potY: 0.5 }}
             railWidth={3}
             renderCommunity={() => null}
-            renderPot={() => <Pot amount={game.pot} />}
+            renderPot={() => <Pot amount={game.pot} sidePots={game.sidePots} />}
             renderSeat={(slot) => <Seat onPress={onSeatPress} slot={slot} />}
             seatCount={game.seatCount}
             seats={game.players}
@@ -172,6 +180,7 @@ function GameScreenBody({
         <BettingControls
           amount={raiseAmount}
           leading={bettingLeading}
+          onAllIn={onAllIn}
           onAmountChange={changeRaise}
           onCheckOrCall={onCheckOrCall}
           onFold={onFold}
@@ -227,6 +236,7 @@ function BettingControls({
   onFold,
   onCheckOrCall,
   onRaise,
+  onAllIn,
 }: {
   state: BettingState;
   amount: number;
@@ -236,8 +246,14 @@ function BettingControls({
   onFold?: () => void;
   onCheckOrCall?: () => void;
   onRaise?: () => void;
+  onAllIn?: () => void;
 }) {
   const [trackWidth, setTrackWidth] = useState(1);
+  const [allInOpen, setAllInOpen] = useState(false);
+  // The turn can move on under the sheet — the hero's own clock, most often — and a seat that
+  // no longer has a stack to commit is not asked to confirm one.
+  if (allInOpen && !state.canAllIn) setAllInOpen(false);
+
   const range = Math.max(1, state.maxRaise - state.minRaise);
   const progress = (amount - state.minRaise) / range;
   const fromEvent = (event: GestureResponderEvent) => {
@@ -245,11 +261,14 @@ function BettingControls({
       state.minRaise + (event.nativeEvent.locationX / trackWidth) * range,
     );
   };
-  const callLabel = state.canCheck ? "CHECK" : `CALL $${state.callAmount ?? 0}`;
+  const callLabel = state.canCheck ? "CHECK" : `CALL $${(state.callAmount ?? 0).toLocaleString()}`;
+  // The same slider opens the round or raises it: with no bet out the action is a bet, and
+  // the amount is the round total either way (§22).
+  const wagerLabel = state.canBet ? "BET" : "RAISE";
   return (
     <View style={styles.betting}>
       <View style={styles.raiseRow}>
-        <Text style={styles.raiseLabel}>RAISE</Text>
+        <Text style={styles.raiseLabel}>{wagerLabel}</Text>
         <View
           accessibilityActions={[
             { name: "increment", label: "Increase raise" },
@@ -274,16 +293,16 @@ function BettingControls({
           onLayout={(event: LayoutChangeEvent) =>
             setTrackWidth(event.nativeEvent.layout.width)
           }
-          onMoveShouldSetResponder={() => state.canRaise}
+          onMoveShouldSetResponder={() => state.canRaise || state.canBet}
           onResponderGrant={fromEvent}
           onResponderMove={fromEvent}
-          onStartShouldSetResponder={() => state.canRaise}
+          onStartShouldSetResponder={() => state.canRaise || state.canBet}
           style={styles.slider}
         >
           <View style={[styles.sliderFill, { width: `${progress * 100}%` }]} />
           <View style={[styles.sliderThumb, { left: `${progress * 100}%` }]} />
         </View>
-        <Text style={styles.raiseAmount}>{`$${amount}`}</Text>
+        <Text style={styles.raiseAmount}>{`$${amount.toLocaleString()}`}</Text>
       </View>
       <View style={styles.actionRow}>
         {leading}
@@ -299,13 +318,51 @@ function BettingControls({
           onPress={onCheckOrCall}
         />
         <ActionButton
-          disabled={!state.canRaise}
+          disabled={!state.canRaise && !state.canBet}
           gold
-          label={`RAISE $${amount}`}
+          label={`${wagerLabel} $${amount.toLocaleString()}`}
           onPress={onRaise}
           wide
         />
+        <ActionButton
+          compact
+          disabled={!state.canAllIn}
+          gold
+          label={`ALL IN · $${state.allInAmount.toLocaleString()}`}
+          onPress={() => setAllInOpen(true)}
+          testID="all-in-button"
+        />
       </View>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setAllInOpen(false)}
+        transparent
+        visible={allInOpen}>
+        <View style={styles.sheetBackdrop}>
+          <View style={styles.sheet} testID="all-in-sheet">
+            <Text style={styles.sheetTitle}>
+              {`ALL IN · $${state.allInAmount.toLocaleString()}`}
+            </Text>
+            <Text style={styles.sheetBody}>Commits your entire Table Stack.</Text>
+            <View style={styles.sheetActions}>
+              <ActionButton
+                label="CANCEL"
+                onPress={() => setAllInOpen(false)}
+                testID="all-in-cancel"
+              />
+              <ActionButton
+                gold
+                label="CONFIRM ALL IN"
+                onPress={() => {
+                  setAllInOpen(false);
+                  onAllIn?.();
+                }}
+                testID="all-in-confirm"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -356,5 +413,37 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   actionRow: { flexDirection: "row", gap: 6, paddingTop: 4 },
+  // The all-in sheet is the felt's own surface rather than an OS alert: the amount it commits
+  // is the point of the confirmation, and it stays inside the table's frame.
+  sheetBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(2,12,9,0.72)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  sheet: {
+    backgroundColor: palette.felt800,
+    borderColor: colors.goldDeep,
+    borderRadius: radius.card,
+    borderWidth: border.hairline,
+    maxWidth: 320,
+    padding: 16,
+    width: "100%",
+  },
+  sheetTitle: {
+    color: colors.gold,
+    fontFamily: fonts.serifBold,
+    fontSize: 18,
+    textAlign: "center",
+  },
+  sheetBody: {
+    color: colors.textDim,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  sheetActions: { flexDirection: "row", gap: 8, marginTop: 14 },
   pressed: { opacity: opacity.pressed },
 });

@@ -1,24 +1,57 @@
 /**
- * bot.ts — the offline opponent: the same legal move, every turn.
+ * bot.ts — the offline opponent: a written-down ordering of legal moves, and the best word
+ * its tiles can spell.
  *
- * Deliberately trivial (STO-284 guardrails): with no betting in this slice, the only legal
- * offline *turn* action is to progress the round, so the bot does exactly that — it passes
- * its turn, and the last seat's pass rolls the street. Its one decision is §19's word: the
- * best word its tiles can spell, searched against the table's dictionary and picked by a
- * written-down order. Both are pure functions of what they are handed — no clock, no random
- * source — so the same table always gets the same play from the same seat.
+ * Deliberately simple (STO-284 guardrails): the bot's betting is an ordered behavior tree
+ * whose leaves are all `bettingBounds`' enablement flags, so it can only ever pick an action
+ * the engine would accept — a bot that guesses at legality stalls a hand. Its rolls come from
+ * the hand's seed and the seat's place in the turn (AGENTS.md — no ambient randomness), so the
+ * same table always gets the same play from the same seat, and a test can pin a whole bot line
+ * by pinning the seed. The tree's shape is the policy, and it is written down for the same
+ * reason: "deterministic" has to be checkable.
  *
  * Extension point: STO-271 ("Deterministic tutorial and offline bots") replaces the bodies
  * with the heuristic search — bet sizing, word potential — and keeps the signatures and the
  * legality contract.
  */
 
-import type { OfflineAction, PlayerId, Tile, TilePlay, WordSubmission } from "@wordpoker/contracts";
+import {
+  ROUND_PHASES,
+  type OfflineAction,
+  type PlayerId,
+  type Tile,
+  type TilePlay,
+  type WordSubmission,
+} from "@wordpoker/contracts";
 
+import { bettingBounds } from "./betting";
 import { resolveSubmission } from "./building";
 import type { Dictionary } from "./dictionary";
-import { OfflineActionError, type OfflineState } from "./offline";
+import { OfflineActionError, handSeed, type OfflineState } from "./offline";
+import { createRng } from "./rng";
 import { scoreWord } from "./scoring";
+
+/** How much of a call the bot will pay before giving the hand up (§23's call amount). */
+export const BOT_CALL_THRESHOLD = 100;
+
+/** How often the bot opens a bet when checking is free. */
+export const BOT_BET_FREQUENCY = 0.2;
+
+/**
+ * The sizes the bot opens for — the table's minimum bet and its next two steps. A size the
+ * stack cannot cover falls through the tree: the bot never shoves on purpose (that is what
+ * an all-in action is for, and the bot does not take it).
+ */
+export const BOT_BET_SIZES = [20, 40, 60] as const;
+
+/** How often the bot raises rather than settling for a call. */
+export const BOT_RAISE_FREQUENCY = 0.15;
+
+/**
+ * Salt for the bot's rolls: a stream of its own, named by the hand, the street and the seat to
+ * act, so one seat's decision cannot shift another's.
+ */
+const BOT_ROLL_SALT = 0x0b07_5eed;
 
 /**
  * What `botId` plays on its turn.
@@ -27,7 +60,15 @@ import { scoreWord } from "./scoring";
  * table moving is a fresh deal. During §19's word window there is no turn at all — a bot's
  * word comes from {@link chooseOfflineWord}, which the caller plays for it — so asking this
  * function during the window is a caller bug that gets named rather than silently answered.
- * Everywhere else the bot passes its turn, which is what walks the round.
+ *
+ * On a betting turn the leaves are tried in order, first match acting:
+ *
+ * 1. checking is free and the roll says bet, for a size the stack covers → `bet`;
+ * 2. checking is free → `check`;
+ * 3. facing a bet bigger than the threshold → `fold`;
+ * 4. the roll says raise and the stack covers the floor raise → `raise` to the floor;
+ * 5. a call is owed (a short stack's call goes all in — the engine caps it, §23) → `call`;
+ * 6. nothing left → `fold`, which the enablement flags say is unreachable.
  *
  * Throws when the bot is not the seat to act — a caller that skipped the turn order has a
  * bug, and a move applied out of turn would desync the table silently.
@@ -41,7 +82,11 @@ export function decideOfflineMove(state: OfflineState, botId: PlayerId): Offline
     throw new OfflineActionError(`${botId} has no word to play: the table is in its word window`);
   }
 
-  const acting = state.toActIndex === null ? undefined : state.seats[state.toActIndex];
+  const toAct = state.toActIndex;
+  if (toAct === null) {
+    throw new OfflineActionError(`no seat is to act at ${state.phase}`);
+  }
+  const acting = state.seats[toAct];
   if (acting === undefined) {
     throw new OfflineActionError(`no seat is to act at ${state.phase}`);
   }
@@ -49,7 +94,40 @@ export function decideOfflineMove(state: OfflineState, botId: PlayerId): Offline
     throw new OfflineActionError(`${botId} is not to act at ${state.phase}; ${acting.id} is`);
   }
 
-  return { type: "advance" };
+  const betting = state.betting;
+  if (betting === null) {
+    throw new OfflineActionError(`no betting round is open at ${state.phase}`);
+  }
+
+  const bounds = bettingBounds(state.seats, betting, toAct, state.stakes.minBet);
+  if (bounds === null) {
+    throw new OfflineActionError(`${botId} cannot act at ${state.phase}`);
+  }
+
+  const rng = createRng(handSeed(state) + BOT_ROLL_SALT + ROUND_PHASES.indexOf(state.phase) * 31 + toAct);
+  const betRoll = rng();
+  const sizeRoll = rng();
+  const size = BOT_BET_SIZES[Math.floor(sizeRoll * BOT_BET_SIZES.length)];
+
+  if (bounds.canCheck && betRoll < BOT_BET_FREQUENCY && size !== undefined && size <= acting.stack) {
+    return { type: "bet", playerId: botId, amount: size };
+  }
+  if (bounds.canCheck) {
+    return { type: "check", playerId: botId };
+  }
+  if (bounds.callAmount > BOT_CALL_THRESHOLD) {
+    return { type: "fold", playerId: botId };
+  }
+  if (bounds.canRaise && betRoll < BOT_RAISE_FREQUENCY && bounds.minRaiseTo <= bounds.maxRaiseTo) {
+    return { type: "raise", playerId: botId, amount: bounds.minRaiseTo };
+  }
+  if (bounds.canCall) {
+    return { type: "call", playerId: botId };
+  }
+
+  // Unreachable while a seat that can act always has fold and an amount it can pay or refuse;
+  // spelled out so the function has no path that returns nothing.
+  return { type: "fold", playerId: botId };
 }
 
 /** What a seat's word search is handed: the tiles it holds, and the words that count. */
