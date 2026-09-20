@@ -210,3 +210,19 @@ The winning player:
 - Does not need to submit a word
 - Receives the entire eligible pot
 - Begins the next hand with the awarded chips in their Table Stack
+
+<!-- Contract status: §22–§26 are implemented in the shared engine. The wire vocabulary —
+     the action union, the refusal reasons, and the pot/seat shapes — is
+     `packages/contracts/src/betting.ts` (STO-336). The stack model is
+     `packages/game-rules/src/chips.ts` (`commitChips`/`awardChips`, STO-337), and the
+     betting-round machine — legality, the current bet, the no-blinds minimum bet, the raise
+     floor, and the reopen rule for full vs short all-in raises — is
+     `packages/game-rules/src/betting.ts` (`applyBettingAction`/`bettingBounds`/`nextActor`,
+     STO-338/STO-339; the no-blinds opening is ADR 0001). §25's layering and settlement are
+     `packages/game-rules/src/pots.ts` (`buildPots`/`resolvePayout`, STO-340/STO-341), with
+     each pot ranked independently and an unbreakable §21.3 tie split evenly — odd chips
+     clockwise from the dealer — rather than refused. §26's fold-out skips the window and the
+     reveal entirely (`judged: []`, STO-342). The offline round machine wires all of it in
+     (`packages/game-rules/src/offline.ts`, STO-343) with the bot policy in `src/bot.ts`
+     (STO-344), and the offline felt renders it (`apps/mobile/src/lib/use-offline-game.ts`,
+     STO-345). The offline table's stakes are ADR 0002. -->

@@ -1,19 +1,27 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { Tile, WordSubmission } from "@wordpoker/contracts";
+import type { OfflineAction, Tile, WordSubmission } from "@wordpoker/contracts";
 
-import { chooseOfflineWord, decideOfflineMove } from "../src/bot";
-import { LETTER_VALUES, type Letter } from "../src/letters";
+import {
+  BOT_BET_SIZES,
+  BOT_CALL_THRESHOLD,
+  BOT_RAISE_FREQUENCY,
+  BOT_BET_FREQUENCY,
+  chooseOfflineWord,
+  decideOfflineMove,
+} from "../src/bot";
+import { bettingBounds, type BettingBounds } from "../src/betting";
 import { resolveSubmission } from "../src/building";
-import { OfflineActionError, reduce, startHand, type OfflineState } from "../src/offline";
+import { LETTER_VALUES, type Letter } from "../src/letters";
+import { availableTiles, OfflineActionError, reduce, startHand, type OfflineState } from "../src/offline";
 import { TEST_DICTIONARY, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const NOW = 1_000_000;
 
-function dealHand(): OfflineState {
-  return startHand({ seed: 4242, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY });
+function dealHand(seed = 4242): OfflineState {
+  return startHand({ seed, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY });
 }
 
 function actingSeatId(state: OfflineState): string {
@@ -23,28 +31,76 @@ function actingSeatId(state: OfflineState): string {
   return seat.id;
 }
 
-describe("decideOfflineMove", () => {
-  it("returns the same move for the same state", () => {
-    const state = reduce(dealHand(), { type: "advance" }, NOW);
-    const bot = actingSeatId(state);
+/** Whether an action is one the seat's bounds enable — the set the bot must stay inside. */
+function enabled(bounds: BettingBounds, action: OfflineAction): boolean {
+  switch (action.type) {
+    case "fold":
+      return bounds.canFold;
+    case "check":
+      return bounds.canCheck;
+    case "bet":
+      return bounds.canBet;
+    case "call":
+      return bounds.canCall;
+    case "raise":
+      return bounds.canRaise;
+    case "allIn":
+      return false;
+    default:
+      return false;
+  }
+}
 
-    assert.deepEqual(decideOfflineMove(state, bot), decideOfflineMove(state, bot));
+describe("decideOfflineMove — the scripted line", () => {
+  /**
+   * One seat's pinned turn for seed 4242: the tree's rolls are a function of the hand's seed,
+   * the street and the seat, so this line is the bot's whole preflop for that table. Re-pin it
+   * only when the tree itself changes.
+   */
+  const OPENING_LINE: readonly {
+    readonly phase: OfflineState["phase"];
+    readonly seat: number;
+    readonly action: OfflineAction;
+  }[] = [
+    { phase: "preflop", seat: 1, action: { type: "check", playerId: "ellis" } },
+    { phase: "preflop", seat: 2, action: { type: "bet", playerId: "jay", amount: 60 } },
+    { phase: "preflop", seat: 3, action: { type: "call", playerId: "mira" } },
+    { phase: "preflop", seat: 0, action: { type: "call", playerId: "hero" } },
+    { phase: "preflop", seat: 1, action: { type: "call", playerId: "ellis" } },
+  ];
+
+  it("plays exactly the pinned line, then lets the street roll", () => {
+    let state = dealHand();
+
+    for (const expected of OPENING_LINE) {
+      const seat = state.seats[expected.seat];
+      assert.ok(seat, `seat ${expected.seat}`);
+      assert.equal(state.phase, expected.phase);
+      assert.equal(state.toActIndex, expected.seat);
+      assert.deepEqual(decideOfflineMove(state, seat.id), expected.action);
+      state = reduce(state, decideOfflineMove(state, seat.id), NOW);
+    }
+
+    assert.equal(state.phase, "flop");
+    assert.deepEqual(
+      state.seats.map((seat) => seat.committedHand),
+      [60, 60, 60, 60],
+    );
   });
 
-  it("passes its turn when it is the bot's turn", () => {
-    const state = reduce(dealHand(), { type: "advance" }, NOW);
+  it("returns the same move for the same state", () => {
+    const state = dealHand();
 
-    assert.equal(state.toActIndex, 1);
-    assert.deepEqual(decideOfflineMove(state, "ellis"), { type: "advance" });
+    assert.deepEqual(decideOfflineMove(state, "ellis"), decideOfflineMove(state, "ellis"));
   });
 
   it("refuses to move out of turn, or for a player who is not seated", () => {
     const state = dealHand();
 
     assert.throws(
-      () => decideOfflineMove(state, "ellis"),
+      () => decideOfflineMove(state, "hero"),
       (error: unknown) =>
-        error instanceof OfflineActionError && error.message.includes("ellis"),
+        error instanceof OfflineActionError && error.message.includes("hero"),
     );
     assert.throws(
       () => decideOfflineMove(state, "ghost"),
@@ -78,24 +134,78 @@ describe("decideOfflineMove", () => {
       (error: unknown) => error instanceof OfflineActionError && error.message.includes("word window"),
     );
   });
+});
 
-  it("only ever asks for a legal transition", () => {
-    let state = dealHand();
-    let moves = 0;
+describe("decideOfflineMove — a table of bots", () => {
+  /** Plays a whole hand with every seat on the bot policy: words included, then the payout. */
+  function playAll(seed: number): { state: OfflineState; actions: number } {
+    let state = startHand({ seed, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY });
+    let actions = 0;
 
     while (state.phase !== "payout") {
       if (state.wordWindow?.status === "open") {
+        for (const slot of state.wordWindow.slots) {
+          const word = chooseOfflineWord({
+            available: availableTiles(state, slot.seat),
+            dictionary: TEST_DICTIONARY,
+          });
+          if (word !== null) {
+            state = reduce(state, { type: "confirmWord", playerId: slot.playerId, submission: word }, NOW);
+          }
+        }
         state = reduce(state, { type: "timeoutWords" }, state.endsAtMs);
         continue;
       }
 
-      state = reduce(state, decideOfflineMove(state, actingSeatId(state)), NOW + moves);
-      moves += 1;
-      assert.ok(moves <= SEATS.length * 4, "a hand is at most four streets of turns");
+      const index = state.toActIndex;
+      assert.ok(index !== null, "a seat is to act");
+      const seat = state.seats[index];
+      const round = state.betting;
+      assert.ok(seat, `seat ${index}`);
+      assert.ok(round, "a betting round is open");
+
+      const action = decideOfflineMove(state, seat.id);
+
+      // The property: every action the tree returns is one the bounds enable, so the engine
+      // has no reason to refuse it.
+      const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
+      assert.ok(bounds, `seat ${index} can act`);
+      assert.ok(enabled(bounds, action), `expected ${JSON.stringify(action)} to be enabled`);
+
+      state = reduce(state, action, NOW);
+      actions += 1;
+      assert.ok(actions <= 40, "a bot hand is a bounded walk");
     }
 
-    assert.equal(state.phase, "payout");
-    assert.ok(moves > 0);
+    return { state, actions };
+  }
+
+  it("drives a full hand to the payout with the chips conserved", () => {
+    for (const seed of [4242, 4243, 4244]) {
+      const { state } = playAll(seed);
+
+      assert.equal(state.phase, "payout");
+      assert.equal(state.betting, null);
+      assert.equal(
+        state.seats.reduce((total, seat) => total + seat.stack, 0),
+        SEATS.length * 1_000,
+        `seed ${seed} conserved its chips`,
+      );
+      assert.equal(
+        state.result?.payout.stackDeltas.reduce((total, delta) => total + (delta.end - delta.start), 0),
+        0,
+        `seed ${seed} balanced its deltas`,
+      );
+    }
+  });
+
+  it("stays inside the tree's own constants", () => {
+    // The tree is the policy: these are its numbers, and a change to any of them is a
+    // deliberate change to how bots play (and to the pinned line above).
+    assert.deepEqual([...BOT_BET_SIZES], [20, 40, 60]);
+    assert.equal(BOT_CALL_THRESHOLD, 100);
+    assert.ok(Math.abs(BOT_BET_FREQUENCY - 0.2) < 1e-9);
+    assert.ok(Math.abs(BOT_RAISE_FREQUENCY - 0.15) < 1e-9);
   });
 });
 

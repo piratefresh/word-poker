@@ -60,6 +60,14 @@ export interface RankShowdownOptions {
    * rules allow it; a table that disables it draws from the single-letter bag alone.
    */
   readonly twoLetterDrawTiles?: boolean;
+  /**
+   * What the draw does when its pool runs out with a tie still unbroken. `"throw"` (the
+   * default) refuses — the pool outlasts any run of tied draws a real table can produce —
+   * while `"tie"` leaves the still-tied seats on one shared place, which is what lets §25's
+   * payout split the pot instead of failing the hand. The fallback changes no ranking a
+   * served table has produced, because the pool is only exhausted when the draw cannot run.
+   */
+  readonly exhaustedDrawPolicy?: "throw" | "tie";
 }
 
 /** A showdown with nobody in it — every seat folded, which §26 settles without one. */
@@ -84,6 +92,16 @@ export class DrawPoolExhaustedError extends Error {
     this.name = "DrawPoolExhaustedError";
   }
 }
+
+/**
+ * The salt §21.3's draw derives its own stream of rolls with: the draw is derived from the
+ * hand's seed rather than continuing the deal's, so a hand that reaches the draw replays the
+ * same way and a draw cannot disturb the tiles a later hand deals.
+ *
+ * Shared by every caller that builds a rng for {@link rankShowdown} — the offline reveal and
+ * §25's per-pot rankings — so one hand seed names one draw, not one per caller.
+ */
+export const DRAW_SEED_SALT = 0x5eed_21;
 
 /**
  * §21.3's draw pool: a fresh, unshuffled bag, or the single-letter bag when the table's
@@ -180,6 +198,7 @@ export function rankShowdown({
   entries,
   rng,
   twoLetterDrawTiles = true,
+  exhaustedDrawPolicy = "throw",
 }: RankShowdownOptions): ShowdownRanking {
   if (entries.length === 0) {
     throw new NoContestantsError();
@@ -281,9 +300,37 @@ export function rankShowdown({
     }
   };
 
+  /**
+   * Places a whole group on one shared place: what `exhaustedDrawPolicy: "tie"` does when
+   * the pool can no longer serve the group. The place is the one the group would have drawn
+   * for, and `compared` is `null` because no tile was drawn to decide it.
+   */
+  const placeTied = (group: readonly Contestant[]): void => {
+    const placeNumber = standings.length + 1;
+    for (const contestant of group) {
+      standings.push({
+        playerId: contestant.entry.playerId,
+        seat: contestant.entry.seat,
+        score: contestant.score,
+        place: placeNumber,
+        decidedBy: "tile-draw",
+        compared: null,
+      });
+    }
+  };
+
   /** §21.3: one tile each, highest printed value first, repeated until the tie is broken. */
   const draw = (group: readonly Contestant[]): void => {
     drawRound += 1;
+
+    // The pool is built here as well as inside `drawTile`, so that `"tie"` asks its question
+    // of the same shuffled pool `"throw"` would have drawn from — and so that a tie the
+    // pool cannot serve is settled before any tile of this round is taken.
+    pool ??= shuffle(showdownDrawPool(twoLetterDrawTiles), rng);
+    if (exhaustedDrawPolicy === "tie" && pool.length - drawnTiles < group.length) {
+      placeTied(group);
+      return;
+    }
 
     // One draw per still-tied seat, in the group's order — seat order, all the way down.
     const ranked: RankedSeat[] = group.map((contestant) => ({
