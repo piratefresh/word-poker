@@ -16,6 +16,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -53,6 +54,11 @@ export interface TileProps {
   disabled?: boolean;
   interactive?: boolean;
   animation?: "none" | "flip" | "deal";
+  /**
+   * The beat a dealing tile waits on before it leaves the deck, in milliseconds. A row
+   * staggers by handing each position its own beat; 0 is the undealt deal, as it was.
+   */
+  dealDelayMs?: number;
   onPress?: () => void;
   onFlipComplete?: (side: TileSide) => void;
   accessibilityLabel?: string;
@@ -168,6 +174,7 @@ export function Tile({
   disabled = false,
   interactive = false,
   animation = "flip",
+  dealDelayMs = 0,
   onPress,
   onFlipComplete,
   accessibilityLabel,
@@ -247,22 +254,28 @@ export function Tile({
       rotation.set(1);
       dealProgress.set(0);
       setRevealing(true);
+      // The delay is the row's stagger and nothing else: the sequence is the deal it has
+      // always been, and its completion still runs on the same clock, so a tile that waits
+      // its beat stays busy until it has actually landed.
       dealProgress.set(
-        withSequence(
-          withTiming(0.58, {
-            duration: Math.round(duration.deal * 0.58),
-            easing: DEAL_EASING,
-          }),
-          withTiming(
-            1,
-            {
-              duration: Math.round(duration.deal * 0.42),
+        withDelay(
+          dealDelayMs,
+          withSequence(
+            withTiming(0.58, {
+              duration: Math.round(duration.deal * 0.58),
               easing: DEAL_EASING,
-            },
-            (finished) => {
-              "worklet";
-              if (finished) scheduleOnRN(finishFlip, id, side);
-            },
+            }),
+            withTiming(
+              1,
+              {
+                duration: Math.round(duration.deal * 0.42),
+                easing: DEAL_EASING,
+              },
+              (finished) => {
+                "worklet";
+                if (finished) scheduleOnRN(finishFlip, id, side);
+              },
+            ),
           ),
         ),
       );
@@ -318,6 +331,7 @@ export function Tile({
     );
   }, [
     animation,
+    dealDelayMs,
     dealProgress,
     finishFlip,
     reduceMotion,
