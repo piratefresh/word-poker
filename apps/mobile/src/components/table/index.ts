@@ -35,3 +35,6 @@ export type {
   TableLayout,
   TableLayoutConfig,
 } from "./table-layout";
+
+export { ChipLayer, chipArrivalMs } from "./chip-layer";
+export type { ChipLayerProps } from "./chip-layer";

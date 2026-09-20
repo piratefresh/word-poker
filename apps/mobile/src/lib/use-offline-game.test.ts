@@ -473,3 +473,121 @@ describe("useOfflineGame — §19's window", () => {
     expect(expectedScore(tiles)).toBe(letters.reduce((sum, value) => sum + value, 0));
   });
 });
+
+describe("useOfflineGame — the chips in flight", () => {
+  test("names the hand, not the turn, so a per-hand effect has something stable to key on", async () => {
+    const result = await table();
+    const opening = result.current.game;
+
+    expect(opening.handId).toBe("offline-hand-1");
+
+    await takeTurn(result);
+
+    // The turn moved — the HUD re-anchors on that — and the hand did not.
+    expect(result.current.game.id).not.toBe(opening.id);
+    expect(result.current.game.handId).toBe(opening.handId);
+  });
+
+  test("starts at rest: the deal is not a transition, so nothing is in the air yet", async () => {
+    const result = await table(BETTING_SEED);
+
+    // The table opens with the opening seats already settled — the first render is where the hand
+    // starts, not a step of it — so their chips are simply in the middle and no flight carries
+    // them there. A flight needs a state to have left from.
+    expect(result.current.game.flights).toEqual([]);
+    expect(result.current.game.pot).toBe(60);
+  });
+
+  test("sends one flight per seat that committed, for what it paid, in seat order", async () => {
+    const result = await table(BETTING_SEED);
+    const owed = row(result).callAmount ?? 0;
+    const potBefore = result.current.game.pot;
+
+    await takeTurn(result);
+
+    const { flights, pot, phase, handId } = result.current.game;
+    // The hero paid the call the row stated, and the seats that answered it inside the same
+    // commit paid with it: one flight each, on the street the transition landed in.
+    expect(flights[0]).toEqual({
+      id: `${handId}:${phase}:0:in`,
+      seatIndex: 0,
+      amount: owed,
+      direction: "in",
+    });
+    // Seat order, so a batch lands the way the table speaks the round.
+    expect(flights.map((flight) => flight.seatIndex)).toEqual(
+      [...flights.map((flight) => flight.seatIndex)].sort((a, b) => a - b),
+    );
+    // No seat has two chips on the same path, and every chip the middle gained is one of these:
+    // nothing reaches the pot without a flight to carry it.
+    expect(new Set(flights.map((flight) => flight.id)).size).toBe(flights.length);
+    expect(flights.reduce((total, flight) => total + flight.amount, 0)).toBe(pot - potBefore);
+  });
+
+  test("keeps the flights it already has when the same state is rendered again", async () => {
+    const dictionary = testDictionary([heroWord(BETTING_SEED)]);
+    const { result, rerender } = await renderHook(() =>
+      useOfflineGame({ seed: BETTING_SEED, dictionary }),
+    );
+    const felt = result as Table;
+
+    await takeTurn(felt);
+    const ids = felt.current.game.flights.map((flight) => flight.id);
+    expect(ids.length).toBeGreaterThan(0);
+
+    // The chips are put in the air by the transition that committed them, never by a render: a
+    // seat re-rendering the table — the HUD's clock ticks once a second — carries the same chips.
+    await rerender(undefined);
+    await rerender(undefined);
+
+    expect(felt.current.game.flights.map((flight) => flight.id)).toEqual(ids);
+  });
+
+  test("ends a flight exactly once, by the id the layer reported", async () => {
+    const result = await table(BETTING_SEED);
+
+    await takeTurn(result);
+
+    const ids = result.current.game.flights.map((flight) => flight.id);
+    expect(ids.length).toBeGreaterThan(1);
+    const [landed, ...stillFlying] = ids;
+
+    await act(async () => {
+      result.current.endChipFlight(landed ?? "");
+    });
+
+    expect(result.current.game.flights.map((flight) => flight.id)).toEqual(stillFlying);
+
+    // The layer reports its own flight, and nothing else would; a report that arrives twice is
+    // not a second landing.
+    await act(async () => {
+      result.current.endChipFlight(landed ?? "");
+    });
+
+    expect(result.current.game.flights.map((flight) => flight.id)).toEqual(stillFlying);
+  });
+
+  test("leaves no flight from the last hand when the next one is dealt", async () => {
+    jest.useFakeTimers();
+
+    const result = await table(BETTING_SEED);
+    await takeTurn(result);
+    await playToWindow(result);
+    await buildHeroWord(result);
+    await runWindowClockOut();
+
+    // A test has no layer over the felt, so nothing reports these chips landing: the hand ends
+    // with its flights still in the air, which is exactly what the deal has to clear.
+    expect(result.current.game.flights.length).toBeGreaterThan(0);
+
+    await act(async () => {
+      result.current.deal();
+    });
+
+    expect(result.current.game.phase).toBe("preflop");
+    expect(result.current.game.handId).toBe("offline-hand-2");
+    expect(result.current.game.flights).toEqual([]);
+
+    jest.useRealTimers();
+  });
+});

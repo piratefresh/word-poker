@@ -319,6 +319,7 @@ describe("<OfflineGameScreen />", () => {
       allIn: jest.fn(),
       setDraft: jest.fn(),
       confirmWord: jest.fn(),
+      endChipFlight: jest.fn(),
       sessionOver: true,
       newGame,
     };

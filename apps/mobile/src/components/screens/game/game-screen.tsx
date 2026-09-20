@@ -21,7 +21,7 @@ import {
   useTurnTimer,
   type BalanceView,
 } from "@/components/hud";
-import { PokerTable, type SeatSlot } from "@/components/table";
+import { ChipLayer, PokerTable, type SeatSlot } from "@/components/table";
 import { colors, fonts, layout, opacity, palette, radius, border } from "@/constants/theme";
 import {
   ActionButton,
@@ -62,6 +62,12 @@ export interface GameScreenProps {
   onRaiseAmountChange?: (amount: number) => void;
   /** Commits the seat's whole Table Stack (§22). The felt asks for confirmation first. */
   onAllIn?: () => void;
+  /**
+   * A chip flight that has landed, reported with the id it was drawn under — the mode's adapter
+   * is what prunes it. A table that never animates chips passes nothing: the layer still draws
+   * what the state holds, and the state is the adapter's to empty.
+   */
+  onChipFlightEnd?: (id: string) => void;
   /** Seat tap, for a caller that opens a player view. Without it a seat is not a control. */
   onSeatPress?: (player: GamePlayer) => void;
 }
@@ -90,6 +96,7 @@ function GameScreenBody({
   onRaise,
   onRaiseAmountChange,
   onAllIn,
+  onChipFlightEnd,
   onSeatPress,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
@@ -155,6 +162,11 @@ function GameScreenBody({
           <PokerTable
             chromeInset={compact ? 36 : 42}
             community={[]}
+            hud={
+              // The chips in flight go over the felt, inside the table's own layout provider: the
+              // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
+              <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
+            }
             layoutConfig={{ seatRadius: { x: 0.98, y: 0.96 }, potY: 0.5 }}
             railWidth={3}
             renderCommunity={() => null}
@@ -190,6 +202,7 @@ function GameScreenBody({
       </View>
       <Hud
         balance={BALANCE_UNAVAILABLE}
+        handId={game.handId}
         onHelp={onHelp}
         onLeave={goBack}
         onSettings={onSettings}
