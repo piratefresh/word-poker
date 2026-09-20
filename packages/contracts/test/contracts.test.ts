@@ -7,10 +7,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  BETTING_ACTIONS,
+  BETTING_REJECTION_REASONS,
   DICTIONARY_IDS,
   ROUND_PHASES,
   WAITING_PHASE,
   WORD_REJECTION_REASONS,
+  isBettingAction,
   isDictionaryId,
   isWordSubmission,
   type OfflineAction,
@@ -21,7 +24,12 @@ import {
 
 const OFFLINE_ACTIONS: readonly OfflineAction[] = [
   { type: "deal" },
-  { type: "advance" },
+  { type: "fold", playerId: "hero" },
+  { type: "check", playerId: "hero" },
+  { type: "bet", playerId: "hero", amount: 20 },
+  { type: "call", playerId: "hero" },
+  { type: "raise", playerId: "hero", amount: 40 },
+  { type: "allIn", playerId: "hero" },
   { type: "draftWord", playerId: "hero", submission: { plays: [{ tileId: "M-1" }] } },
   { type: "confirmWord", playerId: "hero", submission: { plays: [{ tileId: "M-1" }] } },
   { type: "timeoutWords" },
@@ -31,7 +39,12 @@ const OFFLINE_ACTIONS: readonly OfflineAction[] = [
 function actionType(action: OfflineAction): string {
   switch (action.type) {
     case "deal":
-    case "advance":
+    case "fold":
+    case "check":
+    case "bet":
+    case "call":
+    case "raise":
+    case "allIn":
     case "draftWord":
     case "confirmWord":
     case "timeoutWords":
@@ -110,11 +123,81 @@ describe("wire shapes", () => {
   it("names every offline action", () => {
     assert.deepEqual(OFFLINE_ACTIONS.map(actionType), [
       "deal",
-      "advance",
+      "fold",
+      "check",
+      "bet",
+      "call",
+      "raise",
+      "allIn",
       "draftWord",
       "confirmWord",
       "timeoutWords",
     ]);
+  });
+});
+
+describe("betting vocabulary", () => {
+  it("pins the actions and their order", () => {
+    assert.deepEqual([...BETTING_ACTIONS], ["fold", "check", "bet", "call", "raise", "allIn"]);
+  });
+
+  it("pins every §15/§22/§23 refusal reason", () => {
+    // The same contract as the word reasons: both sides switch on these strings, so
+    // reordering or renaming one is a wire change.
+    assert.deepEqual([...BETTING_REJECTION_REASONS], [
+      "not-your-turn",
+      "not-in-hand",
+      "already-folded",
+      "already-all-in",
+      "hand-over",
+      "check-facing-bet",
+      "no-bet-to-call",
+      "bet-facing-bet",
+      "below-min-bet",
+      "below-min-raise",
+      "insufficient-stack",
+      "action-closed",
+    ]);
+  });
+
+  it("accepts a well-formed action of every kind", () => {
+    const valid: readonly unknown[] = [
+      { type: "fold", playerId: "hero" },
+      { type: "check", playerId: "hero" },
+      { type: "bet", playerId: "hero", amount: 20 },
+      { type: "call", playerId: "hero" },
+      { type: "raise", playerId: "hero", amount: 40 },
+      { type: "allIn", playerId: "hero" },
+    ];
+
+    for (const value of valid) {
+      assert.ok(isBettingAction(value), `expected ${JSON.stringify(value)} to pass`);
+    }
+  });
+
+  it("rejects anything that is not a betting action", () => {
+    const malformed: readonly unknown[] = [
+      null,
+      undefined,
+      "fold",
+      7,
+      [],
+      {},
+      { type: "fold" },
+      { type: "fold", playerId: "" },
+      { type: "fold", playerId: 7 },
+      { type: "allIn", playerId: null },
+      { type: "advance", playerId: "hero" },
+      { type: "bet", playerId: "hero" },
+      { type: "bet", playerId: "hero", amount: "20" },
+      { type: "bet", playerId: "hero", amount: -20 },
+      { type: "bet", playerId: "hero", amount: 2.5 },
+      { type: "raise", playerId: "hero", amount: "x" },
+    ];
+
+    for (const value of malformed) {
+      assert.ok(!isBettingAction(value), `expected ${JSON.stringify(value) ?? "undefined"} to be refused`);
+    }
   });
 });
 
