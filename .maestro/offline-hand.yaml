@@ -15,11 +15,13 @@
 #     an element's accessibility label). A `css:` selector never settles on this page and
 #     the step hangs without failing.
 #
-# The route sits behind the app's auth guard, so the run needs one of:
-#   - a signed-in session in Maestro's Chrome profile (sign in once, then rerun), or
-#   - `guard={true}` for the (tabs) group in apps/mobile/src/app/_layout.tsx, which is
-#     the dev-only way to reach the table with no account.
-# Without either, the first assertion fails on the sign-in screen rather than silently.
+# The route sits behind the app's auth guard. A headed run keeps a signed-in
+# session in Maestro's Chrome profile (sign in once — via sign-in.yaml — then
+# rerun); a headless run starts every time on a fresh profile, so the flow
+# signs itself in when the guard bounces it: the seeded E2E user lives in
+# Postgres (scripts/seed-test-user.mjs; see sign-in.yaml for the recipe).
+# `guard={true}` on the (tabs) group in apps/mobile/src/app/_layout.tsx remains
+# the dev-only way to reach the table with no account at all.
 url: http://localhost:8081/offline
 name: Offline hand — build a word and pay out
 tags:
@@ -28,54 +30,79 @@ tags:
 ---
 - openLink: http://localhost:8081/offline
 
-# The table holds until the dictionary has loaded (§11 wants it named before play).
+# If the guard bounced a fresh profile to the sign-in screen, sign in as the
+# E2E user and come back to the table. The wait is optional: a profile that is
+# already signed in goes straight to the table and skips the subflow.
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/offline
+
+# The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
     visible: "PHASE 2 · PRE-FLOP"
     timeout: 90000
 - assertVisible:
     text: "COMMUNITY · 0/5"
 
-# Tap the table forward until §19's window opens. The number of taps depends on the deal and
-# on how the bots take their turns, and a tap can be swallowed mid-re-render, so the flow waits
-# for the builder instead of counting: the dictionary label is the first thing it renders.
+# Tap the table forward to the river. The number of taps depends on the deal and on how the
+# bots take their turns, and a tap can be swallowed mid-re-render, so the flow waits for the
+# river rather than counting. The row's check is the tap that walks the round: it takes the
+# seat's turn and the bots' answers roll the street.
 - repeat:
     while:
       notVisible:
-        text: "Words must be in this list to count"
+        text: "PHASE 5 · THE RIVER"
     commands:
       - tapOn:
-          text: "Advance"
+          text: "CHECK"
       - waitForAnimationToEnd
 
-# The river's close opens §19's window, and the band becomes the word builder.
+# The river's close opens §19's window: one more tap, and the band under the felt — the
+# draft line and the strip of tiles the seat sorts — is what the flow builds its word
+# through. The phase stays the river while the window is open.
+- tapOn:
+    text: "CHECK"
+- waitForAnimationToEnd
 - assertVisible:
     text: "PHASE 5 · THE RIVER"
-- assertVisible:
-    text: "en_US-large \\(broad English\\)"
-- assertVisible:
-    text: "Words must be in this list to count"
-- assertVisible:
-    text: "Drag a tile into this band, or tap it to play it"
 
-# Build the word out of the hero's two private tiles, in rack order, then confirm.
+# Build the word out of the seat's two private tiles, in the order they are tapped.
 #
-# The tiles carry their accessibility label rather than their test id in the hierarchy
-# ("N, 2 points"), and the felt draws the same two tiles above the builder, so the tap is
-# anchored on the tray's own heading. Those two tiles are the deal's first two for
-# OFFLINE_SEED — the seed the app deals with — so a changed seed or table configuration
-# fails here, loudly, instead of silently playing some other word.
+# The tiles carry their accessibility label and their state — the felt above draws the same two
+# tiles, and its labels carry the state alone — so a tap can only land in the strip, and the
+# strip's order is the word's order: a tap appends the tile to the word rather than dropping it
+# wherever it sits. Those two are the deal's first two for OFFLINE_SEED, so a changed seed or
+# table configuration fails here, loudly, instead of silently playing some other word; §7 makes
+# their word 4 points.
 - tapOn:
-    id: "N, 2 points"
-    below:
-      text: "Your tiles"
+    id: "N, 2 points, tap to play it"
 - tapOn:
-    id: "R, 2 points"
-    below:
-      text: "Your tiles"
+    id: "R, 2 points, tap to play it"
 - assertVisible:
     text: "NR"
+- assertVisible:
+    text: "· 4pts"
+
+# Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
+# exactly as it was — which is the whole point of shuffling while a word is being built. The
+# icon button carries no text, so the hierarchy knows it by its accessibility label.
 - tapOn:
-    id: "word-builder-confirm"
+    id: "Shuffle the tiles your word does not hold"
+- assertVisible:
+    text: "NR"
+- assertVisible:
+    text: "· 4pts"
+
+# §19's window turns the check into the confirm: the word as it stands is locked in, and no
+# second control row carries a confirm of its own.
+- tapOn:
+    text: "CHECK"
 - waitForAnimationToEnd
 
 # Every seat has answered, so the window closes and the hand pays out on the real judging.

@@ -1,0 +1,88 @@
+# Sign in as the shared E2E test user, through the real sign-in screen.
+#
+#   maestro test --platform web .maestro/sign-in.yaml
+#
+# The user is seeded into the app's Postgres by scripts/seed-test-user.mjs
+# (run it first, or whenever the password stops working — rerunning resets it):
+#
+#   node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
+#
+# The session cookie persists in Maestro's Chrome profile, so a later run of
+# offline-hand.yaml (or any flow behind the auth guard) starts signed in. This
+# flow is safe to rerun: if a session is already present it signs out first,
+# and it always ends on the home screen signed in as the test user.
+#
+# Selector notes, same lessons as offline-hand.yaml: commands take the mapping
+# form, elements match by `text:` / `id:` — and web text matching folds case,
+# so a selector has to survive a case-insensitive comparison (see the password
+# step below for the trap that creates).
+#
+# Non-UI agents don't need this flow; the same credentials work over HTTP:
+#   POST /api/auth/sign-in/email {"email": ..., "password": ...}
+url: http://localhost:8081/sign-in
+name: Sign in as the E2E test user
+tags:
+  - web
+  - auth
+env:
+  TEST_USER_EMAIL: e2e@wordpoker.dev
+  TEST_USER_PASSWORD: wordpoker-e2e
+---
+- openLink: http://localhost:8081/sign-in
+
+# The app hides everything until the first session check resolves, so give it a
+# beat before deciding which screen we're on.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# A session left by a previous run is dropped first, so the flow signs in from
+# a known state. `optional` — a signed-out profile simply never shows Sign out.
+- extendedWaitUntil:
+    visible:
+      text: "Sign out"
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Sign out"
+          direction: DOWN
+          timeout: 20000
+      - tapOn:
+          text: "Sign out"
+      - extendedWaitUntil:
+          visible: "TAKE YOUR SEAT"
+          timeout: 30000
+
+# The sign-in form. The email input is matched by its placeholder text, but the
+# password input cannot be: on the web, text matching folds case, so "Password"
+# matches both the placeholder and the PASSWORD label above it — and the label
+# comes first in the tree, so the tap lands on it and the typing goes nowhere.
+# `css:` reaches the input itself (offline-hand.yaml warns css never settles on
+# the felt page; this auth page is plain react-native-web and it works), and
+# `below:` the email label pins it should the page ever grow another one.
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 30000
+- tapOn:
+    text: "Email"
+- inputText: ${TEST_USER_EMAIL}
+- tapOn:
+    css: input[type=password]
+    below:
+      text: "EMAIL OR HANDLE"
+- inputText: ${TEST_USER_PASSWORD}
+- tapOn:
+    text: "Sign in"
+
+# Past the guard: home shows the mode picker and the signed-in identity.
+- extendedWaitUntil:
+    visible: "Choose how to play"
+    timeout: 60000
+- assertVisible:
+    text: "Signed in as"
+- assertVisible:
+    text: ${TEST_USER_EMAIL}

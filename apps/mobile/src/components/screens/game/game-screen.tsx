@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -16,26 +16,21 @@ import {
   Hud,
   HUD_CHROME_HEIGHT,
   TurnClockProvider,
-  useToastQueue,
   useTurnClock,
   useTurnTimer,
   type BalanceView,
 } from "@/components/hud";
 import { PokerTable, type SeatSlot } from "@/components/table";
 import {
-  border,
   colors,
-  elevation,
   fonts,
   layout,
   opacity,
-  palette,
   radius,
 } from "@/constants/theme";
 import {
   ActionButton,
   BestWord,
-  ChatGlyph,
   CommunityStrip,
   PlayerRack,
   PlayerSeat,
@@ -51,9 +46,20 @@ import type { BettingState, GamePlayer, GameScreenState } from "./game-types";
 
 export interface GameScreenProps {
   game: GameScreenState;
+  /**
+   * What the felt draws where the seat's hand goes, or nothing for its own rack: a mode that
+   * makes the hand playable (the word builder does, for §19's window) passes the interactive
+   * one, so the table shows one hand rather than a rack and a copy of it.
+   */
+  rack?: ReactNode;
+  /**
+   * A mode's own control at the action row's start, beside fold, check and the bet: the word
+   * builder puts its shuffle there, so the table has one control strip rather than a second
+   * row of its own.
+   */
+  bettingLeading?: ReactNode;
   onBack?: () => void;
   onHelp?: () => void;
-  onChat?: () => void;
   onSettings?: () => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
@@ -77,9 +83,10 @@ export function GameScreen(props: GameScreenProps) {
 /** The body reads the clock, so it has to sit inside the provider rather than beside it. */
 function GameScreenBody({
   game,
+  rack,
+  bettingLeading,
   onBack,
   onHelp,
-  onChat,
   onSettings,
   onFold,
   onCheckOrCall,
@@ -91,7 +98,6 @@ function GameScreenBody({
   const { height, width } = useWindowDimensions();
   const compact = height - insets.top - insets.bottom < 690;
   const [raiseAmount, setRaiseAmount] = useState(game.betting.raiseAmount);
-  const queue = useToastQueue();
   // The shared clock's reading, not a fresh clock read: a deadline derived from a new
   // sample during render would land on a slightly different timeline than the one the
   // countdown resolves against.
@@ -121,25 +127,6 @@ function GameScreenBody({
     else if (router.canGoBack()) router.back();
     else router.replace("/");
   }, [onBack]);
-
-  /**
-   * Report an action, then hand it on. The queue lives here because this is where the
-   * game events are, and a toast that claims an action nobody was told about would be a
-   * lie — hence the guard. One key for all three, so a second action replaces the first
-   * instead of stacking a column of stale reports over the felt.
-   */
-  const report = useCallback(
-    (message: string, run?: () => void) => {
-      if (!run) return;
-      queue.push({ key: "player-action", severity: "info", message });
-      run();
-    },
-    [queue],
-  );
-
-  const callMessage = game.betting.canCheck
-    ? "You checked"
-    : `You called $${game.betting.callAmount ?? 0}`;
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
@@ -176,28 +163,22 @@ function GameScreenBody({
           score={game.bestScore}
           word={game.bestWord}
         />
-        <PlayerRack
-          community={game.community}
-          privateTiles={game.privateTiles}
-        />
+        {rack ?? (
+          <PlayerRack
+            community={game.community}
+            privateTiles={game.privateTiles}
+          />
+        )}
         <BettingControls
           amount={raiseAmount}
+          leading={bettingLeading}
           onAmountChange={changeRaise}
-          onCheckOrCall={() => report(callMessage, onCheckOrCall)}
-          onFold={() => report("You folded", onFold)}
-          onRaise={() =>
-            report(
-              `You raised $${raiseAmount}`,
-              onRaise ? () => onRaise(raiseAmount) : undefined,
-            )
-          }
+          onCheckOrCall={onCheckOrCall}
+          onFold={onFold}
+          onRaise={onRaise ? () => onRaise(raiseAmount) : undefined}
           state={game.betting}
         />
       </View>
-      <ChatButton
-        bottom={insets.bottom + (compact ? 60 : 68)}
-        onPress={onChat}
-      />
       <Hud
         balance={BALANCE_UNAVAILABLE}
         onHelp={onHelp}
@@ -205,7 +186,6 @@ function GameScreenBody({
         onSettings={onSettings}
         phase={game.phase}
         style={{ top: insets.top }}
-        toastQueue={queue}
         turn={view}
         turnPhrase={heroTurnPhrase(game)}
       />
@@ -239,36 +219,10 @@ function Seat({
   );
 }
 
-function ChatButton({
-  bottom,
-  onPress,
-}: {
-  bottom: number;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel="Open table chat, 1 unread message"
-      accessibilityRole="button"
-      hitSlop={layout.hitSlop}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chatButton,
-        { bottom },
-        pressed && styles.pressed,
-      ]}
-    >
-      <ChatGlyph />
-      <View style={styles.unread}>
-        <Text style={styles.unreadText}>1</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 function BettingControls({
   state,
   amount,
+  leading,
   onAmountChange,
   onFold,
   onCheckOrCall,
@@ -276,10 +230,12 @@ function BettingControls({
 }: {
   state: BettingState;
   amount: number;
+  /** A mode's own control for the row's start, drawn before fold. */
+  leading?: ReactNode;
   onAmountChange: (amount: number) => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
-  onRaise: () => void;
+  onRaise?: () => void;
 }) {
   const [trackWidth, setTrackWidth] = useState(1);
   const range = Math.max(1, state.maxRaise - state.minRaise);
@@ -330,6 +286,7 @@ function BettingControls({
         <Text style={styles.raiseAmount}>{`$${amount}`}</Text>
       </View>
       <View style={styles.actionRow}>
+        {leading}
         <ActionButton
           danger
           disabled={!state.canFold}
@@ -400,35 +357,4 @@ const styles = StyleSheet.create({
   },
   actionRow: { flexDirection: "row", gap: 6, paddingTop: 4 },
   pressed: { opacity: opacity.pressed },
-  chatButton: {
-    alignItems: "center",
-    backgroundColor: colors.gold,
-    borderColor: colors.goldDeep,
-    borderRadius: radius.pill,
-    borderWidth: border.hairline,
-    height: 46,
-    justifyContent: "center",
-    position: "absolute",
-    right: 14,
-    width: 46,
-    ...elevation.modal,
-  },
-  unread: {
-    alignItems: "center",
-    backgroundColor: palette.red500,
-    borderColor: palette.felt600,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    height: 16,
-    justifyContent: "center",
-    position: "absolute",
-    right: -2,
-    top: -3,
-    width: 16,
-  },
-  unreadText: {
-    color: colors.onGold,
-    fontFamily: fonts.sansBlack,
-    fontSize: 8,
-  },
 });

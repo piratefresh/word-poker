@@ -17,8 +17,10 @@ export interface HudProps {
   /** Spoken turn phrase, e.g. "Magnus to act". */
   turnPhrase?: string;
   balance: BalanceView;
-  /** The screen owns the queue, because game events are what push to it. */
-  toastQueue: ToastQueue;
+  /** The screen owns the queue, because game events are what push to it. Without one the
+   *  HUD draws no toasts at all — the offline table runs this way while its felt announces
+   *  nothing. */
+  toastQueue?: ToastQueue;
   /** The leave slot in the top bar. */
   onLeave?: () => void;
   onHelp?: () => void;
@@ -80,11 +82,13 @@ export function Hud({
           turnPhrase={turnPhrase}
         />
       </View>
-      <HudToasts
-        onDismiss={toastQueue.dismiss}
-        reduceMotion={reduceMotion}
-        toasts={toastQueue.toasts}
-      />
+      {toastQueue === undefined ? null : (
+        <HudToasts
+          onDismiss={toastQueue.dismiss}
+          reduceMotion={reduceMotion}
+          toasts={toastQueue.toasts}
+        />
+      )}
     </View>
   );
 }

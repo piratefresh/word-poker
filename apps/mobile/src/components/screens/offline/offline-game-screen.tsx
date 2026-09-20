@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Dictionary } from "@wordpoker/game-rules";
 
 import { GameScreen } from "@/components/screens/game/game-screen";
-import { WordBuilder } from "@/components/screens/offline/word-builder";
+import { WordBuilder, WordHand, WordPreview, WordShuffleButton } from "@/components/word-builder";
 import { border, colors, palette, spacing, type } from "@/constants/theme";
 import { useDictionary } from "@/lib/use-dictionary";
 import { useOfflineGame } from "@/lib/use-offline-game";
@@ -14,17 +14,23 @@ import { useOfflineGame } from "@/lib/use-offline-game";
  * The offline table: a whole hand played on the device with the server stopped.
  *
  * The screen is a shell around `GameScreen` — the felt, the seats, the HUD, the tiles, and
- * the countdown are the shipped hand rather than a copy of it — plus the two controls this
- * slice adds: the tap that walks the round, and, once the river closes, the word builder that
- * takes its place for §19's window.
+ * the countdown are the shipped hand rather than a copy of it — plus the word builder. The
+ * felt's own rack is the strip the seat sorts from the first street on, with the draft read
+ * above it as one line of text, so a seat can arrange its tiles while it waits.
  *
- * The table holds off until the dictionary is in hand. §11 wants it on screen before play,
- * and the hand is judged against it at the payout, so a table without one is not a table yet.
+ * The felt's action row is the whole control surface: the shuffle is the builder's, and the
+ * check is the round — the tap that takes the seat's turn and rolls the street, and, once
+ * §19's window is open, the confirm that locks the word in. There is no second row of
+ * Advance/Confirm buttons to keep in step with it, and the band under the felt carries
+ * nothing but the payout's Deal.
  *
- * Betting is out of scope (STO-280), so the mapped state disables all three betting controls
- * and the handlers below are inert. They are wired rather than omitted because the felt keeps
- * its final shape: the controls are the ones the betting slice will arm, and a screen that
- * renders them differently here would be previewing a table that does not exist.
+ * The table holds off until the dictionary is in hand: the hand is judged against it, so a
+ * table without one is not a table yet.
+ *
+ * Betting is out of scope (STO-280), so fold and the bet stay refused. The handlers are wired
+ * rather than omitted because the felt keeps its final shape: the controls are the ones the
+ * betting slice will arm, and a screen that renders them differently here would be previewing
+ * a table that does not exist.
  */
 export function OfflineGameScreen() {
   const dictionary = useDictionary();
@@ -47,61 +53,59 @@ function LoadingTable() {
 
 function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
   const insets = useSafeAreaInsets();
-  const { game, words, deal, advance, play, removePlay, clearDraft, confirmWord } = useOfflineGame({
-    dictionary,
-  });
+  const { game, words, deal, advance, setDraft, confirmWord } = useOfflineGame({ dictionary });
   const payout = game.phase === "payout";
-  // §19's window owns the band while it is open; the deal control takes it back at payout,
-  // which is the state the reveal and the next hand are started from.
-  const building = words !== null && !payout;
+  // §19's window turns the felt's check into the confirm: while the seat may still lock its
+  // word in, the check is what locks it; on every earlier street it is the tap that takes the
+  // seat's turn and rolls the street.
+  const check = words?.confirmable ? confirmWord : advance;
 
   return (
-    <>
+    // §19's window is the felt's rack made playable: the hand the seat is dealt is the hand it
+    // sorts, so the felt draws the builder's strip in the rack's own place and the band under
+    // it keeps the draft. One hand, one row.
+    <WordBuilder
+      community={game.community}
+      confirmable={words?.confirmable ?? false}
+      confirmed={words?.confirmed ?? false}
+      onDraft={setDraft}
+      open={words?.open ?? false}
+      plays={words?.plays ?? []}
+      privateTiles={game.privateTiles}
+      reason={words?.reason ?? null}
+      score={words?.score ?? null}
+      word={words?.word ?? ""}
+    >
       <View style={styles.table}>
         <GameScreen
+          bettingLeading={<WordShuffleButton />}
           game={game}
-          onCheckOrCall={noBetting}
-          onFold={noBetting}
-          onRaise={noBetting}
+          onCheckOrCall={check}
+          rack={
+            // The draft reads above the rack it is built from: one line of text over the
+            // strip, drawn by the builder and placed by the felt's own rack slot.
+            <>
+              <WordPreview />
+              <WordHand />
+            </>
+          }
         />
       </View>
       {/*
-        The round's own control gets a band under the felt rather than a layer over it:
-        every floating position on the felt lands on a seat, the rack, or the board, and
-        the betting row that would otherwise share this space is disabled offline.
+        The band under the felt carries the payout's Deal and nothing else: the draft lives
+        above the rack, and every control the round needs is the felt's own row — fold, check
+        and the bet, with the builder's shuffle at their head.
       */}
-      <View style={[styles.controls, { paddingBottom: insets.bottom + spacing.sm }]}>
-        {building && words !== null ? (
-          <WordBuilder
-            plays={words.plays}
-            word={words.word}
-            privateTiles={game.privateTiles}
-            community={game.community}
-            reason={words.reason}
-            confirmed={words.confirmed}
-            dictionaryLabel={dictionary.label}
-            open={words.open}
-            onPlay={play}
-            onRemove={removePlay}
-            onClear={clearDraft}
-            onConfirm={confirmWord}
-          />
-        ) : (
+      {payout ? (
+        <View style={[styles.controls, { paddingBottom: insets.bottom + spacing.sm }]}>
           <Host colorScheme="dark" matchContents seedColor={colors.gold} style={styles.host}>
-            <Button
-              label={payout ? "Deal" : "Advance"}
-              onPress={payout ? deal : advance}
-              variant="filled"
-            />
+            <Button label="Deal" onPress={deal} variant="filled" />
           </Host>
-        )}
-      </View>
-    </>
+        </View>
+      ) : null}
+    </WordBuilder>
   );
 }
-
-/** Offline has no betting: the mapped state disables the controls that would call this. */
-function noBetting() {}
 
 const styles = StyleSheet.create({
   // The felt's gradient lands on `felt800`, so the band under it paints that same colour

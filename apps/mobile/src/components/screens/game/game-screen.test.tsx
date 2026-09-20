@@ -50,8 +50,9 @@ test("shows one header, the HUD's own, and none of the header it replaced", asyn
   expect(view.getAllByRole("button", { name: "How to play" })).toHaveLength(1);
   expect(view.queryByRole("button", { name: "Go back" })).toBeNull();
   expect(view.queryByRole("button", { name: "Open chat" })).toBeNull();
-  // The chat button it also carried is gone; the FAB at the bottom is the only one left.
-  expect(view.getAllByLabelText(/chat/)).toHaveLength(1);
+  // The FAB the screen used to float over the action row is gone with it, so the table carries
+  // no chat control at all until there is chat behind one.
+  expect(view.queryAllByLabelText(/chat/)).toHaveLength(0);
 });
 
 test("reports the balance as unavailable, never as a figure the player does not have", async () => {
@@ -122,20 +123,14 @@ test.each(CHROME_BUTTONS)("%s invokes the screen's handler", async (label, prop)
   expect(handlers[prop]).toHaveBeenCalledTimes(1);
 });
 
-test("reports a taken action in the HUD's toast stack", async () => {
+test("hands a pressed action on to its handler", async () => {
   const onFold = jest.fn();
-  const view = await renderScreen({ onFold });
+  const onCheckOrCall = jest.fn();
+  const view = await renderScreen({ onCheckOrCall, onFold });
 
   await fireEvent.press(view.getByText("FOLD"));
+  await fireEvent.press(view.getByText("CHECK"));
 
   expect(onFold).toHaveBeenCalledTimes(1);
-  expect(view.getByText("You folded")).toBeOnTheScreen();
-});
-
-test("never claims an action it did not hand on", async () => {
-  const view = await renderScreen();
-
-  await fireEvent.press(view.getByText("FOLD"));
-
-  expect(view.queryByText("You folded")).toBeNull();
+  expect(onCheckOrCall).toHaveBeenCalledTimes(1);
 });
