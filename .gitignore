@@ -30,9 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — `.env.example` is the only env file that is versioned
 .env
-.env*.local
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -42,3 +43,19 @@ example
 # generated native folders
 ios/
 android/
+
+# stray lockfiles — this workspace pins one pnpm lock, at the repository root
+package-lock.json
+/apps/*/pnpm-lock.yaml
+/packages/*/pnpm-lock.yaml
+
+# the raw word list the dictionary script reads; the artifact it prepares under
+# packages/game-rules/data is what ships (see scripts/prepare-dictionary.ts)
+/en_US-large.txt
+
+# one-off probes, not assets
+/probe-table.png
+
+# working plan notes — AGENTS.md keeps work in the tracker, not in repo docs
+/plans/
+/TUTORIAL_CLIENT_SIDE_COUNTDOWN_PLAN.md
