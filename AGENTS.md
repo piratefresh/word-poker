@@ -106,6 +106,23 @@ https://linear.app/magnus-adhd-brain/project/word-poker-native-8db6058274e1
 Current epic: **Native workspace foundation** (STO-260). Create work as a
 ticket in that project rather than as a doc in this repo.
 
+# Agent skills
+
+## Issue tracker
+
+Issues live in Linear — project **Word Poker Native** (workspace `magnus-adhd-brain`,
+team Story Time), through the Linear MCP tools. See `docs/agents/issue-tracker.md`.
+
+## Triage labels
+
+The five triage roles keep their own names; the category roles map `bug` → `Bug`,
+`enhancement` → `Improvement`. See `docs/agents/triage-labels.md`.
+
+## Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root.
+See `docs/agents/domain.md`.
+
 # Workspace architecture
 
 pnpm monorepo: `apps/*` (deployables) + `packages/*` (shared libs). Apps today:
