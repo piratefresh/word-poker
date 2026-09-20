@@ -188,6 +188,11 @@ export function BestWord({
   score?: number;
   payout: boolean;
 }) {
+  // The block is the table's answer, not a placeholder: while the hand is being played and
+  // there is no word yet, the spot above the rack belongs to the seat's own line — the word
+  // builder draws its draft there — and a heading over an em dash is not information.
+  if (!payout && word === undefined) return null;
+
   return (
     <View style={styles.bestWord}>
       <Text style={styles.bestWordLabel}>
@@ -240,14 +245,6 @@ export function ActionButton({
         content
       )}
     </Pressable>
-  );
-}
-
-export function ChatGlyph({ small = false }: { small?: boolean }) {
-  return (
-    <View style={[styles.chatGlyph, small && styles.chatGlyphSmall]}>
-      <View style={[styles.chatTail, small && styles.chatTailSmall]} />
-    </View>
   );
 }
 
@@ -445,34 +442,4 @@ const styles = StyleSheet.create({
   goldActionText: { color: colors.onGold },
   disabled: { opacity: opacity.disabled },
   pressed: { opacity: opacity.pressed },
-  chatGlyph: {
-    borderColor: colors.onGold,
-    borderRadius: 4,
-    borderWidth: 1.6,
-    height: 16,
-    width: 20,
-  },
-  chatGlyphSmall: { borderColor: colors.gold, height: 11, width: 14 },
-  chatTail: {
-    backgroundColor: colors.gold,
-    borderBottomColor: colors.onGold,
-    borderBottomWidth: 1.5,
-    borderLeftColor: colors.onGold,
-    borderLeftWidth: 1.5,
-    bottom: -4,
-    height: 6,
-    left: 4,
-    position: "absolute",
-    transform: [{ rotate: "-35deg" }],
-    width: 6,
-  },
-  chatTailSmall: {
-    backgroundColor: palette.felt600,
-    borderBottomColor: colors.gold,
-    borderLeftColor: colors.gold,
-    bottom: -3,
-    height: 4,
-    left: 3,
-    width: 4,
-  },
 });

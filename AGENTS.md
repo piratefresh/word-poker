@@ -14,6 +14,50 @@ gestures or a custom DnD layer on top of Reanimated. The app mounts `GestureHand
 (`apps/mobile/src/app/_layout.tsx`); wrap the surface that drags in the library's `DropProvider`, make the
 sources `Draggable` and the targets `Droppable`, and keep a tap path for accessibility and tests.
 
+**One documented exception: the word builder's sortable strip** (`word-builder/strip.tsx`). The kit's
+horizontal `Sortable` is the only thing that animates the other tiles out of a dragged tile's way, but it
+arms its drag with a 200ms long-press that is not configurable — on the web, with a pointer, a tile reads as
+one that will not move. So the strip drives its own pan (Reanimated + gesture-handler, the same ground the kit
+sits on): it arms on `DRAG_ACTIVATE_PX` of travel, like dnd-kit's pointer sensor, and slides the rest of the
+tiles aside as the dragged one crosses their places. This is the *only* place a pan is hand-rolled; everything
+else still goes through the library. Do not spread this pattern — if a second surface needs it, lift it into a
+shared hook first.
+
+# Word builder
+
+`apps/mobile/src/components/word-builder/` is the one builder for every mode: `WordHand` is the
+sortable strip of tiles and goes in the felt's rack slot (`GameScreen`'s `rack` prop), and
+`WordPreview` is the draft as one line of text directly above it — it draws nothing until the
+strip spells something. The builder carries no buttons of its own: the shuffle is
+`WordShuffleButton`, placed in the felt's action row (`GameScreen`'s `bettingLeading` prop) beside
+fold, check and the bet, and the confirm is that row's check — §19's window is what turns it from
+the tap that walks the round into the tap that locks the word in. `WordBuilder` owns the draft the
+two share; a mode's adapter hands it a `WordDraft` — plays, word, score, reason, confirmed,
+`open`, `confirmable` — and gets the seat's edits back as one `onDraft(plays)` call
+(`apps/mobile/src/lib/use-offline-game.ts` is the offline adapter). Never write a second builder:
+the engine judges the draft, the builder only draws it and reports it.
+
+The word is built the whole hand, in parallel with the betting, not only at the river: `open` is
+true while the seat may still play and sort tiles, and `confirmable` is the narrower gate that
+§19's word window opens for locking the word in. The offline adapter holds the seat's draft
+locally across every street and judges it against `game-rules` for the live preview, then hands
+the confirmed submission to the engine.
+
+The tiles are sorted where they lie: a tap toggles a tile in or out of the word *without moving
+it*, a drag reorders it through the strip, and the word is the selected tiles read left to right —
+the word's order *is* the strip's order, and there is no second row of played tiles. Shuffle
+rearranges only the tiles the word does not hold. The seat's order is the one source of truth: the
+strip re-seeds its layout from that order (see `strip.tsx`), so an external edit — a tap, a fresh
+tile dealt — is never fought by a private copy of the list. A tile ignores a press for
+`DRAG_SETTLE_MS` after a drop, because the pan does not cancel the tile's own press on the web —
+the pointer never leaves the tile, since the tile travels with it.
+
+The rack is a straight row of `TILE_METRICS`'s `medium` tile, and the places spread into the room
+the felt gives them — up to a tile and `MAX_GAP` — closing in on each other (the gap first, then
+some of the tile) when that room is narrower than the row, so a hand of seven stays on screen and
+stays tappable. The strip's places and its drag are measured in that tile, so the two cannot
+drift apart.
+
 # End-to-end (web)
 
 UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
@@ -24,9 +68,25 @@ maestro test --platform web .maestro/offline-hand.yaml
 ```
 
 Headed is the default (`--headless` hides the browser; headless also takes `--screen-size`). Keep a Chrome
-whose version matches the `chromedriver` on `PATH`. Routes behind the auth guard need a signed-in session or
-`guard={true}` on the `(tabs)` group in `apps/mobile/src/app/_layout.tsx` for the run. Each flow's header
-documents its own selectors and what it needs.
+whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
+it needs.
+
+## E2E test user
+
+Flows behind the auth guard sign in as the shared E2E user `e2e@wordpoker.dev` / `wordpoker-e2e`, seeded
+straight into Postgres (Better Auth's own hash) by an idempotent script — rerun it whenever the password
+stops working; it resets the password and keeps the user's id:
+
+```bash
+node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
+```
+
+`.maestro/sign-in.yaml` signs in as that user through the real sign-in screen (safe to rerun: it signs out
+an existing session first, and always ends past the guard on the home screen). A headed run keeps the
+session in Maestro's Chrome profile; a headless run starts on a fresh profile every time, so flows that
+need a session compose the sign-in conditionally — `offline-hand.yaml` shows the pattern. Non-UI agents
+don't need the browser at all: `POST /api/auth/sign-in/email` with the same JSON credentials returns the
+session cookie.
 
 # Game rules spec
 

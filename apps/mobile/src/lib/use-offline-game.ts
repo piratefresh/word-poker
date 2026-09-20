@@ -21,7 +21,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { PlayerId, TilePlay, WordRejectionReason } from "@wordpoker/contracts";
+import type {
+  PlayerId,
+  TilePlay,
+  WordRejectionReason,
+} from "@wordpoker/contracts";
 import {
   OFFLINE_TURN_MS,
   WORD_WINDOW_MS,
@@ -31,6 +35,7 @@ import {
   decideOfflineMove,
   reduce,
   resolveSubmission,
+  scoreWord,
   spellSubmission,
   startHand,
   type Dictionary,
@@ -46,6 +51,7 @@ import type {
   PlayerStatus,
 } from "@/components/screens/game/game-types";
 import { isSupportedSeatCount, type SeatCount } from "@/components/table";
+import type { WordDraft } from "@/components/word-builder";
 import { colors, palette } from "@/constants/theme";
 
 /**
@@ -78,7 +84,11 @@ const ROSTER: readonly { id: PlayerId; name: string; initials: string }[] = [
  */
 const NOMINAL_STACK = 1_000;
 
-/** The betting controls, in their offline shape: present, and refusing every press. */
+/**
+ * The betting row's fixed half, in its offline shape: fold and the bet are out of this slice
+ * (STO-280), so they never arm; the check is the row's one live control and `bettingRow`
+ * decides what it is for.
+ */
 const NO_BETS = {
   minRaise: 0,
   maxRaise: 0,
@@ -89,25 +99,16 @@ const NO_BETS = {
   canRaise: false,
 } as const;
 
-/** What the word builder renders while §19's window is open (docs/rules/hand-flow.md §19). */
-export interface OfflineWords {
-  /** The hero's draft in word order; the confirmed word once the hero has confirmed. */
-  readonly plays: readonly TilePlay[];
-  /** The letters those plays spell, uppercase; "" while nothing is played. */
-  readonly word: string;
-  /** Why the draft would be refused if confirmed now, or null while it would stand (§11). */
-  readonly reason: WordRejectionReason | null;
-  /** True once the hero confirmed: the word is locked and no control is live (§19). */
-  readonly confirmed: boolean;
-  /** True while the hero may still play tiles, take them back, and confirm. */
-  readonly open: boolean;
-}
-
 export interface OfflineGame {
   /** The mapped state: exactly what `GameScreen` renders. */
   game: GameScreenState;
-  /** The word builder's view, or null outside §19's window. */
-  words: OfflineWords | null;
+  /**
+   * §19's window as the word builder reads it, or null outside it
+   * (docs/rules/hand-flow.md §19). The draft is in the builder's own vocabulary — the
+   * engine's answers about the word, and nothing about this table — because the builder is
+   * every mode's: the seated table's adapter maps its socket into the same shape.
+   */
+  words: WordDraft | null;
   /** Starts the next hand. Only legal once the current hand has paid out. */
   deal: () => void;
   /**
@@ -116,12 +117,12 @@ export interface OfflineGame {
    * their words, on their own.
    */
   advance: () => void;
-  /** Appends a play to the hero's draft; a choice tile names the face it plays (§10). */
-  play: (tileId: string, chosenFace?: string) => void;
-  /** Takes back the hero's play at `index`. */
-  removePlay: (index: number) => void;
-  /** Clears the hero's draft. */
-  clearDraft: () => void;
+  /**
+   * Replaces the hero's draft with the one the seat has built: one submission, whatever the
+   * edit was. The engine judges the whole draft, and a draft it cannot build is refused with
+   * §11's reason while the seat still has time to fix it.
+   */
+  setDraft: (plays: readonly TilePlay[]) => void;
   /** Confirms the hero's draft as its word (§19). */
   confirmWord: () => void;
 }
@@ -142,6 +143,13 @@ export function useOfflineGame({
     startHand({ seed, players: ROSTER.map((player) => player.id), nowMs: Date.now(), dictionary }),
   );
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
+
+  // The hero's word is built the whole hand, not only inside §19's window, so its draft lives
+  // here across every street (the video's model — the builder runs in parallel with the
+  // betting). The engine only learns of it when the seat confirms; until then it is the client's
+  // own optimistic draft, judged against `game-rules` for the live preview (AGENTS.md).
+  const [heroDraft, setHeroDraft] = useState<readonly TilePlay[]>([]);
+  const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
 
   /**
    * Runs one change, then lets the bots answer it. A word the engine refused leaves the table
@@ -164,9 +172,11 @@ export function useOfflineGame({
     [state],
   );
 
-  const plays = editablePlays(state);
-
-  const deal = useCallback(() => act((current) => reduce(current, { type: "deal" }, Date.now())), [act]);
+  const deal = useCallback(() => {
+    setHeroDraft([]);
+    setRefusal(null);
+    act((current) => reduce(current, { type: "deal" }, Date.now()));
+  }, [act]);
 
   const advance = useCallback(
     () =>
@@ -180,45 +190,45 @@ export function useOfflineGame({
     [act],
   );
 
-  const draft = useCallback(
-    (next: readonly TilePlay[]) =>
-      act((current) =>
-        reduce(
-          current,
-          { type: "draftWord", playerId: HERO_ID, submission: { plays: [...next] } },
-          Date.now(),
-        ),
-      ),
-    [act],
-  );
+  /**
+   * Replaces the hero's draft with the one the seat has built — playing a tile, taking one back,
+   * reordering the word, naming the other face of a choice tile. The draft is the client's own
+   * the whole hand, so this holds it here and judges it against `game-rules` for the live
+   * preview; a draft those tiles cannot build (the same tile twice, a letter the seat does not
+   * hold, a sequence out of order) is refused and the draft the seat had is the one that stays,
+   * exactly as §19's window will refuse it. Once the window is open the engine is kept in step
+   * too, so a clock that runs out scores the word the seat had built.
+   */
+  const setDraft = useCallback(
+    (next: readonly TilePlay[]) => {
+      if (state.phase === "payout") return;
 
-  const play = useCallback(
-    (tileId: string, chosenFace?: string) => {
-      if (plays === null) return;
-      draft([...plays, chosenFace === undefined ? { tileId } : { tileId, chosenFace }]);
+      const resolution = resolveSubmission({
+        available: availableTiles(state, heroIndex),
+        submission: { plays: [...next] },
+      });
+      if (!resolution.ok && isUnbuildable(resolution.reason)) {
+        setRefusal(resolution.reason);
+        return;
+      }
+
+      setHeroDraft(next);
+      setRefusal(null);
+      if (state.wordWindow?.status === "open") {
+        act((current) =>
+          reduce(current, { type: "draftWord", playerId: HERO_ID, submission: { plays: [...next] } }, Date.now()),
+        );
+      }
     },
-    [draft, plays],
+    [act, heroIndex, state],
   );
-
-  const removePlay = useCallback(
-    (index: number) => {
-      if (plays === null) return;
-      draft(plays.filter((_, at) => at !== index));
-    },
-    [draft, plays],
-  );
-
-  const clearDraft = useCallback(() => {
-    if (plays === null) return;
-    draft([]);
-  }, [draft, plays]);
 
   const confirmWord = useCallback(() => {
-    if (plays === null || plays.length === 0) return;
+    if (heroDraft.length === 0 || state.wordWindow?.status !== "open") return;
     act((current) =>
-      reduce(current, { type: "confirmWord", playerId: HERO_ID, submission: { plays: [...plays] } }, Date.now()),
+      reduce(current, { type: "confirmWord", playerId: HERO_ID, submission: { plays: [...heroDraft] } }, Date.now()),
     );
-  }, [act, plays]);
+  }, [act, heroDraft, state]);
 
   // §19's clock belongs to the table, not to the hero's taps: a window that runs out with a
   // seat still drafting settles on its own, a beat after the deadline so the engine reads the
@@ -238,24 +248,28 @@ export function useOfflineGame({
   }, [state.wordWindow, state.endsAtMs]);
 
   return {
-    game: useMemo(() => toScreenState(state), [state]),
-    words: useMemo(() => wordsOf(state, refusal), [state, refusal]),
+    game: useMemo(() => toScreenState(state, heroDraft), [state, heroDraft]),
+    words: useMemo(() => wordsOf(state, heroDraft, refusal), [state, heroDraft, refusal]),
     deal,
     advance,
-    play,
-    removePlay,
-    clearDraft,
+    setDraft,
     confirmWord,
   };
 }
 
-/** The hero's plays while it can still edit them, or null when the window is closed or locked. */
-function editablePlays(state: OfflineState): readonly TilePlay[] | null {
-  const window = state.wordWindow;
-  if (window === null || window.status !== "open") return null;
-
-  const slot = window.slots.find((candidate) => candidate.playerId === HERO_ID);
-  return slot?.status === "drafting" ? slot.draft?.plays ?? [] : null;
+/**
+ * Whether a draft is one the tiles cannot build at all (§10), as against one that is merely
+ * unfinished. An unbuildable draft is refused and the previous one kept; a partial or empty one
+ * (too short, still nothing) is a word in progress the seat is allowed to hold.
+ */
+function isUnbuildable(reason: WordRejectionReason): boolean {
+  return (
+    reason === "tile-reused" ||
+    reason === "uses-unavailable-letters" ||
+    reason === "two-letter-split" ||
+    reason === "sequence-reversed" ||
+    reason === "too-long"
+  );
 }
 
 /**
@@ -299,36 +313,44 @@ function settleBots(state: OfflineState, nowMs: number): OfflineState {
 }
 
 /**
- * What the word builder shows: the hero's plays, the word they spell, and whether §11 would
- * take it — the engine's own answer, computed here for the instant preview the client is
- * allowed to give itself (AGENTS.md). The payout re-judges the same submission authoritatively.
+ * What the word builder shows: the hero's draft, the word it spells, and whether §11 would take
+ * it — the engine's own answer, computed here for the instant preview the client is allowed to
+ * give itself (AGENTS.md). The payout re-judges the same submission authoritatively.
+ *
+ * The draft is the client's the whole hand, so this reads the local `heroDraft` on every street
+ * — the builder runs in parallel with the betting, not only inside §19's window. Once the seat
+ * confirms, the engine's locked submission takes over. There is no draft to show at payout: the
+ * hand is judged and the felt shows the winner.
  */
-function wordsOf(state: OfflineState, refusal: WordRejectionReason | null): OfflineWords | null {
-  const window = state.wordWindow;
-  if (window === null) return null;
+function wordsOf(
+  state: OfflineState,
+  heroDraft: readonly TilePlay[],
+  refusal: WordRejectionReason | null,
+): WordDraft | null {
+  if (state.phase === "payout") return null;
 
   const index = state.seats.findIndex((seat) => seat.id === HERO_ID);
-  const slot = window.slots[index];
-  const plays =
-    slot?.status === "confirmed"
-      ? slot.submission.plays
-      : slot?.status === "drafting"
-        ? slot.draft?.plays ?? []
-        : [];
+  const window = state.wordWindow;
+  const slot = window?.slots[index];
+  const confirmed = slot?.status === "confirmed";
+  const plays = confirmed ? slot.submission.plays : heroDraft;
 
-  const resolution = resolveSubmission({
-    available: availableTiles(state, index),
-    submission: { plays: [...plays] },
-  });
+  const available = availableTiles(state, index);
+  const resolution = resolveSubmission({ available, submission: { plays: [...plays] } });
 
   return {
     plays,
     // The letters the seat has typed, not the word it can stand behind: a one-tile draft has
     // a letter to show even though §12 refuses to call it a word yet.
-    word: spellSubmission({ available: availableTiles(state, index), submission: { plays: [...plays] } }),
+    word: spellSubmission({ available, submission: { plays: [...plays] } }),
+    // §7 on the same resolution: what the draft is worth as it stands, letter multipliers and
+    // Full Rack Bonus included, so the seat watches the number move as it builds.
+    score: resolution.ok ? scoreWord(resolution.tiles) : null,
     reason: refusal ?? previewReason(plays.length, resolution, state.dictionary),
-    confirmed: slot?.status === "confirmed",
-    open: window.status === "open" && slot?.status === "drafting",
+    confirmed,
+    // The seat may build until it confirms; only §19's window lets it lock the word in.
+    open: !confirmed,
+    confirmable: !confirmed && window?.status === "open" && slot?.status === "drafting",
   };
 }
 
@@ -354,7 +376,10 @@ function previewReason(
  * countdown instead of counting it. The state's own deadline stays authoritative for
  * whoever advances an expired turn.
  */
-function toScreenState(state: OfflineState): GameScreenState {
+function toScreenState(
+  state: OfflineState,
+  heroDraft: readonly TilePlay[],
+): GameScreenState {
   const hero = state.seats.find((seat) => seat.id === HERO_ID);
   const best = state.result?.standings[0];
   const winner = state.phase === "payout" && best !== undefined ? { id: best.playerId, score: best.score } : null;
@@ -376,7 +401,28 @@ function toScreenState(state: OfflineState): GameScreenState {
     // and §11's reasons mean a seat can top the table without one (the §21.3 draw) — then
     // there is no word to show and the line stays as the felt draws it.
     bestWord: best?.word ?? undefined,
-    betting: NO_BETS,
+    betting: bettingRow(state, heroDraft),
+  };
+}
+
+/**
+ * The action row's live half: the check, and what it is for right now.
+ *
+ * Checking commits no chips, which makes it the offline slice's whole round — the tap that
+ * takes the seat's turn while the streets advance — and, once §19's window is open, the
+ * confirm: the word as it stands is locked in, exactly as §19's "must confirm before the
+ * clock runs out" requires, without a second control row to do it from.
+ */
+function bettingRow(state: OfflineState, heroDraft: readonly TilePlay[]): GameScreenState["betting"] {
+  const window = state.wordWindow;
+  const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
+  const drafting =
+    window?.status === "open" && window.slots[heroIndex]?.status === "drafting";
+
+  return {
+    ...NO_BETS,
+    canCheck:
+      actingSeat(state)?.id === HERO_ID || (drafting && heroDraft.length > 0),
   };
 }
 

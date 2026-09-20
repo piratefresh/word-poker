@@ -78,11 +78,9 @@ async function advanceToWordWindow(result: Table) {
 
 /** The hero plays both of its tiles, in order, and confirms the word they spell. */
 async function buildHeroWord(result: Table) {
-  for (const play of heroTiles().map(playOf)) {
-    await act(async () => {
-      result.current.play(play.tileId, play.chosenFace);
-    });
-  }
+  await act(async () => {
+    result.current.setDraft(heroTiles().map(playOf));
+  });
 
   await act(async () => {
     result.current.confirmWord();
@@ -125,8 +123,14 @@ describe("useOfflineGame", () => {
       result.current.game.players.filter((player) => player?.isHero).map((player) => player?.id),
     ).toEqual(["hero"]);
 
-    // §19's window has not opened, so there is no draft to build yet.
-    expect(result.current.words).toBeNull();
+    // The builder runs the whole hand, so the draft is ready from the deal: empty, open to
+    // build, but not confirmable until §19's window opens after the river.
+    expect(result.current.words).toMatchObject({
+      plays: [],
+      word: "",
+      open: true,
+      confirmable: false,
+    });
   });
 
   test("keeps the unrevealed board slots null and fills them down the streets", async () => {
@@ -166,12 +170,14 @@ describe("useOfflineGame", () => {
     expect(result.current.game.phase).toBe("river");
     expect(result.current.game.secondsRemaining).toBe(60);
 
+    // The draft was open all hand; the window is what now makes it confirmable.
     expect(result.current.words).toMatchObject({
       plays: [],
       word: "",
       reason: null,
       confirmed: false,
       open: true,
+      confirmable: true,
     });
   });
 
@@ -181,18 +187,17 @@ describe("useOfflineGame", () => {
 
     const plays = heroTiles().map(playOf);
     await act(async () => {
-      result.current.play(plays[0]?.tileId ?? "", plays[0]?.chosenFace);
+      result.current.setDraft(plays.slice(0, 1));
     });
 
-    // The draft is the engine's slot, not a local mirror: one tap is one play, and the word
-    // is the letters those tiles print — including a draft of one tile, which §12 will not
-    // call a word yet.
+    // One edit is one submission, and the word is the letters those tiles print — including a
+    // draft of one tile, which §12 will not call a word yet.
     expect(result.current.words?.plays).toHaveLength(1);
     expect(result.current.words?.word).toBe(spells(heroTiles().slice(0, 1)));
     expect(result.current.words?.open).toBe(true);
 
     await act(async () => {
-      result.current.play(plays[1]?.tileId ?? "", plays[1]?.chosenFace);
+      result.current.setDraft(plays);
     });
     expect(result.current.words?.word).toBe(heroWord());
 
@@ -215,44 +220,103 @@ describe("useOfflineGame", () => {
     expect(result.current.game.players.filter((player) => player?.status === "winner")).toHaveLength(1);
   });
 
-  test("refuses a play the tiles cannot make, and keeps the draft it had", async () => {
+  test("refuses a draft the tiles cannot build, and keeps the draft it had", async () => {
     const result = await table();
     await advanceToWordWindow(result);
 
     const [first] = heroTiles().map(playOf);
     await act(async () => {
-      result.current.play(first?.tileId ?? "");
+      result.current.setDraft([first ?? { tileId: "" }]);
     });
-    // §11: a physical tile is played once. The engine refuses the second play and the draft
-    // is left exactly as it was, with the reason on screen.
+    // §11: a physical tile is played once. The engine refuses a draft that plays it twice, and
+    // the draft is left exactly as it was, with the reason on screen.
     await act(async () => {
-      result.current.play(first?.tileId ?? "");
+      result.current.setDraft([first ?? { tileId: "" }, first ?? { tileId: "" }]);
     });
 
     expect(result.current.words?.plays).toHaveLength(1);
     expect(result.current.words?.reason).toBe("tile-reused");
   });
 
-  test("takes a play back, and clears the draft the hero wants to start over", async () => {
+  test("takes a tile back out of the draft, and clears the draft the hero wants to start over", async () => {
     const result = await table();
     await advanceToWordWindow(result);
 
     const plays = heroTiles().map(playOf);
     await act(async () => {
-      result.current.play(plays[0]?.tileId ?? "");
+      result.current.setDraft(plays);
     });
     await act(async () => {
-      result.current.play(plays[1]?.tileId ?? "");
-    });
-    await act(async () => {
-      result.current.removePlay(0);
+      result.current.setDraft(plays.slice(1));
     });
     expect(result.current.words?.plays).toEqual([plays[1]]);
 
     await act(async () => {
-      result.current.clearDraft();
+      result.current.setDraft([]);
     });
     expect(result.current.words).toMatchObject({ plays: [], word: "" });
+  });
+
+  test("previews what §7 makes the draft worth, bonus included at the whole rack", async () => {
+    const result = await table();
+    await advanceToWordWindow(result);
+
+    // Nothing played is nothing to score: the builder shows a word, not a number, until there
+    // are letters behind it.
+    expect(result.current.words?.score).toBeNull();
+
+    const plays = heroTiles().map(playOf);
+    await act(async () => {
+      result.current.setDraft(plays.slice(0, 1));
+    });
+    // §12: one tile is a letter, not a word, so there is still nothing to score.
+    expect(result.current.words?.word).toHaveLength(spells(heroTiles().slice(0, 1)).length);
+    expect(result.current.words?.score).toBeNull();
+
+    await act(async () => {
+      result.current.setDraft(plays);
+    });
+    expect(result.current.words?.score).toMatchObject({
+      letterScore: expectedScore(heroTiles()),
+      fullRackBonus: 0,
+      total: expectedScore(heroTiles()),
+    });
+
+    // The board's tiles are the seat's to play too, so all seven are reachable — and the
+    // preview earns §7.3's bonus exactly when they are all in the word.
+    const board = result.current.game.community.filter((tile) => tile !== null);
+    await act(async () => {
+      result.current.setDraft([...plays, ...board.map(playOf)]);
+    });
+
+    // `expectedScore` is the test's own §7, rack bonus included, so this is a second opinion
+    // on the whole number rather than on the parts of it the engine reports.
+    expect(result.current.words?.plays).toHaveLength(7);
+    expect(result.current.words?.score).toMatchObject({
+      fullRackBonus: 10,
+      total: expectedScore([...heroTiles(), ...board]),
+    });
+  });
+
+  test("reads the word off the order the draft holds, whatever order it was built in", async () => {
+    const result = await table();
+    await advanceToWordWindow(result);
+
+    const plays = heroTiles().map(playOf);
+    await act(async () => {
+      result.current.setDraft(plays);
+    });
+    const before = result.current.words;
+    expect(before?.word).toBe(heroWord());
+
+    // The strip's order is the word's order, so a reorder arrives as the same tiles in the
+    // other sequence: the letters read the other way and the score does not move.
+    await act(async () => {
+      result.current.setDraft([plays[1], plays[0]].filter((play) => play !== undefined));
+    });
+
+    expect(result.current.words?.word).toBe([...heroWord()].reverse().join(""));
+    expect(result.current.words?.score?.total).toBe(before?.score?.total);
   });
 
   test("starts the next hand from the payout, on a fresh deal", async () => {
@@ -270,7 +334,8 @@ describe("useOfflineGame", () => {
     expect(result.current.game.id).not.toBe(finished);
     expect(result.current.game.community).toEqual([null, null, null, null, null]);
     expect(result.current.game.players[0]?.status).toBe("your-turn");
-    expect(result.current.words).toBeNull();
+    // A fresh hand is a fresh, empty draft — open to build again, and cleared of the last one.
+    expect(result.current.words).toMatchObject({ plays: [], word: "", open: true, confirmable: false });
   });
 
   test("plays the same hand twice for the same seed, and a different one for another", async () => {

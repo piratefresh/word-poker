@@ -79,16 +79,16 @@ function expectBoard(view: RenderResult, dealt: number) {
 /** Four taps walk preflop → flop → turn → river; the river's close opens §19's window. */
 async function advanceToWordWindow(view: RenderResult) {
   for (let street = 0; street < 4; street += 1) {
-    await fireEvent.press(roundButton(view, "Advance"));
+    await fireEvent.press(view.getByText("CHECK"));
   }
 }
 
-/** The hero plays both of its tiles and confirms the word they spell. */
+/** The hero plays both of its tiles and locks the word in — §19's window turns check into confirm. */
 async function buildHeroWord(view: RenderResult) {
   for (const tile of HERO_TILES) {
     await fireEvent.press(view.getByTestId(`word-builder-tile-${tile.id}`));
   }
-  await fireEvent.press(view.getByTestId("word-builder-confirm"));
+  await fireEvent.press(view.getByText("CHECK"));
 }
 
 describe("<OfflineGameScreen />", () => {
@@ -128,7 +128,7 @@ describe("<OfflineGameScreen />", () => {
     ];
 
     for (const [dealt, phase] of streets) {
-      await fireEvent.press(roundButton(view, "Advance"));
+      await fireEvent.press(view.getByText("CHECK"));
 
       // The hero taps their own turn; the bots' turns and the street roll that follows
       // are in the same transition, so one tap is one street.
@@ -137,18 +137,30 @@ describe("<OfflineGameScreen />", () => {
     }
   });
 
-  test("hands the band to the word builder when §19's window opens", async () => {
+  test("keeps the felt's row as the whole control surface", async () => {
     const view = await renderTable();
 
-    expect(view.queryByTestId("word-builder")).toBeNull();
-
-    await advanceToWordWindow(view);
-
-    // The draft is the hero's own work now: the builder owns the band, the round's tap is
-    // gone, and §11's vocabulary is named above the tiles.
-    expect(view.getByTestId("word-builder")).toBeOnTheScreen();
+    // The builder brings no buttons of its own, and nothing of its drawing either until the
+    // strip spells something: the row is fold, check and the bet with the shuffle at its head.
+    expect(view.queryByTestId("word-preview")).toBeNull();
+    expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
+    expect(view.getByText("FOLD")).toBeOnTheScreen();
+    expect(view.getByText("CHECK")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
-    expect(view.getByText(/en_US-large/)).toBeOnTheScreen();
+    expect(view.queryByText("Confirm")).toBeNull();
+    expect(view.queryByText("Clear")).toBeNull();
+  });
+
+  test("reads the draft above the rack once there is one", async () => {
+    const view = await renderTable();
+    const first = HERO_TILES[0]!;
+
+    await fireEvent.press(view.getByTestId(`word-builder-tile-${first.id}`));
+
+    // One line of text over the rack, and nothing but the line: the strip below it is the
+    // word, so the preview only has to be legible.
+    const letters = "sequenceLetter" in first ? `${first.letter}${first.sequenceLetter}` : first.letter;
+    expect(view.getByTestId("word-builder-word")).toHaveTextContent(letters);
   });
 
   test("plays a word from the rack, then pays out and deals the next hand", async () => {

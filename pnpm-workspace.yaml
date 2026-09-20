@@ -1,3 +1,25 @@
 packages:
   - apps/*
   - packages/*
+
+# The React Native toolchain resolves native modules from a flat `node_modules`, so ask for the
+# hoisted layout instead of pnpm's default isolated one.
+nodeLinker: hoisted
+
+# pnpm blocks a dependency's build scripts unless it is named here (`ERR_PNPM_IGNORED_BUILDS` fails
+# the install outright). All three only link the prebuilt binary their platform package already
+# ships (see each one's `optionalDependencies`), so nothing is compiled from source:
+#   esbuild            node install.js                      (vite/vitest's bundler)
+#   msgpackr-extract   node-gyp-build-optional-packages     (the server's msgpackr)
+#   unrs-resolver      node postinstall.js                  (eslint's resolver)
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+  unrs-resolver: true
+
+# The supply-chain policy rejects any subdependency resolved from a git repository
+# (`ERR_PNPM_EXOTIC_SUBDEP`), which fails the workspace install. The offender is the server's
+# transport: `colyseus` pulls in `@colyseus/uwebsockets-transport`, whose `uWebSockets.js` is only
+# distributed from uNetworking's git repo (it is never published to npm), so the git resolution is
+# unavoidable and legitimate. Allow exotic subdeps so the install completes.
+blockExoticSubdeps: false
