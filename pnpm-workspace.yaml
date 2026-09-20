@@ -1,3 +1,29 @@
 packages:
   - apps/*
   - packages/*
+
+# The React Native toolchain resolves native modules from a flat `node_modules`, which is why
+# `.npmrc` asks for `node-linker=hoisted`. pnpm 11 stopped reading settings from `.npmrc`, so the
+# same setting is stated here too: pnpm 10 honors `.npmrc`, pnpm 11+ (including EAS's) honors this
+# key, and a run that reads neither would silently install the isolated layout instead.
+nodeLinker: hoisted
+
+# The dependency build scripts pnpm blocks unless they are named, which is what stopped the EAS
+# iOS build at its install phase (`ERR_PNPM_IGNORED_BUILDS` — newer pnpm fails the install outright
+# where pnpm 10.15 only warned). All three only link the prebuilt binary their platform package
+# already ships (see each one's `optionalDependencies`), so nothing is compiled from source:
+#   esbuild            node install.js                      (vite/vitest's bundler)
+#   msgpackr-extract   node-gyp-build-optional-packages     (the server's msgpackr)
+#   unrs-resolver      node postinstall.js                  (eslint's resolver)
+#
+# Both spellings are kept because pnpm 11 replaced the first with the second and ignores the old
+# key silently: `allowBuilds` is what pnpm 11+ (EAS's) reads, `onlyBuiltDependencies` is what the
+# pinned pnpm 10.x reads. Drop the old key once every install runs pnpm 11 or newer.
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+  unrs-resolver: true
+onlyBuiltDependencies:
+  - esbuild
+  - msgpackr-extract
+  - unrs-resolver
