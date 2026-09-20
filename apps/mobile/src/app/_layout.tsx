@@ -1,6 +1,6 @@
 import { Inter_400Regular, Inter_500Medium, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
 import { JetBrainsMono_400Regular, JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono';
-import { NotoSerif_400Regular, NotoSerif_700Bold } from '@expo-google-fonts/noto-serif';
+import { NotoSerif_400Regular, NotoSerif_700Bold, NotoSerif_700Bold_Italic } from '@expo-google-fonts/noto-serif';
 import { useFonts } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -33,6 +33,7 @@ export default function RootLayout() {
     JetBrainsMono_600SemiBold,
     NotoSerif_400Regular,
     NotoSerif_700Bold,
+    NotoSerif_700Bold_Italic,
   });
 
   // Keep the splash screen up until the first session check and the fonts resolve, so
