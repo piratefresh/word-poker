@@ -305,6 +305,25 @@ export const duration = {
   flip: 640,
   deal: 450,
   celebrate: 900,
+
+  // The in-hand screen's own timings (WP-412), kept here with every other duration so no
+  // component carries a number of its own — `deal` and `flip` are already the tile's.
+  phaseIn: 500,
+  potPop: 800,
+  wordMorph: 550,
+  tileStagger: 130,
+  holeStagger: 120,
+  chipFlight: 1300,
+  chipDelay: 150,
+  chipStagger: 60,
+  payoutFlight: 1500,
+  payoutDelay: 500,
+  payoutStagger: 120,
+  breathe: 1600,
+  winnerBurst: 1100,
+  timerPulse: 1000,
+  statusFade: 200,
+  actionFade: 300,
 } as const;
 
 export const easing = {
@@ -313,8 +332,12 @@ export const easing = {
   accelerate: [0.4, 0, 1, 1] as const,
   flip: [0.45, 0, 0.2, 1] as const,
   deal: [0.34, 1.56, 0.64, 1] as const,
+  /** Chip flights: Material's standard curve, in and out. */
+  inOut: [0.4, 0, 0.2, 1] as const,
   spring: { damping: 16, stiffness: 180, mass: 0.9 },
   springSnappy: { damping: 22, stiffness: 320, mass: 0.7 },
+  /** Lands slightly past the mark, then settles — the phase header's rise. */
+  springOvershoot: { damping: 11, stiffness: 170, mass: 0.9 },
 } as const;
 
 /* ── layout ──────────────────────────────────────────────────────── */
