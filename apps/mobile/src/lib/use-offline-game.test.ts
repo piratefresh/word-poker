@@ -6,6 +6,12 @@ import { LETTER_VALUES, WORD_WINDOW_MS, dealHand, type Letter } from "@wordpoker
 import { testDictionary } from "./dictionary-fixtures";
 import { useOfflineGame, type OfflineGame } from "./use-offline-game";
 
+// The adapter reaches the HUD for the phase numbers, and the HUD's loop gate asks the router
+// whether its screen is on top. expo-router reaches a navigation package Jest cannot parse, so
+// the one hook is all this suite needs to answer: with nothing to run, the gate keeps its
+// focused default and the loops are enabled, which is what a table in front of the seat is.
+jest.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
+
 const SEED = 7;
 /** A seed whose first bot bets: the hero starts preflop facing a call. */
 const BETTING_SEED = 20_260_919;

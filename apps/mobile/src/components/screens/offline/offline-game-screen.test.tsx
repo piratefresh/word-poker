@@ -31,6 +31,9 @@ jest.mock("react-native-safe-area-context", () =>
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => false), replace: jest.fn() },
   useLocalSearchParams: () => ({ seed: mockSeedParam }),
+  // The HUD's loop gate reads this to learn whether its screen is on top, and a suite stands
+  // in for a screen that is: with nothing to run, the gate keeps its focused default.
+  useFocusEffect: () => undefined,
 }));
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
