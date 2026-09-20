@@ -6,15 +6,35 @@
  * knowing it reads differently to a player: a stalled fetch painted as `$0` would tell
  * them they are broke. So every unknown state gets its own wording, and only the
  * signed-out chip is a control.
+ *
+ * The header also carries the hand's first two effects. The phase block — the stamp and
+ * the clock row together — rises into place once per phase change, and the digits breathe
+ * while the hero is the one on turn. Both hang off the HUD's phase clock and the loop
+ * gate rather than off a render, so a pot or a seat moving moves neither.
  */
 
-import { type ReactElement, type ReactNode } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  Easing,
+  cancelAnimation,
+  interpolate,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from "react-native-reanimated";
 import Svg, { Circle, Line, Polyline } from "react-native-svg";
 
 import {
   border,
   colors,
+  duration,
+  easing as motionEasing,
   fonts,
   fontSize,
   layout,
@@ -45,6 +65,15 @@ export interface HudTopBarProps {
   onBalancePress?: () => void;
   /** Spoken turn phrase, e.g. "Magnus to act". Passed through to the announcement hook. */
   turnPhrase?: string;
+  /**
+   * The hand's phase clock, owned by the HUD. Optional so the bar still renders on its own:
+   * without one it stands still rather than inventing a phase change to rise on.
+   */
+  tick?: SharedValue<number>;
+  /** Whether the screen's loops may run. Absent means nothing has parked the screen. */
+  loopsEnabled?: boolean;
+  /** Overrides the OS reduced-motion value; the tests use it. */
+  reduceMotion?: boolean;
   testID?: string;
 }
 
@@ -68,6 +97,14 @@ const GLASS_DIAMETER = { leading: 30, trailing: 28 } as const;
 const LOADING_PLACEHOLDER = "···";
 const UNAVAILABLE_PLACEHOLDER = "—";
 const IDLE_CLOCK = "--:--";
+
+/** The phase header's entrance, in points: the block settles into place rather than sliding. */
+const PHASE_RISE = 8;
+/** The timer's pulse floor. Never 0: the digits stay readable while they breathe. */
+const TIMER_PULSE_OPACITY = 0.55;
+
+/** The digits' breathing curve — the standard in-and-out, built from its tokens. */
+const TIMER_PULSE_EASING = Easing.bezier(...motionEasing.inOut);
 
 /** Eight teeth is the least that still reads as a cog at 14pt. */
 const GEAR_TEETH = [0, 45, 90, 135, 180, 225, 270, 315].map((degrees) => {
@@ -93,18 +130,67 @@ export function HudTopBar({
   onSettings,
   onBalancePress,
   turnPhrase,
+  tick,
+  loopsEnabled,
+  reduceMotion,
   testID,
 }: HudTopBarProps): ReactElement {
+  // The bar follows the HUD's clock, and a bar rendered without one holds a clock of its
+  // own that never ticks: the hook is unconditional, so its order never depends on props.
+  const localTick = useSharedValue(0);
+  const clockTick = tick ?? localTick;
+  const loopsOn = loopsEnabled ?? true;
+  const systemReduceMotion = useReducedMotion();
+  const reduce = reduceMotion ?? systemReduceMotion;
+
+  // 1 is at rest: the block is legible and in place on its first frame, and a renderer that
+  // never runs an animation simply leaves it there.
+  const rise = useSharedValue(1);
+  const fade = useSharedValue(1);
+
+  // Restarted by the phase tick, never by a re-render: a pot change, a seat change or any
+  // other render of the same phase does not move this block (WP-412 AC2).
+  useAnimatedReaction(
+    () => clockTick.get(),
+    (current, previous) => {
+      if (current === previous) return;
+      if (reduce) {
+        rise.set(1);
+        fade.set(1);
+        return;
+      }
+      // Continue from where it is: only a block already at rest re-enters from the top, so a
+      // second phase landing mid-spring never snaps back to 8pt (STO-349 AC2).
+      if (rise.get() >= 1) rise.set(0);
+      rise.set(withSpring(1, motionEasing.springOvershoot));
+      if (fade.get() >= 1) fade.set(0);
+      fade.set(withTiming(1, { duration: duration.phaseIn }));
+    },
+    [reduce],
+  );
+
+  // Both readings go through `interpolate`: the shipped mock returns `undefined` there, so a
+  // test render sees the block where it belongs rather than wherever an animation stopped.
+  const entrance = useAnimatedStyle(() => ({
+    opacity: interpolate(fade.get(), [0, 1], [0, 1]),
+    transform: [{ translateY: interpolate(rise.get(), [0, 1], [PHASE_RISE, 0]) }],
+  }));
+
   return (
     <View style={styles.bar} testID={testID}>
       <GlassButton label="Leave the table" onPress={onLeave} size="leading">
         <BackChevron />
       </GlassButton>
       <BalanceChip balance={balance} onPress={onBalancePress} />
-      <View style={styles.centre}>
+      <Animated.View style={[styles.centre, entrance]}>
         <Text style={styles.stamp}>{`PHASE ${phaseNumber} · ${PHASE_LABEL[phase]}`}</Text>
-        <TurnClock phrase={turnPhrase} turn={turn} />
-      </View>
+        <TurnClock
+          loopsEnabled={loopsOn}
+          phrase={turnPhrase}
+          reduceMotion={reduce}
+          turn={turn}
+        />
+      </Animated.View>
       <View style={styles.trailing}>
         <GlassButton label="How to play" onPress={onHelp} size="trailing">
           <Text style={styles.helpGlyph}>?</Text>
@@ -196,7 +282,52 @@ function balanceText(balance: Exclude<BalanceView, { state: "signed-out" }>): st
 }
 
 /** The countdown, plus — while a turn is live — its band-change announcement. */
-function TurnClock({ turn, phrase }: { turn: TurnTimerView | null; phrase?: string }) {
+function TurnClock({
+  turn,
+  phrase,
+  loopsEnabled,
+  reduceMotion,
+}: {
+  turn: TurnTimerView | null;
+  phrase?: string;
+  loopsEnabled: boolean;
+  reduceMotion: boolean;
+}) {
+  // 1 is rest: with no animation running the digits are at full strength on the first frame.
+  const pulse = useSharedValue(1);
+
+  // The phrase is the hero's own status — `heroTurnPhrase` names a player exactly when that
+  // player is to act — so the pair is what "the hero is on the clock" means. Nothing else
+  // pulses: the clock is the hero's, and a loop left running behind a parked screen or an
+  // expired turn is the thing the gate exists to stop (WP-412 AC9).
+  const live = turn !== null && phrase !== undefined && loopsEnabled && !reduceMotion;
+
+  useEffect(() => {
+    cancelAnimation(pulse);
+    if (!live) {
+      pulse.set(1);
+      return;
+    }
+    pulse.set(
+      withRepeat(
+        withTiming(TIMER_PULSE_OPACITY, {
+          duration: duration.timerPulse / 2,
+          easing: TIMER_PULSE_EASING,
+        }),
+        -1,
+        true,
+      ),
+    );
+    return () => {
+      cancelAnimation(pulse);
+      pulse.set(1);
+    };
+  }, [live, pulse]);
+
+  const heartbeat = useAnimatedStyle(() => ({
+    opacity: interpolate(pulse.get(), [0, 1], [0, 1]),
+  }));
+
   if (!turn) {
     return (
       <View accessibilityLabel="No turn in progress" accessible style={styles.clockRow}>
@@ -212,9 +343,9 @@ function TurnClock({ turn, phrase }: { turn: TurnTimerView | null; phrase?: stri
     <>
       <View accessibilityLabel={clockLabel(turn)} accessible style={styles.clockRow}>
         {loud ? <Text style={styles.clockMark}>!</Text> : null}
-        <Text style={[styles.clock, loud && styles.clockLoud]}>
+        <Animated.Text style={[styles.clock, loud && styles.clockLoud, heartbeat]}>
           {formatClockMs(turn.remainingMs)}
-        </Text>
+        </Animated.Text>
       </View>
       <TurnAnnouncement phrase={phrase} turn={turn} />
     </>

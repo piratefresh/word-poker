@@ -2,6 +2,7 @@ import type { RoundPhase } from "@wordpoker/contracts";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { spacing } from "@/constants/theme";
+import { useLoopsEnabled, usePhaseClock } from "@/motion";
 
 import type { ToastQueue } from "./hud-toasts";
 import { HudToasts } from "./hud-toasts";
@@ -10,6 +11,12 @@ import { BalanceView, PHASE_NUMBER } from "./hud-types";
 import type { TurnTimerView } from "./turn-clock";
 
 export interface HudProps {
+  /**
+   * A stable id for the hand on the table. The phase clock counts a new hand as a change —
+   * the next hand opens on preflop again, and the effects have to rise for it — so this is
+   * the hand's identity, not the state's phase-and-actor composite id.
+   */
+  handId?: string;
   /** The hand's phase. The top bar names it, and numbers it, in its stamp. */
   phase: RoundPhase;
   /** The live turn, or null between turns. */
@@ -26,7 +33,8 @@ export interface HudProps {
   onHelp?: () => void;
   onSettings?: () => void;
   onBalancePress?: () => void;
-  /** Overrides the OS reduced-motion value; the tests use it. */
+  /** Overrides the OS reduced-motion value for every effect the HUD carries; the tests use
+   *  it. Absent means each effect asks the OS for itself. */
   reduceMotion?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -52,6 +60,7 @@ export const HUD_CHROME_HEIGHT = HUD_BAR_HEIGHT;
  * clear at every viewport.
  */
 export function Hud({
+  handId,
   phase,
   turn,
   turnPhrase,
@@ -65,11 +74,18 @@ export function Hud({
   style,
   testID,
 }: HudProps) {
+  // The container owns both, because both are the hand's rather than the bar's: the clock
+  // says when the street moved, and the gate says whether a loop may run at all. The bar
+  // only draws them.
+  const { tick } = usePhaseClock(handId ?? "", phase);
+  const loopsEnabled = useLoopsEnabled();
+
   return (
     <View pointerEvents="box-none" style={[styles.hud, style]} testID={testID}>
       <View pointerEvents="box-none" style={styles.chrome}>
         <HudTopBar
           balance={balance}
+          loopsEnabled={loopsEnabled}
           onBalancePress={onBalancePress}
           onHelp={onHelp}
           onLeave={onLeave}
@@ -78,6 +94,8 @@ export function Hud({
           // Derived rather than passed: the ordinal is a property of the phase, and two
           // screens each deciding what number a phase is would eventually disagree.
           phaseNumber={PHASE_NUMBER[phase]}
+          reduceMotion={reduceMotion}
+          tick={tick}
           turn={turn}
           turnPhrase={turnPhrase}
         />

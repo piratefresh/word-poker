@@ -6,6 +6,13 @@ import { type BalanceView } from "./hud-types";
 import { HudTopBar, type HudTopBarProps } from "./hud-top-bar";
 import { deriveTurnTimer, type TurnTimerView } from "./turn-clock";
 
+// The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
+// and the bar reads it for its two effects, so the one hook is layered on here.
+jest.mock("react-native-reanimated", () => ({
+  ...jest.requireActual<Record<string, unknown>>("react-native-reanimated/mock"),
+  useReducedMotion: () => false,
+}));
+
 const SECOND = 1000;
 const START = 1_700_000_000_000;
 const PHRASE = "Magnus to act";
