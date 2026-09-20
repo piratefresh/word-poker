@@ -2,6 +2,10 @@
   "name": "word-poker",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "pnpm": ">=12"
+  },
   "scripts": {
     "start": "pnpm --filter @wordpoker/mobile start",
     "dev:server": "pnpm --filter @wordpoker/server start",
