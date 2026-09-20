@@ -25,12 +25,12 @@ const STATUS_LABEL: Record<PlayerStatus, string> = {
   call: "CALL",
   raise: "RAISE",
   fold: "FOLD",
+  "all-in": "ALL-IN",
+  busted: "BUSTED",
   winner: "WINNER",
 };
 const ROLE_LABEL: Record<PlayerRole, string> = {
   dealer: "D",
-  "small-blind": "SB",
-  "big-blind": "BB",
 };
 
 const SEAT_STACK_HEIGHT = 92;
@@ -120,12 +120,14 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
   const winner = seat.status === "winner";
   const lit = active || winner;
   const statusColor = winner ? colors.goldHi : active ? colors.gold : colors.success;
+  // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
+  const out = seat.status === "fold" || seat.status === "busted";
   const betStyle =
     Math.abs(anchor.x - 0.5) > Math.abs(anchor.y - 0.5)
       ? { left: anchor.x < 0.5 ? 72 : -3, top: 22 }
       : { left: 34, top: anchor.y < 0.5 ? 45 : -13 };
   return (
-    <View style={[styles.seat, seat.status === "fold" && styles.folded]}>
+    <View style={[styles.seat, out && styles.folded]}>
       <View style={styles.avatarWrap}>
         <View
           style={[
@@ -137,12 +139,7 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
           <Text style={styles.initials}>{seat.initials}</Text>
         </View>
         {seat.role ? (
-          <View
-            style={[
-              styles.roleBadge,
-              seat.role === "small-blind" && styles.smallBlind,
-              seat.role === "big-blind" && styles.bigBlind,
-            ]}>
+          <View style={styles.roleBadge}>
             <Text style={styles.roleText}>{ROLE_LABEL[seat.role]}</Text>
           </View>
         ) : null}
@@ -170,11 +167,25 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
   );
 }
 
-export function Pot({ amount }: { amount: number }) {
+/**
+ * The chips in the middle. A hand whose all-ins differ splits them into layers (§25); the
+ * main pot is the headline and every side pot is a line under it, because each is contested
+ * by a different set of seats and a single merged total would claim otherwise.
+ */
+export function Pot({ amount, sidePots = [] }: { amount: number; sidePots?: readonly number[] }) {
   return (
-    <View style={styles.pot}>
+    <View style={styles.pot} testID="pot">
       <Text style={styles.potLabel}>POT</Text>
       <Text style={styles.potAmount}>{`$${amount.toLocaleString()}`}</Text>
+      {sidePots.map((side, index) => (
+        <Text
+          key={`side-pot-${index}`}
+          style={styles.sidePotAmount}
+          testID={`side-pot-${index}`}
+        >
+          {`SIDE POT $${side.toLocaleString()}`}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -215,6 +226,8 @@ export function ActionButton({
   danger,
   gold,
   wide,
+  compact,
+  testID,
 }: {
   label: string;
   onPress?: () => void;
@@ -222,6 +235,9 @@ export function ActionButton({
   danger?: boolean;
   gold?: boolean;
   wide?: boolean;
+  /** Hugs its label instead of sharing the row: for a control beside full-width actions. */
+  compact?: boolean;
+  testID?: string;
 }) {
   const content = <Text style={[styles.actionText, gold && styles.goldActionText]}>{label}</Text>;
   return (
@@ -232,11 +248,13 @@ export function ActionButton({
       style={({ pressed }) => [
         styles.action,
         wide && styles.wideAction,
+        compact && styles.compactAction,
         danger && styles.dangerAction,
         gold && styles.goldAction,
         disabled && styles.disabled,
         pressed && styles.pressed,
-      ]}>
+      ]}
+      testID={testID}>
       {gold ? (
         <LinearGradient {...gradients.goldButton} style={styles.actionGradient}>
           {content}
@@ -339,8 +357,6 @@ const styles = StyleSheet.create({
     width: 17,
     zIndex: 2,
   },
-  smallBlind: { backgroundColor: colors.gold, width: 19 },
-  bigBlind: { backgroundColor: "#e07a5f", width: 19 },
   roleText: { color: colors.onGold, fontFamily: fonts.monoBold, fontSize: 7 },
   playerName: {
     color: colors.textBright,
@@ -397,6 +413,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
   },
   potAmount: { color: colors.gold, fontFamily: fonts.serifBold, fontSize: 26, lineHeight: 30 },
+  sidePotAmount: {
+    color: colors.textDim,
+    fontFamily: fonts.mono,
+    fontSize: 9,
+    letterSpacing: 1,
+  },
   bestWord: { alignItems: "center", paddingBottom: 3, paddingTop: 7 },
   bestWordLabel: {
     color: colors.textFaint,
@@ -425,6 +447,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   wideAction: { flex: 1.35 },
+  compactAction: { flex: 0, paddingHorizontal: 10 },
   dangerAction: { borderColor: "rgba(255,93,78,0.4)" },
   goldAction: { borderColor: colors.goldDeep },
   actionGradient: {

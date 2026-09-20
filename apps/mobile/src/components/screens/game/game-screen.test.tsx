@@ -128,9 +128,100 @@ test("hands a pressed action on to its handler", async () => {
   const onCheckOrCall = jest.fn();
   const view = await renderScreen({ onCheckOrCall, onFold });
 
+  // The hero owes the fixture's bet, so the row's second control is the call.
   await fireEvent.press(view.getByText("FOLD"));
-  await fireEvent.press(view.getByText("CHECK"));
+  await fireEvent.press(view.getByText("CALL $20"));
 
   expect(onFold).toHaveBeenCalledTimes(1);
   expect(onCheckOrCall).toHaveBeenCalledTimes(1);
+});
+
+test("labels the wager button with the action it would take", async () => {
+  const onRaise = jest.fn();
+  const view = await renderScreen({ onRaise });
+
+  // Facing a bet, the slider raises: the amount is the round total it would raise to.
+  await fireEvent.press(view.getByText("RAISE $40"));
+  expect(onRaise).toHaveBeenCalledWith(40);
+
+  // With no bet out, the same slider opens the round, and the button says so.
+  await view.rerender(
+    <GameScreen
+      game={{
+        ...FOUR_PLAYER_FLOP_FIXTURE,
+        betting: {
+          ...FOUR_PLAYER_FLOP_FIXTURE.betting,
+          minRaise: 20,
+          raiseAmount: 20,
+          canCheck: true,
+          canRaise: false,
+          canBet: true,
+          callAmount: undefined,
+          currentBet: 0,
+        },
+      }}
+      onRaise={onRaise}
+    />,
+  );
+
+  await fireEvent.press(view.getByText("BET $20"));
+  expect(onRaise).toHaveBeenCalledWith(20);
+});
+
+test("asks before committing the whole stack, and only commits on the confirm", async () => {
+  const onAllIn = jest.fn();
+  const view = await renderScreen({ onAllIn });
+
+  // The button states the exact amount §22 commits, and opens the felt's own sheet.
+  expect(view.getByText("ALL IN · $980")).toBeOnTheScreen();
+  await fireEvent.press(view.getByTestId("all-in-button"));
+  expect(view.getByTestId("all-in-sheet")).toBeOnTheScreen();
+  expect(view.getByText("Commits your entire Table Stack.")).toBeOnTheScreen();
+
+  await fireEvent.press(view.getByTestId("all-in-cancel"));
+  expect(view.queryByTestId("all-in-sheet")).toBeNull();
+  expect(onAllIn).not.toHaveBeenCalled();
+
+  await fireEvent.press(view.getByTestId("all-in-button"));
+  await fireEvent.press(view.getByTestId("all-in-confirm"));
+
+  expect(onAllIn).toHaveBeenCalledTimes(1);
+  expect(view.queryByTestId("all-in-sheet")).toBeNull();
+});
+
+test("leaves a disabled control inert", async () => {
+  const onFold = jest.fn();
+  const onAllIn = jest.fn();
+  const view = await renderScreen({
+    game: {
+      ...FOUR_PLAYER_FLOP_FIXTURE,
+      betting: { ...FOUR_PLAYER_FLOP_FIXTURE.betting, canFold: false, canAllIn: false },
+    },
+    onAllIn,
+    onFold,
+  });
+
+  await fireEvent.press(view.getByText("FOLD"));
+  await fireEvent.press(view.getByTestId("all-in-button"));
+
+  expect(onFold).not.toHaveBeenCalled();
+  expect(onAllIn).not.toHaveBeenCalled();
+  expect(view.queryByTestId("all-in-sheet")).toBeNull();
+});
+
+test("draws each side pot under the main pot, and none when the hand has one pot", async () => {
+  const view = await renderScreen();
+
+  expect(view.getByTestId("pot")).toBeOnTheScreen();
+  expect(view.queryByTestId("side-pot-0")).toBeNull();
+
+  await view.rerender(
+    <GameScreen
+      game={{ ...FOUR_PLAYER_FLOP_FIXTURE, sidePots: [500, 250] }}
+      onBack={jest.fn()}
+    />,
+  );
+
+  expect(view.getByTestId("side-pot-0")).toHaveTextContent("SIDE POT $500");
+  expect(view.getByTestId("side-pot-1")).toHaveTextContent("SIDE POT $250");
 });

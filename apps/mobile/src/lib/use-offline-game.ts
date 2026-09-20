@@ -3,9 +3,13 @@
  *
  * This is the thin seam between `@wordpoker/game-rules` (which knows nothing about screens)
  * and the existing `GameScreen` (which knows nothing about the engine). It owns one
- * `OfflineState`, runs the fixed bot on the bots' turns *and* on their words, maps the settled
- * hand into the felt's winner, and maps everything else into the shape the felt already
- * renders.
+ * `OfflineState`, dispatches the hero's betting actions and word edits, runs the fixed bot on
+ * the bots' turns *and* on their words, and maps everything the table decided into the shape
+ * the felt already renders.
+ *
+ * Legality is the engine's, never this file's: every control is armed from `bettingBounds`, so
+ * a dispatcher here is only ever reached for an action the engine would accept (and a stale
+ * one — a tap after the clock moved the turn — is dropped rather than crashing the table).
  *
  * The dictionary arrives as an injected setting (`useDictionary` loads it one screen up), so
  * the hand is judged against exactly the list the table displays before play.
@@ -22,15 +26,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
+  BettingAction,
   PlayerId,
   TilePlay,
   WordRejectionReason,
 } from "@wordpoker/contracts";
 import {
+  BettingRejectionError,
+  DEFAULT_STAKES,
   OFFLINE_TURN_MS,
   WORD_WINDOW_MS,
   WordRejectionError,
   availableTiles,
+  bettingBounds,
   chooseOfflineWord,
   decideOfflineMove,
   reduce,
@@ -39,6 +47,7 @@ import {
   spellSubmission,
   startHand,
   type Dictionary,
+  type HandResult,
   type OfflineSeat,
   type OfflineState,
   type SubmissionResolution,
@@ -46,6 +55,7 @@ import {
 
 import { PHASE_NUMBER } from "@/components/hud";
 import type {
+  BettingState,
   GamePlayer,
   GameScreenState,
   PlayerStatus,
@@ -53,14 +63,9 @@ import type {
 import { isSupportedSeatCount, type SeatCount } from "@/components/table";
 import type { WordDraft } from "@/components/word-builder";
 import { colors, palette } from "@/constants/theme";
+import { randomSeed } from "@/lib/offline-seed";
 
-/**
- * The seed a table starts from when the caller does not pick one. Fixed, so the offline
- * slice is the same hand on every device — a later story can seed it per player.
- */
-export const OFFLINE_SEED = 20_260_919;
-
-/** The hero always sits in this seat; the bots fill the rest, and act after them. */
+/** The hero always sits in this seat; the bots fill the rest. */
 const HERO_ID: PlayerId = "hero";
 
 /**
@@ -78,26 +83,23 @@ const ROSTER: readonly { id: PlayerId; name: string; initials: string }[] = [
 ];
 
 /**
- * No wallet, no blinds, and no betting in this slice, so the stack a seat shows is the
- * table's buy-in and never moves. It is here because a seat without a stack is not a
- * seat; it is not here because anything can win it.
+ * The row when the hero has nothing to do: no round of theirs is open, so every control is
+ * dark. `raiseStep` still carries the table's step, because the slider's own arithmetic
+ * divides by it even while the slider is inert.
  */
-const NOMINAL_STACK = 1_000;
-
-/**
- * The betting row's fixed half, in its offline shape: fold and the bet are out of this slice
- * (STO-280), so they never arm; the check is the row's one live control and `bettingRow`
- * decides what it is for.
- */
-const NO_BETS = {
+const INERT_BETS: BettingState = {
   minRaise: 0,
   maxRaise: 0,
-  raiseStep: 0,
+  raiseStep: DEFAULT_STAKES.minBet,
   raiseAmount: 0,
   canFold: false,
   canCheck: false,
   canRaise: false,
-} as const;
+  canBet: false,
+  canAllIn: false,
+  allInAmount: 0,
+  currentBet: 0,
+};
 
 export interface OfflineGame {
   /** The mapped state: exactly what `GameScreen` renders. */
@@ -111,12 +113,18 @@ export interface OfflineGame {
   words: WordDraft | null;
   /** Starts the next hand. Only legal once the current hand has paid out. */
   deal: () => void;
-  /**
-   * Passes the hero's turn — or, while §19's window is open, closes the window with the clock
-   * run out, which is how the hero skips building a word. The bots take their turns, and
-   * their words, on their own.
-   */
-  advance: () => void;
+  /** Surrenders the hand (§22). */
+  fold: () => void;
+  /** Passes when nothing is owed; the engine refuses it while facing a bet. */
+  check: () => void;
+  /** Opens the round with `amount` committed this round. */
+  bet: (amount: number) => void;
+  /** Matches the current bet; a short stack calls short and goes all in (§23). */
+  call: () => void;
+  /** Raises to `amount` — a round total, not an increment (§22). */
+  raiseTo: (amount: number) => void;
+  /** Commits the hero's exact remaining Table Stack (§22). */
+  allIn: () => void;
   /**
    * Replaces the hero's draft with the one the seat has built: one submission, whatever the
    * edit was. The engine judges the whole draft, and a draft it cannot build is refused with
@@ -125,22 +133,48 @@ export interface OfflineGame {
   setDraft: (plays: readonly TilePlay[]) => void;
   /** Confirms the hero's draft as its word (§19). */
   confirmWord: () => void;
+  /**
+   * Whether the session has ended — the hero is busted, or fewer than two seats can still
+   * pay a hand (ADR 0002). The felt shows its end-state over the table.
+   */
+  sessionOver: boolean;
+  /** Restarts the session: fresh Table Stacks, a fresh seed, hand 1. */
+  newGame: () => void;
 }
 
 /**
  * Owns the offline hand. Everything the table decides for itself — the bots' turns, the bots'
- * words, §19's clock running out — resolves inside the same state transition that reached it,
- * so the screen never sits waiting on a seat that has nobody behind it.
+ * words, a clock running out — resolves inside the same state transition that reached it, so
+ * the screen never sits waiting on a seat that has nobody behind it.
  */
 export function useOfflineGame({
-  seed = OFFLINE_SEED,
+  seed,
   dictionary,
 }: {
-  seed?: number;
+  /**
+   * The seed the whole session replays from: this hand, and every hand after it, since the
+   * engine derives each next hand's seed from the one before (`game-rules`). The caller picks
+   * it — `/offline` draws a fresh one per table, or takes the one the URL pins
+   * (`@/lib/offline-seed`) — because the same seed anywhere has to be the same hand
+   * everywhere.
+   */
+  seed: number;
   dictionary: Dictionary;
 }): OfflineGame {
   const [state, setState] = useState<OfflineState>(() =>
-    startHand({ seed, players: ROSTER.map((player) => player.id), nowMs: Date.now(), dictionary }),
+    // The deal leaves the first turn to the seat clockwise from the button, which is a bot on
+    // this roster: the opening turns settle before the first render, exactly as every later
+    // bot turn settles inside the hero's own action.
+    settleBots(
+      startHand({
+        seed,
+        players: ROSTER.map((player) => player.id),
+        nowMs: Date.now(),
+        dictionary,
+        stakes: DEFAULT_STAKES,
+      }),
+      Date.now(),
+    ),
   );
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
 
@@ -155,6 +189,11 @@ export function useOfflineGame({
    * Runs one change, then lets the bots answer it. A word the engine refused leaves the table
    * where it was and reports §11's reason instead: the payload never became the hero's word,
    * and the next tap is the hero's to make.
+   *
+   * A betting action the engine refused — the hero's clock fired as the hero tapped, or a
+   * second tap landed on a control the last transition had already moved — is dropped the
+   * same way, without a message: there is nothing for the seat to fix, and the felt is
+   * already rendering the table that refused it.
    */
   const act = useCallback(
     (change: (current: OfflineState) => OfflineState) => {
@@ -166,6 +205,7 @@ export function useOfflineGame({
           setRefusal(error.reason);
           return;
         }
+        if (error instanceof BettingRejectionError) return;
         throw error;
       }
     },
@@ -173,22 +213,64 @@ export function useOfflineGame({
   );
 
   const deal = useCallback(() => {
+    if (state.sessionOver) return;
     setHeroDraft([]);
     setRefusal(null);
     act((current) => reduce(current, { type: "deal" }, Date.now()));
-  }, [act]);
+  }, [act, state.sessionOver]);
 
-  const advance = useCallback(
-    () =>
-      act((current) =>
-        current.wordWindow?.status === "open"
-          ? // The window has no turn to pass: a tap here means the hero is done building, so
-            // the slice runs §19's clock to its deadline and lets the timeout rule settle it.
-            reduce(current, { type: "timeoutWords" }, current.endsAtMs)
-          : reduce(current, { type: "advance" }, Date.now()),
-      ),
+  const bet = useCallback(
+    (amount: number) =>
+      act((current) => reduce(current, { type: "bet", playerId: HERO_ID, amount }, Date.now())),
     [act],
   );
+
+  const raiseTo = useCallback(
+    (amount: number) =>
+      act((current) => reduce(current, { type: "raise", playerId: HERO_ID, amount }, Date.now())),
+    [act],
+  );
+
+  /** The hero's betting dispatchers: one engine action each, named as the felt names them. */
+  const fold = useCallback(
+    () => act((current) => reduce(current, { type: "fold", playerId: HERO_ID }, Date.now())),
+    [act],
+  );
+  const check = useCallback(
+    () => act((current) => reduce(current, { type: "check", playerId: HERO_ID }, Date.now())),
+    [act],
+  );
+  const call = useCallback(
+    () => act((current) => reduce(current, { type: "call", playerId: HERO_ID }, Date.now())),
+    [act],
+  );
+  const allIn = useCallback(
+    () => act((current) => reduce(current, { type: "allIn", playerId: HERO_ID }, Date.now())),
+    [act],
+  );
+
+  /**
+   * Restarts the session — what the end-of-session overlay's New game does. Fresh Table
+   * Stacks come from the table's stakes and the seed is drawn again: a new session is a new
+   * run, not a continuation of the one that ended (ADR 0002). A URL-pinned `?seed=` pins only
+   * the session's first hand, as it always did; every later session is drawn.
+   */
+  const newGame = useCallback(() => {
+    setHeroDraft([]);
+    setRefusal(null);
+    setState(
+      settleBots(
+        startHand({
+          seed: randomSeed(),
+          players: ROSTER.map((player) => player.id),
+          nowMs: Date.now(),
+          dictionary,
+          stakes: DEFAULT_STAKES,
+        }),
+        Date.now(),
+      ),
+    );
+  }, [dictionary]);
 
   /**
    * Replaces the hero's draft with the one the seat has built — playing a tile, taking one back,
@@ -201,7 +283,8 @@ export function useOfflineGame({
    */
   const setDraft = useCallback(
     (next: readonly TilePlay[]) => {
-      if (state.phase === "payout") return;
+      const hero = state.seats[heroIndex];
+      if (state.phase === "payout" || hero === undefined || hero.folded || hero.sittingOut) return;
 
       const resolution = resolveSubmission({
         available: availableTiles(state, heroIndex),
@@ -247,13 +330,51 @@ export function useOfflineGame({
     return () => clearTimeout(timer);
   }, [state.wordWindow, state.endsAtMs]);
 
+  // A betting turn belongs to the table's clock too: when the hero's thirty seconds run out
+  // the seat checks if it can and folds otherwise — §29's auto-fold, applied to the seat a
+  // human left unattended — and the bots answer the same way they answer a tap.
+  useEffect(() => {
+    const index = state.toActIndex;
+    if (state.betting === null || index === null || state.seats[index]?.id !== HERO_ID) return;
+
+    const timer = setTimeout(() => {
+      setState((current) => {
+        const currentIndex = current.toActIndex;
+        const round = current.betting;
+        if (round === null || currentIndex === null || current.seats[currentIndex]?.id !== HERO_ID) {
+          return current;
+        }
+
+        const bounds = bettingBounds(current.seats, round, currentIndex, current.stakes.minBet);
+        if (bounds === null) return current;
+
+        const action: BettingAction = bounds.canCheck
+          ? { type: "check", playerId: HERO_ID }
+          : { type: "fold", playerId: HERO_ID };
+
+        return settleBots(reduce(current, action, Math.max(Date.now(), current.endsAtMs)), Date.now());
+      });
+    }, Math.max(state.endsAtMs - Date.now(), 0) + 25);
+
+    return () => clearTimeout(timer);
+  }, [state.betting, state.toActIndex, state.endsAtMs, state.seats]);
+
+  const game = useMemo(() => toScreenState(state, heroDraft), [state, heroDraft]);
+
   return {
-    game: useMemo(() => toScreenState(state, heroDraft), [state, heroDraft]),
+    game,
     words: useMemo(() => wordsOf(state, heroDraft, refusal), [state, heroDraft, refusal]),
     deal,
-    advance,
+    fold,
+    check,
+    bet,
+    call,
+    raiseTo,
+    allIn,
     setDraft,
     confirmWord,
+    sessionOver: game.sessionOver,
+    newGame,
   };
 }
 
@@ -296,17 +417,19 @@ function resolveBotTurns(state: OfflineState): OfflineState {
  */
 function settleBots(state: OfflineState, nowMs: number): OfflineState {
   let next = resolveBotTurns(state);
+  const window = next.wordWindow;
+  if (window?.status !== "open") return next;
 
-  for (const [index, seat] of next.seats.entries()) {
-    if (seat.id === HERO_ID || next.wordWindow?.status !== "open") continue;
+  for (const slot of window.slots) {
+    if (slot.playerId === HERO_ID || slot.status !== "drafting") continue;
 
-    const slot = next.wordWindow.slots[index];
-    if (slot?.status !== "drafting") continue;
-
-    const submission = chooseOfflineWord({ available: availableTiles(next, index), dictionary: next.dictionary });
+    const submission = chooseOfflineWord({
+      available: availableTiles(next, slot.seat),
+      dictionary: next.dictionary,
+    });
     if (submission === null) continue;
 
-    next = reduce(next, { type: "confirmWord", playerId: seat.id, submission }, nowMs);
+    next = reduce(next, { type: "confirmWord", playerId: slot.playerId, submission }, nowMs);
   }
 
   return next;
@@ -319,19 +442,20 @@ function settleBots(state: OfflineState, nowMs: number): OfflineState {
  *
  * The draft is the client's the whole hand, so this reads the local `heroDraft` on every street
  * — the builder runs in parallel with the betting, not only inside §19's window. Once the seat
- * confirms, the engine's locked submission takes over. There is no draft to show at payout: the
- * hand is judged and the felt shows the winner.
+ * confirms, the engine's locked submission takes over. There is no draft to show at payout, and
+ * none once the hero is out of the hand: a folded seat builds no word (§19).
  */
 function wordsOf(
   state: OfflineState,
   heroDraft: readonly TilePlay[],
   refusal: WordRejectionReason | null,
 ): WordDraft | null {
-  if (state.phase === "payout") return null;
-
   const index = state.seats.findIndex((seat) => seat.id === HERO_ID);
+  const hero = state.seats[index];
+  if (state.phase === "payout" || hero === undefined || hero.folded || hero.sittingOut) return null;
+
   const window = state.wordWindow;
-  const slot = window?.slots[index];
+  const slot = window?.slots.find((candidate) => candidate.seat === index);
   const confirmed = slot?.status === "confirmed";
   const plays = confirmed ? slot.submission.plays : heroDraft;
 
@@ -380,9 +504,10 @@ function toScreenState(
   state: OfflineState,
   heroDraft: readonly TilePlay[],
 ): GameScreenState {
-  const hero = state.seats.find((seat) => seat.id === HERO_ID);
+  const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
+  const hero = state.seats[heroIndex];
   const best = state.result?.standings[0];
-  const winner = state.phase === "payout" && best !== undefined ? { id: best.playerId, score: best.score } : null;
+  const winners = winnerIds(state.result);
 
   return {
     // One turn, one identity: the HUD re-anchors its countdown when this changes, so it
@@ -392,45 +517,82 @@ function toScreenState(
     phaseNumber: PHASE_NUMBER[state.phase],
     secondsRemaining: (state.wordWindow?.status === "open" ? WORD_WINDOW_MS : OFFLINE_TURN_MS) / 1_000,
     seatCount: toSeatCount(state.seats.length),
-    players: state.seats.map((seat, index) => player(seat, index, state, winner)),
-    pot: 0,
+    players: state.seats.map((seat, index) => player(seat, index, state, winners)),
+    // The pot is every chip committed this hand, in the layers §25 gives it: the main pot is
+    // the first layer and the rest are side pots the felt draws under it.
+    pot: state.seats.reduce((total, seat) => total + seat.committedHand, 0),
+    sidePots: state.result?.payout.pots.slice(1).map((pot) => pot.amount) ?? [],
+    // The session ends when the table cannot seat a hand any more, and for this screen also
+    // when the seat it speaks for has busted: the session is the hero's run, and a table that
+    // plays on without the hero has nothing left to show.
+    sessionOver: state.sessionOver || (state.phase === "payout" && (hero?.stack ?? 0) <= 0),
     community: state.community.map((tile, index) => (index < state.revealed ? tile : null)),
     privateTiles: hero?.privateTiles ?? [],
-    bestScore: winner?.score,
+    bestScore: best?.score,
     // The felt's "winning word" line: the ladder's top place is the word that took the pot,
     // and §11's reasons mean a seat can top the table without one (the §21.3 draw) — then
-    // there is no word to show and the line stays as the felt draws it.
+    // there is no word to show and the line stays as the felt draws it. A fold-out has no
+    // reveal at all and nothing to show (§26).
     bestWord: best?.word ?? undefined,
-    betting: bettingRow(state, heroDraft),
+    betting: bettingRow(state, heroIndex, heroDraft),
   };
 }
 
-/**
- * The action row's live half: the check, and what it is for right now.
- *
- * Checking commits no chips, which makes it the offline slice's whole round — the tap that
- * takes the seat's turn while the streets advance — and, once §19's window is open, the
- * confirm: the word as it stands is locked in, exactly as §19's "must confirm before the
- * clock runs out" requires, without a second control row to do it from.
- */
-function bettingRow(state: OfflineState, heroDraft: readonly TilePlay[]): GameScreenState["betting"] {
-  const window = state.wordWindow;
-  const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
-  const drafting =
-    window?.status === "open" && window.slots[heroIndex]?.status === "drafting";
+/** Which seats the settled hand paid: the ladder's first place, or §26's one survivor. */
+function winnerIds(result: HandResult | null): readonly PlayerId[] {
+  if (result === null) return [];
+  if (result.standings.length === 0) return [result.winner];
+  return result.standings.filter((standing) => standing.place === 1).map((standing) => standing.playerId);
+}
 
-  return {
-    ...NO_BETS,
-    canCheck:
-      actingSeat(state)?.id === HERO_ID || (drafting && heroDraft.length > 0),
-  };
+/**
+ * The action row, read off the engine's own bounds — never recomputed here (AGENTS.md: the
+ * client renders what the engine decided). When the hero is to act, every control is exactly
+ * as legal as `bettingBounds` says; on every other turn the row is inert, with one exception:
+ * §19's window, where the check is the confirm, arms as soon as the hero has a draft to lock
+ * in (the word window is not a betting round, so the engine has no bounds for it).
+ */
+function bettingRow(
+  state: OfflineState,
+  heroIndex: number,
+  heroDraft: readonly TilePlay[],
+): BettingState {
+  const hero = state.seats[heroIndex];
+  const round = state.betting;
+
+  if (round !== null && heroIndex >= 0 && state.toActIndex === heroIndex && hero !== undefined) {
+    const bounds = bettingBounds(state.seats, round, heroIndex, state.stakes.minBet);
+    if (bounds !== null) {
+      return {
+        minRaise: bounds.minRaiseTo,
+        maxRaise: bounds.maxRaiseTo,
+        raiseStep: state.stakes.minBet,
+        raiseAmount: bounds.minRaiseTo,
+        canFold: bounds.canFold,
+        canCheck: bounds.canCheck,
+        ...(bounds.callAmount > 0 ? { callAmount: bounds.callAmount } : {}),
+        canRaise: bounds.canRaise,
+        canBet: bounds.canBet,
+        canAllIn: bounds.canAllIn,
+        allInAmount: hero.stack,
+        currentBet: bounds.currentBet,
+      };
+    }
+  }
+
+  const window = state.wordWindow;
+  const drafting =
+    window?.status === "open" &&
+    window.slots.some((slot) => slot.seat === heroIndex && slot.status === "drafting");
+
+  return { ...INERT_BETS, canCheck: drafting === true && heroDraft.length > 0 };
 }
 
 function player(
   seat: OfflineSeat,
   index: number,
   state: OfflineState,
-  winner: { id: PlayerId } | null,
+  winners: readonly PlayerId[],
 ): GamePlayer {
   return {
     id: seat.id,
@@ -439,19 +601,33 @@ function player(
     // The felt badges this seat "· YOU" and the HUD names it in the spoken turn phrase;
     // without the flag the offline table never says which seat is the player's.
     isHero: seat.id === HERO_ID,
-    stack: NOMINAL_STACK,
+    stack: seat.stack,
     color: colors.players[index % colors.players.length] ?? palette.amber400,
-    status: seatStatus(seat, state, winner),
+    // No blinds exist (ADR 0001), so the button is the only role a seat can hold — and it
+    // rides on the seat index, which is why a busted seat can still be the dealer.
+    ...(index === state.dealerSeat ? { role: "dealer" as const } : {}),
+    // What the seat has committed this round, drawn as the chip beside it. A seat that has
+    // put nothing in has no chip to show.
+    ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
+    status: seatStatus(seat, state, winners),
   };
 }
 
 function seatStatus(
   seat: OfflineSeat,
   state: OfflineState,
-  winner: { id: PlayerId } | null,
+  winners: readonly PlayerId[],
 ): PlayerStatus {
-  if (winner !== null) return winner.id === seat.id ? "winner" : "waiting";
-  if (actingSeat(state)?.id !== seat.id) return "waiting";
+  // A settled hand pays its winner(s) the pill before any other state: a seat that shoved
+  // and won is a winner, not "all-in".
+  if (state.phase === "payout" && winners.includes(seat.id)) return "winner";
+  if (seat.sittingOut) return "busted";
+  if (seat.folded) return "fold";
+  if (seat.allIn) return "all-in";
+  if (state.phase === "payout") return "waiting";
+
+  const acting = actingSeat(state);
+  if (acting?.id !== seat.id) return "waiting";
 
   return seat.id === HERO_ID ? "your-turn" : "thinking";
 }
