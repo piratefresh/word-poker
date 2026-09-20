@@ -14,6 +14,11 @@
  * The dictionary arrives as an injected setting (`useDictionary` loads it one screen up), so
  * the hand is judged against exactly the list the table displays before play.
  *
+ * Every engine transition commits through one seam, and the chips it put in the air are read off
+ * the seats' commitments either side of it — so a check or a fold emits nothing, and no action
+ * has to remember to announce its own chips. The felt's layer over the table reports a flight
+ * back when it lands, and that report is the only thing that prunes it.
+ *
  * Deliberately minimal: the hand's controls and the mapped state. The general form of this —
  * selectors, an animation-event stream, adapter lifecycle, and a source that can be swapped
  * between offline, tutorial, and the online room — is STO-277's store, and is where this goes
@@ -23,7 +28,7 @@
  * server stopped and the device in airplane mode.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   BettingAction,
@@ -56,6 +61,7 @@ import {
 import { PHASE_NUMBER } from "@/components/hud";
 import type {
   BettingState,
+  ChipFlight,
   GamePlayer,
   GameScreenState,
   PlayerStatus,
@@ -134,6 +140,12 @@ export interface OfflineGame {
   /** Confirms the hero's draft as its word (§19). */
   confirmWord: () => void;
   /**
+   * A chip flight that has landed, so the felt stops drawing it. The layer over the table
+   * reports its own flight's id when the chips are down; a new hand drops whatever is still in
+   * the air on its own, so nothing depends on a report arriving.
+   */
+  endChipFlight: (id: string) => void;
+  /**
    * Whether the session has ended — the hero is busted, or fewer than two seats can still
    * pay a hand (ADR 0002). The felt shows its end-state over the table.
    */
@@ -185,6 +197,33 @@ export function useOfflineGame({
   const [heroDraft, setHeroDraft] = useState<readonly TilePlay[]>([]);
   const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
 
+  // The chips the felt is drawing. It is the layer over the table that says when one has landed,
+  // so this is where they are held until it does.
+  const [flights, setFlights] = useState<readonly ChipFlight[]>([]);
+
+  // A clock fires after the turn it belonged to may already have moved on, so it reads the state
+  // through this rather than through the closure it was armed with: a transition has to name the
+  // state it started from for its chips to be read off it, and the functional update that would
+  // have hidden that is exactly what a `(previous, next)` pair needs to replace. The write is in
+  // an effect — a ref may not be touched during render — and lands before any timer that follows
+  // the render can run.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  /**
+   * The engine's one seam: every transition commits through here, whoever asked for it — the
+   * hero's tap, §19's window running out, the betting clock, a new deal. The chips a transition
+   * puts in the air are read off the seats' commitments either side of it, so a transition that
+   * moved no chips emits nothing, and no caller can miss a flight by not being wired up.
+   */
+  const commit = useCallback((previous: OfflineState, next: OfflineState) => {
+    if (next === previous) return;
+    setState(next);
+    setFlights((live) => reconcileFlights(live, previous, next));
+  }, []);
+
   /**
    * Runs one change, then lets the bots answer it. A word the engine refused leaves the table
    * where it was and reports §11's reason instead: the payload never became the hero's word,
@@ -198,7 +237,7 @@ export function useOfflineGame({
   const act = useCallback(
     (change: (current: OfflineState) => OfflineState) => {
       try {
-        setState(settleBots(change(state), Date.now()));
+        commit(state, settleBots(change(state), Date.now()));
         setRefusal(null);
       } catch (error) {
         if (error instanceof WordRejectionError) {
@@ -209,7 +248,7 @@ export function useOfflineGame({
         throw error;
       }
     },
-    [state],
+    [commit, state],
   );
 
   const deal = useCallback(() => {
@@ -258,7 +297,12 @@ export function useOfflineGame({
   const newGame = useCallback(() => {
     setHeroDraft([]);
     setRefusal(null);
-    setState(
+    // A restart deals hand 1 again, and a session can end on hand 1 — so the hand counter alone
+    // does not say this transition is a new one. The felt is emptied here, where the restart
+    // commits, the same way a deal empties it through the seam.
+    setFlights([]);
+    commit(
+      stateRef.current,
       settleBots(
         startHand({
           seed: randomSeed(),
@@ -270,7 +314,7 @@ export function useOfflineGame({
         Date.now(),
       ),
     );
-  }, [dictionary]);
+  }, [commit, dictionary]);
 
   /**
    * Replaces the hero's draft with the one the seat has built — playing a tile, taking one back,
@@ -320,15 +364,23 @@ export function useOfflineGame({
     if (state.wordWindow?.status !== "open") return;
 
     const timer = setTimeout(() => {
-      setState((current) =>
-        current.wordWindow?.status === "open"
-          ? settleBots(reduce(current, { type: "timeoutWords" }, Math.max(Date.now(), current.endsAtMs)), Date.now())
-          : current,
+      // The window may have closed while this timer was armed — the hero confirmed, the hand
+      // paid out — and a clock that fired into a table that has already moved on has nothing
+      // left to settle.
+      const current = stateRef.current;
+      if (current.wordWindow?.status !== "open") return;
+
+      commit(
+        current,
+        settleBots(
+          reduce(current, { type: "timeoutWords" }, Math.max(Date.now(), current.endsAtMs)),
+          Date.now(),
+        ),
       );
     }, Math.max(state.endsAtMs - Date.now(), 0) + 25);
 
     return () => clearTimeout(timer);
-  }, [state.wordWindow, state.endsAtMs]);
+  }, [commit, state.wordWindow, state.endsAtMs]);
 
   // A betting turn belongs to the table's clock too: when the hero's thirty seconds run out
   // the seat checks if it can and folds otherwise — §29's auto-fold, applied to the seat a
@@ -338,28 +390,48 @@ export function useOfflineGame({
     if (state.betting === null || index === null || state.seats[index]?.id !== HERO_ID) return;
 
     const timer = setTimeout(() => {
-      setState((current) => {
-        const currentIndex = current.toActIndex;
-        const round = current.betting;
-        if (round === null || currentIndex === null || current.seats[currentIndex]?.id !== HERO_ID) {
-          return current;
-        }
+      // The turn may have moved on while this timer was armed, and a seat that is no longer the
+      // one to act is not the seat this clock is for.
+      const current = stateRef.current;
+      const currentIndex = current.toActIndex;
+      const round = current.betting;
+      if (round === null || currentIndex === null || current.seats[currentIndex]?.id !== HERO_ID) {
+        return;
+      }
 
-        const bounds = bettingBounds(current.seats, round, currentIndex, current.stakes.minBet);
-        if (bounds === null) return current;
+      const bounds = bettingBounds(current.seats, round, currentIndex, current.stakes.minBet);
+      if (bounds === null) return;
 
-        const action: BettingAction = bounds.canCheck
-          ? { type: "check", playerId: HERO_ID }
-          : { type: "fold", playerId: HERO_ID };
+      const action: BettingAction = bounds.canCheck
+        ? { type: "check", playerId: HERO_ID }
+        : { type: "fold", playerId: HERO_ID };
 
-        return settleBots(reduce(current, action, Math.max(Date.now(), current.endsAtMs)), Date.now());
-      });
+      commit(
+        current,
+        settleBots(reduce(current, action, Math.max(Date.now(), current.endsAtMs)), Date.now()),
+      );
     }, Math.max(state.endsAtMs - Date.now(), 0) + 25);
 
     return () => clearTimeout(timer);
-  }, [state.betting, state.toActIndex, state.endsAtMs, state.seats]);
+  }, [commit, state.betting, state.toActIndex, state.endsAtMs, state.seats]);
 
-  const game = useMemo(() => toScreenState(state, heroDraft), [state, heroDraft]);
+  /**
+   * A flight that has landed: the layer over the felt reports its own id, and the felt stops
+   * drawing it. Nothing else ends one — a chip that lands is the layer's to report, and a new
+   * hand is the one thing that drops one without a report.
+   */
+  const endChipFlight = useCallback((id: string) => {
+    setFlights((live) => {
+      const remaining = live.filter((flight) => flight.id !== id);
+      // A second report of the same id is not a change the felt has to render for.
+      return remaining.length === live.length ? live : remaining;
+    });
+  }, []);
+
+  const game = useMemo(
+    () => toScreenState(state, heroDraft, flights),
+    [flights, heroDraft, state],
+  );
 
   return {
     game,
@@ -373,6 +445,7 @@ export function useOfflineGame({
     allIn,
     setDraft,
     confirmWord,
+    endChipFlight,
     sessionOver: game.sessionOver,
     newGame,
   };
@@ -492,6 +565,70 @@ function previewReason(
 }
 
 /**
+ * The chips one transition put in motion: a seat whose commitment grew across it sent the
+ * difference to the middle, and each of those is a flight on the street the transition landed in.
+ *
+ * The diff is what makes the emission exact. A check, a fold, a street that reveals no chips and
+ * a transition the engine refused all move no commitment and so emit nothing; and reading the
+ * engine's own `committedHand` means no action has to remember to announce its own chips —
+ * wherever the transition came from, it is here that its chips are found.
+ *
+ * The hand the ids are built from is the engine's own number for the hand in play: it holds for
+ * the whole hand, so a flight is the same node on every render of it.
+ */
+function flightsBetween(previous: OfflineState, next: OfflineState): readonly ChipFlight[] {
+  const handId = `offline-hand-${next.hand}`;
+
+  return next.seats.reduce<ChipFlight[]>((flights, seat, seatIndex) => {
+    const committed = seat.committedHand - (previous.seats[seatIndex]?.committedHand ?? 0);
+    if (committed <= 0) return flights;
+
+    flights.push({
+      // `handId:street:seat:in` — stable while the hand is, and self-describing: the street is
+      // the phase the chips were committed in, and the seat is the index the felt places chips
+      // by. STO-354 is the first to emit the other direction, out of the pot.
+      id: `${handId}:${next.phase}:${seatIndex}:in`,
+      seatIndex,
+      amount: committed,
+      direction: "in",
+    });
+    return flights;
+  }, []);
+}
+
+/**
+ * The flights the felt goes on drawing, after one transition: the ones already in the air, plus
+ * the chips that transition just sent.
+ *
+ * A seat that already has a flight for this street — the round re-opened and it acted again
+ * before its chips landed — keeps the node it has, carrying the total it has committed there,
+ * rather than stacking a second chip on the same path. The node is the flight's id, so the one
+ * it has is the one it keeps.
+ */
+function reconcileFlights(
+  live: readonly ChipFlight[],
+  previous: OfflineState,
+  next: OfflineState,
+): readonly ChipFlight[] {
+  // A transition that deals the next hand wipes the felt: the chips of the hand that just ended
+  // have no business flying over the one that starts. (The session's own restart is the same
+  // thing from hand 1, and clears the felt where it commits.)
+  if (next.hand !== previous.hand) return [];
+
+  const sent = flightsBetween(previous, next);
+  if (sent.length === 0) return live;
+
+  const flights = [...live];
+  for (const flight of sent) {
+    const at = flights.findIndex((candidate) => candidate.id === flight.id);
+    const landed = at === -1 ? undefined : flights[at];
+    if (landed === undefined) flights.push(flight);
+    else flights[at] = { ...landed, amount: landed.amount + flight.amount };
+  }
+  return flights;
+}
+
+/**
  * Everything the felt needs, mapped off the engine state.
  *
  * `secondsRemaining` is the turn's full budget rather than `endsAtMs` minus now: the HUD
@@ -503,6 +640,7 @@ function previewReason(
 function toScreenState(
   state: OfflineState,
   heroDraft: readonly TilePlay[],
+  flights: readonly ChipFlight[],
 ): GameScreenState {
   const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
   const hero = state.seats[heroIndex];
@@ -513,6 +651,7 @@ function toScreenState(
     // One turn, one identity: the HUD re-anchors its countdown when this changes, so it
     // has to name the seat and the street, not just the hand.
     id: `offline-${state.hand}-${state.phase}-${state.toActIndex ?? state.wordWindow?.status ?? "done"}`,
+    handId: `offline-hand-${state.hand}`,
     phase: state.phase,
     phaseNumber: PHASE_NUMBER[state.phase],
     secondsRemaining: (state.wordWindow?.status === "open" ? WORD_WINDOW_MS : OFFLINE_TURN_MS) / 1_000,
@@ -522,6 +661,7 @@ function toScreenState(
     // the first layer and the rest are side pots the felt draws under it.
     pot: state.seats.reduce((total, seat) => total + seat.committedHand, 0),
     sidePots: state.result?.payout.pots.slice(1).map((pot) => pot.amount) ?? [],
+    flights,
     // The session ends when the table cannot seat a hand any more, and for this screen also
     // when the seat it speaks for has busted: the session is the hero's run, and a table that
     // plays on without the hero has nothing left to show.

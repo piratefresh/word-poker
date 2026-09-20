@@ -10,12 +10,16 @@ import type { GameScreenState } from "./game-types";
  */
 export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
   id: "demo-hand-flop",
+  handId: "demo-hand-flop",
   phase: "flop",
   phaseNumber: 3,
   secondsRemaining: 44,
   seatCount: 4,
   pot: 60,
   sidePots: [],
+  // Nothing is in the air on a board that has stopped: the fixture is a still frame, and the
+  // flop's bets are already in the pot.
+  flights: [],
   sessionOver: false,
   players: [
     {
