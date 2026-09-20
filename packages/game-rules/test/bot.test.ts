@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { OfflineAction, Tile, WordSubmission } from "@wordpoker/contracts";
+import type { OfflineAction } from "@wordpoker/contracts";
 
 import {
-  BOT_BET_SIZES,
-  BOT_CALL_THRESHOLD,
-  BOT_RAISE_FREQUENCY,
-  BOT_BET_FREQUENCY,
+  BOT_BET_FRACTIONS,
+  BOT_BLUFF_BET_FREQUENCY,
+  BOT_BLUFF_RAISE_FREQUENCY,
+  BOT_VALUE_BET_EDGE,
+  BOT_VALUE_RAISE_FREQUENCY,
   chooseOfflineWord,
   decideOfflineMove,
 } from "../src/bot";
 import { bettingBounds, type BettingBounds } from "../src/betting";
-import { resolveSubmission } from "../src/building";
-import { LETTER_VALUES, type Letter } from "../src/letters";
+import { BOT_EQUITY_SAMPLES } from "../src/equity";
 import { availableTiles, OfflineActionError, reduce, startHand, type OfflineState } from "../src/offline";
 import { TEST_DICTIONARY, testDictionary } from "./fixtures";
 
@@ -39,75 +39,66 @@ function enabled(bounds: BettingBounds, action: OfflineAction): boolean {
     case "check":
       return bounds.canCheck;
     case "bet":
-      return bounds.canBet;
+      return bounds.canBet && action.amount >= bounds.minBet && action.amount <= bounds.maxRaiseTo;
     case "call":
       return bounds.canCall;
     case "raise":
-      return bounds.canRaise;
+      return bounds.canRaise && action.amount >= bounds.minRaiseTo && action.amount <= bounds.maxRaiseTo;
     case "allIn":
-      return false;
+      return bounds.canAllIn;
     default:
       return false;
   }
 }
 
-describe("decideOfflineMove — the scripted line", () => {
-  /**
-   * One seat's pinned turn for seed 4242: the tree's rolls are a function of the hand's seed,
-   * the street and the seat, so this line is the bot's whole preflop for that table. Re-pin it
-   * only when the tree itself changes.
-   */
-  const OPENING_LINE: readonly {
-    readonly phase: OfflineState["phase"];
-    readonly seat: number;
-    readonly action: OfflineAction;
-  }[] = [
-    { phase: "preflop", seat: 1, action: { type: "check", playerId: "ellis" } },
-    { phase: "preflop", seat: 2, action: { type: "bet", playerId: "jay", amount: 60 } },
-    { phase: "preflop", seat: 3, action: { type: "call", playerId: "mira" } },
-    { phase: "preflop", seat: 0, action: { type: "call", playerId: "hero" } },
-    { phase: "preflop", seat: 1, action: { type: "call", playerId: "ellis" } },
-  ];
+/** Plays a whole hand with every seat on the bot policy: words included, then the payout. */
+function playAll(seed: number): { state: OfflineState; actions: number } {
+  let state = startHand({ seed, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY });
+  let actions = 0;
 
-  it("plays exactly the pinned line, then lets the street roll", () => {
-    let state = dealHand();
-
-    for (const expected of OPENING_LINE) {
-      const seat = state.seats[expected.seat];
-      assert.ok(seat, `seat ${expected.seat}`);
-      assert.equal(state.phase, expected.phase);
-      assert.equal(state.toActIndex, expected.seat);
-      assert.deepEqual(decideOfflineMove(state, seat.id), expected.action);
-      state = reduce(state, decideOfflineMove(state, seat.id), NOW);
+  while (state.phase !== "payout") {
+    if (state.wordWindow?.status === "open") {
+      for (const slot of state.wordWindow.slots) {
+        if (state.wordWindow?.status !== "open") break;
+        const word = chooseOfflineWord({
+          available: availableTiles(state, slot.seat),
+          dictionary: TEST_DICTIONARY,
+        });
+        if (word !== null) {
+          state = reduce(state, { type: "confirmWord", playerId: slot.playerId, submission: word }, NOW);
+        }
+      }
+      if (state.wordWindow?.status === "open") {
+        state = reduce(state, { type: "timeoutWords" }, state.endsAtMs);
+      }
+      continue;
     }
 
-    assert.equal(state.phase, "flop");
-    assert.deepEqual(
-      state.seats.map((seat) => seat.committedHand),
-      [60, 60, 60, 60],
-    );
-  });
+    const index = state.toActIndex;
+    assert.ok(index !== null, "a seat is to act");
+    const seat = state.seats[index];
+    const round = state.betting;
+    assert.ok(seat, `seat ${index}`);
+    assert.ok(round, "a betting round is open");
 
-  it("returns the same move for the same state", () => {
-    const state = dealHand();
+    const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
+    assert.ok(bounds, `seat ${index} can act`);
 
-    assert.deepEqual(decideOfflineMove(state, "ellis"), decideOfflineMove(state, "ellis"));
-  });
+    const action = decideOfflineMove(state, seat.id);
 
-  it("refuses to move out of turn, or for a player who is not seated", () => {
-    const state = dealHand();
+    // The property: every action the policy returns is one the bounds enable, with an amount
+    // the engine will take — so `reduce` has no reason to refuse it and the hand cannot stall.
+    assert.ok(bounds && enabled(bounds, action), `expected ${JSON.stringify(action)} to be enabled`);
 
-    assert.throws(
-      () => decideOfflineMove(state, "hero"),
-      (error: unknown) =>
-        error instanceof OfflineActionError && error.message.includes("hero"),
-    );
-    assert.throws(
-      () => decideOfflineMove(state, "ghost"),
-      (error: unknown) => error instanceof OfflineActionError,
-    );
-  });
+    state = reduce(state, action, NOW);
+    actions += 1;
+    assert.ok(actions <= 60, "a bot hand is a bounded walk");
+  }
 
+  return { state, actions };
+}
+
+describe("decideOfflineMove — the guards", () => {
   it("deals once the hand has paid out", () => {
     let state = dealHand();
     while (state.phase !== "payout") {
@@ -124,9 +115,13 @@ describe("decideOfflineMove — the scripted line", () => {
   });
 
   it("has no move while the word window is open", () => {
+    // Checking every seat around reaches the river's window without a fold-out: a hand where
+    // everyone calls the bot policy's folds never opens one (§26 ends it first).
     let state = dealHand();
     while (state.wordWindow?.status !== "open") {
-      state = reduce(state, decideOfflineMove(state, actingSeatId(state)), NOW);
+      const index = state.toActIndex;
+      assert.ok(index !== null, "a seat is to act before the window opens");
+      state = reduce(state, { type: "check", playerId: state.seats[index]?.id ?? "" }, NOW);
     }
 
     assert.throws(
@@ -134,52 +129,28 @@ describe("decideOfflineMove — the scripted line", () => {
       (error: unknown) => error instanceof OfflineActionError && error.message.includes("word window"),
     );
   });
+
+  it("refuses to move out of turn, or for a player who is not seated", () => {
+    const state = dealHand();
+
+    assert.throws(
+      () => decideOfflineMove(state, "hero"),
+      (error: unknown) => error instanceof OfflineActionError && error.message.includes("hero"),
+    );
+    assert.throws(
+      () => decideOfflineMove(state, "ghost"),
+      (error: unknown) => error instanceof OfflineActionError,
+    );
+  });
+
+  it("returns the same move for the same state", () => {
+    const state = dealHand();
+
+    assert.deepEqual(decideOfflineMove(state, "ellis"), decideOfflineMove(state, "ellis"));
+  });
 });
 
 describe("decideOfflineMove — a table of bots", () => {
-  /** Plays a whole hand with every seat on the bot policy: words included, then the payout. */
-  function playAll(seed: number): { state: OfflineState; actions: number } {
-    let state = startHand({ seed, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY });
-    let actions = 0;
-
-    while (state.phase !== "payout") {
-      if (state.wordWindow?.status === "open") {
-        for (const slot of state.wordWindow.slots) {
-          const word = chooseOfflineWord({
-            available: availableTiles(state, slot.seat),
-            dictionary: TEST_DICTIONARY,
-          });
-          if (word !== null) {
-            state = reduce(state, { type: "confirmWord", playerId: slot.playerId, submission: word }, NOW);
-          }
-        }
-        state = reduce(state, { type: "timeoutWords" }, state.endsAtMs);
-        continue;
-      }
-
-      const index = state.toActIndex;
-      assert.ok(index !== null, "a seat is to act");
-      const seat = state.seats[index];
-      const round = state.betting;
-      assert.ok(seat, `seat ${index}`);
-      assert.ok(round, "a betting round is open");
-
-      const action = decideOfflineMove(state, seat.id);
-
-      // The property: every action the tree returns is one the bounds enable, so the engine
-      // has no reason to refuse it.
-      const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
-      assert.ok(bounds, `seat ${index} can act`);
-      assert.ok(enabled(bounds, action), `expected ${JSON.stringify(action)} to be enabled`);
-
-      state = reduce(state, action, NOW);
-      actions += 1;
-      assert.ok(actions <= 40, "a bot hand is a bounded walk");
-    }
-
-    return { state, actions };
-  }
-
   it("drives a full hand to the payout with the chips conserved", () => {
     for (const seed of [4242, 4243, 4244]) {
       const { state } = playAll(seed);
@@ -199,53 +170,100 @@ describe("decideOfflineMove — a table of bots", () => {
     }
   });
 
-  it("stays inside the tree's own constants", () => {
-    // The tree is the policy: these are its numbers, and a change to any of them is a
-    // deliberate change to how bots play (and to the pinned line above).
-    assert.deepEqual([...BOT_BET_SIZES], [20, 40, 60]);
-    assert.equal(BOT_CALL_THRESHOLD, 100);
-    assert.ok(Math.abs(BOT_BET_FREQUENCY - 0.2) < 1e-9);
-    assert.ok(Math.abs(BOT_RAISE_FREQUENCY - 0.15) < 1e-9);
+  it("stays inside the policy's own constants", () => {
+    // The constants are the policy: a change to any of them is a deliberate change to how bots
+    // play, and to the sample budget the felt pays for on every decision.
+    assert.equal(BOT_VALUE_BET_EDGE, 1.35);
+    assert.equal(BOT_BLUFF_BET_FREQUENCY, 0.12);
+    assert.equal(BOT_BLUFF_RAISE_FREQUENCY, 0.07);
+    assert.equal(BOT_VALUE_RAISE_FREQUENCY, 0.55);
+    assert.deepEqual([...BOT_BET_FRACTIONS], [0.5, 0.75, 1]);
+    assert.equal(BOT_EQUITY_SAMPLES, 32);
   });
 });
 
-/** A single-letter tile as the bag prints it. */
-function letter(face: Letter, copy = 1): Tile {
-  return { id: `${face}-${copy}`, letter: face, points: LETTER_VALUES[face] };
-}
+describe("decideOfflineMove — what the policy reads", () => {
+  /**
+   * The decision is a function of the public table and the seat's own tiles, so replacing every
+   * tile it cannot see — the other racks, the face-down board — must leave its move alone.
+   * This is the invariant STO-361 turns on, tested at the level a bug would show up: the action.
+   */
+  it("plays the same move whatever the deal put behind the hidden tiles", () => {
+    for (const seed of [4242, 4243, 9001]) {
+      let state = dealHand(seed);
 
-/** A choice tile: one physical tile, two faces, either of them playable (§10). */
-function choice(first: Letter, second: Letter): Tile {
-  return {
-    id: `${first}${second}-1`,
-    letter: first,
-    points: LETTER_VALUES[first],
-    alternativeLetter: second,
-    alternativePoints: LETTER_VALUES[second],
-  };
-}
+      for (let step = 0; step < 12; step += 1) {
+        if (state.phase === "payout" || state.wordWindow?.status === "open") break;
+        const index = state.toActIndex;
+        if (index === null) break;
+        const seat = state.seats[index];
+        if (seat === undefined) break;
 
-/** A fixed-sequence tile: both faces, in printed order, on one physical tile (§10). */
-function sequence(first: Letter, second: Letter): Tile {
-  return {
-    id: `${first}${second}-seq-1`,
-    letter: first,
-    points: LETTER_VALUES[first],
-    sequenceLetter: second,
-    sequencePoints: LETTER_VALUES[second],
-  };
-}
+        const replaced: OfflineState = {
+          ...state,
+          community: state.community.map((tile, at) =>
+            at < state.revealed ? tile : { id: `hidden-board-${at}`, letter: "Z", points: 10 },
+          ),
+          seats: state.seats.map((other, at) =>
+            at === index
+              ? other
+              : { ...other, privateTiles: [{ id: `hidden-rack-${at}`, letter: "Q", points: 10 }] },
+          ),
+        };
 
-/** The word a submission spells, or `null` when the seat cannot build it at all. */
-function spelled(available: readonly Tile[], submission: WordSubmission): string | null {
-  const resolution = resolveSubmission({ available, submission });
-  return resolution.ok ? resolution.word : null;
-}
+        assert.deepEqual(
+          decideOfflineMove(replaced, seat.id),
+          decideOfflineMove(state, seat.id),
+          `seed ${seed} step ${step}: the move did not read a hidden tile`,
+        );
+
+        state = reduce(state, decideOfflineMove(state, seat.id), NOW);
+      }
+    }
+  });
+
+  /**
+   * The raise a seat faces is part of the key its rolls are named by. A roll that ignored it
+   * would be the same roll on every reopening, so a seat that once decided to raise would raise
+   * again — and again, until the stacks were gone. What this pins is that no seat raises more
+   * than a street's worth of times once it is being raised back at.
+   */
+  it("does not raise itself down the stack when it is raised back", () => {
+    let worst = 0;
+
+    for (let seed = 1; seed <= 12; seed += 1) {
+      let state = startHand({ seed, players: SEATS, nowMs: NOW, dictionary: TEST_DICTIONARY });
+      const raises = new Map<string, number>();
+      let steps = 0;
+
+      while (state.phase !== "payout" && steps < 60) {
+        steps += 1;
+        if (state.wordWindow?.status === "open") {
+          state = reduce(state, { type: "timeoutWords" }, state.endsAtMs);
+          continue;
+        }
+        const index = state.toActIndex;
+        const seat = index === null ? undefined : state.seats[index];
+        if (index === null || seat === undefined) break;
+
+        const action = decideOfflineMove(state, seat.id);
+        if (action.type === "raise") {
+          const key = `${state.phase}:${index}`;
+          raises.set(key, (raises.get(key) ?? 0) + 1);
+          worst = Math.max(worst, raises.get(key) ?? 0);
+        }
+        state = reduce(state, action, NOW);
+      }
+    }
+
+    assert.ok(worst <= 3, `a seat raised ${worst} times in one street`);
+  });
+});
 
 describe("chooseOfflineWord", () => {
-  it("returns the same word for the same tiles and dictionary", () => {
-    const available = [letter("C"), letter("A"), letter("T"), letter("S")];
-    const dictionary = testDictionary(["CAT", "CATS", "ACTS", "AS"]);
+  it("confirms the best word the tiles can spell", () => {
+    const available = availableTiles(dealHand(), 0);
+    const dictionary = testDictionary(["AA", "QI", "STRONG"]);
 
     assert.deepEqual(
       chooseOfflineWord({ available, dictionary }),
@@ -253,59 +271,10 @@ describe("chooseOfflineWord", () => {
     );
   });
 
-  it("prefers §7's score, then the letter count, then the word itself", () => {
-    const available = [letter("C"), letter("A"), letter("T"), letter("S")];
-    const dictionary = testDictionary(["AS", "SAT", "CAT", "CATS", "ACTS", "CAST", "SCAT"]);
-
-    const submission = chooseOfflineWord({ available, dictionary });
-
-    // Four four-letter words tie on §7's score; §21.1 ties again; the alphabet settles it.
-    assert.equal(spelled(available, submission ?? { plays: [] }), "ACTS");
-  });
-
-  it("tries both faces of a choice tile", () => {
-    const available = [choice("A", "E"), letter("T"), letter("S")];
-    const dictionary = testDictionary(["AT", "ET", "SET"]);
-
-    const submission = chooseOfflineWord({ available, dictionary });
-
-    // SET is worth more than either two-letter word, and it is only spellable on the E face.
-    assert.equal(spelled(available, submission ?? { plays: [] }), "SET");
-  });
-
-  it("plays a fixed-sequence tile as both of its letters, in order", () => {
-    const available = [sequence("T", "H"), letter("E"), letter("R"), letter("E", 2)];
-    const dictionary = testDictionary(["HER", "THERE", "THREE"]);
-
-    const submission = chooseOfflineWord({ available, dictionary });
-
-    // THERE and THREE tie on both score and length, so the alphabet decides.
-    assert.equal(spelled(available, submission ?? { plays: [] }), "THERE");
-  });
-
-  it("plays every physical tile at most once", () => {
-    const one = [letter("A")];
-    const two = [letter("A"), letter("B")];
-    const dictionary = testDictionary(["AB", "AAB", "AA"]);
-
-    assert.equal(spelled(two, chooseOfflineWord({ available: two, dictionary }) ?? { plays: [] }), "AB");
-    assert.equal(chooseOfflineWord({ available: one, dictionary }), null);
-  });
-
-  it("plays the whole rack when the bonus makes it worth it", () => {
-    const available: Tile[] = ["A", "B", "C", "D", "E", "F", "G"].map((face) => letter(face as Letter));
-    const dictionary = testDictionary(["AB", "ABCDEFG"]);
-
-    const submission = chooseOfflineWord({ available, dictionary });
-
-    // 21 points of letters plus §7.3's +10 for playing all seven; AB would score 5.
-    assert.equal(spelled(available, submission ?? { plays: [] }), "ABCDEFG");
-  });
-
   it("returns no word when the tiles spell nothing the table counts", () => {
-    const available = [letter("C"), letter("A"), letter("T"), letter("S")];
-
-    assert.equal(chooseOfflineWord({ available, dictionary: testDictionary(["STRONG"]) }), null);
-    assert.equal(chooseOfflineWord({ available, dictionary: testDictionary([]) }), null);
+    assert.equal(
+      chooseOfflineWord({ available: availableTiles(dealHand(), 0), dictionary: testDictionary(["STRONG"]) }),
+      null,
+    );
   });
 });

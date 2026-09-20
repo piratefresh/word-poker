@@ -58,6 +58,38 @@ some of the tile) when that room is narrower than the row, so a hand of seven st
 stays tappable. The strip's places and its drag are measured in that tile, so the two cannot
 drift apart.
 
+# The offline opponent
+
+The CPU seats at the offline table are decided in `packages/game-rules`, in three pieces:
+`observation.ts` builds the table as one seat is allowed to see it, `equity.ts` prices a
+hand by simulating the worlds still possible, and `bot.ts` is the policy that turns that
+into a bet. `word-search.ts` is the search all of them share — the best word a rack can
+spell — and the felt's best-word line reads the same function.
+
+**The information boundary is the rule, not a nicety.** `OfflineState` holds every seat's
+`privateTiles` and all five community tiles from the deal, so `state.seats[j]` and
+`state.community` are a bot cheating; a bot reads `observeTable(state, botId)` and nothing
+else, and `observation.test.ts` fails if a decision moves when hidden tiles do. Only §18's
+revealed board is in there — `availableTiles()` returns the board entire and is *not* the
+same thing preflop.
+
+**Every roll is named, never ambient.** `decisionSeed(observation, stream)` folds the hand,
+the street, the seat and the public state of the betting into a seed, with one stream per
+purpose (simulation, mixing, sizing). `handSeed` names those streams and must never be fed
+to `dealHand`: the deal is behind the boundary. The betting state is in the key on purpose —
+a roll named only by (hand, street, seat) is the same roll on every reopening, which is how
+a seat that once decided to raise raises until the stacks are gone.
+
+**The estimate is a baseline, and its limits are written down.** `estimateBotEquity`
+averages over a fixed number of sampled worlds — hidden racks drawn from the printed bag
+minus what the seat can see, §9's multipliers rolled, §10's two-letter tiles placed from the
+rolled target — and assumes every rival holds a legal rack and plays its best word. It has no
+opponent model, so what comes out is showdown equity against *random* racks, not against the
+hands a rival's betting says it holds, and not realized EV. Read the module header before
+changing it. Size the sample budget against a measurement, not a guess: a full-rack search
+runs ~0.4 ms cold and free once memoised, and one decision is ~30 ms at the shipped 32
+samples.
+
 # End-to-end (web)
 
 UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
@@ -70,6 +102,25 @@ maestro test --platform web .maestro/offline-hand.yaml
 Headed is the default (`--headless` hides the browser; headless also takes `--screen-size`). Keep a Chrome
 whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
 it needs.
+
+The flows are `offline-hand.yaml` (a whole hand: the bots' betting, the hero's word, the payout) and
+`offline-cpu-line.yaml` (the CPU's line for one seed, replayed twice — the end-to-end half of the decision
+engine's determinism). A flow takes its table's address from a `baseUrl` env defaulting to port 8081, so a
+second worktree serving the same app on its own port overrides it rather than fighting for the port:
+
+```bash
+maestro test --platform web -e baseUrl=http://localhost:8099 .maestro/offline-cpu-line.yaml
+```
+
+A worktree has no `apps/mobile/.env` (it is gitignored): copy it from the main checkout before starting the
+web build there, or the auth routes have no database to reach.
+
+Serve the app on the host the flows name. A web dev build with no `hostUri` points its auth client at
+`http://localhost:8081` whatever origin the page is on (`apps/mobile/src/lib/auth-client.ts`), and Better
+Auth in development trusts `localhost:8081` and the LAN wildcards in `apps/mobile/src/lib/auth.ts` — so a
+session signed in through one origin does not exist on another, and a table served anywhere else bounces
+back to the sign-in screen however right the credentials are. Running a second checkout's build on another
+port therefore needs `EXPO_PUBLIC_AUTH_URL` pointed at that origin as well.
 
 ## E2E test user
 
@@ -131,7 +182,8 @@ them — it lives in a shared package so client and server can never disagree on
 
 - **`packages/game-rules`** — the pure, deterministic engine: word/hand evaluation,
   scoring, legal-move validation, the betting-phase machine
-  (`preflop → flop → turn → river → payout`), and round/timer math. No I/O, no framework
+  (`preflop → flop → turn → river → payout`), round/timer math, and the offline CPU's
+  decision engine (`observation.ts`, `equity.ts`, `bot.ts` — see below). No I/O, no framework
   (no Colyseus, no React), no wall-clock or RNG reads inside — inject the clock and seed
   so the same inputs always give the same outputs.
 - **`packages/contracts`** — the wire vocabulary both sides agree on: client→server

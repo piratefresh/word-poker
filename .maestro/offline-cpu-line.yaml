@@ -1,0 +1,70 @@
+# The CPU decision engine's line, replayed: the same seed twice, the same prices twice.
+#
+# STO-361 rebuilt the offline opponent around a seeded equity estimate, and the engine's own
+# tests pin what it decides for a given table. What they cannot pin is the whole path — the
+# app's seed, the deal, the estimator's sample stream, the row the felt arms — and a policy
+# that reached for anything ambient (a clock, `Math.random`, a cache built in a different
+# order) would still pass every one of them while playing a different hand on the second load.
+# So this flow plays the same table twice and asserts the CPU's money is in the same place
+# both times.
+#
+#   maestro test --platform web .maestro/offline-cpu-line.yaml
+#
+# Same CLI rules as `offline-hand.yaml`: mapped selectors, `id:` for hierarchy values, and the
+# sign-in subflow for a fresh profile. The seed pins the deal: ellis opens for 40 — a fraction
+# of what an unopened round is worth to four seats, which is the sizing this ticket introduced
+# — jay folds, mira calls, and the hero is left facing a call of 40 with a raise floor of 80.
+url: http://localhost:8081/offline?seed=20260919
+name: Offline CPU — the line replays
+tags:
+  - web
+  - offline
+---
+- openLink: http://localhost:8081/offline?seed=20260919
+
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/offline?seed=20260919
+
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 90000
+- assertVisible:
+    text: "CALL $40"
+- assertVisible:
+    text: "RAISE $80"
+- assertVisible:
+    text: "$80"
+
+# A second load of the same table is the same table: the bots' decisions are a function of the
+# hand, the street, the seat and the state of the betting, so the price the hero is shown does
+# not move.
+- openLink: http://localhost:8081/offline?seed=20260919
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 90000
+- assertVisible:
+    text: "CALL $40"
+- assertVisible:
+    text: "RAISE $80"
+- assertVisible:
+    text: "$80"
+
+# And the hero's call is answered by the same bots: mira calls, jay stays folded, the street
+# rolls with three seats' money in it — the preflop round closes on the CPU's own decisions.
+- tapOn:
+    text: "CALL \\$40"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "PHASE 3 · THE FLOP"
+    timeout: 15000
+- assertVisible:
+    text: "$120"
+- assertVisible:
+    text: "COMMUNITY · 3/5"

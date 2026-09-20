@@ -1,6 +1,6 @@
 import { Button, Host } from "@expo/ui";
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -74,6 +74,18 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
   // word in, the check is what locks it. On every other turn the same button is the engine's
   // own check or call, whichever the row armed.
   const checkOrCall = words?.confirmable ? confirmWord : game.betting.canCheck ? check : call;
+  /**
+   * The felt's wager control, which is one button for two of §22's actions: with no bet out it
+   * opens the round (`bet`), and facing one it moves it (`raise`). The engine refuses a raise
+   * with nothing to raise — `no-bet-to-call` — so a button wired to `raise` alone does nothing
+   * at all when the row has armed a bet, and `act` swallows the refusal rather than saying so.
+   * The row already carries the engine's own answer (`canBet`), so the tap sends the action the
+   * row drew.
+   */
+  const wager = useCallback(
+    (amount: number) => (game.betting.canBet ? bet(amount) : raiseTo(amount)),
+    [bet, game.betting.canBet, raiseTo],
+  );
 
   return (
     // §19's window is the felt's rack made playable: the hand the seat is dealt is the hand it
@@ -99,7 +111,7 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
           onCheckOrCall={checkOrCall}
           onChipFlightEnd={endChipFlight}
           onFold={fold}
-          onRaise={raiseTo}
+          onRaise={wager}
           rack={
             // The draft reads above the rack it is built from: one line of text over the
             // strip, drawn by the builder and placed by the felt's own rack slot.

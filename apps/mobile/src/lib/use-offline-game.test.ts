@@ -13,8 +13,8 @@ import { useOfflineGame, type OfflineGame } from "./use-offline-game";
 jest.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
 
 const SEED = 7;
-/** A seed whose first bot bets: the hero starts preflop facing a call. */
-const BETTING_SEED = 20_260_919;
+/** A seed whose bots put a bet in front of the hero: mira opens the hand for 60. */
+const BETTING_SEED = 9;
 const SEATS = 4;
 
 /** The hero's live result, as `renderHook` hands it over. */
@@ -299,10 +299,13 @@ describe("useOfflineGame — §19's window", () => {
   test("builds the hero's word from its own tiles, and pays out on the confirmation", async () => {
     jest.useFakeTimers();
 
-    const result = await table();
+    // A table whose bots put chips in: the payout this test is about is the one that moves a
+    // pot into a stack, and a quiet table (every seat checking to the river) has none to move.
+    const seed = BETTING_SEED;
+    const result = await table(seed);
     await playToWindow(result);
 
-    const plays = heroTiles().map(playOf);
+    const plays = heroTiles(seed).map(playOf);
     await act(async () => {
       result.current.setDraft(plays.slice(0, 1));
     });
@@ -310,13 +313,13 @@ describe("useOfflineGame — §19's window", () => {
     // One edit is one submission, and the word is the letters those tiles print — including a
     // draft of one tile, which §12 will not call a word yet.
     expect(result.current.words?.plays).toHaveLength(1);
-    expect(result.current.words?.word).toBe(spells(heroTiles().slice(0, 1)));
+    expect(result.current.words?.word).toBe(spells(heroTiles(seed).slice(0, 1)));
     expect(result.current.words?.open).toBe(true);
 
     await act(async () => {
       result.current.setDraft(plays);
     });
-    expect(result.current.words?.word).toBe(heroWord());
+    expect(result.current.words?.word).toBe(heroWord(seed));
 
     await act(async () => {
       result.current.confirmWord();
@@ -331,9 +334,9 @@ describe("useOfflineGame — §19's window", () => {
     await runWindowClockOut();
 
     expect(result.current.game.phase).toBe("payout");
-    expect(result.current.game.bestScore).toBeGreaterThanOrEqual(expectedScore(heroTiles()));
+    expect(result.current.game.bestScore).toBeGreaterThanOrEqual(expectedScore(heroTiles(seed)));
     // The winner's own word is what the felt's reveal line shows.
-    expect(result.current.game.bestWord).toBe(heroWord());
+    expect(result.current.game.bestWord).toBe(heroWord(seed));
     expect(result.current.game.players.filter((player) => player?.status === "winner")).toHaveLength(1);
 
     // The pot is a real one now, and it landed in the winner's stack: every chip still on the

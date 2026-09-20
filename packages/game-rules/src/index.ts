@@ -38,12 +38,36 @@ export {
 export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
 export { decideOfflineMove, chooseOfflineWord } from "./bot";
 export {
-  BOT_BET_FREQUENCY,
-  BOT_BET_SIZES,
-  BOT_CALL_THRESHOLD,
-  BOT_RAISE_FREQUENCY,
+  BOT_BET_FRACTIONS,
+  BOT_BLUFF_BET_FREQUENCY,
+  BOT_BLUFF_RAISE_FREQUENCY,
+  BOT_VALUE_BET_EDGE,
+  BOT_VALUE_RAISE_FREQUENCY,
 } from "./bot";
-export type { ChooseWordOptions } from "./bot";
+export { evaluateBestWord } from "./word-search";
+export type { SearchWordsOptions, WordCandidate } from "./word-search";
+export {
+  BOT_EQUITY_SAMPLES,
+  DEFAULT_EQUITY_MODEL,
+  estimateBotEquity,
+  sampleWorld,
+} from "./equity";
+export type {
+  BotEquity,
+  EquityDiagnostics,
+  EquityModel,
+  EstimateEquityOptions,
+  PotEquity,
+  SampledWorld,
+} from "./equity";
+export { BOT_STREAMS, decisionSeed, observeTable } from "./observation";
+export type {
+  BotObservation,
+  BotRoundObservation,
+  BotSeatObservation,
+  BotStream,
+} from "./observation";
+export { mixSeed } from "./rng";
 export {
   BettingRejectionError,
   OFFLINE_TURN_MS,
