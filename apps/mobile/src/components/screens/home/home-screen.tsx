@@ -45,6 +45,7 @@ const MODES: Mode[] = [
   },
   {
     key: "online",
+    href: "/online",
     glyph: "🌐",
     label: "Online Mode",
     description: "Play live opponents",

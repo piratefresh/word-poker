@@ -5,20 +5,34 @@ import {
   playground,
   createRouter,
   createEndpoint,
+  LobbyRoom,
 } from "colyseus";
+import { GAME_ROOM_NAME, LOBBY_ROOM_NAME } from "@wordpoker/contracts";
 
 /**
  * Import your Room files
  */
 import { GameRoom } from "./rooms/GameRoom.js";
 
+/**
+ * The listable table. `enableRealtimeListing()` is what makes Colyseus push this room's joins,
+ * leaves, locks and metadata changes to lobby subscribers — without it a listing only ever
+ * changes when a client asks for it again, and the lobby's seat counts would sit still.
+ */
+const game = defineRoom(GameRoom).enableRealtimeListing();
+
 const server = defineServer({
 
   /**
    * Define your room handlers:
+   *
+   * `lobby` is Colyseus's own LobbyRoom: it subscribes a client to the matchmaking listings and
+   * pushes every room's add, change and removal as they happen, which is how the lobby screen
+   * keeps live seat counts without polling.
    */
   rooms: {
-    game: defineRoom(GameRoom),
+    [GAME_ROOM_NAME]: game,
+    [LOBBY_ROOM_NAME]: defineRoom(LobbyRoom),
   },
 
   /**

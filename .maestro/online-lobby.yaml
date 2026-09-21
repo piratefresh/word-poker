@@ -1,0 +1,151 @@
+# The online lobby, driven end to end against the web build (STO-389): the list of open tables,
+# a table created through the real form, the seated screen it lands on, joining from the list,
+# the live seat counts that come back from a leave, and both forms of a link that opens a table
+# directly.
+#
+#   pnpm dev:server                                # the Colyseus server on 2567
+#   pnpm --filter @wordpoker/mobile web            # the Expo web build on 8081
+#   node --env-file=apps/mobile/.env scripts/seed-test-user.mjs   # if the password stopped working
+#   maestro test --platform web .maestro/online-lobby.yaml
+#
+# One table has to exist before the flow starts, or there is nothing to join from the list — and a
+# browser cannot be both the player at a table and the one browsing it. `scripts/hold-table.mjs`
+# is that other player: it creates "Node Table" (500 coins, 2 seats) and holds its seat until it
+# is stopped, which is what the "1 / 2" assertions below count. Run it beside the two servers:
+#
+#   node scripts/hold-table.mjs
+#
+# The flow leaves every seat it takes, and an empty table disposes itself, so nothing is left
+# behind but the holder's table.
+#
+# Selector notes are sign-in.yaml's: commands take the mapping form, elements match by `text:` or
+# `id:` — a view's test id or an element's accessibility label — and web text matching folds case.
+url: http://localhost:8081/online
+name: Online lobby — create a table, sit down, leave
+tags:
+  - web
+  - online
+---
+- openLink: http://localhost:8081/online
+
+# The lobby sits behind the auth guard. A headed run keeps its session in Maestro's Chrome
+# profile; a headless run starts on a fresh one, so the sign-in is composed — the wait is
+# optional, a profile that is already signed in goes straight through.
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/online
+
+# The list is the server's own listing, subscribed live. The actor's table is in it with the one
+# seat it holds.
+- extendedWaitUntil:
+    visible: "Open tables"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "Node Table"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "1 / 2"
+    timeout: 30000
+
+# Create a table through the form. The defaults are §2's first buy-in (500 coins) and §5's cap
+# (6 seats), so the flow only names it.
+- tapOn:
+    text: "Create a table"
+- tapOn:
+    id: "Table name"
+- inputText: "Maestro Table"
+- tapOn:
+    text: "Create"
+
+# The creator lands seated at the table they made: its name, its fixed buy-in, its live seat
+# count, and the waiting state §3's card promised.
+- extendedWaitUntil:
+    visible:
+      text: "Maestro Table"
+    timeout: 30000
+- assertVisible:
+    text: "WAITING"
+- assertVisible:
+    text: "$500"
+- assertVisible:
+    text: "1 / 6"
+
+# Leave: the seat goes, and with the last of them the table disposes — the lobby's live
+# subscription drops the row rather than leaving a table nobody can sit at.
+- tapOn:
+    text: "Leave table"
+- extendedWaitUntil:
+    visible: "Open tables"
+    timeout: 30000
+- assertNotVisible:
+    text: "Maestro Table"
+
+# Join from the list: the row states the table's own terms (name, buy-in, seats taken of seats
+# it has, the state §3's browser reads), and tapping it takes the free seat.
+- tapOn:
+    id: "Join Node Table.*"
+- extendedWaitUntil:
+    visible:
+      text: "Node Table"
+    timeout: 30000
+- assertVisible:
+    text: "2 / 2"
+- assertVisible:
+    text: "IN HAND"
+
+# And back out: the table has the actor's seat left, so the lobby shows it open again. The count
+# is the server's own, pushed when the seat went — so this waits rather than samples.
+- tapOn:
+    text: "Leave table"
+- extendedWaitUntil:
+    visible: "Open tables"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "Node Table"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "1 / 2"
+    timeout: 30000
+
+# A link that names a table lands on that table's own screen rather than on the lobby — in both
+# forms the app deals with. The table both name is gone, which is the other half of STO-401: the
+# seat cannot be taken, so the screen says so and offers the way back instead of sitting on
+# "taking your seat". (This drives the signed-in arrival; a link that arrives before there is a
+# session to take it is `pending-destination`'s own unit suite.)
+- openLink: http://localhost:8081/online?room=no-such-table
+- extendedWaitUntil:
+    visible:
+      text: "ONLINE TABLE"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "That table is full or has just closed."
+    timeout: 30000
+- tapOn:
+    text: "Back to lobby"
+- extendedWaitUntil:
+    visible: "Open tables"
+    timeout: 30000
+
+# The form the app writes itself: routing to a table leaves `/online/<roomId>` in the address bar,
+# so this is what a reload of the seated screen, a bookmark and a shared URL arrive as.
+- openLink: http://localhost:8081/online/no-such-table
+- extendedWaitUntil:
+    visible:
+      text: "That table is full or has just closed."
+    timeout: 30000
+- tapOn:
+    text: "Back to lobby"
+- extendedWaitUntil:
+    visible: "Open tables"
+    timeout: 30000

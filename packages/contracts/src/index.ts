@@ -1,6 +1,34 @@
 /** The wire vocabulary the app and the server agree on: phases, tiles, words, players, actions. */
 
-export { ROUND_PHASES, WAITING_PHASE, type RoomPhase, type RoundPhase } from "./phases";
+export {
+  ROUND_PHASES,
+  WAITING_PHASE,
+  isRoomPhase,
+  type RoomPhase,
+  type RoundPhase,
+} from "./phases";
+export {
+  BUY_IN_PRESETS,
+  GAME_ROOM_NAME,
+  LOBBY_ROOM_NAME,
+  MAX_SEATS,
+  MIN_SEATS,
+  ROOM_NAME_MAX_LENGTH,
+  isBuyInPreset,
+  isGameRoomMetadata,
+  minBetFor,
+  roomSummaryFromListing,
+  tableStatus,
+  validateRoomCreateOptions,
+  type BuyInPreset,
+  type GameRoomCreateOptions,
+  type GameRoomMetadata,
+  type RoomCreateField,
+  type RoomCreateRefusal,
+  type RoomCreateValidation,
+  type RoomSummary,
+  type TableStatus,
+} from "./rooms";
 export { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "./dictionaries";
 export type {
   ChoiceTile,

@@ -31,6 +31,26 @@ Then open http://localhost:2567 for the playground, or /monitor for the monitor.
 
 ## What's included
 
+### Rooms
+
+Two rooms are registered in `src/app.config.ts`, under the names `packages/contracts` publishes
+(`GAME_ROOM_NAME`, `LOBBY_ROOM_NAME`):
+
+- **`game`** — a table. `onCreate` validates its config with `validateRoomCreateOptions` (§2's
+  fixed buy-in, §5's seat cap, a name) and throws the refusal sentence if it is not legal, which
+  is what a client's failed `create` sees. The validated config is mirrored into `GameRoomState`
+  (`name`, `buyIn`, `minBet`, `maxSeats`) so a seated client reads its own stakes, and published
+  as matchmaking metadata (`{ …config, status }`) for the lobby listing. The room is defined with
+  `defineRoom(GameRoom).enableRealtimeListing()` — without that call Colyseus never pushes its
+  joins, leaves, locks or metadata changes to lobby subscribers.
+- **`lobby`** — Colyseus's own `LobbyRoom`. A client joins it once and receives `rooms` (the
+  current listing), `+` (an add or change) and `-` (a removal); sending it `filter` asks for the
+  list again. Seat counts ride the listing (`clients` / `maxClients`), so nothing has to be
+  published twice.
+
+The desktop client of that wire lives in `apps/mobile`: `src/lib/use-lobby.ts` folds the
+messages into rows, and `src/lib/room-session.ts` creates and joins tables by id.
+
 ### Turn-based
 
 `GameRoom` owns the turn order: `state.currentTurn` names whose turn it is, and a

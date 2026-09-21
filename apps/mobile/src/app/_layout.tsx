@@ -2,13 +2,21 @@ import { Inter_400Regular, Inter_500Medium, Inter_700Bold, Inter_800ExtraBold } 
 import { JetBrainsMono_400Regular, JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono';
 import { NotoSerif_400Regular, NotoSerif_700Bold, NotoSerif_700Bold_Italic } from '@expo-google-fonts/noto-serif';
 import { useFonts } from 'expo-font';
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { DarkTheme, router, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { authClient } from '@/lib/auth-client';
+import {
+  destinationFromURL,
+  rememberDestination,
+  takeDestination,
+} from '@/lib/pending-destination';
+import { leaveTable } from '@/lib/room-session';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,25 +49,88 @@ export default function RootLayout() {
   if (isPending || !fontsLoaded) return null;
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <ThemeProvider value={DarkTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Protected guard={!session}>
-            <Stack.Screen name="sign-in" />
-            <Stack.Screen name="sign-up" />
-            <Stack.Screen name="forgot-password" />
-          </Stack.Protected>
-          <Stack.Protected guard={!!session}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="tutorial" />
-            <Stack.Screen name="offline" />
-          </Stack.Protected>
-          {/* Outside the guards: the emailed reset link may land while a stale
-              session is still on the device, and the reset has to win. */}
-          <Stack.Screen name="reset-password" />
-        </Stack>
-        <AnimatedSplashOverlay />
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <DeepLinks session={!!session}>
+      <GestureHandlerRootView style={styles.root}>
+        <ThemeProvider value={DarkTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Protected guard={!session}>
+              <Stack.Screen name="sign-in" />
+              <Stack.Screen name="sign-up" />
+              <Stack.Screen name="forgot-password" />
+            </Stack.Protected>
+            <Stack.Protected guard={!!session}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="tutorial" />
+              <Stack.Screen name="offline" />
+              <Stack.Screen name="online" />
+              <Stack.Screen name="online/[roomId]" />
+            </Stack.Protected>
+            {/* Outside the guards: the emailed reset link may land while a stale
+                session is still on the device, and the reset has to win. */}
+            <Stack.Screen name="reset-password" />
+          </Stack>
+          <AnimatedSplashOverlay />
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </DeepLinks>
   );
+}
+
+/**
+ * The app's arrival links — `wordpoker://online?room=…` and its web equivalent.
+ *
+ * A link can arrive before the device can take it: the guard bounces a signed-out device to
+ * sign-in, and by the time a session exists the URL that started it is long gone. So the launch
+ * URL and every later one are read here, above the guard, and a link that names a table is held
+ * (`pending-destination`) until there is a session to land it with. Nothing is navigated to that
+ * the guard would immediately throw away.
+ */
+function DeepLinks({ session, children }: { session: boolean; children: ReactNode }) {
+  // The launch URL is the app's own; only the first run may read it, or a later session change
+  // would re-follow the link the device was already started with.
+  const launchRead = useRef(false);
+
+  useEffect(() => {
+    let live = true;
+
+    const arrive = (url: string | null) => {
+      const destination = destinationFromURL(url);
+      if (!destination) return;
+      if (session) {
+        router.replace(destination);
+        return;
+      }
+      rememberDestination(destination);
+    };
+
+    if (!launchRead.current) {
+      launchRead.current = true;
+      void Linking.getInitialURL().then((url) => {
+        if (live) arrive(url);
+      });
+    }
+
+    const arriving = Linking.addEventListener('url', ({ url }) => arrive(url));
+    return () => {
+      live = false;
+      arriving.remove();
+    };
+  }, [session]);
+
+  // Signed out, the seat is not a seat: the guarded routes are unreachable until someone signs in
+  // again, so the device gives the table up rather than leaving the server counting a player who
+  // cannot reach it — a room counts connections, and this one would count a ghost.
+  useEffect(() => {
+    if (session) return;
+    void leaveTable();
+  }, [session]);
+
+  // Signed in: land on whatever link was waiting for a session, once.
+  useEffect(() => {
+    if (!session) return;
+    const destination = takeDestination();
+    if (destination) router.replace(destination);
+  }, [session]);
+
+  return children;
 }
