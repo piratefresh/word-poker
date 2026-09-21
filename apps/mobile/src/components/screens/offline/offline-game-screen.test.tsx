@@ -1,9 +1,10 @@
-import { act, fireEvent, render, type RenderResult } from "@testing-library/react-native";
+import { act, fireEvent, render, within, type RenderResult } from "@testing-library/react-native";
 
 import type { Tile } from "@wordpoker/contracts";
-import { WORD_WINDOW_MS, dealHand, type Dictionary } from "@wordpoker/game-rules";
+import { dealHand, type Dictionary } from "@wordpoker/game-rules";
 
 import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
+import { duration } from "@/constants/theme";
 import { testDictionary } from "@/lib/dictionary-fixtures";
 import { useOfflineGame, type OfflineGame } from "@/lib/use-offline-game";
 
@@ -88,10 +89,52 @@ jest.mock("@/lib/use-dictionary", () => ({
  */
 const FELT_BOX = { nativeEvent: { layout: { width: 360, height: 320 } } };
 
+/** The CPU's beat, as the theme states it: one seat's action per beat, and the tests own it. */
+const BEAT_MS = duration.cpuBeat;
+
+/** One beat of the table's own clock, painted. */
+async function beat() {
+  await act(async () => {
+    jest.advanceTimersByTime(BEAT_MS);
+  });
+}
+
+/**
+ * Whether §19's window is what the table is waiting on. Nobody is to act in the window — no seat
+ * is thinking and the hero's own pill has stopped saying it is their turn — while the phase stays
+ * the river.
+ */
+function windowIsOpen(view: RenderResult): boolean {
+  return view.queryByText("THINKING...") === null && view.queryByText("YOUR TURN") === null;
+}
+
+/** Whether the hero's own action is what the felt is waiting on: their turn, or their word. */
+function waitsOnTheHero(view: RenderResult): boolean {
+  return view.queryByText("YOUR TURN") !== null || windowIsOpen(view);
+}
+
+/** Runs the CPU's turns, one beat at a time, until the felt is the hero's to move again. */
+async function passedToTheHero(view: RenderResult) {
+  for (let step = 0; step < 40 && !waitsOnTheHero(view); step += 1) {
+    await beat();
+  }
+}
+
 async function renderTable() {
   const view = await render(<OfflineGameScreen />);
   await fireEvent(view.getByTestId("poker-table"), "layout", FELT_BOX);
+  // The deal leaves the first turn to a bot, and the felt says so — a seat thinking while the
+  // hero's row is dark. Every test here reads the table once the CPU has played it to the hero.
+  await passedToTheHero(view);
   return view;
+}
+
+/**
+ * The felt's own row, reached by the ids its controls carry: the seat nameplates print CHECK,
+ * CALL and FOLD as status as well, so a text selector for a control can land on a seat instead.
+ */
+function control(view: RenderResult, id: string) {
+  return within(view.getByTestId(id));
 }
 
 /**
@@ -120,32 +163,32 @@ function stripTiles(view: RenderResult): string[] {
     .map((tile) => String(tile.props.testID).replace("word-builder-tile-", ""));
 }
 
-/**
- * Takes the hero's turn the way the felt's row offers it: the check when nothing is owed, the
- * call when a bot has bet. The row arms exactly one of the two, and which one it is comes from
- * the engine's own bounds — never from the test's guess about the seed.
- */
-async function takeTurn(view: RenderResult) {
-  const check = view.queryByText("CHECK");
-  if (check) {
-    await fireEvent.press(check);
-    return;
-  }
-  await fireEvent.press(view.getByText(/^CALL \$[\d,]+$/));
+/** The chips the felt draws in the middle, as the number it is showing. */
+function potAmount(view: RenderResult): number {
+  const [amount] = within(view.getByTestId("pot")).getAllByText(/^\$[\d,]+$/);
+  return Number(String(amount?.props.children).replace(/[$,]/g, ""));
 }
 
 /**
- * Taps the hero's turn until the river's close opens §19's window. The room between the two
- * is read off the row itself: while a betting round is open the hero holds either a check or
- * a call worth taking, and once the window opens the row goes dark (its call button falls
- * back to `CALL $0`) until there is a word to confirm.
+ * Takes the hero's turn the way the felt's row offers it: the check when nothing is owed, the
+ * call when a bot has bet. Which one the row names comes from the engine's own bounds — never
+ * from the test's guess about the seed — and the CPU answers on the beats either side of it.
+ */
+async function takeTurn(view: RenderResult) {
+  await passedToTheHero(view);
+  await fireEvent.press(view.getByTestId("action-check-call"));
+  await passedToTheHero(view);
+}
+
+/**
+ * Taps the hero's turn until the river's close opens §19's window. The rooms between the two are
+ * the CPU's own beats, so each pass waits for the hero to hold the table before it acts.
  */
 async function advanceToWordWindow(view: RenderResult) {
-  for (let step = 0; step < 30; step += 1) {
-    if (!view.queryByText("CHECK") && !view.queryByText(/^CALL \$[1-9][\d,]*$/)) return;
+  for (let step = 0; step < 30 && !windowIsOpen(view); step += 1) {
     await takeTurn(view);
   }
-  throw new Error("the window never opened");
+  expect(windowIsOpen(view)).toBe(true);
 }
 
 /** The hero plays both of its tiles and locks the word in — §19's window turns check into confirm. */
@@ -153,13 +196,20 @@ async function buildHeroWord(view: RenderResult) {
   for (const tile of HERO_TILES) {
     await fireEvent.press(view.getByTestId(`word-builder-tile-${tile.id}`));
   }
-  await fireEvent.press(view.getByText("CHECK"));
+  await fireEvent.press(view.getByTestId("action-check-call"));
 }
 
 describe("<OfflineGameScreen />", () => {
+  // The CPU plays on a timer, so the screen's tests run the table's clock themselves — the same
+  // way the hook's suite does — and `passedToTheHero` is what advances it.
   beforeEach(() => {
+    jest.useFakeTimers();
     mockDictionary = testDictionary([HERO_WORD]);
     mockSeedParam = String(SEED);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   test("holds the table until the dictionary is in hand", async () => {
@@ -185,7 +235,7 @@ describe("<OfflineGameScreen />", () => {
 
     // The pinned hand's first bot opens for 60, so the felt states a real call and a real pot
     // — the numbers the engine counted, not a placeholder row.
-    expect(view.getByText("CALL $60")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("CALL $60")).toBeOnTheScreen();
     expect(view.getByTestId("pot")).toHaveTextContent(/\$60/);
     expect(view.getByText("ALL IN · $1,000")).toBeOnTheScreen();
   });
@@ -214,8 +264,8 @@ describe("<OfflineGameScreen />", () => {
     for (const [dealt, phase] of streets) {
       await takeTurn(view);
 
-      // The hero takes their own turn; the bots' turns and the street roll that follows
-      // are in the same transition, so one action is one street.
+      // The hero takes their own turn, and the CPU answers it on its beats: the whole round
+      // answers before the street rolls, so one action is one street.
       expectBoard(view, dealt);
       expect(view.getByText(phase)).toBeOnTheScreen();
     }
@@ -229,9 +279,9 @@ describe("<OfflineGameScreen />", () => {
     // shuffle at its head. No second row of word or round buttons exists.
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
-    expect(view.getByText("FOLD")).toBeOnTheScreen();
-    expect(view.getByText("CALL $60")).toBeOnTheScreen();
-    expect(view.getByText("RAISE $120")).toBeOnTheScreen();
+    expect(control(view, "action-fold").getByText("FOLD")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("CALL $60")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("RAISE $120")).toBeOnTheScreen();
     expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
@@ -254,16 +304,17 @@ describe("<OfflineGameScreen />", () => {
     // §19's window is a clock, and a clock is what this test has to own: a seat that never
     // confirms — here, a bot whose tiny vocabulary holds nothing it can spell — leaves the
     // window to run out, and the hook's own timer is what settles it.
-    jest.useFakeTimers();
-
     const view = await renderTable();
     await advanceToWordWindow(view);
 
     await buildHeroWord(view);
 
-    await act(async () => {
-      jest.advanceTimersByTime(WORD_WINDOW_MS + 100);
-    });
+    // The window's last sixty seconds, run a beat at a time: the table's clock is what closes it.
+    for (let step = 0; step < 80 && view.queryByText("PHASE 6 · PAYOUT") === null; step += 1) {
+      await act(async () => {
+        jest.advanceTimersByTime(BEAT_MS);
+      });
+    }
 
     expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
     expect(view.getAllByText("WINNER")).toHaveLength(1);
@@ -272,31 +323,50 @@ describe("<OfflineGameScreen />", () => {
 
     expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
     expectBoard(view, 0);
+  });
 
-    jest.useRealTimers();
+  test("opens the round with the bet the row names, and the round moves on", async () => {
+    const view = await renderTable();
+
+    // The pinned hand checks around to the hero on the river, which is where the row arms the
+    // opening bet rather than a raise: the same slider, and the other engine action.
+    for (let street = 0; street < 3; street += 1) await takeTurn(view);
+    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("BET $20")).toBeOnTheScreen();
+
+    const before = potAmount(view);
+    await fireEvent.press(view.getByTestId("action-wager"));
+    await passedToTheHero(view);
+
+    // The chips moved: the amount the button named left the seat's stack for the middle — the
+    // hero's 20 and the three calls it drew, each on its own beat — which is the engine's own
+    // `bet`. A raise with nothing to raise is refused, and a refused action is dropped where
+    // nothing moved, which is exactly how this tap used to do nothing: the pot stood still at
+    // 480, and a refused bet would have left the hero holding the turn with `BET $20` on the row.
+    expect(before).toBe(480);
+    expect(potAmount(view)).toBe(560);
+    // The row has stopped offering the hero a bet: with the round closed there is no amount to
+    // name, so the wager falls back to its inert label and the call has gone quiet.
+    expect(control(view, "action-wager").getByText("RAISE $0")).toBeOnTheScreen();
+    expect(windowIsOpen(view)).toBe(true);
+    expect(control(view, "action-check-call").getByText("CALL $0")).toBeOnTheScreen();
   });
 
   test("leaves the table where it was when a disabled control is pressed in the window", async () => {
-    jest.useFakeTimers();
-
     const view = await renderTable();
     await advanceToWordWindow(view);
 
     // The window is open and the hero has nothing to confirm yet, so the row is the table's
     // own controls gone quiet: the call button falls back to `CALL $0` and does nothing.
-    await fireEvent.press(view.getByText("CALL $0"));
+    await fireEvent.press(view.getByTestId("action-check-call"));
 
     expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
     expect(view.queryByText("PHASE 6 · PAYOUT")).toBeNull();
 
-    await act(async () => {
-      jest.advanceTimersByTime(1_000);
-    });
+    await beat();
 
     expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
     expect(view.queryByText("PHASE 6 · PAYOUT")).toBeNull();
-
-    jest.useRealTimers();
   });
 
   test("shows the session's end-state over the felt, and New game restarts it", async () => {

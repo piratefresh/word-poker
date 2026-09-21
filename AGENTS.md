@@ -58,6 +58,18 @@ some of the tile) when that room is narrower than the row, so a hand of seven st
 stays tappable. The strip's places and its drag are measured in that tile, so the two cannot
 drift apart.
 
+# Offline table
+
+The CPU plays one action per beat, not the whole round at once: `use-offline-game.ts` resolves a
+single seat's move per `duration.cpuBeat`, each its own commit, so the chips a bot sends, its
+nameplate and the pot are on the felt before the next seat moves. Never fold the bots back into
+the transition that triggered them (`settleBots`-style) — a whole street played inside the hero's
+tap is exactly the unreadable jump the beat exists to prevent, and it is also what made the CPU
+pass block the frame (STO-371). A seat's last action is printed on its nameplate for the street
+it was taken on (`seatActions` in the adapter); the engine stores what a seat committed, not the
+gesture that committed it, so CHECK, CALL, BET and RAISE have nowhere else to come from. Tests
+that own the table's clock advance it `duration.cpuBeat` at a time.
+
 # End-to-end (web)
 
 UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:

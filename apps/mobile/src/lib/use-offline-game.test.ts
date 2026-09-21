@@ -3,6 +3,9 @@ import { act, renderHook } from "@testing-library/react-native";
 import type { Tile } from "@wordpoker/contracts";
 import { LETTER_VALUES, WORD_WINDOW_MS, dealHand, type Letter } from "@wordpoker/game-rules";
 
+import { duration } from "@/constants/theme";
+import type { GamePlayer } from "@/components/screens/game/game-types";
+
 import { testDictionary } from "./dictionary-fixtures";
 import { useOfflineGame, type OfflineGame } from "./use-offline-game";
 
@@ -16,6 +19,13 @@ const SEED = 7;
 /** A seed whose first bot bets: the hero starts preflop facing a call. */
 const BETTING_SEED = 20_260_919;
 const SEATS = 4;
+
+/**
+ * The CPU plays on a beat of its own, and this is the whole of it: a table test owns the clock
+ * (every test here runs on fake timers), and `passedToTheHero` is what advances the table to its
+ * next decision.
+ */
+const BEAT_MS = duration.cpuBeat;
 
 /** The hero's live result, as `renderHook` hands it over. */
 type Table = { current: OfflineGame };
@@ -76,15 +86,48 @@ function row(result: Table) {
   return result.current.game.betting;
 }
 
-/** Takes the hero's turn the way the row offers it: check when nothing is owed, else call. */
+/** Lets the CPU take its next turn — one seat's move per beat, as the table plays it. */
+async function beat() {
+  await act(async () => {
+    jest.advanceTimersByTime(BEAT_MS);
+  });
+}
+
+/**
+ * Whether the table is back on the seat: the hero's row is armed for a turn of its own, §19's
+ * window is open on the hero's slot, or the hand has paid out.
+ */
+function waitsOnTheHero(result: Table): boolean {
+  const { betting, phase } = result.current.game;
+  return (
+    phase === "payout" ||
+    betting.canFold ||
+    betting.canCheck ||
+    result.current.words?.confirmable === true
+  );
+}
+
+/** Runs the CPU's turns, one beat at a time, until the table is the hero's to move again. */
+async function passedToTheHero(result: Table) {
+  for (let step = 0; step < 40 && !waitsOnTheHero(result); step += 1) {
+    await beat();
+  }
+}
+
+/**
+ * Takes the hero's turn the way the row offers it — check when nothing is owed, else call — and
+ * lets the CPU answer it. The table is back on the hero when this returns, or at §19's window.
+ */
 async function takeTurn(result: Table) {
+  await passedToTheHero(result);
   await act(async () => {
     if (row(result).canCheck) result.current.check();
     else result.current.call();
   });
+  await passedToTheHero(result);
 }
 
-/** Taps the row until §19's window opens — the bots answer inside each tap. */
+/** Taps the row until §19's window opens — the bots answer on the beats between the taps. */
 async function playToWindow(result: Table) {
   for (let step = 0; step < 40 && !result.current.words?.confirmable; step += 1) {
     await takeTurn(result);
@@ -105,19 +148,33 @@ async function buildHeroWord(result: Table) {
 
 /**
  * §19's window closes with the clock run out — how a window ends while a seat that has nothing
- * to confirm is still drafting. The hook's own timer is what settles it, so this needs fake
- * timers.
+ * to confirm is still drafting. The window's own timer is what settles it, so the test runs the
+ * table's clock out a beat at a time: a clock that is stepped over does not paint what it passed.
  */
-async function runWindowClockOut() {
-  await act(async () => {
-    jest.advanceTimersByTime(WORD_WINDOW_MS + 100);
-  });
+async function runWindowClockOut(result: Table) {
+  const deadline = Math.ceil((WORD_WINDOW_MS + 100) / BEAT_MS);
+  for (let step = 0; step < deadline && result.current.game.phase !== "payout"; step += 1) {
+    await beat();
+  }
+  expect(result.current.game.phase).toBe("payout");
 }
+
+// The CPU answers on a timer, so every table here runs on the same clock the app does: fake
+// timers, advanced a beat at a time. A test that needs the table to have moved asks for it.
+beforeEach(() => {
+  jest.useFakeTimers();
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+});
 
 describe("useOfflineGame — the dealt table", () => {
   test("deals a hand the felt can render as it stands, with the row armed off the engine", async () => {
     const result = await table();
 
+    // The deal leaves the first turn to a bot, so the first frame is the table sitting on that
+    // seat's turn: the hero's row is dark and the seat itself says it is thinking.
     expect(result.current.game).toMatchObject({
       phase: "preflop",
       phaseNumber: 2,
@@ -131,8 +188,8 @@ describe("useOfflineGame — the dealt table", () => {
     expect(result.current.game.privateTiles).toHaveLength(2);
     expect(result.current.game.players).toHaveLength(4);
     expect(result.current.game.players.map((player) => player?.status)).toEqual([
-      "your-turn",
       "waiting",
+      "thinking",
       "waiting",
       "waiting",
     ]);
@@ -149,8 +206,20 @@ describe("useOfflineGame — the dealt table", () => {
       result.current.game.players.filter((player) => player?.isHero).map((player) => player?.id),
     ).toEqual(["hero"]);
 
-    // The row is the engine's own bounds: nothing is owed, the opening bet is open, and the
-    // slider is bounded by the minimum bet and the hero's stack.
+    // The builder runs the whole hand, so the draft is ready from the deal: empty, open to
+    // build, but not confirmable until §19's window opens after the river.
+    expect(result.current.words).toMatchObject({
+      plays: [],
+      word: "",
+      open: true,
+      confirmable: false,
+    });
+
+    await passedToTheHero(result);
+
+    // The bots checked around on their own beats, and the row the engine armed for the hero is
+    // the engine's own bounds: nothing is owed, the opening bet is open, and the slider is
+    // bounded by the minimum bet and the hero's stack.
     expect(row(result)).toEqual({
       minRaise: 20,
       maxRaise: 1_000,
@@ -163,15 +232,6 @@ describe("useOfflineGame — the dealt table", () => {
       canAllIn: true,
       allInAmount: 1_000,
       currentBet: 0,
-    });
-
-    // The builder runs the whole hand, so the draft is ready from the deal: empty, open to
-    // build, but not confirmable until §19's window opens after the river.
-    expect(result.current.words).toMatchObject({
-      plays: [],
-      word: "",
-      open: true,
-      confirmable: false,
     });
   });
 
@@ -187,18 +247,21 @@ describe("useOfflineGame — the dealt table", () => {
       expect(result.current.game.community.slice(count)).toEqual(Array(5 - count).fill(null));
       expect(result.current.game.phaseNumber).toBe(3 + street);
 
-      // The bots take their turns inside the tap, so the table is back on the hero.
+      // The bots take their turns on their own beats, so the tap plus the beats it starts are
+      // the street, and the table is back on the hero.
       expect(result.current.game.players[0]?.status).toBe("your-turn");
     }
   });
 
   test("opens a fresh turn per action, so the HUD's countdown re-anchors", async () => {
     const result = await table();
-    const first = result.current.game.id;
+    await passedToTheHero(result);
+    const heroTurn = result.current.game.id;
 
     await takeTurn(result);
 
-    expect(result.current.game.id).not.toBe(first);
+    // The turn moved — the HUD re-anchors on that — and it moved on the hero's own action.
+    expect(result.current.game.id).not.toBe(heroTurn);
   });
 
   test("opens §19's word window after the river, with the hero's draft ready", async () => {
@@ -225,8 +288,10 @@ describe("useOfflineGame — the dealt table", () => {
 
   test("reads the pot off the seats' commitments as the chips come in", async () => {
     const betting = await table(BETTING_SEED);
+    await passedToTheHero(betting);
 
-    // mira opened the hand for 60, so the hero owes a call that the row states exactly.
+    // mira opened the hand for 60 — the seats in front of it checked around on their beats — so
+    // the hero owes a call that the row states exactly.
     expect(row(betting).canCheck).toBe(false);
     expect(row(betting).callAmount).toBe(60);
     expect(row(betting).canBet).toBe(false);
@@ -258,28 +323,26 @@ describe("useOfflineGame — the dealt table", () => {
 
 describe("useOfflineGame — the hero's clocks", () => {
   test("checks on the deadline when checking is free", async () => {
-    jest.useFakeTimers();
-
     const result = await table();
+    await passedToTheHero(result);
     expect(row(result).canCheck).toBe(true);
 
     await act(async () => {
       jest.advanceTimersByTime(30_100);
     });
+    // The auto-check is the table's action like any other, so the bots answer it on their beats.
+    await passedToTheHero(result);
 
     // The auto-check completed the preflop round and the bots answered: the table is on the
     // flop with the hero's commitment untouched.
     expect(result.current.game.phase).toBe("flop");
     expect(result.current.game.players[0]?.status).toBe("your-turn");
     expect(result.current.game.pot).toBe(0);
-
-    jest.useRealTimers();
   });
 
   test("folds on the deadline when a bet is owed", async () => {
-    jest.useFakeTimers();
-
     const result = await table(BETTING_SEED);
+    await passedToTheHero(result);
     expect(row(result).canCheck).toBe(false);
 
     await act(async () => {
@@ -290,15 +353,126 @@ describe("useOfflineGame — the hero's clocks", () => {
     expect(result.current.game.players[0]?.status).toBe("fold");
     expect(result.current.words).toBeNull();
     expect(result.current.game.players[0]?.stack).toBe(1_000);
+  });
+});
 
-    jest.useRealTimers();
+/** The seats' pills, in seat order, as the felt reads them. */
+function statuses(result: Table): (GamePlayer["status"] | undefined)[] {
+  return result.current.game.players.map((player) => player?.status);
+}
+
+/** The seats the table is sitting on: exactly one, while a betting round is open. */
+function thinkingSeats(result: Table): number[] {
+  return result.current.game.players.flatMap((player, seat) =>
+    player?.status === "thinking" ? [seat] : [],
+  );
+}
+
+/** The deal's tiles for one seat, as the table hands them out. */
+function seatTiles(seat: number, seed = SEED): readonly Tile[] {
+  return dealHand({ seed, playerCount: SEATS }).privateTiles[seat] ?? [];
+}
+
+describe("useOfflineGame — the CPU's beat", () => {
+  test("moves one seat per beat rather than the round at once", async () => {
+    const result = await table(BETTING_SEED);
+    await passedToTheHero(result);
+
+    // The opening seats answered on their own beats: mira's bet is on the table, on its own
+    // nameplate, and the table is on exactly one seat — there is no round being played out in a
+    // transition of somebody else's.
+    expect(statuses(result)[3]).toBe("bet");
+    expect(thinkingSeats(result)).toEqual([]);
+    expect(result.current.game.pot).toBe(60);
+
+    const owed = row(result).callAmount ?? 0;
+    const potBefore = result.current.game.pot;
+    await act(async () => {
+      result.current.call();
+    });
+
+    // The hero's call is the hero's own transition: the pot took it, the hero's own pill says
+    // what it was, and the seat behind the hero is the one the table sits on.
+    expect(result.current.game.pot).toBe(potBefore + owed);
+    expect(statuses(result)[0]).toBe("call");
+    expect(thinkingSeats(result)).toEqual([1]);
+
+    await beat();
+
+    // One beat, one seat: ellis answered it, and the table sits on the next one.
+    expect(thinkingSeats(result)).toEqual([2]);
+    expect(statuses(result)[0]).toBe("call");
+  });
+
+  test("prints a seat's action for the street it was taken on, and only for that street", async () => {
+    const result = await table();
+    await passedToTheHero(result);
+
+    // The seats in front of the hero checked on their own beats, and a check moves no chips and
+    // leaves no flag on the seat: the nameplate is the only place it can be read.
+    expect(statuses(result).slice(1)).toEqual(["check", "check", "check"]);
+
+    // The hero's check closes the street. A street nobody has acted on yet is what the pills
+    // show, so the words from the last one do not survive into it — not the bots' and not the
+    // hero's own.
+    await act(async () => {
+      result.current.check();
+    });
+    expect(result.current.game.phase).toBe("flop");
+    expect(statuses(result)).not.toContain("check");
+  });
+
+  test("keeps the hand the hero gave up on the table, rather than running it out in the fold", async () => {
+    const result = await table(BETTING_SEED);
+    await passedToTheHero(result);
+
+    await act(async () => {
+      result.current.fold();
+    });
+
+    // The fold is the hero's own transition: the street has not rolled, the pot is where the hero
+    // left it, and the seat behind the hero is the one the table sits on.
+    expect(result.current.game.phase).toBe("preflop");
+    expect(result.current.game.pot).toBe(60);
+    expect(statuses(result)[0]).toBe("fold");
+    expect(thinkingSeats(result)).toEqual([1]);
+
+    // The rest of the hand is the table's, not the fold's: it plays on the same beat, one seat at
+    // a time, with the payout a hand's worth of beats away rather than already paid.
+    await beat();
+    expect(thinkingSeats(result)).toEqual([2]);
+    expect(result.current.game.phase).toBe("preflop");
+  });
+
+  test("confirms the bots' words on their own beats inside §19's window", async () => {
+    // Every seat has a word in this dictionary — the hero's own tiles and each bot's — so the
+    // window can close on the seats rather than on the clock, and the beats it took to close are
+    // what this test counts.
+    const dictionary = testDictionary([0, 1, 2, 3].map((seat) => spells(seatTiles(seat))));
+    const { result } = await renderHook(() => useOfflineGame({ seed: SEED, dictionary }));
+    const felt = result as Table;
+
+    await playToWindow(felt);
+    await buildHeroWord(felt);
+
+    // The hero's confirm is the hero's own transition: the window is still open on the bots'
+    // slots, and nothing has answered for them.
+    expect(felt.current.game.phase).toBe("river");
+
+    let beats = 0;
+    for (let step = 0; step < 10 && felt.current.game.phase !== "payout"; step += 1) {
+      await beat();
+      beats += 1;
+    }
+
+    // One seat per beat: the three bots still in the hand, and then the window is settled.
+    expect(felt.current.game.phase).toBe("payout");
+    expect(beats).toBe(3);
   });
 });
 
 describe("useOfflineGame — §19's window", () => {
   test("builds the hero's word from its own tiles, and pays out on the confirmation", async () => {
-    jest.useFakeTimers();
-
     const result = await table();
     await playToWindow(result);
 
@@ -328,7 +502,7 @@ describe("useOfflineGame — §19's window", () => {
 
     // A bot whose tiles spell nothing the table counts never confirms, so the window ends the
     // way §19 says it does: with the clock. Only then does the hand pay out on the real judging.
-    await runWindowClockOut();
+    await runWindowClockOut(result);
 
     expect(result.current.game.phase).toBe("payout");
     expect(result.current.game.bestScore).toBeGreaterThanOrEqual(expectedScore(heroTiles()));
@@ -343,7 +517,6 @@ describe("useOfflineGame — §19's window", () => {
       result.current.game.players.reduce((total, player) => total + (player?.stack ?? 0), 0),
     ).toBe(4_000);
 
-    jest.useRealTimers();
   });
 
   test("refuses a draft the tiles cannot build, and keeps the draft it had", async () => {
@@ -444,26 +617,25 @@ describe("useOfflineGame — §19's window", () => {
   });
 
   test("starts the next hand from the payout, on a fresh deal", async () => {
-    jest.useFakeTimers();
-
     const result = await table();
     await playToWindow(result);
     await buildHeroWord(result);
-    await runWindowClockOut();
+    await runWindowClockOut(result);
     const finished = result.current.game.id;
 
     await act(async () => {
       result.current.deal();
     });
+    await passedToTheHero(result);
 
     expect(result.current.game.phase).toBe("preflop");
     expect(result.current.game.id).not.toBe(finished);
     expect(result.current.game.community).toEqual([null, null, null, null, null]);
+    // The fresh deal leaves the first turn to a bot, exactly as the session's first one did: the
+    // table is on that seat until its beat passes, and then the hero's row is armed again.
     expect(result.current.game.players[0]?.status).toBe("your-turn");
     // A fresh hand is a fresh, empty draft — open to build again, and cleared of the last one.
     expect(result.current.words).toMatchObject({ plays: [], word: "", open: true, confirmable: false });
-
-    jest.useRealTimers();
   });
 
   test("keeps every letter of a word a multiplier tile prints at its §6 value", async () => {
@@ -488,40 +660,43 @@ describe("useOfflineGame — the chips in flight", () => {
     expect(result.current.game.handId).toBe(opening.handId);
   });
 
-  test("starts at rest: the deal is not a transition, so nothing is in the air yet", async () => {
+  test("starts at rest: the deal moves no chips, so nothing is in the air yet", async () => {
     const result = await table(BETTING_SEED);
 
-    // The table opens with the opening seats already settled — the first render is where the hand
-    // starts, not a step of it — so their chips are simply in the middle and no flight carries
-    // them there. A flight needs a state to have left from.
+    // The first render is where the hand starts, not a step of it: no seat has committed and no
+    // flight carries anything. The seats' own bets come a beat later, each with its own flight —
+    // and a flight always needs a state to have left from.
     expect(result.current.game.flights).toEqual([]);
+    expect(result.current.game.pot).toBe(0);
+
+    await passedToTheHero(result);
+
+    // mira's opening 60 came through the beat, and it is on the felt as a flight rather than as a
+    // pot that moved on its own.
     expect(result.current.game.pot).toBe(60);
+    expect(result.current.game.flights.map((flight) => flight.seatIndex)).toContain(3);
   });
 
-  test("sends one flight per seat that committed, for what it paid, in seat order", async () => {
+  test("sends a flight for what a seat paid, when it paid it", async () => {
     const result = await table(BETTING_SEED);
-    const owed = row(result).callAmount ?? 0;
-    const potBefore = result.current.game.pot;
+    await passedToTheHero(result);
 
+    const owed = row(result).callAmount ?? 0;
     await takeTurn(result);
 
-    const { flights, pot, phase, handId } = result.current.game;
-    // The hero paid the call the row stated, and the seats that answered it inside the same
-    // commit paid with it: one flight each, on the street the transition landed in.
-    expect(flights[0]).toEqual({
-      id: `${handId}:${phase}:0:in`,
+    const { flights, pot } = result.current.game;
+    // The hero paid the call the row stated, on the street it was paid in: its own beat's flight,
+    // and not a share of a batch the whole round moved in.
+    expect(flights).toContainEqual({
+      id: "offline-hand-1:preflop:0:in",
       seatIndex: 0,
       amount: owed,
       direction: "in",
     });
-    // Seat order, so a batch lands the way the table speaks the round.
-    expect(flights.map((flight) => flight.seatIndex)).toEqual(
-      [...flights.map((flight) => flight.seatIndex)].sort((a, b) => a - b),
-    );
-    // No seat has two chips on the same path, and every chip the middle gained is one of these:
+    // No seat has two nodes on the same path, and every chip the middle holds is one of these:
     // nothing reaches the pot without a flight to carry it.
     expect(new Set(flights.map((flight) => flight.id)).size).toBe(flights.length);
-    expect(flights.reduce((total, flight) => total + flight.amount, 0)).toBe(pot - potBefore);
+    expect(flights.reduce((total, flight) => total + flight.amount, 0)).toBe(pot);
   });
 
   test("keeps the flights it already has when the same state is rendered again", async () => {
@@ -568,13 +743,11 @@ describe("useOfflineGame — the chips in flight", () => {
   });
 
   test("leaves no flight from the last hand when the next one is dealt", async () => {
-    jest.useFakeTimers();
-
     const result = await table(BETTING_SEED);
     await takeTurn(result);
     await playToWindow(result);
     await buildHeroWord(result);
-    await runWindowClockOut();
+    await runWindowClockOut(result);
 
     // A test has no layer over the felt, so nothing reports these chips landing: the hand ends
     // with its flights still in the air, which is exactly what the deal has to clear.
@@ -587,7 +760,5 @@ describe("useOfflineGame — the chips in flight", () => {
     expect(result.current.game.phase).toBe("preflop");
     expect(result.current.game.handId).toBe("offline-hand-2");
     expect(result.current.game.flights).toEqual([]);
-
-    jest.useRealTimers();
   });
 });
