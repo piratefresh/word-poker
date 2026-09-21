@@ -31,7 +31,7 @@ import type {
 
 import { commitChips, type ChipSeat } from "./chips";
 
-/** The offline table's stakes: a table setting, not a rule of the game (§22, ADR 0001). */
+/** The offline table's stakes; online rooms derive their minimum from the room buy-in (§22, ADR 0001). */
 export const DEFAULT_STAKES = { minBet: 20, startingStack: 1_000 } as const;
 
 /** The betting settings a table fixes before it seats anyone. */

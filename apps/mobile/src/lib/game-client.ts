@@ -1,9 +1,6 @@
 import { Client } from "@colyseus/sdk";
 import Constants from "expo-constants";
 
-/** The room name the server registers in apps/server/src/app.config.ts. */
-export const GAME_ROOM = "game";
-
 /** The Colyseus server runs on this port beside the Expo dev server. */
 const GAME_SERVER_PORT = 2567;
 
@@ -19,6 +16,6 @@ function devGameURL(): string {
   return host ? `ws://${host}:${GAME_SERVER_PORT}` : `ws://localhost:${GAME_SERVER_PORT}`;
 }
 
-export const gameServerURL = process.env.EXPO_PUBLIC_GAME_URL ?? devGameURL();
+const gameServerURL = process.env.EXPO_PUBLIC_GAME_URL ?? devGameURL();
 
 export const gameClient = new Client(gameServerURL);

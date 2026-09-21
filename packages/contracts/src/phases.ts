@@ -12,3 +12,8 @@ export const WAITING_PHASE = "waiting";
 
 /** Every value a table's `phase` can hold — the waiting room, then the hand's rounds. */
 export type RoomPhase = RoundPhase | typeof WAITING_PHASE;
+
+/** Whether an untrusted value — a table's published status, read off a socket — is a phase. */
+export function isRoomPhase(value: unknown): value is RoomPhase {
+  return value === WAITING_PHASE || (ROUND_PHASES as readonly unknown[]).includes(value);
+}
