@@ -340,6 +340,36 @@ export const easing = {
   springOvershoot: { damping: 11, stiffness: 170, mass: 0.9 },
 } as const;
 
+/**
+ * The results screen's entrance (STO-384): one clock over the whole sequence, one offset per
+ * beat. Every offset is measured from the start of the sequence rather than from the beat
+ * before it — the screen's seven beats overlap, and only one clock drives them all.
+ */
+export const resultsEntrance = {
+  /** Where the clock stops: the last beat's end, and the moment the primary goes live. */
+  total: 1_140,
+  /** The pot's count-up, its bloom, and the CTA row's fade — the three slow beats. */
+  count: 700,
+  bloomFade: 900,
+  ctaIn: 220,
+  /** Beat starts, in ms from the sequence's start. */
+  headline: 0,
+  pot: 180,
+  bloom: 180,
+  winner: 420,
+  cards: 520,
+  cardStagger: 70,
+  tiles: 640,
+  tileStagger: 40,
+  cta: 900,
+  /** Beat lengths: the fade-and-rise every entering element shares, and the winner's ring. */
+  rise: 320,
+  tileIn: 300,
+  pulse: 360,
+  /** Reduce Motion collapses the whole sequence to this one fade. */
+  fade: 200,
+} as const;
+
 /* ── layout ──────────────────────────────────────────────────────── */
 
 export const layout = {
@@ -370,6 +400,7 @@ export const theme = {
   glow,
   duration,
   easing,
+  resultsEntrance,
   layout,
   opacity,
 } as const;

@@ -189,6 +189,9 @@ importers:
       '@wordpoker/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@wordpoker/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@wordpoker/game-rules':
         specifier: workspace:*
         version: link:../../packages/game-rules
@@ -405,6 +408,12 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.23.13
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   packages/game-rules:
     dependencies:

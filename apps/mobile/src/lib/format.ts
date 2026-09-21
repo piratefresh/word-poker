@@ -7,8 +7,17 @@
  * with dots or spaces would change the UI under us.
  */
 
-/** `$1,240` — grouped, no decimals. Non-finite and fractional input is floored. */
+/**
+ * `$1,240` — grouped, no decimals. Non-finite and fractional input is floored.
+ *
+ * Carries the `"worklet"` directive because the results pot formats each frame of its count-up
+ * from inside an `animatedProps` updater, on the UI thread: a plain function cannot be called
+ * from there. The directive changes nothing for the many JS-thread callers — it only registers
+ * the function with the worklet runtime as well.
+ */
 export function formatAmount(amount: number): string {
+  "worklet";
+
   const whole = Number.isFinite(amount) ? Math.trunc(amount) : 0;
   const sign = whole < 0 ? "-" : "";
   const digits = Math.abs(whole).toString();

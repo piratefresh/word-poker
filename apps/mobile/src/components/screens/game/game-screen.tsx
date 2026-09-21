@@ -316,6 +316,10 @@ function BettingControls({
           disabled={!state.canCheck && state.callAmount == null}
           label={callLabel}
           onPress={onCheckOrCall}
+          // The one control the row arms for two actions, so a test cannot name it by its label:
+          // the felt's nameplates print CHECK and CALL as seat status too, and a text selector
+          // lands on whichever the tree puts first.
+          testID="action-check-call"
         />
         <ActionButton
           disabled={!state.canRaise && !state.canBet}
