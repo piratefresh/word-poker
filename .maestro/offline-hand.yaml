@@ -1,7 +1,7 @@
 # The offline hand, played end to end against the web build:
 # deal → real betting rounds to the river → a hero BET → §19's window opens → build a word
 # from the rack → confirm → §11 judges it against the real dictionary → §21 names a winner →
-# next hand.
+# the results → DEAL ANOTHER → the next hand.
 #
 # Run it with the CLI (headed by default; add `--headless` to hide the browser):
 #   maestro test --platform web .maestro/offline-hand.yaml
@@ -67,26 +67,17 @@ tags:
 - assertVisible:
     text: "CALL $60"
 
-# Play the hero's turns to the river. Which control the row arms depends on the bot line —
-# the check when nothing is owed, the call when a bot has bet — so each pass taps whichever
-# of the two is on screen, and the flow waits for the river rather than counting turns.
+# Play the hero's turns to the river. The row arms its check/call control with the check when
+# nothing is owed and the call when a bot has bet, so one tap takes the turn either way — and it
+# is taken by the control's id, because the felt's nameplates print CHECK and CALL as seat status
+# too and a text selector lands on whichever of them the accessibility tree puts first.
 - repeat:
     while:
       notVisible:
         text: "PHASE 5 · THE RIVER"
     commands:
-      - runFlow:
-          when:
-            visible: "CHECK"
-          commands:
-            - tapOn:
-                text: "CHECK"
-      - runFlow:
-          when:
-            notVisible: "CHECK"
-          commands:
-            - tapOn:
-                text: "CALL \\$[0-9,]+"
+      - tapOn:
+          id: "action-check-call"
       - waitForAnimationToEnd
 
 # On the river the bots check to the hero, so the row arms the bet: the slider seeds at the
@@ -132,10 +123,18 @@ tags:
     text: "· 4pts"
 
 # §19's window turns the check into the confirm: the word as it stands is locked in, and no
-# second control row carries a confirm of its own.
-- tapOn:
-    text: "CHECK"
-- waitForAnimationToEnd
+# second control row carries a confirm of its own. The row's control is tapped until the hand pays
+# out rather than once — the hero's opening bet can be raised at, so the round is answered street
+# by street, and the tap that confirms is the one §19's window arms. The taps are by id, because
+# the felt's nameplates print CHECK and CALL as seat status too.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 6 · PAYOUT"
+    commands:
+      - tapOn:
+          id: "action-check-call"
+      - waitForAnimationToEnd
 
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
 # immediately when the bots found words, or on the window's clock when they did not.
@@ -145,10 +144,31 @@ tags:
 - assertVisible:
     text: "WINNER"
 
-# And the table deals again.
+# The payout of the hand is the results, presented over the felt: this hand's number, its pot
+# counted up, every seat that reached the reveal, and the rating card under the scoreboard.
+# The table's own Deal is gone — the results' primary is the only deal left on the table.
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 5000
+- assertVisible:
+    text: "SCOREBOARD"
+- assertVisible:
+    text: ".*WORDS PLAYED.*"
+- assertVisible:
+    text: "DEAL ANOTHER"
+# The seat confirmed its word inside §19's window, so its own card carries that submission rather
+# than the window's timeout: the confirm and the payoff are the same word.
+- assertNotVisible:
+    text: "The window closed"
+
+# The primary is inert until the entrance settles; the tap retries until it takes, then the
+# next hand is dealt and nothing of the results is left behind.
+- waitForAnimationToEnd
 - tapOn:
-    text: "Deal"
+    text: "DEAL ANOTHER"
 - assertVisible:
     text: "PHASE 2 · PRE-FLOP"
 - assertVisible:
     text: "COMMUNITY · 0/5"
+- assertNotVisible:
+    text: "HAND #1 · RESULTS"

@@ -12,9 +12,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "db:migrate": "tsx src/cli/migrate.ts",
-    "db:reset": "tsx src/cli/reset.ts"
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "db:migrate": "node --import tsx src/cli/migrate.ts"
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.4",
@@ -26,6 +25,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.4",
-    "@types/pg": "^8.23.1"
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.3"
   }
 }

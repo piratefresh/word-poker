@@ -60,6 +60,8 @@ import type {
   GameScreenState,
   PlayerStatus,
 } from "@/components/screens/game/game-types";
+import { buildResultsSnapshot } from "@/components/screens/results/results-snapshot";
+import type { ResultsSnapshot } from "@/components/screens/results/results-types";
 import { isSupportedSeatCount, type SeatCount } from "@/components/table";
 import type { WordDraft } from "@/components/word-builder";
 import { colors, palette } from "@/constants/theme";
@@ -111,6 +113,13 @@ export interface OfflineGame {
    * every mode's: the seated table's adapter maps its socket into the same shape.
    */
   words: WordDraft | null;
+  /**
+   * The settled hand as the results screen renders it, or `null` while no hand has paid out.
+   * Mapped off the engine's own numbers — §7's score, §21's order, §25's pots — and handed to
+   * the surface once, which freezes it: the table can deal again behind the results, and
+   * nothing on screen follows it (STO-380).
+   */
+  results: ResultsSnapshot | null;
   /** Starts the next hand. Only legal once the current hand has paid out. */
   deal: () => void;
   /** Surrenders the hand (§22). */
@@ -361,9 +370,17 @@ export function useOfflineGame({
 
   const game = useMemo(() => toScreenState(state, heroDraft), [state, heroDraft]);
 
+  // The settled hand, mapped off the state that settled it. Only a paid-out hand has one, so
+  // this is null on every other street — the results do not exist until the pot has moved.
+  const results = useMemo(
+    () => (state.result === null ? null : buildResultsSnapshot({ state, players: game.players })),
+    [game.players, state],
+  );
+
   return {
     game,
     words: useMemo(() => wordsOf(state, heroDraft, refusal), [state, heroDraft, refusal]),
+    results,
     deal,
     fold,
     check,

@@ -1,6 +1,5 @@
-import { Button, Host } from "@expo/ui";
-import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,6 +8,7 @@ import type { Dictionary } from "@wordpoker/game-rules";
 import { ActionButton } from "@/components/screens/game/game-primitives";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
+import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { WordBuilder, WordHand, WordPreview, WordShuffleButton } from "@/components/word-builder";
 import { border, colors, fonts, palette, radius, spacing, type } from "@/constants/theme";
 import { pinnedSeed, randomSeed } from "@/lib/offline-seed";
@@ -26,8 +26,11 @@ import { useOfflineGame } from "@/lib/use-offline-game";
  * The felt's action row is the whole control surface: fold, check/call, the bet/raise slider
  * with the builder's shuffle at its head, and all-in with its own confirmation. The check
  * doubles as §19's confirm once the window opens — the word as it stands is locked in — so
- * there is no second row of word buttons to keep in step with it. The band under the felt
- * carries the payout's Deal and nothing else.
+ * there is no second row of word buttons to keep in step with it.
+ *
+ * The hand's payoff is the results surface, presented over the felt the moment the table
+ * reaches `payout`: the hand's number, the pot, every seat that reached the reveal, and the
+ * two ways out — from there the results' own primary is the only deal on the table.
  *
  * A session ends: a busted hero, or fewer than two seats that can still pay (ADR 0002), gets
  * the end-of-session sheet — every seat's final stack and a New game that resets the table.
@@ -62,18 +65,24 @@ function LoadingTable() {
 }
 
 function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ seed?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
-  const { game, words, deal, fold, check, bet, call, raiseTo, allIn, setDraft, confirmWord, sessionOver, newGame } =
+  const { game, words, results, deal, fold, check, bet, call, raiseTo, allIn, setDraft, confirmWord, sessionOver, newGame } =
     useOfflineGame({ seed, dictionary });
   const payout = game.phase === "payout";
   // §19's window turns the felt's check into the confirm: while the seat may still lock its
   // word in, the check is what locks it. On every other turn the same button is the engine's
   // own check or call, whichever the row armed.
   const checkOrCall = words?.confirmable ? confirmWord : game.betting.canCheck ? check : call;
+
+  // Leaving the table is the app's own exit, not the results' invention: back the way the
+  // felt's own back control goes, and home when there is nothing behind this screen.
+  const leaveTable = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  }, []);
 
   return (
     // §19's window is the felt's rack made playable: the hand the seat is dealt is the hand it
@@ -110,16 +119,13 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
         />
       </View>
       {/*
-        The band under the felt carries the payout's Deal and nothing else: the draft lives
-        above the rack, and every control the round needs is the felt's own row — fold,
-        check/call, the bet and the all-in, with the builder's shuffle at their head.
+        The hand's payoff, presented over the felt: every hand that pays out ends here, and
+        from here the results' own primary is the only deal on the table (STO-379 decision 4).
+        The session's last hand keeps its end-of-session sheet instead — a New game is the only
+        useful thing left to say once the hero has busted (ADR 0002).
       */}
-      {payout && !sessionOver ? (
-        <View style={[styles.controls, { paddingBottom: insets.bottom + spacing.sm }]}>
-          <Host colorScheme="dark" matchContents seedColor={colors.gold} style={styles.host}>
-            <Button label="Deal" onPress={deal} variant="filled" />
-          </Host>
-        </View>
+      {payout && !sessionOver && results !== null ? (
+        <ResultsScreen onDeal={deal} onExit={leaveTable} snapshot={results} />
       ) : null}
       {sessionOver ? <SessionOver game={game} onNewGame={newGame} /> : null}
     </WordBuilder>
@@ -161,24 +167,12 @@ function SessionOver({
 }
 
 const styles = StyleSheet.create({
-  // The felt's gradient lands on `felt800`, so the band under it paints that same colour
-  // and the two surfaces read as one table.
+  // The felt's gradient lands on `felt800`, so the felt's own backdrop paints that same
+  // colour and the two surfaces read as one table.
   screen: { backgroundColor: palette.felt800, flex: 1 },
   loading: { alignItems: "center", flex: 1, justifyContent: "center" },
   loadingText: { ...type.bodyDim },
   table: { flex: 1, overflow: "hidden" },
-  // §19's builder is a sheet under the felt, not a floating panel: it paints the felt's own
-  // colour so nothing shows through it, and the felt above is clipped to the room it has.
-  controls: {
-    alignItems: "center",
-    backgroundColor: palette.felt800,
-    borderTopColor: colors.borderFaint,
-    borderTopWidth: border.hairline,
-    paddingTop: spacing.sm * 2,
-  },
-  // `@expo/ui`'s host hugs its parent's start edge by default, so the pill asks for the
-  // centre itself rather than relying on the row's alignment.
-  host: { alignSelf: "center" },
   // The session's end-state is the felt's own sheet, not an OS alert: the final stacks are
   // the table's last word, and they stay on the table.
   overlayBackdrop: {

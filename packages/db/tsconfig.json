@@ -1,7 +1,12 @@
 {
   "compilerOptions": {
     "target": "es2024",
-    "module": "nodenext",
+    // The rest of the workspace's packages set these two: every package here is consumed as
+    // TypeScript source, and the one bundler that reads it besides `tsx` is Metro (the app's
+    // `results-rating+api.ts` route imports this package). `nodenext` demanded `.js` specifiers
+    // that Metro resolves literally, so it could not find `../mikro-orm.config.js` at all.
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "moduleDetection": "force",
     "types": ["node"],
     "resolveJsonModule": true,
@@ -14,5 +19,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "mikro-orm.config.ts"]
 }

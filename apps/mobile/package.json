@@ -22,6 +22,7 @@
     "@expo-google-fonts/noto-serif": "^0.4.2",
     "@expo/ui": "~57.0.18",
     "@wordpoker/contracts": "workspace:*",
+    "@wordpoker/db": "workspace:*",
     "@wordpoker/game-rules": "workspace:*",
     "better-auth": "^1.7.4",
     "dotenv": "17.4.2",

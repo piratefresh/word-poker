@@ -247,7 +247,7 @@ describe("<OfflineGameScreen />", () => {
     expect(view.getByTestId("word-builder-word")).toHaveTextContent(letters);
   });
 
-  test("plays a word from the rack, then pays out and deals the next hand", async () => {
+  test("plays a word from the rack, then pays out through the results into the next hand", async () => {
     // §19's window is a clock, and a clock is what this test has to own: a seat that never
     // confirms — here, a bot whose tiny vocabulary holds nothing it can spell — leaves the
     // window to run out, and the hook's own timer is what settles it.
@@ -265,10 +265,36 @@ describe("<OfflineGameScreen />", () => {
     expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
     expect(view.getAllByText("WINNER")).toHaveLength(1);
 
-    await fireEvent.press(roundButton(view, "Deal"));
+    // The payoff of the hand is the results, over the felt: the table's own Deal is gone, and
+    // the surface's primary is the only one left (STO-379 decisions 2 and 4).
+    expect(view.queryByText("Deal")).toBeNull();
+    expect(view.getByText(`HAND #1 · RESULTS`)).toBeOnTheScreen();
+    // The pot is inside the headline's one accessibility node, so it is hidden from the tree by
+    // design — the query has to say so (STO-387).
+    expect(view.getByTestId("results-pot", { includeHiddenElements: true })).toBeOnTheScreen();
+    // Every seat is counted: the table's shape, and how many of them played a word (§20).
+    expect(view.getByTestId("results-summary")).toHaveTextContent(
+      "4 PLAYERS · 0 FOLDS · 1 WORD PLAYED",
+    );
+
+    // The entrance's one hand-off to React lands a tick after the surface mounts — on a suite
+    // that owns the clock, that tick is one of its own timers, so it has to be advanced before
+    // the primary is live.
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+    });
+    expect(view.getByTestId("results-deal").props.accessibilityState).toMatchObject({
+      disabled: false,
+    });
+
+    await fireEvent.press(view.getByTestId("results-deal"));
 
     expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
     expectBoard(view, 0);
+    // Nothing of the results is left on screen — or reachable to a second tap.
+    expect(view.queryByTestId("results-deal")).toBeNull();
+    expect(view.queryByTestId("results-main-menu")).toBeNull();
+    expect(view.queryByText("HAND #1 · RESULTS")).toBeNull();
 
     jest.useRealTimers();
   });
@@ -307,6 +333,9 @@ describe("<OfflineGameScreen />", () => {
         sessionOver: true,
       },
       words: null,
+      // The session's last hand keeps its end-of-session sheet rather than the results: a New
+      // game is the only useful thing left to offer once the hero has busted (ADR 0002).
+      results: null,
       deal: jest.fn(),
       fold: jest.fn(),
       check: jest.fn(),
