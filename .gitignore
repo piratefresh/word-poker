@@ -61,9 +61,10 @@ package-lock.json
 /TUTORIAL_CLIENT_SIDE_COUNTDOWN_PLAN.md
 
 # agent skills — `.agents/skills/` is the canonical project install and is
-# versioned (see skills-lock.json for sources). `npx skills add` links each
-# harness's own project directory at it, so those are generated links, not
-# source: restore them after cloning with `npx skills experimental_install`.
+# versioned (sources and hashes in skills-lock.json). `npx skills` points each
+# harness's own project directory at that copy, so those are generated links,
+# not source: after cloning, `npx skills update -p` (re)creates them for the
+# harnesses whose root directory exists in the checkout.
 /skills/
 /.claude/skills/
 /.pi/skills/
