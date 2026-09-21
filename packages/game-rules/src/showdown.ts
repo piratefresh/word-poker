@@ -68,6 +68,18 @@ export interface RankShowdownOptions {
    * served table has produced, because the pool is only exhausted when the draw cannot run.
    */
   readonly exhaustedDrawPolicy?: "throw" | "tie";
+  /**
+   * What the ladder does with seats §21.1–§21.2 could not separate: `true` (the default) runs
+   * §21.3's draw, which is what a served table does, while `false` leaves them together on one
+   * shared place.
+   *
+   * `false` exists for callers that are integrating over the draw rather than playing it out.
+   * The draw is symmetric across tied seats — a fresh bag, one tile each, highest wins — so a
+   * caller estimating how often a hand wins (`./equity`) wants the group's average share
+   * rather than one sampling of it: with the draw left out, a k-way tie contributes exactly
+   * 1/k instead of 1 or 0, which is the same expectation with none of the variance.
+   */
+  readonly drawTies?: boolean;
 }
 
 /** A showdown with nobody in it — every seat folded, which §26 settles without one. */
@@ -199,6 +211,7 @@ export function rankShowdown({
   rng,
   twoLetterDrawTiles = true,
   exhaustedDrawPolicy = "throw",
+  drawTies = true,
 }: RankShowdownOptions): ShowdownRanking {
   if (entries.length === 0) {
     throw new NoContestantsError();
@@ -356,9 +369,14 @@ export function rankShowdown({
   const arrange = (group: readonly Contestant[], stepIndex: number): void => {
     const step = COMPARISON_STEPS[stepIndex];
 
-    // Past the last comparison: §21.3's draw is all that is left to separate this group.
+    // Past the last comparison: §21.3's draw is all that is left to separate this group — or,
+    // for a caller integrating over the draw, the one shared place the group is left on.
     if (step === undefined) {
-      draw(group);
+      if (drawTies) {
+        draw(group);
+      } else {
+        placeTied(group);
+      }
       return;
     }
 

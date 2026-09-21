@@ -33,12 +33,12 @@ export interface EvaluateWordOptions extends ResolveSubmissionOptions {
 }
 
 /** How one played tile resolves, or why it cannot be played at all. */
-type Resolution =
+export type PlayResolution =
   | { readonly ok: true; readonly play: TilePlayResolution }
   | { readonly ok: false; readonly reason: WordRejectionReason };
 
 /** §12: a word is at least two letters. */
-const MIN_WORD_LETTERS = 2;
+export const MIN_WORD_LETTERS = 2;
 
 /**
  * What a play's named face gives, checked against the faces the tile prints.
@@ -47,8 +47,12 @@ const MIN_WORD_LETTERS = 2;
  * it is playing: a choice tile must name the face it plays (`E` for A/E), and a sequence
  * tile may name its first letter or the printed pair but nothing that would take one letter
  * out of the pair or turn it around (§10).
+ *
+ * Exported because the rack's word search (`./word-search`) spells a play tile by tile as it
+ * walks: §10's face and order rules have to be the same ones `resolveSubmission` applies, or
+ * the search would find words the window then refuses.
  */
-function resolvePlay(tile: Tile, play: TilePlay): Resolution {
+export function resolvePlay(tile: Tile, play: TilePlay): PlayResolution {
   const face = play.chosenFace;
 
   if ("sequenceLetter" in tile) {

@@ -28,11 +28,15 @@
 # the flow plays are the ones that hand holds, and every run plays the same hand.
 #
 # The pinned seed's line, as the engine plays it (the bots are deterministic too):
-#   preflop mira bets 60 → the hero calls; flop jay bets 40 → the hero calls; turn ellis
-#   bets 20 → the hero calls; river everyone checks to the hero, who opens for the minimum
-#   (the slider seeds at `BET $20`) and is called around, which closes the river's round and
-#   opens §19's window. A different seed means different tiles and different bots, and the
-#   assertions below are the ones that would fail first.
+#   preflop ellis opens for 40 → jay folds → mira calls → the hero calls $40; flop and turn
+#   everyone checks to the hero, who checks; river everyone checks to the hero, who opens for
+#   the minimum (the slider seeds at `BET $20`), ellis folds and mira calls, which closes the
+#   river's round and opens §19's window. A different seed means different tiles and different
+#   bots, and the assertions below are the ones that would fail first.
+#
+# The bots' line is the CPU decision engine's (STO-361): ellis's opening 40 is a fraction of
+# what an unopened round is worth to four seats, not one of a fixed list of sizes, and the
+# $80 raise floor the hero is offered is that bet plus the round's own increment.
 url: http://localhost:8081/offline?seed=20260919
 name: Offline hand — bet, build a word and pay out
 tags:
@@ -61,11 +65,14 @@ tags:
 - assertVisible:
     text: "COMMUNITY · 0/5"
 
-# The opening bot's bet is on the felt before the hero's first tap: the row states the call
-# the engine says is owed, not a placeholder. This is the seed's line, so a changed seed or
-# table configuration fails here, loudly.
+# The bots' money is on the felt before the hero's first tap: the row states the call the
+# engine says is owed and the floor a raise would have to reach, both read off the round the
+# CPU opened. This is the seed's line, so a changed seed or a changed CPU policy fails here,
+# loudly.
 - assertVisible:
-    text: "CALL $60"
+    text: "CALL $40"
+- assertVisible:
+    text: "RAISE $80"
 
 # Play the hero's turns to the river. Which control the row arms depends on the bot line —
 # the check when nothing is owed, the call when a bot has bet — so each pass taps whichever
@@ -89,9 +96,15 @@ tags:
                 text: "CALL \\$[0-9,]+"
       - waitForAnimationToEnd
 
+# The round the bots played is in the pot: ellis's 40, mira's 40, and the hero's call of 40.
+# Four seats' stacks are in the thousands on this seed, so the only $120 on the felt is the pot
+# — which makes this the assertion that the CPU's chips are real and the hero's are in with them.
+- assertVisible:
+    text: "$120"
+
 # On the river the bots check to the hero, so the row arms the bet: the slider seeds at the
-# table's minimum bet, and the tap opens the round with it. Real chips move: the bots call,
-# the pot the felt draws grows, and the round's close opens §19's window.
+# table's minimum bet, and the tap opens the round with it. Real chips move: mira calls the 20,
+# ellis folds, the pot the felt draws grows, and the round's close opens §19's window.
 - assertVisible:
     text: "BET $20"
 - tapOn:
@@ -99,6 +112,8 @@ tags:
 - waitForAnimationToEnd
 - assertVisible:
     text: "PHASE 5 · THE RIVER"
+- assertVisible:
+    text: "$160"
 
 # The river's close opened §19's window: the band under the felt — the draft line and the
 # strip of tiles the seat sorts — is what the flow builds its word through. The phase stays

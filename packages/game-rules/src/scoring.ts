@@ -47,6 +47,29 @@ const RACK_TILES = PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;
 const FULL_RACK_BONUS = 10;
 
 /**
+ * §7.2/§9: what a printed multiplier does to the letters of its tile — 1 for a tile that
+ * carries none.
+ *
+ * Exported because a walk that scores a play the moment it is played (`./word-search`) adds
+ * the tile's contribution to a running total, and §7's factor has to mean the same thing on
+ * both paths or the search and the showdown would disagree about what a word is worth.
+ */
+export function multiplierFactor(multiplier: LetterMultiplier | undefined): number {
+  return multiplier === undefined ? 1 : MULTIPLIER_FACTORS[multiplier];
+}
+
+/**
+ * §7.3: what playing `tileCount` physical tiles adds on top of the letter score — the flat
+ * bonus for a full rack, and nothing for anything shorter.
+ *
+ * Exported for the same reason as {@link multiplierFactor}: a running total needs the rule,
+ * not the whole breakdown.
+ */
+export function fullRackBonus(tileCount: number): number {
+  return tileCount === RACK_TILES ? FULL_RACK_BONUS : 0;
+}
+
+/**
  * Scores an already-validated word (docs/rules/scoring.md §7).
  *
  * The letters come out in word order with their multipliers already applied, so the reveal
@@ -64,8 +87,7 @@ export function scoreWord(tiles: readonly TilePlayResolution[]): WordScore {
   let letterScore = 0;
 
   for (const tile of tiles) {
-    const multiplier = tile.multiplier;
-    const factor = multiplier === undefined ? 1 : MULTIPLIER_FACTORS[multiplier];
+    const factor = multiplierFactor(tile.multiplier);
 
     for (const { letter, points } of tile.letters) {
       const value = points * factor;
@@ -73,15 +95,13 @@ export function scoreWord(tiles: readonly TilePlayResolution[]): WordScore {
       letters.push({
         letter,
         baseValue: points,
-        ...(multiplier === undefined ? {} : { multiplier }),
+        ...(tile.multiplier === undefined ? {} : { multiplier: tile.multiplier }),
         value,
       });
     }
   }
 
-  // A full rack is every physical tile on the felt, and no submission can play more than
-  // that, so equality is the whole test — there is no "all of" to check separately.
-  const fullRackBonus = tiles.length === RACK_TILES ? FULL_RACK_BONUS : 0;
+  const bonus = fullRackBonus(tiles.length);
 
-  return { letters, letterScore, fullRackBonus, total: letterScore + fullRackBonus };
+  return { letters, letterScore, fullRackBonus: bonus, total: letterScore + bonus };
 }

@@ -224,5 +224,6 @@ The winning player:
      clockwise from the dealer — rather than refused. §26's fold-out skips the window and the
      reveal entirely (`judged: []`, STO-342). The offline round machine wires all of it in
      (`packages/game-rules/src/offline.ts`, STO-343) with the bot policy in `src/bot.ts`
-     (STO-344), and the offline felt renders it (`apps/mobile/src/lib/use-offline-game.ts`,
+     (STO-344, rebuilt in STO-361 over the seeded equity estimate in `src/equity.ts`), and the
+     offline felt renders it (`apps/mobile/src/lib/use-offline-game.ts`,
      STO-345). The offline table's stakes are ADR 0002. -->

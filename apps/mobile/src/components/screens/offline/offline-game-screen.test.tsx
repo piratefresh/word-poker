@@ -49,7 +49,7 @@ jest.mock("react-native-reanimated", () => ({
  * does not pin draws its own seed (`@/lib/offline-seed`), and a drawn seed is not knowable in
  * advance, so the draw is stood in for with {@link DRAWN_SEED}.
  */
-const SEED = 20_260_919;
+const SEED = 9;
 
 const HERO_TILES: readonly Tile[] = dealHand({ seed: SEED, playerCount: 4 }).privateTiles[0] ?? [];
 
@@ -74,6 +74,19 @@ jest.mock("@/lib/offline-seed", () => ({
 const HERO_WORD = HERO_TILES.map((tile) =>
   "sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter,
 ).join("");
+
+/**
+ * A second seed, for the turn this suite wants to see with nobody in the pot: the bots check
+ * the round to the hero under it, so the row arms a bet rather than a call.
+ */
+const QUIET_SEED = 7;
+
+/** The word the hero's own two tiles spell for a seed, as the fixture's list spells it. */
+function tilesWord(seed: number): string {
+  return (dealHand({ seed, playerCount: 4 }).privateTiles[0] ?? [])
+    .map((tile) => ("sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter))
+    .join("");
+}
 
 /** The table's vocabulary, injected: the drawer this screen loads holds the hero's word. */
 let mockDictionary: Dictionary | null = testDictionary([HERO_WORD]);
@@ -188,6 +201,23 @@ describe("<OfflineGameScreen />", () => {
     expect(view.getByText("CALL $60")).toBeOnTheScreen();
     expect(view.getByTestId("pot")).toHaveTextContent(/\$60/);
     expect(view.getByText("ALL IN · $1,000")).toBeOnTheScreen();
+  });
+
+  test("opens the round when the row arms a bet, with an action the engine accepts", async () => {
+    mockSeedParam = String(QUIET_SEED);
+    mockDictionary = testDictionary([tilesWord(QUIET_SEED)]);
+    const view = await renderTable();
+
+    // This seed's bots check the round to the hero, so the row arms the wager as a *bet* (§22:
+    // an unopened round is opened, not raised) beside the check. The tap has to send the engine
+    // that action: a raise with nothing to raise is refused as `no-bet-to-call`, and `act`
+    // swallows a betting refusal, so a mis-wired button leaves the table exactly as it was with
+    // nothing on screen and nothing in the log to say so.
+    await fireEvent.press(view.getByText(/^BET \$[\d,]+$/));
+
+    // Chips moved into the middle, which is the one thing a refused tap cannot do. The bots
+    // answer the bet inside the same commit, so the felt states the pot the engine counted.
+    expect(view.getByTestId("pot")).toHaveTextContent(/\$[1-9]/);
   });
 
   test("deals its own drawn hand for a table the URL does not pin", async () => {

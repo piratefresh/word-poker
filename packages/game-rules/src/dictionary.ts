@@ -76,6 +76,17 @@ export interface Dictionary extends DictionaryInfo {
    * two letters is `false` rather than normalised into a word it never was.
    */
   isWord(word: string): boolean;
+  /**
+   * Whether any word in the list is extended by `prefix` — what a search that spells a word
+   * one tile at a time asks before walking deeper (`./word-search`). Normalises exactly as
+   * `isWord` does, minus the two-letter floor: a prefix is a word still being spelled and may
+   * be a single letter.
+   *
+   * A required member rather than an optional one: the list is strictly ascending, so the
+   * answer is one binary search, and a word list that could not answer cheaply would leave
+   * that search walking every order of every subset of a rack to find nothing.
+   */
+  hasPrefix(prefix: string): boolean;
 }
 
 /**
@@ -99,6 +110,9 @@ const MIN_WORD_LETTERS = 2;
 
 /** A word as the artifact stores it: two or more A–Z letters, nothing else. */
 const WORD_INPUT = /^[A-Za-z]{2,}$/;
+
+/** A word still being spelled: one or more A–Z letters, nothing else. */
+const PREFIX_INPUT = /^[A-Za-z]+$/;
 
 /**
  * Whether `word` is in a sorted word list, by binary search.
@@ -142,6 +156,49 @@ function isWord(words: readonly string[], word: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Whether any word in a sorted list is extended by `prefix`, by binary search.
+ *
+ * The list is strictly ascending, so the entries that could start with `prefix` form one
+ * contiguous run beginning at the first entry not below `prefix`: the search narrows to that
+ * entry and asks it once. Nothing after it can start with `prefix` unless it does, because a
+ * word extended by `prefix` sorts at or after `prefix` and before the first string that
+ * differs from it — so one `startsWith` on the lower bound is the whole answer.
+ *
+ * Normalisation is {@link isWord}'s — trim, then upper-case — with the length floor dropped:
+ * a prefix is a word still being spelled, and `A` is a perfectly good one.
+ *
+ * @param words The artifact's words, strictly ascending.
+ * @param prefix The letters spelled so far, whatever their case and surrounding whitespace.
+ */
+function hasPrefix(words: readonly string[], prefix: string): boolean {
+  const trimmed = prefix.trim();
+  if (!PREFIX_INPUT.test(trimmed)) {
+    return false;
+  }
+
+  // ASCII-only input, so upper-casing is a per-character map: no length surprises.
+  const wanted = trimmed.toUpperCase();
+  let low = 0;
+  let high = words.length;
+
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    const candidate = words[middle];
+    if (candidate === undefined) {
+      return false;
+    }
+    if (candidate < wanted) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+
+  const first = words[low];
+  return first !== undefined && first.startsWith(wanted);
 }
 
 /**
@@ -193,6 +250,7 @@ export function createDictionary(artifact: DictionaryArtifact): Dictionary {
     source: artifact.source,
     size: words.length,
     isWord: (word: string) => isWord(words, word),
+    hasPrefix: (prefix: string) => hasPrefix(words, prefix),
   };
 }
 

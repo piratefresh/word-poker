@@ -200,8 +200,14 @@ function openSlots(slots: readonly Slot[], at: "private" | "community" | null): 
   });
 }
 
-/** Picks §10's target for this hand: one weighted draw over the configured counts. */
-function rollTarget(targets: SpecialTilesConfig["twoLetterTargets"], rng: () => number): number {
+/**
+ * Picks §10's target for this hand: one weighted draw over the configured counts.
+ *
+ * Exported because it is the one part of §10's placement that is decided before the pass looks
+ * at the table at all — how many two-letter tiles the hand is aiming for — and a model that
+ * samples the tiles still face down (`./equity`) rolls the same target the deal would have.
+ */
+export function rollTwoLetterTarget(targets: SpecialTilesConfig["twoLetterTargets"], rng: () => number): number {
   if (targets.length === 0) {
     return 0;
   }
@@ -237,7 +243,7 @@ function placeSequences(slots: readonly Slot[], rng: () => number, config: Speci
   }).length;
 
   const placements = Math.min(
-    rollTarget(config.twoLetterTargets, rng),
+    rollTwoLetterTarget(config.twoLetterTargets, rng),
     TWO_LETTER_TILE_LIMIT - twoLetterCount,
     config.sequencePairs.length,
   );
@@ -271,8 +277,15 @@ function placeSequences(slots: readonly Slot[], rng: () => number, config: Speci
   return displaced;
 }
 
-/** §10's fixed-sequence tile: both faces in printed order, each worth its §6 value. */
-function sequenceTile([first, second]: readonly [string, string]): SequenceTile {
+/**
+ * §10's fixed-sequence tile: both faces in printed order, each worth its §6 value.
+ *
+ * Exported because it is the shape of a tile the deal *places* rather than a bag member, and
+ * the only other place that has to build one is the model that samples the tiles still face
+ * down (`./equity`) — a second definition of the shape would be a second answer to what a
+ * sequence tile is.
+ */
+export function sequenceTile([first, second]: readonly [string, string]): SequenceTile {
   return {
     // The `-seq-` marker keeps the id out of the bag's namespace: a table may configure
     // AE or TS as a sequence pair, and `AE-1` is already the bag's choice tile.
@@ -286,10 +299,6 @@ function sequenceTile([first, second]: readonly [string, string]): SequenceTile 
 
 /**
  * Rolls §9's multiplier for every dealt tile, in deal order, one roll each.
- *
- * The roll is read as one number so the two kinds cannot both land: the bottom
- * `tripleLetterChance` of the range is a Triple Letter tile, the next band a Double Letter
- * tile, and the rest leaves the tile as it was printed.
  */
 function rollMultipliers(slots: readonly Slot[], rng: () => number, config: SpecialTilesConfig): void {
   for (const slot of slots) {
@@ -298,19 +307,35 @@ function rollMultipliers(slots: readonly Slot[], rng: () => number, config: Spec
       continue;
     }
 
-    const double = config.doubleLetterChance + (highestPoints(tile) >= HIGH_VALUE_POINTS ? config.highValueDoubleBonus : 0);
-    const roll = rng();
-    const multiplier: LetterMultiplier | undefined =
-      roll < config.tripleLetterChance
-        ? "triple-letter"
-        : roll < config.tripleLetterChance + double
-          ? "double-letter"
-          : undefined;
-
-    if (multiplier !== undefined) {
-      slot.tiles[slot.index] = { ...tile, multiplier };
-    }
+    slot.tiles[slot.index] = rollMultiplier(tile, config, rng);
   }
+}
+
+/**
+ * §9's multiplier for one tile: one roll, read as bands so the two kinds cannot both land —
+ * the bottom `tripleLetterChance` of the range is a Triple Letter tile, the next band a Double
+ * Letter tile, and the rest leaves the tile as it was printed. A high-value letter carries the
+ * extra double chance §9 allows it.
+ *
+ * Exported because a multiplier belongs to the physical tile, so anything that has to know
+ * what a face-down tile could carry rolls it the same way — the model that samples the tiles a
+ * seat cannot see (`./equity`) included. A tile whose roll lands on nothing comes back as the
+ * tile it was, not as a copy: the deal's output is a table of tiles, and a copy would make two
+ * tables' tiles the same by value and different by identity for no reason.
+ */
+export function rollMultiplier(tile: Tile, config: SpecialTilesConfig, rng: () => number): Tile {
+  const double =
+    config.doubleLetterChance +
+    (highestPoints(tile) >= HIGH_VALUE_POINTS ? config.highValueDoubleBonus : 0);
+  const roll = rng();
+  const multiplier: LetterMultiplier | undefined =
+    roll < config.tripleLetterChance
+      ? "triple-letter"
+      : roll < config.tripleLetterChance + double
+        ? "double-letter"
+        : undefined;
+
+  return multiplier === undefined ? tile : { ...tile, multiplier };
 }
 
 /**
