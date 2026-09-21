@@ -86,6 +86,9 @@ If the table is closed:
 - Raise controls cannot exceed the Table Stack.
 - All In commits the exact remaining Table Stack.
 - Side pots are created when required.
+- Each betting turn has a configurable 60-second budget by default.
+- An idle connected seat auto-checks when it owes nothing and auto-folds when it owes chips.
+- A disconnected seat auto-folds when action reaches it.
 
 ## Re-Buy
 

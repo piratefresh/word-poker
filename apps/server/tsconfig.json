@@ -9,7 +9,6 @@
     "moduleResolution": "bundler",
     "strict": true,
     "allowJs": true,
-    "strictNullChecks": false,
     "esModuleInterop": true,
     "experimentalDecorators": true,
     "skipLibCheck": true,

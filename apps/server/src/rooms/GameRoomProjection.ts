@@ -1,0 +1,264 @@
+import {
+  WAITING_PHASE,
+  type GameTableConfig,
+  type PrivateSeatState,
+  type PrivateWordState,
+} from "@wordpoker/contracts";
+import type { Tile } from "@wordpoker/contracts";
+import { buildPots, type OfflineState } from "@wordpoker/game-rules";
+
+import {
+  BettingState,
+  ComparisonState,
+  ComparisonValueState,
+  GameRoomState,
+  HandResultState,
+  PotState,
+  SeatState,
+  StackDeltaState,
+  StandingState,
+  TableConfigState,
+  TileState,
+  WordSlotState,
+  WordWindowState,
+} from "./schema/GameRoomState.js";
+
+export interface ProjectionBinding {
+  readonly playerId: string;
+  readonly seat: number;
+  readonly connected: boolean;
+  readonly tableStack: number;
+}
+
+export interface GameRoomProjectionInput {
+  readonly table: GameTableConfig;
+  readonly game: OfflineState | null;
+  readonly bindings: readonly ProjectionBinding[];
+  readonly now: number;
+}
+
+export interface PrivateStateInput {
+  readonly game: OfflineState | null;
+  readonly binding: ProjectionBinding;
+  readonly now: number;
+}
+
+/**
+ * Deep schema adapter for the room. It is the only module that knows how domain nulls, private
+ * values, and showdown data are represented by the synchronized Colyseus projection.
+ */
+export class GameRoomProjection {
+  constructor(private readonly state: GameRoomState) {}
+
+  project(input: GameRoomProjectionInput): void {
+    this.state.now = input.now;
+    this.projectTable(input);
+    this.projectSeats(input);
+    this.projectCommunity(input);
+    this.projectBetting(input);
+    this.projectPots(input);
+    this.projectWordWindow(input);
+    this.projectResult(input);
+  }
+
+  privateState(input: PrivateStateInput): PrivateSeatState {
+    const seat = input.game?.seats[input.binding.seat];
+    const activeTurn =
+      input.game?.wordWindow?.status !== "open" && input.game?.toActIndex === input.binding.seat;
+
+    return {
+      now: input.now,
+      playerId: input.binding.playerId,
+      seat: input.binding.seat,
+      tableStack: seat?.stack ?? input.binding.tableStack,
+      rack: seat?.privateTiles.map((tile) => ({ ...tile })) ?? [],
+      word: privateWordState(input.game, input.binding.playerId),
+      isYourTurn: activeTurn,
+      turnDeadline: activeTurn ? input.game?.endsAtMs ?? 0 : 0,
+    };
+  }
+
+  private projectTable(input: GameRoomProjectionInput): void {
+    const table: TableConfigState = this.state.table;
+    table.name = input.table.name;
+    table.buyIn = input.table.buyIn;
+    table.minBet = input.table.minBet;
+    table.maxSeats = input.table.maxSeats;
+
+    this.state.phase = input.game?.phase ?? WAITING_PHASE;
+    this.state.sessionOver = input.game?.sessionOver ?? false;
+    this.state.handCount = input.game?.hand ?? 0;
+    this.state.dealerSeat = input.game?.dealerSeat ?? -1;
+    this.state.toActSeat = input.game?.toActIndex ?? -1;
+    const turnOpen = input.game?.betting != null && input.game?.toActIndex != null;
+    this.state.turnDeadline = turnOpen ? input.game?.endsAtMs ?? 0 : 0;
+  }
+
+  private projectSeats(input: GameRoomProjectionInput): void {
+    this.state.seats.clear();
+    const gameById = new Map(input.game?.seats.map((seat) => [seat.id, seat]) ?? []);
+
+    for (const binding of input.bindings) {
+      const engineSeat = gameById.get(binding.playerId);
+      const seat = new SeatState();
+      seat.seat = binding.seat;
+      seat.playerId = binding.playerId;
+      seat.connected = binding.connected;
+      seat.tableStack = engineSeat?.stack ?? binding.tableStack;
+      seat.committedThisRound = engineSeat?.committedRound ?? 0;
+      seat.committedThisHand = engineSeat?.committedHand ?? 0;
+      seat.isAllIn = engineSeat?.allIn ?? false;
+      seat.hasFolded = engineSeat?.folded ?? false;
+      seat.sittingOut = engineSeat?.sittingOut ?? false;
+      seat.actedThisRound = engineSeat?.actedThisRound ?? false;
+      this.state.seats.set(binding.playerId, seat);
+    }
+  }
+
+  private projectCommunity(input: GameRoomProjectionInput): void {
+    this.state.community.splice(0, this.state.community.length);
+    const community = input.game?.community.slice(0, input.game.revealed) ?? [];
+    for (const tile of community) this.state.community.push(projectTile(tile));
+  }
+
+  private projectBetting(input: GameRoomProjectionInput): void {
+    const projection: BettingState = this.state.betting;
+    const betting = input.game?.betting;
+    projection.active = betting !== null && betting !== undefined;
+    projection.minBet = input.game?.stakes.minBet ?? input.table.minBet;
+    projection.currentBet = betting?.currentBet ?? 0;
+    projection.minRaise =
+      betting === null || betting === undefined
+        ? 0
+        : Math.max(betting.lastRaiseSize, projection.minBet);
+  }
+
+  private projectPots(input: GameRoomProjectionInput): void {
+    this.state.pots.splice(0, this.state.pots.length);
+    if (input.game === null) return;
+
+    for (const pot of buildPots(input.game.seats)) {
+      this.state.pots.push(
+        projectPot({
+          amount: pot.amount,
+          eligible: pot.eligible.map((index) => input.game?.seats[index]?.id ?? ""),
+          winners: [],
+          ranking: null,
+        }),
+      );
+    }
+  }
+
+  private projectWordWindow(input: GameRoomProjectionInput): void {
+    const projection: WordWindowState = this.state.wordWindow;
+    const window = input.game?.wordWindow;
+    projection.active = window !== null && window !== undefined;
+    projection.status = window?.status ?? "none";
+    projection.now = input.now;
+    projection.deadline =
+      window?.status === "open" || window?.status === "settled"
+        ? input.game?.endsAtMs ?? 0
+        : 0;
+    projection.slots.splice(0, projection.slots.length);
+
+    for (const slot of window?.slots ?? []) {
+      const projected = new WordSlotState();
+      projected.playerId = slot.playerId;
+      projected.status = slot.status;
+      projection.slots.push(projected);
+    }
+  }
+
+  private projectResult(input: GameRoomProjectionInput): void {
+    const projection: HandResultState = this.state.result;
+    const result = input.game?.result;
+    projection.available = result !== null && result !== undefined;
+    projection.winner = result?.winner ?? "";
+    projection.standings.splice(0, projection.standings.length);
+    projection.comparisons.splice(0, projection.comparisons.length);
+    projection.pots.splice(0, projection.pots.length);
+    projection.stackDeltas.splice(0, projection.stackDeltas.length);
+    if (result === null || result === undefined) return;
+
+    for (const standing of result.standings) {
+      const projected = new StandingState();
+      projected.playerId = standing.playerId;
+      projected.seat = standing.seat;
+      projected.score = standing.score;
+      projected.place = standing.place;
+      projected.decidedBy = standing.decidedBy;
+      projected.compared = standing.compared ?? 0;
+      projected.hasCompared = standing.compared !== null;
+      projected.word = standing.word ?? "";
+      projected.reason = standing.reason ?? "";
+      projection.standings.push(projected);
+    }
+
+    for (const comparison of result.comparisons) {
+      const projected = new ComparisonState();
+      projected.step = comparison.step;
+      projected.round = comparison.round;
+      for (const value of comparison.values) {
+        const item = new ComparisonValueState();
+        item.playerId = value.playerId;
+        item.value = value.value ?? 0;
+        item.hasValue = value.value !== null;
+        projected.values.push(item);
+      }
+      comparison.advanced.forEach((playerId) => projected.advanced.push(playerId));
+      projection.comparisons.push(projected);
+    }
+
+    for (const pot of result.payout.pots) projection.pots.push(projectPot(pot));
+    for (const delta of result.payout.stackDeltas) {
+      const projected = new StackDeltaState();
+      projected.playerId = delta.playerId;
+      projected.start = delta.start;
+      projected.end = delta.end;
+      projection.stackDeltas.push(projected);
+    }
+  }
+}
+
+function projectTile(tile: Tile): TileState {
+  const projected = new TileState();
+  projected.kind =
+    "alternativeLetter" in tile ? "choice" : "sequenceLetter" in tile ? "sequence" : "letter";
+  projected.id = tile.id;
+  projected.letter = tile.letter;
+  projected.points = tile.points;
+  projected.alternativeLetter = "alternativeLetter" in tile ? tile.alternativeLetter : "";
+  projected.alternativePoints = "alternativePoints" in tile ? tile.alternativePoints : 0;
+  projected.sequenceLetter = "sequenceLetter" in tile ? tile.sequenceLetter : "";
+  projected.sequencePoints = "sequencePoints" in tile ? tile.sequencePoints : 0;
+  projected.multiplier = tile.multiplier ?? "";
+  return projected;
+}
+
+function projectPot(pot: {
+  amount: number;
+  eligible: readonly string[];
+  winners: readonly string[];
+  ranking: unknown;
+}): PotState {
+  const projected = new PotState();
+  projected.amount = pot.amount;
+  pot.eligible.forEach((playerId) => projected.eligible.push(playerId));
+  pot.winners.forEach((playerId) => projected.winners.push(playerId));
+  projected.rankingJson = pot.ranking === null ? "" : JSON.stringify(pot.ranking);
+  return projected;
+}
+
+function privateWordState(game: OfflineState | null, playerId: string): PrivateWordState {
+  const slot = game?.wordWindow?.slots.find((candidate) => candidate.playerId === playerId);
+  if (slot === undefined) {
+    return { status: "none", draft: null, confirmed: null };
+  }
+  if (slot.status === "confirmed") {
+    return { status: "confirmed", draft: null, confirmed: slot.submission };
+  }
+  if (slot.status === "drafting") {
+    return { status: "drafting", draft: slot.draft, confirmed: null };
+  }
+  return { status: "timed-out", draft: null, confirmed: null };
+}

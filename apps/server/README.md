@@ -38,9 +38,9 @@ Two rooms are registered in `src/app.config.ts`, under the names `packages/contr
 
 - **`game`** — a table. `onCreate` validates its config with `validateRoomCreateOptions` (§2's
   fixed buy-in, §5's seat cap, a name) and throws the refusal sentence if it is not legal, which
-  is what a client's failed `create` sees. The validated config is mirrored into `GameRoomState`
-  (`name`, `buyIn`, `minBet`, `maxSeats`) so a seated client reads its own stakes, and published
-  as matchmaking metadata (`{ …config, status }`) for the lobby listing. The room is defined with
+  is what a client's failed `create` sees. The validated config is mirrored into
+  `GameRoomState.table` so a seated client reads its own stakes, while the public projection keeps
+  private racks and word drafts out of synchronized state. The room is defined with
   `defineRoom(GameRoom).enableRealtimeListing()` — without that call Colyseus never pushes its
   joins, leaves, locks or metadata changes to lobby subscribers.
 - **`lobby`** — Colyseus's own `LobbyRoom`. A client joins it once and receives `rooms` (the
@@ -51,23 +51,35 @@ Two rooms are registered in `src/app.config.ts`, under the names `packages/contr
 The desktop client of that wire lives in `apps/mobile`: `src/lib/use-lobby.ts` folds the
 messages into rows, and `src/lib/room-session.ts` creates and joins tables by id.
 
-### Turn-based
+### Authoritative hands
 
-`GameRoom` owns the turn order: `state.currentTurn` names whose turn it is, and a
-`play` message from anyone else is ignored. The room locks once it is full, and
-each turn carries a deadline — a `clock.setTimeout` skips a player who runs out
-the clock, so one idle client cannot stall the match.
+`GameRoom` is the adapter around the shared `@wordpoker/game-rules` reducer. Once the configured
+seats are present, the server deals the hand, supplies `client.sessionId` as the player id, and
+accepts only the shared `betting`, `draftWord`, and `confirmWord` messages. Illegal actions are
+sent back as a targeted `rejected` event; the public schema exposes seats, commitments, pots,
+revealed community tiles, word-window status, and the payout result.
 
-`state.turnDeadline` is stamped from `this.clock.currentTime`, the room's own
-clock, so a reconnecting client can render the remaining time without the server
-sending a countdown.
+The room sends each connection a separate `privateState` event containing that seat's rack and
+word draft. The synchronized community is sliced to the engine's revealed count, so unrevealed
+tiles never cross the public boundary. A disconnected actor is folded when its turn is reached;
+the hand does not pause for a missing client. An idle actor is auto-checked or auto-folded by the
+server's configurable turn clock, and receives a targeted `turn-timeout` rejection event.
+
+Every deadline is checked on the room's own timestep loop, so a test paces the room by choosing
+the tick. The room options are `turnDuration` (60 s default), `tickMs` (50 ms default),
+`reconnectSeconds` (180 s default), `payoutDelay` (250 ms default), and `seed` — the seed is
+honored only when `WORDPOKER_DETERMINISTIC_SEED=1`, and the default is drawn server-side. When a
+hand pays out and no second seat can pay another, the table returns to `waiting` between hands,
+holding each seat and its ended stack until the wallet and re-buy flows land (Epic B).
 
 - https://docs.colyseus.io/room/timing-events
 
 ### Reconnection
 
-`GameRoom.onDrop()` holds a dropped client's seat for 30 seconds via
-`allowReconnection()`. The SDK retries automatically with exponential backoff;
-`onReconnect()` fires if it gets back in time, `onLeave()` if it does not.
+`GameRoom.onDrop()` holds a dropped client's seat for 180 seconds via
+`allowReconnection()`, folds it when necessary, and sends a fresh private snapshot from
+`onReconnect()`. The snapshot restores the seat's private rack and draft without restarting the
+hand or its shared clock; an expired hold folds the seat out and leaves its committed chips in the
+pot.
 
 - https://docs.colyseus.io/room/reconnection

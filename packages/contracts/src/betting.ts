@@ -107,6 +107,8 @@ export const BETTING_REJECTION_REASONS = [
   "insufficient-stack",
   /** The seat has already acted since the last full raise; action is not reopened to it (§22). */
   "action-closed",
+  /** The server synthesized an action because this seat's turn clock expired (STO-395). */
+  "turn-timeout",
 ] as const;
 
 /** Why a betting action was refused. */

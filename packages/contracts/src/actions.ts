@@ -18,4 +18,8 @@ export type OfflineAction =
   | BettingAction
   | { type: "draftWord"; playerId: PlayerId; submission: WordSubmission }
   | { type: "confirmWord"; playerId: PlayerId; submission: WordSubmission }
+  /** The server's betting clock expired; clients never send this action. */
+  | { type: "timeoutTurn" }
+  /** The server folds the acting seat — a disconnected seat when action reaches it (§29); clients never send this action. */
+  | { type: "foldTurn" }
   | { type: "timeoutWords" };
