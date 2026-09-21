@@ -59,3 +59,11 @@ package-lock.json
 # working plan notes — AGENTS.md keeps work in the tracker, not in repo docs
 /plans/
 /TUTORIAL_CLIENT_SIDE_COUNTDOWN_PLAN.md
+
+# agent skills — `.agents/skills/` is the canonical project install and is
+# versioned (see skills-lock.json for sources). `npx skills add` links each
+# harness's own project directory at it, so those are generated links, not
+# source: restore them after cloning with `npx skills experimental_install`.
+/skills/
+/.claude/skills/
+/.pi/skills/
