@@ -73,9 +73,9 @@ it needs.
 
 ## E2E test user
 
-Flows behind the auth guard sign in as the shared E2E user `e2e@wordpoker.dev` / `wordpoker-e2e`, seeded
-straight into Postgres (Better Auth's own hash) by an idempotent script — rerun it whenever the password
-stops working; it resets the password and keeps the user's id:
+Flows behind the auth guard sign in as the shared E2E user `e2e@wordpoker.dev`, seeded straight into
+Postgres (Better Auth's own hash) by an idempotent script — rerun it whenever the password stops working;
+it resets the password and keeps the user's id:
 
 ```bash
 node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
@@ -87,6 +87,44 @@ session in Maestro's Chrome profile; a headless run starts on a fresh profile ev
 need a session compose the sign-in conditionally — `offline-hand.yaml` shows the pattern. Non-UI agents
 don't need the browser at all: `POST /api/auth/sign-in/email` with the same JSON credentials returns the
 session cookie.
+
+The password is the default in that seed script, and it is deliberately not written here: this file is
+injected into every session's system prompt, and omp's secret obfuscator (`.omp/secrets.yml`, enabled by
+`.omp/config.yml`) leaves static prompt text alone. Take it from `.maestro/sign-in.yaml` — a read is
+provider-visible text, so a session sees a `$$…$$` placeholder where the password sits, and a tool
+argument carrying that placeholder is restored locally before it runs.
+
+# End-to-end (native)
+
+The same offline hand also runs as a device flow: `apps/mobile/.maestro/native/offline-hand.yaml`
+(`appId:`, a `wordpoker://offline?seed=…` deep link instead of a URL, and the ids and labels a
+device's accessibility tree exposes). It sits beside `eas.json` because that is the working directory
+an EAS workflow job gets — a job's paths resolve from there, not from the repository root.
+
+The build under test is eas.json's `e2e-test` profile: an .apk for Android, a simulator .app for
+iOS, and `EXPO_PUBLIC_E2E_AUTH_BYPASS=1`. The table lives behind the sign-in guard and a device has
+no auth server to reach, so that flag makes the guard take the seat as signed in
+(`apps/mobile/src/lib/e2e.ts`). Never set it outside that profile — a build with it boots past the
+guard. Nothing else is missing on a device: the dictionary ships in the bundle, the bots run
+in-process, and the seed is the whole of the table's randomness.
+
+```bash
+cd apps/mobile
+eas build --platform android --profile e2e-test    # or --platform ios
+eas build:run --platform android --latest          # installs it on a booted emulator/device
+maestro test --platform android .maestro/native/offline-hand.yaml
+```
+
+Android wants a booted emulator or an adb-visible device; `--platform ios` needs a Mac with a
+Simulator. The flow takes the action row by testID (`action-check-call`, `action-wager`) — the felt's
+nameplates print CHECK and CALL as seat status too, so a text selector there is ambiguous — and
+everything else by the string a component prints, matched whole and case-sensitively, unlike the web.
+
+EAS Workflows can run these flows on its own emulator and simulator — a `maestro` job with
+`flow_path: .maestro/native` behind the `e2e-test` profile, as the Expo E2E example shows — but that
+job type and the workers it needs (`linux-*-nested-virtualization` for Android, `macos-*` for iOS)
+require a paid Expo plan on this account (September 2026), so no workflow file is checked in. Add
+one when that changes; trigger it from an `e2e` label on a pull request, or by hand.
 
 # Game rules spec
 
