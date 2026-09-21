@@ -91,9 +91,6 @@ export function useLobby(): LobbyView {
       setRooms((current) => current.filter((row) => row.roomId !== roomId));
     };
 
-    setStatus("loading");
-    setError(undefined);
-
     gameClient
       .joinOrCreate(LOBBY_ROOM_NAME)
       .then((joined) => {
@@ -130,6 +127,8 @@ export function useLobby(): LobbyView {
       return;
     }
     // The subscription is gone, so the retry is a fresh one.
+    setStatus("loading");
+    setError(undefined);
     setAttempt((current) => current + 1);
   }, []);
 

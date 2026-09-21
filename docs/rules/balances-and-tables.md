@@ -53,6 +53,7 @@ There are:
 - No custom buy-ins
 - No minimum-to-maximum buy-in ranges
 - No buy-in slider
+- An opening minimum bet derived as 2% of the fixed buy-in (10, 100, or 1,000 Coins)
 - No forced blinds
 
 ## Example Tables

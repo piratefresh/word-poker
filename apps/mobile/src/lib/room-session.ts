@@ -70,7 +70,9 @@ interface TableState {
 }
 
 let view: RoomSessionView = { status: "idle" };
-let held: Room | null = null;
+/** Rooms this device still owns. Creating a table may add a second room without dropping the first. */
+const heldRooms = new Map<string, Room>();
+let activeRoomId: string | null = null;
 const listeners = new Set<() => void>();
 
 /**
@@ -147,24 +149,27 @@ function hold(room: Room, taken: number) {
   }
 
   inFlight = null;
-  held = room;
+  heldRooms.set(room.roomId, room);
+  activeRoomId = room.roomId;
   // The room's state lands a round trip after the seat does, so this first publish carries no
   // table: a screen waits in its seated-but-empty state until the first patch names one.
   publish({ status: "seated", roomId: room.roomId });
 
   room.onStateChange((state) => {
-    if (held !== room) return;
+    if (activeRoomId !== room.roomId || heldRooms.get(room.roomId) !== room) return;
     publish({ status: "seated", roomId: room.roomId, table: tableOf(state) });
   });
 
   room.onLeave(() => {
-    if (held !== room) return;
-    held = null;
+    if (heldRooms.get(room.roomId) !== room) return;
+    heldRooms.delete(room.roomId);
+    if (activeRoomId !== room.roomId) return;
+    activeRoomId = null;
     publish({ status: "lost", roomId: room.roomId, error: "You're no longer at that table." });
   });
 
   room.onError((code, message) => {
-    if (held !== room) return;
+    if (heldRooms.get(room.roomId) !== room) return;
     console.warn("[room-session] room error", code, message);
   });
 }
@@ -174,14 +179,33 @@ function hold(room: Room, taken: number) {
  * and the request that owns it can never be observed half-given-up. Returns the room whose leave
  * still has to make its round trip; the caller decides whether to wait on it.
  */
-function giveUp(): Room | null {
-  const room = held;
-  held = null;
+function giveUp(): Room[] {
+  const rooms = [...heldRooms.values()];
+  heldRooms.clear();
+  activeRoomId = null;
   // A request still in the air belongs to a device that has moved on: it gives its seat back on
   // arrival (`hold`) rather than holding one this release meant to give up.
   attempt++;
   inFlight = null;
   publish({ status: "idle" });
+  return rooms;
+}
+
+/** Give up one named room, preserving any other table created by this device. */
+function giveUpRoom(roomId: string): Room | null {
+  const room = heldRooms.get(roomId) ?? null;
+  if (room !== null) heldRooms.delete(roomId);
+
+  if (inFlight?.roomId === roomId) {
+    attempt++;
+    inFlight = null;
+  }
+
+  if (activeRoomId === roomId) {
+    activeRoomId = null;
+    publish({ status: "idle" });
+  }
+
   return room;
 }
 
@@ -201,8 +225,8 @@ export function useRoomSession(): RoomSessionView {
 export function useActiveRoomId(): string | null {
   return useSyncExternalStore(
     subscribe,
-    () => (view.status === "seated" ? (view.roomId ?? null) : null),
-    () => (view.status === "seated" ? (view.roomId ?? null) : null),
+    () => (view.status === "seated" ? activeRoomId : null),
+    () => (view.status === "seated" ? activeRoomId : null),
   );
 }
 
@@ -212,19 +236,18 @@ export function useActiveRoomId(): string | null {
  * the table. A refusal from the server rejects with the sentence it refused with (§2's config).
  */
 export async function createTable(options: GameRoomCreateOptions): Promise<string> {
-  // The claim is taken in the same tick as the release: a request that arrives while this one is
-  // in the air has to find it, and the leaving of the old room is a round trip of its own.
-  const previous = giveUp();
+  // Creating is intentionally additive: STO-400 allows a seated player to open another table.
+  // Claiming still invalidates an older in-flight request, whose room will be returned by `hold`.
   const taken = claim(null);
   publish({ status: "joining" });
-  await previous?.leave();
 
   try {
     const room = await gameClient.create(GAME_ROOM_NAME, options);
     hold(room, taken);
     return room.roomId;
   } catch (error) {
-    if (taken === attempt) inFlight = null;
+    if (taken !== attempt) throw error;
+    inFlight = null;
     const message = createFailure(error);
     console.warn("[room-session] create failed", message);
     publish({ status: "error", error: message });
@@ -249,13 +272,14 @@ export async function joinTable(roomId: string): Promise<void> {
   const previous = giveUp();
   const taken = claim(roomId);
   publish({ status: "joining", roomId });
-  await previous?.leave();
+  await Promise.all(previous.map((room) => room.leave()));
 
   try {
     const room = await gameClient.joinById(roomId);
     hold(room, taken);
   } catch (error) {
-    if (taken === attempt) inFlight = null;
+    if (taken !== attempt) throw error;
+    inFlight = null;
     const message = joinFailure(error);
     console.warn("[room-session] join failed", roomId, message);
     publish({ status: "error", roomId, error: message });
@@ -264,6 +288,10 @@ export async function joinTable(roomId: string): Promise<void> {
 }
 
 /** Leave the table and give up the seat; the room disposes itself once the last seat goes. */
-export async function leaveTable(): Promise<void> {
-  await giveUp()?.leave();
+export async function leaveTable(roomId?: string): Promise<void> {
+  const rooms =
+    roomId === undefined
+      ? giveUp()
+      : [giveUpRoom(roomId)].filter((room): room is Room => room !== null);
+  await Promise.all(rooms.map((room) => room.leave()));
 }

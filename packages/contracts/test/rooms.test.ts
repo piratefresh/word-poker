@@ -106,6 +106,7 @@ describe("isGameRoomMetadata", () => {
       { minBet: 100, status: "waiting" },
       { ...published, status: "lobby" },
       { ...published, buyIn: 1_234 },
+      { ...published, minBet: 20 },
       { ...published, status: undefined },
     ]) {
       assert.strictEqual(isGameRoomMetadata(value), false, JSON.stringify(value));

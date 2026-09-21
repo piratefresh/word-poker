@@ -121,7 +121,7 @@ export function SeatedScreen() {
     if (leavingOnce.current) return;
     leavingOnce.current = true;
     setLeaving(true);
-    void leaveTable().finally(toLobby);
+    void leaveTable(roomId).finally(toLobby);
   };
 
   // A seat held at some other table is not this table's face — the join above is what moves it.

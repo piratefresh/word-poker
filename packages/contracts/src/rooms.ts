@@ -138,6 +138,7 @@ export function isGameRoomMetadata(value: unknown): value is GameRoomMetadata {
     candidate.name.length > 0 &&
     isBuyInPreset(candidate.buyIn) &&
     typeof candidate.minBet === "number" &&
+    candidate.minBet === minBetFor(candidate.buyIn) &&
     typeof candidate.maxSeats === "number" &&
     isRoomPhase(candidate.status)
   );

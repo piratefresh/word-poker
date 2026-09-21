@@ -5,7 +5,7 @@ import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { DarkTheme, router, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -15,6 +15,7 @@ import {
   destinationFromURL,
   rememberDestination,
   takeDestination,
+  type Destination,
 } from '@/lib/pending-destination';
 import { leaveTable } from '@/lib/room-session';
 
@@ -89,11 +90,22 @@ function DeepLinks({ session, children }: { session: boolean; children: ReactNod
   // The launch URL is the app's own; only the first run may read it, or a later session change
   // would re-follow the link the device was already started with.
   const launchRead = useRef(false);
+  const initialConsumed = useRef(false);
+  const [initialDestination, setInitialDestination] = useState<Destination | null>(null);
 
   useEffect(() => {
-    let live = true;
+    if (!launchRead.current) {
+      launchRead.current = true;
+      // Do not cancel this promise when auth changes: a signed-out launch can resolve after the
+      // user signs in, and the current session must decide whether it is routed or remembered.
+      void Linking.getInitialURL()
+        .then((url) => setInitialDestination(destinationFromURL(url) ?? null))
+        .catch(() => {});
+    }
+  }, []);
 
-    const arrive = (url: string | null) => {
+  useEffect(() => {
+    const arriving = Linking.addEventListener('url', ({ url }) => {
       const destination = destinationFromURL(url);
       if (!destination) return;
       if (session) {
@@ -101,20 +113,8 @@ function DeepLinks({ session, children }: { session: boolean; children: ReactNod
         return;
       }
       rememberDestination(destination);
-    };
-
-    if (!launchRead.current) {
-      launchRead.current = true;
-      void Linking.getInitialURL().then((url) => {
-        if (live) arrive(url);
-      });
-    }
-
-    const arriving = Linking.addEventListener('url', ({ url }) => arrive(url));
-    return () => {
-      live = false;
-      arriving.remove();
-    };
+    });
+    return () => arriving.remove();
   }, [session]);
 
   // Signed out, the seat is not a seat: the guarded routes are unreachable until someone signs in
@@ -125,12 +125,15 @@ function DeepLinks({ session, children }: { session: boolean; children: ReactNod
     void leaveTable();
   }, [session]);
 
-  // Signed in: land on whatever link was waiting for a session, once.
+  // Signed in: land on whatever link was waiting for a session, once. The launch URL is kept in
+  // state until it resolves, so auth can finish before Linking answers without losing the route.
   useEffect(() => {
-    if (!session) return;
-    const destination = takeDestination();
-    if (destination) router.replace(destination);
-  }, [session]);
+    if (!session || initialConsumed.current) return;
+    const destination = takeDestination() ?? initialDestination;
+    if (!destination) return;
+    initialConsumed.current = true;
+    router.replace(destination);
+  }, [initialDestination, session]);
 
   return children;
 }

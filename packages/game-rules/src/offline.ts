@@ -247,7 +247,8 @@ export interface StartHandOptions {
   };
   /**
    * The table's betting settings. Absent means `DEFAULT_STAKES`: a 20-chip minimum bet and a
-   * 1,000-chip starting stack — settings, not buried literals (ADR 0001, ADR 0002).
+   * 1,000-chip starting stack — settings, not buried literals. Online room stakes are derived
+   * from the room buy-in instead (ADR 0001, ADR 0002).
    */
   stakes?: Partial<Stakes & { startingStack: number }>;
   /**

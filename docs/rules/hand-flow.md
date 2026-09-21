@@ -35,7 +35,8 @@ The offline game plays one hand on the client, with no server in the loop:
 - Each street runs a **real betting round** (§15, §22–§23): seats fold, check, bet, call,
   raise or shove, and the street rolls only when the round closes. Betting is from the Table
   Stack alone; the offline table seats every player on a fixed 1,000-chip stack with a
-  20-chip minimum bet (ADR 0002), and hands carry their stacks into the next hand.
+  20-chip minimum bet, while an online table derives its minimum as 2% of its fixed buy-in
+  (ADR 0001), and hands carry their stacks into the next hand.
 - The river's round closes into **Word Building** (§19) instead of paying out: every seat
   still in the hand shares one 60-second window to draft and confirm a word, and the hand
   pays out once every seat has confirmed or run out of time.

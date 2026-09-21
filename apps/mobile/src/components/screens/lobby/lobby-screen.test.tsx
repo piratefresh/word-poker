@@ -181,7 +181,12 @@ test("lists a table with the stakes, the seats and the state a player picks it b
     table("beta", {
       clients: 6,
       maxClients: 6,
-      metadata: { ...table("beta").metadata, name: "High rollers", buyIn: 50_000 },
+      metadata: {
+        ...table("beta").metadata,
+        name: "High rollers",
+        buyIn: 50_000,
+        minBet: 1_000,
+      },
     }),
   ]);
 
