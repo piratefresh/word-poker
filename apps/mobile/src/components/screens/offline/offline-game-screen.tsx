@@ -96,6 +96,9 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
           bettingLeading={<WordShuffleButton />}
           game={game}
           onAllIn={allIn}
+          // The felt's wager control names its own action, so the engine actions line up with
+          // it one to one: BET opens the round, RAISE answers it (§22).
+          onBet={bet}
           onCheckOrCall={checkOrCall}
           onChipFlightEnd={endChipFlight}
           onFold={fold}
