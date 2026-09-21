@@ -161,6 +161,10 @@ The five triage roles keep their own names; the category roles map `bug` → `Bu
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root.
 See `docs/agents/domain.md`.
 
+# Code style
+
+Follow [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md) across the monorepo.
+
 # Workspace architecture
 
 pnpm monorepo: `apps/*` (deployables) + `packages/*` (shared libs). Apps today:

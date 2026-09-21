@@ -19,6 +19,8 @@ from the right-hand column — Linear's are capitalised where the role isn't.
 
 Every triaged issue carries exactly one category role and one state role.
 
-The team's other labels — `Feature`, `frontend`, `Backend`, `UI`, `tutorial`, `powerups` —
-describe the work rather than its triage state. A ticket carrying one of them still gets a
-category and a state role.
+The team's other labels — `Feature`, `frontend`, `Backend`, `UI`, `tutorial`, `powerups`,
+`Refactor` — describe the work rather than its triage state. A ticket carrying one of them
+still gets a category and a state role. `Refactor` marks internal restructuring: the
+behaviour is expected to be unchanged, so a ticket carrying it that changes behaviour is
+mislabelled.
