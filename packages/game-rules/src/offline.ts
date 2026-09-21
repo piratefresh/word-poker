@@ -59,10 +59,10 @@ import { scoreWord } from "./scoring";
 import { DRAW_SEED_SALT, rankShowdown } from "./showdown";
 
 /**
- * How long a seat's betting turn lasts on the injected clock. The server gives a betting
- * round 30 seconds, so an offline turn is handed the same budget.
+ * How long a seat's betting turn lasts on the injected clock. Online and offline use the same
+ * one-minute budget.
  */
-export const OFFLINE_TURN_MS = 30_000;
+export const OFFLINE_TURN_MS = 60_000;
 
 /**
  * How long §19's word window stays open. One clock for the whole table: the rules give the
@@ -187,6 +187,7 @@ export interface OfflineState {
   toActIndex: number | null;
   /** When the current turn's clock runs out, or when §19's window closes, on the caller's timeline. */
   endsAtMs: number;
+  turnDurationMs: number;
   /**
    * The seat holding the dealer button: turn order starts at the first live seat clockwise
    * from it, and it steps one seat per completed hand. No blinds ride on it (ADR 0001).
@@ -258,6 +259,7 @@ export interface StartHandOptions {
   stacks?: readonly { playerId: PlayerId; stack: number }[];
   /** The seat holding the dealer button. Absent means seat 0, the first hand's button. */
   dealerSeat?: number;
+  turnDurationMs?: number;
 }
 
 /**
@@ -329,7 +331,12 @@ export function startHand({
   stakes,
   stacks,
   dealerSeat,
+  turnDurationMs: requestedTurnDurationMs,
 }: StartHandOptions): OfflineState {
+  const turnDurationMs = requestedTurnDurationMs ?? OFFLINE_TURN_MS;
+  if (!Number.isFinite(turnDurationMs) || turnDurationMs <= 0) {
+    throw new OfflineActionError("the betting turn duration must be positive");
+  }
   const dealt = dealHand({ seed, playerCount: players.length });
   const startingStack = stakes?.startingStack ?? DEFAULT_STAKES.startingStack;
   const carried = new Map((stacks ?? []).map((entry) => [entry.playerId, entry.stack]));
@@ -375,7 +382,8 @@ export function startHand({
     community: dealt.community,
     revealed: revealedCount("preflop"),
     toActIndex,
-    endsAtMs: nowMs + OFFLINE_TURN_MS,
+    endsAtMs: nowMs + turnDurationMs,
+    turnDurationMs,
     dealerSeat: button,
     betting: { currentBet: 0, lastRaiseSize: 0 },
     sessionOver: false,
@@ -410,6 +418,12 @@ export function reduce(state: OfflineState, action: OfflineAction, nowMs: number
     case "timeoutWords":
       return timeoutWords(state, nowMs);
 
+    case "timeoutTurn":
+      return timeoutTurn(state, nowMs);
+
+    case "foldTurn":
+      return foldTurn(state, nowMs);
+
     case "fold":
     case "check":
     case "bet":
@@ -421,11 +435,19 @@ export function reduce(state: OfflineState, action: OfflineAction, nowMs: number
 }
 
 /** Applies one betting action to the open round, or refuses it with a named reason. */
-function applyBetting(state: OfflineState, action: BettingAction, nowMs: number): OfflineState {
+function applyBetting(
+  state: OfflineState,
+  action: BettingAction,
+  nowMs: number,
+  allowExpired = false,
+): OfflineState {
   const round = state.betting;
   if (round === null || state.toActIndex === null) {
     // No round is open: the seats are building words, or the hand has paid out (§19, §26).
     throw new BettingRejectionError("hand-over");
+  }
+  if (!allowExpired && nowMs >= state.endsAtMs) {
+    throw new BettingRejectionError("turn-timeout");
   }
 
   const applied = applyBettingAction(state.seats, round, state.toActIndex, action, state.stakes.minBet);
@@ -440,7 +462,7 @@ function applyBetting(state: OfflineState, action: BettingAction, nowMs: number)
       seats: step.seats,
       betting: step.round,
       toActIndex: step.toAct,
-      endsAtMs: nowMs + OFFLINE_TURN_MS,
+      endsAtMs: nowMs + state.turnDurationMs,
     };
   }
 
@@ -449,6 +471,43 @@ function applyBetting(state: OfflineState, action: BettingAction, nowMs: number)
   }
 
   return rollStreets({ ...state, seats: step.seats, betting: step.round }, nowMs);
+}
+
+/** Apply the server-owned deadline action to the current betting actor. */
+function timeoutTurn(state: OfflineState, nowMs: number): OfflineState {
+  if (state.betting === null || state.toActIndex === null) {
+    throw new OfflineActionError(`no betting turn is open at ${where(state)}`);
+  }
+  if (nowMs < state.endsAtMs) {
+    throw new OfflineActionError(
+      `the betting turn still has ${state.endsAtMs - nowMs}ms to run`,
+    );
+  }
+
+  const actor = state.seats[state.toActIndex];
+  if (actor === undefined) {
+    throw new OfflineActionError("the betting turn names no seat");
+  }
+
+  const action: BettingAction =
+    actor.committedRound === state.betting.currentBet
+      ? { type: "check", playerId: actor.id }
+      : { type: "fold", playerId: actor.id };
+  return applyBetting(state, action, nowMs, true);
+}
+
+/** §29's server-owned fold of the acting seat. The seat is not there to act, so the turn's
+ * deadline cannot make the fold illegal — unlike a voluntary fold, this is legal at any point
+ * of the clock, including after it has run out. */
+function foldTurn(state: OfflineState, nowMs: number): OfflineState {
+  if (state.betting === null || state.toActIndex === null) {
+    throw new OfflineActionError(`no betting turn is open at ${where(state)}`);
+  }
+  const actor = state.seats[state.toActIndex];
+  if (actor === undefined) {
+    throw new OfflineActionError("the betting turn names no seat");
+  }
+  return applyBetting(state, { type: "fold", playerId: actor.id }, nowMs, true);
 }
 
 /** Opens the next street's betting round: the commits and acted flags start over. */
@@ -480,7 +539,7 @@ function rollStreets(state: OfflineState, nowMs: number): OfflineState {
     };
 
     if (next.toActIndex !== null) {
-      return { ...next, endsAtMs: nowMs + OFFLINE_TURN_MS };
+      return { ...next, endsAtMs: nowMs + next.turnDurationMs };
     }
   }
 
@@ -820,6 +879,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     dictionary: state.dictionary,
     wordBuilding: { autoSubmitDrafts: state.autoSubmitDrafts },
     stakes: { minBet: state.stakes.minBet },
+    turnDurationMs: state.turnDurationMs,
   });
 
   return { ...fresh, hand: state.hand + 1 };

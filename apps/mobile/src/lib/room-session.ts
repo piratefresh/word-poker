@@ -61,12 +61,14 @@ export interface RoomSessionView {
 
 /** The slice of the room's synced state the session reads. The schema lives on the server. */
 interface TableState {
-  name: string;
-  buyIn: number;
-  minBet: number;
-  maxSeats: number;
+  table: {
+    name: string;
+    buyIn: number;
+    minBet: number;
+    maxSeats: number;
+  };
   phase: RoomPhase;
-  players: { size: number };
+  seats: { size: number };
 }
 
 let view: RoomSessionView = { status: "idle" };
@@ -108,11 +110,11 @@ function subscribe(listener: () => void): () => void {
 function tableOf(state: unknown): TableSnapshot {
   const table = state as TableState;
   return {
-    name: table.name,
-    buyIn: table.buyIn,
-    minBet: table.minBet,
-    maxSeats: table.maxSeats,
-    seats: table.players.size,
+    name: table.table.name,
+    buyIn: table.table.buyIn,
+    minBet: table.table.minBet,
+    maxSeats: table.table.maxSeats,
+    seats: table.seats.size,
     phase: table.phase,
   };
 }

@@ -1,40 +1,132 @@
-import { Room, Client, CloseCode, Delayed, ErrorCode, ServerError } from "colyseus";
+import { randomInt } from "node:crypto";
+
+import { Client, CloseCode, ErrorCode, Room, ServerError } from "colyseus";
 import {
-  ROUND_PHASES,
+  GAME_EVENTS,
+  GAME_MESSAGES,
   WAITING_PHASE,
+  isGameMessagePayload,
   minBetFor,
   validateRoomCreateOptions,
+  type GameRejectionEvent,
   type GameRoomMetadata,
+  type GameTableConfig,
+  type OfflineAction,
+  type OnlineBettingAction,
   type RoomPhase,
-  type RoundPhase,
 } from "@wordpoker/contracts";
-import { GameRoomState, Player } from "./schema/GameRoomState.js";
+import {
+  BettingRejectionError,
+  OfflineActionError,
+  WordRejectionError,
+  OFFLINE_TURN_MS,
+  loadDictionary,
+  type Dictionary,
+} from "@wordpoker/game-rules";
 
-/** How long each betting round lasts before the clock advances the table. */
-const DEFAULT_ROUND_DURATION = 30_000;
+import {
+  AuthoritativeGame,
+  type AuthoritativePlayer,
+} from "./AuthoritativeGame.js";
+import {
+  GameRoomProjection,
+  type ProjectionBinding,
+} from "./GameRoomProjection.js";
+import { GameRoomState } from "./schema/GameRoomState.js";
 
-/** A table's config without its live status — settled once, at create, and never again. */
-type TableConfig = Omit<GameRoomMetadata, "status">;
+const DEFAULT_RECONNECT_SECONDS = 180;
+const DEFAULT_PAYOUT_DELAY_MS = 250;
+const HOLD_RECHECK_MS = 1_000;
 
+type TableConfig = GameTableConfig;
+
+interface SeatBinding {
+  readonly playerId: string;
+  readonly seat: number;
+  client: Client;
+  connected: boolean;
+  present: boolean;
+  tableStack: number;
+}
+
+interface RoomKnobs {
+  seed?: unknown;
+  payoutDelay?: unknown;
+  turnDuration?: unknown;
+  reconnectSeconds?: unknown;
+  tickMs?: unknown;
+}
+
+/** Colyseus lifecycle coordinator for one authoritative table. */
 export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMetadata }> {
   state = new GameRoomState();
 
-  /** Per-room so tests can run the phases through in milliseconds. */
-  private roundDuration = DEFAULT_ROUND_DURATION;
-  private roundTimeout?: Delayed;
-
-  /** What the table was created with; §2's stakes are fixed for the table's whole life. */
+  private dictionary!: Dictionary;
   private table!: TableConfig;
+  private engine?: AuthoritativeGame;
+  private readonly bindings = new Map<string, SeatBinding>();
+  private readonly projection = new GameRoomProjection(this.state);
+  private seed = 1;
+  private turnDuration = OFFLINE_TURN_MS;
+  private reconnectSeconds = DEFAULT_RECONNECT_SECONDS;
+  private payoutDelay = DEFAULT_PAYOUT_DELAY_MS;
+  private tickMs = 50;
+  private payoutReadyAtMs: number | null = null;
 
-  /**
-   * A table is created with its config: §2's fixed buy-in, §5's seat cap, a name. The options are
-   * checked here with the same validator the client's form runs, so the create either makes a
-   * table §2 allows or fails — and a failure throws while `create` is still in flight, which is
-   * what hands the form the refusal sentence rather than an unconfigured room.
-   */
-  onCreate(rawOptions: unknown) {
-    // `in` rather than `!validation.ok`: the server compiles with strictNullChecks off, where
-    // boolean discriminants stop narrowing.
+  private get game() {
+    return this.engine?.state ?? null;
+  }
+
+  private get authoritative(): AuthoritativeGame {
+    if (this.engine === undefined) {
+      throw new Error("the room has not initialized its game engine");
+    }
+    return this.engine;
+  }
+
+  private now(): number {
+    return this.clock.currentTime;
+  }
+
+  messages = {
+    [GAME_MESSAGES.betting]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.betting, payload)) return;
+
+      const action: OfflineAction = {
+        ...payload,
+        playerId: client.sessionId,
+      } as OnlineBettingAction & { playerId: string };
+      this.apply(client, action, "betting");
+    },
+    [GAME_MESSAGES.draftWord]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.draftWord, payload)) return;
+
+      this.apply(
+        client,
+        {
+          type: "draftWord",
+          playerId: client.sessionId,
+          submission: payload.submission,
+        },
+        "draftWord",
+      );
+    },
+    [GAME_MESSAGES.confirmWord]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.confirmWord, payload)) return;
+
+      this.apply(
+        client,
+        {
+          type: "confirmWord",
+          playerId: client.sessionId,
+          submission: payload.submission,
+        },
+        "confirmWord",
+      );
+    },
+  };
+
+  async onCreate(rawOptions: unknown) {
     const validation = validateRoomCreateOptions(rawOptions);
     if ("refusal" in validation) {
       throw new ServerError(ErrorCode.APPLICATION_ERROR, validation.refusal.message);
@@ -43,116 +135,416 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     const { name, buyIn, maxSeats } = validation.options;
     this.table = { name, buyIn, minBet: minBetFor(buyIn), maxSeats };
     this.maxClients = maxSeats;
+    this.dictionary = await loadDictionary();
 
-    // The same config, mirrored into synced state: a joined client renders its own table's
-    // stakes without a second source (the matchmaking listing is for players who have not sat).
-    this.state.name = name;
-    this.state.buyIn = buyIn;
-    this.state.minBet = this.table.minBet;
-    this.state.maxSeats = maxSeats;
-
-    // The round clock is a test knob, not a create option: a client that could set it could skip
-    // every timer, so only a development server reads it.
-    const knob = (rawOptions ?? {}) as { roundDuration?: unknown };
-    if (process.env.NODE_ENV !== "production" && typeof knob.roundDuration === "number") {
-      this.roundDuration = knob.roundDuration;
-    }
-
-    this.publishPhase();
-  }
-
-  onJoin(client: Client, options: unknown) {
-    console.log(client.sessionId, "joined!", options);
-    this.state.players.set(client.sessionId, new Player());
-
-    // The matchmaker locks a room the moment its last seat goes (Colyseus's own client count) and
-    // unlocks it when one frees, which is the listing the lobby draws §3's full tables from. This
-    // room adds nothing to that, and an explicit lock would outlive the fullness that caused it.
-    if (this.state.players.size === this.maxClients) {
-      this.startHand();
-    }
-  }
-
-  onLeave(client: Client, code: CloseCode) {
-    console.log(client.sessionId, "left!", code);
-    this.state.players.delete(client.sessionId);
-
-    // A round with an empty seat has nobody to play it, so stop counting down and wait
-    // for the table to fill again rather than running the clock past a missing player.
-    if (this.state.players.size < this.maxClients) {
-      this.pause();
-    }
-  }
-
-  onDispose() {
-    console.log("room", this.roomId, "disposing...");
-  }
-
-  /** Deal a fresh hand: back to the first betting round, and count from there. */
-  private startHand() {
-    this.state.handCount++;
-    this.enterPhase(ROUND_PHASES[0]);
-  }
-
-  /** Hand the table to the next betting round, dealing a new hand once past the last. */
-  private advancePhase() {
-    const current = ROUND_PHASES.indexOf(this.state.phase as RoundPhase);
-    const next = current + 1;
-    if (next >= ROUND_PHASES.length) {
-      this.startHand();
+    const knobs = (rawOptions ?? {}) as RoomKnobs;
+    if (
+      process.env.WORDPOKER_DETERMINISTIC_SEED === "1" &&
+      typeof knobs.seed === "number" &&
+      Number.isSafeInteger(knobs.seed)
+    ) {
+      this.seed = knobs.seed;
     } else {
-      this.enterPhase(ROUND_PHASES[next]);
+      this.seed = randomSeed();
+    }
+    if (
+      typeof knobs.payoutDelay === "number" &&
+      Number.isFinite(knobs.payoutDelay) &&
+      knobs.payoutDelay >= 0
+    ) {
+      this.payoutDelay = knobs.payoutDelay;
+    }
+    if (
+      typeof knobs.turnDuration === "number" &&
+      Number.isFinite(knobs.turnDuration) &&
+      knobs.turnDuration > 0
+    ) {
+      this.turnDuration = knobs.turnDuration;
+    }
+    if (
+      typeof knobs.reconnectSeconds === "number" &&
+      Number.isFinite(knobs.reconnectSeconds) &&
+      knobs.reconnectSeconds > 0
+    ) {
+      this.reconnectSeconds = knobs.reconnectSeconds;
+    }
+    if (typeof knobs.tickMs === "number" && Number.isFinite(knobs.tickMs) && knobs.tickMs > 0) {
+      this.tickMs = knobs.tickMs;
+    }
+
+    this.engine = new AuthoritativeGame({
+      seed: this.seed,
+      dictionary: this.dictionary,
+      minBet: this.table.minBet,
+      turnDurationMs: this.turnDuration,
+    });
+    this.setTimestep(() => this.onTick(), this.tickMs);
+    this.project();
+    this.publishPhase();
+  }
+
+  onJoin(client: Client, _options: unknown) {
+    if (this.game !== null) {
+      throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table is mid-hand; join the next hand");
+    }
+
+    const seat = firstFreeSeat(this.bindings, this.maxClients);
+    if (seat === null) {
+      throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table has no free seat");
+    }
+
+    // Seats are anonymous: any client that joins becomes a seat keyed by its `sessionId`.
+    // There is no `onAuth`/identity until Epic B, so a seat is a connection.
+    this.bindings.set(client.sessionId, {
+      playerId: client.sessionId,
+      seat,
+      client,
+      connected: true,
+      present: true,
+      tableStack: this.table.buyIn,
+    });
+    this.project();
+
+    if (this.presentBindings().length === this.maxClients && this.game === null) {
+      this.startFirstHand();
+    }
+
+    if (this.game === null) {
+      this.sendPrivateStateLater(client);
     }
   }
 
-  /** Enter a phase and (re)arm the round clock against it. */
-  private enterPhase(phase: RoundPhase) {
-    this.roundTimeout?.clear();
-    this.state.phase = phase;
-    this.state.roundDeadline = this.clock.currentTime + this.roundDuration;
-    this.roundTimeout = this.clock.setTimeout(() => this.advancePhase(), this.roundDuration);
-    this.publishPhase();
-  }
+  onDrop(client: Client, _code: CloseCode) {
+    const binding = this.bindings.get(client.sessionId);
+    if (binding === undefined) return;
 
-  /** Stop the clock and return to waiting — used when the table drops below full. */
-  private pause() {
-    this.roundTimeout?.clear();
-    this.roundTimeout = undefined;
-    this.state.phase = WAITING_PHASE;
-    this.state.roundDeadline = 0;
-    this.publishPhase();
-  }
+    binding.connected = false;
+    this.project();
+    // Keep the seat's current turn alive during the reconnect hold. If the dropped seat is still
+    // to act when its deadline expires, the room's tick folds it; reconnecting before then
+    // restores the same rack, draft, seat, and remaining clock.
 
-  /**
-   * Publish the table's lobby card: its config plus the phase it is in, so a list row can read
-   * §3's waiting / in-hand without joining. Colyseus replaces metadata rather than merging it, so
-   * the whole object is sent every time; seat counts are absent on purpose, since the listing
-   * already carries `clients` / `maxClients` and the matchmaker pushes them as seats fill.
-   */
-  private publishPhase() {
-    const metadata: GameRoomMetadata = { ...this.table, status: this.state.phase as RoomPhase };
-
-    // Deliberately not awaited: the listing is a mirror of the table, and a store hiccup must not
-    // fail a join or stall the round clock that triggered the publish.
-    this.setMatchmaking({ metadata }).catch((error: unknown) => {
-      console.warn("room", this.roomId, "could not publish its metadata", error);
+    this.allowReconnection(client, this.reconnectSeconds).catch(() => {
+      // Colyseus routes expiry to onLeave; room shutdown can reject this promise.
     });
   }
 
-  /**
-   * Called on any disconnection the client did not ask for — a network blip, a
-   * suspended tab, a tunnel change. Holding the seat lets the SDK retry into the
-   * same session, so the player keeps their entity and their place in the room.
-   */
-  onDrop(client: Client, code: CloseCode) {
-    // Deliberately not awaited: the framework routes the outcome to onReconnect()
-    // or onLeave() by itself. The catch is only here because the promise also
-    // rejects when the room is already disposing (server shutdown), which would
-    // otherwise surface as an unhandled rejection.
-    this.allowReconnection(client, 30).catch(() => {});
+  onReconnect(client: Client) {
+    const binding = this.bindings.get(client.sessionId);
+    if (binding === undefined) return;
+
+    binding.client = client;
+    binding.connected = true;
+    this.project();
+    this.sendPrivateState(client);
   }
 
-  onReconnect(client: Client) {
-    console.log(client.sessionId, "reconnected!");
+  onLeave(client: Client, _code: CloseCode) {
+    const binding = this.bindings.get(client.sessionId);
+    if (binding === undefined) return;
+
+    binding.connected = false;
+    binding.present = false;
+
+    if (this.game === null) {
+      this.bindings.delete(client.sessionId);
+      this.project();
+      this.publishPhase();
+      return;
+    }
+
+    this.foldDisconnectedTurns();
+    this.project();
   }
+
+  private startFirstHand() {
+    const players: AuthoritativePlayer[] = this.presentBindings().map((binding) => ({
+      playerId: binding.playerId,
+      stack: binding.tableStack,
+    }));
+    this.authoritative.start(players, this.now(), 0);
+    this.syncStacks();
+    this.project();
+    this.publishPhase();
+    this.sendPrivateStatesLater();
+  }
+
+  private apply(
+    client: Client,
+    action: OfflineAction,
+    message: "betting" | "draftWord" | "confirmWord",
+  ) {
+    if (this.game === null) {
+      this.sendRejection(client, rejectionFor(message, "hand-over"));
+      return;
+    }
+
+    try {
+      this.authoritative.dispatch(action, this.now());
+      this.foldDisconnectedTurns();
+      this.syncStacks();
+      this.project();
+      this.sendPrivateStates();
+    } catch (error) {
+      if (error instanceof BettingRejectionError) {
+        if (error.reason === "turn-timeout") {
+          this.handleTurnTimeout();
+          return;
+        }
+        this.sendRejection(client, { action: "betting", reason: error.reason });
+      } else if (error instanceof WordRejectionError) {
+        if (message === "betting") {
+          this.sendRejection(client, rejectionFor(message, "hand-over"));
+        } else {
+          this.sendRejection(client, { action: message, reason: error.reason });
+        }
+      } else if (error instanceof OfflineActionError) {
+        this.sendRejection(client, rejectionFor(message, "hand-over"));
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  private foldDisconnectedTurns() {
+    if (this.game === null) return;
+    this.authoritative.foldDisconnectedTurns(this.livePlayerIds(), this.now());
+  }
+
+  /** The room's one clock: every deadline is checked here, on the timestep, so nothing is armed
+   * against Colyseus's timer service and a test paces the room by choosing `tickMs`. */
+  private onTick(): void {
+    try {
+      const now = this.now();
+      this.state.now = now;
+      const game = this.game;
+      if (game === null) return;
+
+      if (game.phase !== "payout") this.payoutReadyAtMs = null;
+
+      if (game.betting !== null && game.toActIndex !== null) {
+        if (now >= game.endsAtMs) this.handleTurnTimeout();
+        return;
+      }
+
+      if (game.wordWindow?.status === "open") {
+        if (now >= game.endsAtMs) this.handleWordTimeout();
+        return;
+      }
+
+      if (game.phase === "payout") {
+        if (this.payoutReadyAtMs === null) this.payoutReadyAtMs = now + this.payoutDelay;
+        else if (now >= this.payoutReadyAtMs) this.startNextHandOrWait();
+      }
+    } catch (error) {
+      console.error("room tick failed", error);
+    }
+  }
+
+  private handleTurnTimeout() {
+    const game = this.game;
+    if (game === null || game.betting === null || game.toActIndex === null) return;
+    if (this.now() < game.endsAtMs) return;
+
+    try {
+      const actor = game.seats[game.toActIndex];
+      if (actor === undefined) return;
+      const binding = this.bindingFor(actor.id);
+
+      // A dropped seat is folded by the room's connection-aware path, regardless of whether it
+      // owes chips. It must never receive an action or a timeout event after it disconnected.
+      if (binding?.connected !== true) {
+        this.foldDisconnectedTurns();
+        this.project();
+        this.sendPrivateStates();
+        return;
+      }
+
+      this.authoritative.timeoutTurn(this.now());
+      this.foldDisconnectedTurns();
+      this.syncStacks();
+      this.project();
+      this.sendPrivateStates();
+      this.sendRejection(binding.client, { action: "betting", reason: "turn-timeout" });
+    } catch (error) {
+      console.error("turn timeout failed", error);
+    }
+  }
+
+  private handleWordTimeout(): void {
+    if (this.game?.wordWindow?.status !== "open") return;
+    try {
+      this.authoritative.timeoutWords(this.now());
+      this.syncStacks();
+      this.project();
+      this.sendPrivateStates();
+    } catch (error) {
+      console.error("word timeout failed", error);
+    }
+  }
+
+  private startNextHandOrWait(): void {
+    const game = this.game;
+    if (game === null || game.phase !== "payout") return;
+    this.syncStacks();
+    const present = this.presentBindings();
+    if (present.length !== this.maxClients) {
+      this.authoritative.clear();
+      for (const [playerId, binding] of this.bindings) {
+        if (!binding.present) this.bindings.delete(playerId);
+      }
+      this.project();
+      this.publishPhase();
+      this.sendPrivateStates();
+      return;
+    }
+    if (!present.every((binding) => binding.connected)) {
+      // §29's hold spans the gap between hands too: a dropped seat keeps its seat and stack, so
+      // the table waits for it to come back or for its hold to expire (onLeave then takes the
+      // under-full path above) instead of dealing hands it will only fold away.
+      this.payoutReadyAtMs = this.now() + HOLD_RECHECK_MS;
+      return;
+    }
+    this.authoritative.dealNext(this.now());
+    if (this.game?.sessionOver === true) {
+      // §27/§28: a busted seat re-buys or leaves between hands, and the wallet is Epic B's — so
+      // the room holds each seat's ended stack and waits rather than dealing a hand nobody can pay.
+      this.authoritative.clear();
+      this.project();
+      this.publishPhase();
+      this.sendPrivateStates();
+      return;
+    }
+    this.syncStacks();
+    this.project();
+    this.publishPhase();
+    this.sendPrivateStates();
+  }
+
+  private syncStacks() {
+    const game = this.game;
+    if (game === null) return;
+
+    for (const seat of game.seats) {
+      const binding = this.bindingFor(seat.id);
+      if (binding !== undefined) binding.tableStack = seat.stack;
+    }
+  }
+
+  private project() {
+    this.projection.project({
+      table: this.table,
+      game: this.game,
+      bindings: this.projectionBindings(),
+      now: this.now(),
+    });
+    this.publishPhase();
+  }
+
+  private sendPrivateStates() {
+    for (const binding of this.presentBindings()) {
+      if (binding.connected) this.sendPrivateState(binding.client);
+    }
+  }
+
+  private sendPrivateStateLater(client: Client) {
+    this.clock.setTimeout(() => {
+      const binding = this.bindings.get(client.sessionId);
+      if (binding?.connected === true) this.sendPrivateState(binding.client);
+    }, 0);
+  }
+
+  private sendPrivateStatesLater() {
+    this.clock.setTimeout(() => this.sendPrivateStates(), 0);
+  }
+
+  private sendPrivateState(client: Client) {
+    const binding = this.bindings.get(client.sessionId);
+    if (binding === undefined) return;
+
+    client.send(
+      GAME_EVENTS.privateState,
+      this.projection.privateState({
+        game: this.game,
+        binding,
+        now: this.now(),
+      }),
+    );
+  }
+
+  private sendRejection(client: Client, event: GameRejectionEvent) {
+    client.send(GAME_EVENTS.rejected, event);
+  }
+
+  private publishPhase() {
+    if (this.table === undefined) return;
+    const status: RoomPhase = this.game?.phase ?? WAITING_PHASE;
+    const metadata: GameRoomMetadata = { ...this.table, status };
+    this.setMatchmaking({ metadata }).catch(() => {
+      // A listing failure must not mutate the hand or reject an action.
+    });
+  }
+
+  private isAtTable(client: Client): boolean {
+    const binding = this.bindings.get(client.sessionId);
+    return binding !== undefined && binding.present && binding.connected;
+  }
+
+  private isPayload<Name extends keyof typeof GAME_MESSAGES>(name: Name, value: unknown) {
+    return isGameMessagePayload(GAME_MESSAGES[name], value);
+  }
+
+  private bindingFor(playerId: string) {
+    return this.bindings.get(playerId);
+  }
+
+  private livePlayerIds(): ReadonlySet<string> {
+    return new Set(
+      this.orderedBindings()
+        .filter((binding) => binding.present && binding.connected)
+        .map((binding) => binding.playerId),
+    );
+  }
+
+  private projectionBindings(): ProjectionBinding[] {
+    return this.orderedBindings().map((binding) => ({
+      playerId: binding.playerId,
+      seat: binding.seat,
+      connected: binding.connected,
+      tableStack: binding.tableStack,
+    }));
+  }
+
+  private presentBindings(): SeatBinding[] {
+    return this.orderedBindings().filter((binding) => binding.present);
+  }
+
+  private orderedBindings(): SeatBinding[] {
+    return [...this.bindings.values()].sort((a, b) => a.seat - b.seat);
+  }
+}
+
+function firstFreeSeat(bindings: ReadonlyMap<string, SeatBinding>, maxSeats: number): number | null {
+  const occupied = new Set(
+    [...bindings.values()]
+      .filter((binding) => binding.present)
+      .map((binding) => binding.seat),
+  );
+  for (let seat = 0; seat < maxSeats; seat += 1) {
+    if (!occupied.has(seat)) return seat;
+  }
+  return null;
+}
+
+/** A seed nobody can read off the wire: the room id is public, so it must never derive the deal. */
+function randomSeed(): number {
+  return randomInt(0, 0x1_0000_0000);
+}
+
+function rejectionFor(
+  message: "betting" | "draftWord" | "confirmWord",
+  reason: "hand-over",
+): GameRejectionEvent {
+  if (message === "betting") return { action: "betting", reason };
+  return { action: message, reason: "timer-expired" };
 }

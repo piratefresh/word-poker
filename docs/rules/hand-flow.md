@@ -108,6 +108,13 @@ The player may:
 
 Checking is not available when the player must call an existing bet.
 
+### Betting turn clock
+
+Each betting turn has a configurable 60-second budget by default. The server owns this clock and
+auto-actions an idle connected seat when it expires: it checks when the seat owes nothing and folds
+when it owes a call. A disconnected seat is always folded when action reaches it, regardless of
+what it owes. The timeout action is server-owned and cannot be sent by a client.
+
 The betting round ends when:
 
 - All remaining players have contributed the same amount, or

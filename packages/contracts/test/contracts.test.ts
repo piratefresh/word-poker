@@ -32,6 +32,8 @@ const OFFLINE_ACTIONS: readonly OfflineAction[] = [
   { type: "allIn", playerId: "hero" },
   { type: "draftWord", playerId: "hero", submission: { plays: [{ tileId: "M-1" }] } },
   { type: "confirmWord", playerId: "hero", submission: { plays: [{ tileId: "M-1" }] } },
+  { type: "timeoutTurn" },
+  { type: "foldTurn" },
   { type: "timeoutWords" },
 ];
 
@@ -47,6 +49,8 @@ function actionType(action: OfflineAction): string {
     case "allIn":
     case "draftWord":
     case "confirmWord":
+    case "timeoutTurn":
+    case "foldTurn":
     case "timeoutWords":
       return action.type;
     default: {
@@ -131,6 +135,8 @@ describe("wire shapes", () => {
       "allIn",
       "draftWord",
       "confirmWord",
+      "timeoutTurn",
+      "foldTurn",
       "timeoutWords",
     ]);
   });
@@ -157,6 +163,7 @@ describe("betting vocabulary", () => {
       "below-min-raise",
       "insufficient-stack",
       "action-closed",
+      "turn-timeout",
     ]);
   });
 

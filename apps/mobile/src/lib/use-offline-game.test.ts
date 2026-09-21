@@ -119,7 +119,7 @@ describe("useOfflineGame — the dealt table", () => {
       pot: 0,
       sidePots: [],
       sessionOver: false,
-      secondsRemaining: 30,
+      secondsRemaining: 60,
     });
     expect(result.current.game.community).toEqual([null, null, null, null, null]);
     expect(result.current.game.privateTiles).toHaveLength(2);
@@ -258,7 +258,7 @@ describe("useOfflineGame — the hero's clocks", () => {
     expect(row(result).canCheck).toBe(true);
 
     await act(async () => {
-      jest.advanceTimersByTime(30_100);
+      jest.advanceTimersByTime(60_100);
     });
 
     // The auto-check completed the preflop round and the bots answered: the table is on the
@@ -277,7 +277,7 @@ describe("useOfflineGame — the hero's clocks", () => {
     expect(row(result).canCheck).toBe(false);
 
     await act(async () => {
-      jest.advanceTimersByTime(30_100);
+      jest.advanceTimersByTime(60_100);
     });
 
     // The hero gave the hand up rather than paying the call; a folded seat builds no word.

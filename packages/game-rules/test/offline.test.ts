@@ -190,6 +190,78 @@ describe("reduce — the betting round", () => {
     assert.equal(state.endsAtMs, NOW + 5_000 + OFFLINE_TURN_MS);
   });
 
+  it("auto-checks an idle seat when its turn expires", () => {
+    const state = dealHand();
+    const timedOut = reduce(state, { type: "timeoutTurn" }, state.endsAtMs);
+
+    assert.equal(timedOut.seats[1]?.actedThisRound, true);
+    assert.equal(timedOut.seats[1]?.folded, false);
+    assert.equal(timedOut.toActIndex, 2);
+  });
+
+  it("auto-folds an idle seat that owes chips when its turn expires", () => {
+    let state = dealHand();
+    state = reduce(state, { type: "bet", playerId: "ellis", amount: 20 }, NOW);
+    const timedOut = reduce(state, { type: "timeoutTurn" }, state.endsAtMs);
+
+    assert.equal(timedOut.seats[2]?.folded, true);
+    assert.equal(timedOut.seats[2]?.committedHand, 0);
+    assert.equal(timedOut.toActIndex, 3);
+  });
+
+  it("refuses a timeout before the deadline and refuses late voluntary action", () => {
+    const state = dealHand();
+    assert.throws(
+      () => reduce(state, { type: "timeoutTurn" }, state.endsAtMs - 1),
+      OfflineActionError,
+    );
+    assert.throws(
+      () => reduce(state, { type: "check", playerId: "ellis" }, state.endsAtMs),
+      (error: unknown) => error instanceof BettingRejectionError && error.reason === "turn-timeout",
+    );
+  });
+
+  it("server-folds the acting seat at the deadline, and the fold-out pays (§29)", () => {
+    const state = dealHand({ players: ["hero", "ellis"] });
+    const { index, id } = actingSeat(state);
+
+    const folded = reduce(state, { type: "foldTurn" }, state.endsAtMs);
+
+    assert.equal(folded.seats[index]?.id, id);
+    assert.equal(folded.seats[index]?.folded, true);
+    assert.equal(folded.phase, "payout", "the last seat standing takes the pot (§26)");
+    assert.equal(folded.result?.winner, "hero");
+  });
+
+  it("server-folds the acting seat before the deadline too — the onLeave path (§29)", () => {
+    const state = dealHand();
+    const { index } = actingSeat(state);
+
+    const folded = reduce(state, { type: "foldTurn" }, state.endsAtMs - 1);
+
+    assert.equal(folded.seats[index]?.folded, true);
+    assert.equal(folded.phase, "preflop", "the hand goes on with the seats that remain");
+    assert.equal(folded.toActIndex, index + 1);
+  });
+
+  it("refuses a server fold when no betting round is open", () => {
+    const state = checkAround(dealHand());
+    assert.equal(state.wordWindow?.status, "open");
+
+    assert.throws(() => reduce(state, { type: "foldTurn" }, state.endsAtMs), OfflineActionError);
+  });
+
+  it("carries a configured turn duration into the next hand", () => {
+    let state = dealHand({ turnDurationMs: 5_000 });
+    assert.equal(state.endsAtMs, NOW + 5_000);
+    state = checkAround(state);
+    state = payOut(state);
+    const next = reduce(state, { type: "deal" }, NOW + 10_000);
+
+    assert.equal(next.turnDurationMs, 5_000);
+    assert.equal(next.endsAtMs, NOW + 10_000 + 5_000);
+  });
+
   it("refuses an action from the wrong seat, with the machine's reason", () => {
     const state = dealHand();
 

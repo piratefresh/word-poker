@@ -26,7 +26,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
-  BettingAction,
   PlayerId,
   TilePlay,
   WordRejectionReason,
@@ -339,9 +338,10 @@ export function useOfflineGame({
     return () => clearTimeout(timer);
   }, [state.wordWindow, state.endsAtMs]);
 
-  // A betting turn belongs to the table's clock too: when the hero's thirty seconds run out
-  // the seat checks if it can and folds otherwise — §29's auto-fold, applied to the seat a
-  // human left unattended — and the bots answer the same way they answer a tap.
+  // A betting turn belongs to the table's clock too: when the hero's sixty seconds run out
+  // the engine's own `timeoutTurn` settles the turn — it checks when the committed amount
+  // already matches the bet and folds otherwise — and the bots answer the same way they
+  // answer a tap.
   useEffect(() => {
     const index = state.toActIndex;
     if (state.betting === null || index === null || state.seats[index]?.id !== HERO_ID) return;
@@ -354,14 +354,7 @@ export function useOfflineGame({
           return current;
         }
 
-        const bounds = bettingBounds(current.seats, round, currentIndex, current.stakes.minBet);
-        if (bounds === null) return current;
-
-        const action: BettingAction = bounds.canCheck
-          ? { type: "check", playerId: HERO_ID }
-          : { type: "fold", playerId: HERO_ID };
-
-        return settleBots(reduce(current, action, Math.max(Date.now(), current.endsAtMs)), Date.now());
+        return settleBots(reduce(current, { type: "timeoutTurn" }, Math.max(Date.now(), current.endsAtMs)), Date.now());
       });
     }, Math.max(state.endsAtMs - Date.now(), 0) + 25);
 
