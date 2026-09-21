@@ -58,6 +58,13 @@ export interface GameScreenProps {
   onSettings?: () => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
+  /**
+   * The wager row's one slider, and the two actions it can be: with no bet out it opens the
+   * round (`onBet`), and facing one it raises to the amount (§22). Each is named as the engine
+   * names it, and the felt calls the one its own button is labelled with — a mode wires the
+   * engine action the button says, rather than re-deriving which action the amount was for.
+   */
+  onBet?: (amount: number) => void;
   onRaise?: (amount: number) => void;
   onRaiseAmountChange?: (amount: number) => void;
   /** Commits the seat's whole Table Stack (§22). The felt asks for confirmation first. */
@@ -93,6 +100,7 @@ function GameScreenBody({
   onSettings,
   onFold,
   onCheckOrCall,
+  onBet,
   onRaise,
   onRaiseAmountChange,
   onAllIn,
@@ -142,6 +150,11 @@ function GameScreenBody({
     else if (router.canGoBack()) router.back();
     else router.replace("/");
   }, [onBack]);
+
+  // The wager row is one slider with one press, and its label is what says which action that
+  // press takes: `canBet` names it BET, and the same fact picks the engine action behind it. A
+  // mode that armed the control for a bet is told it was a bet — nothing re-derives it.
+  const commitWager = game.betting.canBet ? onBet : onRaise;
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
@@ -196,7 +209,7 @@ function GameScreenBody({
           onAmountChange={changeRaise}
           onCheckOrCall={onCheckOrCall}
           onFold={onFold}
-          onRaise={onRaise ? () => onRaise(raiseAmount) : undefined}
+          onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
           state={game.betting}
         />
       </View>
@@ -248,7 +261,7 @@ function BettingControls({
   onAmountChange,
   onFold,
   onCheckOrCall,
-  onRaise,
+  onWager,
   onAllIn,
 }: {
   state: BettingState;
@@ -258,7 +271,8 @@ function BettingControls({
   onAmountChange: (amount: number) => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
-  onRaise?: () => void;
+  /** Commits `amount` as the action the button is labelled with — a bet, or a raise. */
+  onWager?: () => void;
   onAllIn?: () => void;
 }) {
   const [trackWidth, setTrackWidth] = useState(1);
@@ -319,22 +333,29 @@ function BettingControls({
       </View>
       <View style={styles.actionRow}>
         {leading}
+        {/* The row's controls carry ids as well as labels: the felt's nameplates print
+            CHECK, CALL and FOLD as seat status too, so a device flow that matched the
+            row by text alone could land on a seat instead of a control (see
+            .maestro/native/offline-hand.yaml). */}
         <ActionButton
           danger
           disabled={!state.canFold}
           label="FOLD"
           onPress={onFold}
+          testID="action-fold"
         />
         <ActionButton
           disabled={!state.canCheck && state.callAmount == null}
           label={callLabel}
           onPress={onCheckOrCall}
+          testID="action-check-call"
         />
         <ActionButton
           disabled={!state.canRaise && !state.canBet}
           gold
           label={`${wagerLabel} $${amount.toLocaleString()}`}
-          onPress={onRaise}
+          onPress={onWager}
+          testID="action-wager"
           wide
         />
         <ActionButton

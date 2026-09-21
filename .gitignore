@@ -59,3 +59,7 @@ package-lock.json
 # working plan notes — AGENTS.md keeps work in the tracker, not in repo docs
 /plans/
 /TUTORIAL_CLIENT_SIDE_COUNTDOWN_PLAN.md
+
+# the omp harness's own state — per-machine config and the secret-obfuscator mapping
+# AGENTS.md refers to. Never shared, and never committed.
+/.omp/

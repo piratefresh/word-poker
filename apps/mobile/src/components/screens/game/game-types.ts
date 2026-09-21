@@ -9,6 +9,7 @@ export type PlayerStatus =
   | "thinking"
   | "check"
   | "call"
+  | "bet"
   | "raise"
   | "fold"
   | "all-in"

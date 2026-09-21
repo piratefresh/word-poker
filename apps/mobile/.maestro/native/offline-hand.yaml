@@ -1,0 +1,163 @@
+# The offline hand, played end to end on a build of the app rather than in a browser: deal →
+# real betting rounds to the river → a hero BET → §19's window opens → build a word from the
+# rack → confirm → §11 judges it against the real dictionary → §21 names a winner → next hand.
+#
+# The same hand as .maestro/offline-hand.yaml (repository root) on the same pinned seed, and a
+# second flow on purpose: a flow is a web flow (`url:`) or a device flow (`appId:`), never
+# both, and the selectors differ where the platforms do — see the notes below.
+#
+# This is the copy EAS Workflows runs. It lives beside `eas.json` because that is where an EAS
+# job runs: the job's working directory is this app directory (a probe run put it at
+# /home/expo/workingdir/build/apps/mobile), so `flow_path` in apps/mobile/.eas/workflows is
+# resolved from here and not from the repository root.
+#
+# Run it locally against a device that already has the app installed:
+#
+#   maestro test --platform android .maestro/native/offline-hand.yaml      # from apps/mobile
+#
+# Run it in CI, which builds the app with eas.json's `e2e-test` profile — an .apk for the
+# Android emulator, a simulator .app for iOS — and then drives this same flow:
+#
+#   eas workflow:run .eas/workflows/e2e-android.yml                        # from apps/mobile
+#
+# The build under test has nothing behind it. The dictionary ships in the bundle (the engine's
+# lazy artifact import), the bots run in-process, and the seed the deep link pins is the whole
+# of the table's randomness. The one thing a device cannot do without a server is sign in, and
+# this route sits behind the sign-in guard — so `e2e-test` sets EXPO_PUBLIC_E2E_AUTH_BYPASS
+# (src/lib/e2e.ts) and the guard lets the seat through. No account, no network, no backend.
+#
+# The seed pins both the deal and the bots' line, as the web flow's header spells out: preflop
+# mira bets 60 → the hero calls; flop jay bets 40 → the hero calls; turn ellis bets 20 → the
+# hero calls; river everyone checks to the hero, who opens for the minimum (the slider seeds at
+# the table's `BET $20`) and is called around, which closes the river's round and opens §19's
+# window. A different seed means different tiles and different bots, and the assertions below
+# are the ones that would fail first.
+#
+# The CPU plays on a beat of its own — one seat's action per `duration.cpuBeat` — so the table
+# between two hero actions moves on its own, and every step that waits for a bot waits for it
+# rather than asserting it on the spot.
+#
+# Selector notes — the native half of the web flow's lesson. A device matches text as a
+# whole-string regex and does not fold case, so a selector is what a component prints
+# (`CHECK`, `BET $20`, `PHASE 2 · PRE-FLOP`), with `$` escaped for the regex. And where the
+# felt makes a text selector ambiguous — its seat nameplates print CHECK and CALL as status —
+# the flow reaches for a control's testID instead: `action-check-call` walks the round and,
+# inside §19's window, is the confirm. Tiles are held by the strip's ids, which are the deal's
+# own (`word-builder-tile-<tile id>`); the felt draws copies of the same tiles without one.
+appId: com.wordpoker.wordpoker
+name: Offline hand — bet, build a word and pay out (native)
+tags:
+  - native
+  - offline
+---
+- launchApp
+
+# The web flow pins the seed in its URL; a device gets the same route as a deep link. The
+# scheme is app.json's `scheme`, so expo-router reads this as /offline?seed=…
+- openLink: wordpoker://offline?seed=20260919
+
+# The table holds until the dictionary has loaded (the hand is judged against it).
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 90000
+- assertVisible:
+    text: "COMMUNITY · 0/5"
+
+# The opening bot's bet is on the felt a beat after the deal: the row states the call the engine
+# says is owed, not a placeholder. This is the seed's line, so a changed seed or table
+# configuration fails here, loudly.
+- extendedWaitUntil:
+    visible: "CALL \\$60"
+    timeout: 20000
+
+# Play the hero's turns to the river. Each pass waits for the hero to hold the clock — the
+# seat's own nameplate says so, and the wait also ends when the street turns past the hero — so
+# the loop paces itself against the bots instead of spinning. The control it taps is the row's
+# check-or-call, whose label depends on the bot line and is left to the engine; the loop's own
+# condition ends the walk at the river, where the row is asked for a bet rather than a call.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 5 · THE RIVER"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+
+# On the river the bots check to the hero, so the row arms the bet: the slider seeds at the
+# table's minimum bet, and the tap opens the round with it. Real chips move: the bots answer it
+# on their beats, the pot the felt draws grows, and the round's close opens §19's window.
+#
+# The assertions are the tap being a real bet and not the silent nothing it once was on the web:
+# the chips reach the middle (480 → 560, the hero's 20 and three calls), and the row stops
+# offering the hero a bet — with the action refused, the hero would still be the seat to act and
+# `BET $20` would still be on the felt.
+- assertVisible:
+    text: "BET \\$20"
+- assertVisible:
+    text: "\\$480"
+- tapOn:
+    text: "BET \\$20"
+- extendedWaitUntil:
+    visible: "\\$560"
+    timeout: 20000
+- assertNotVisible:
+    text: "BET \\$20"
+- assertVisible:
+    text: "PHASE 5 · THE RIVER"
+
+# The river's close opened §19's window: the band under the felt — the draft line and the strip
+# of tiles the seat sorts — is what the flow builds its word through. The phase stays the river
+# while the window is open.
+#
+# Build the word out of the seat's two private tiles, in the order they are tapped. The strip
+# is the only place these ids appear, and the strip's order is the word's order: a tap appends
+# the tile to the word rather than dropping it wherever it sits. These two are the deal's tiles
+# for the seed the deep link pins — N-4 and R-3, 2 points each — so a changed seed or table
+# configuration fails here, loudly, instead of silently playing some other word; §7 makes their
+# word 4 points.
+- tapOn:
+    id: "word-builder-tile-N-4"
+- tapOn:
+    id: "word-builder-tile-R-3"
+- assertVisible:
+    text: "NR"
+- assertVisible:
+    text: "· 4pts"
+
+# Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
+# exactly as it was — which is the whole point of shuffling while a word is being built.
+- tapOn:
+    id: "word-builder-shuffle"
+- assertVisible:
+    text: "NR"
+- assertVisible:
+    text: "· 4pts"
+
+# §19's window turns the check into the confirm: the word as it stands is locked in, and no
+# second control row carries a confirm of its own.
+- tapOn:
+    id: "action-check-call"
+
+# Every seat has answered, so the window closes and the hand pays out on the real judging:
+# immediately when the bots found words, or on the window's clock when they did not.
+- extendedWaitUntil:
+    visible: "PHASE 6 · PAYOUT"
+    timeout: 70000
+- assertVisible:
+    text: "WINNER"
+
+# And the table deals again.
+- tapOn:
+    text: "Deal"
+- assertVisible:
+    text: "PHASE 2 · PRE-FLOP"
+- assertVisible:
+    text: "COMMUNITY · 0/5"

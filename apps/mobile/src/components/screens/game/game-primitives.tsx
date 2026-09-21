@@ -35,6 +35,7 @@ const STATUS_LABEL: Record<PlayerStatus, string> = {
   thinking: "THINKING...",
   check: "CHECK",
   call: "CALL",
+  bet: "BET",
   raise: "RAISE",
   fold: "FOLD",
   "all-in": "ALL-IN",

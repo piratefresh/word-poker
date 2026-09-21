@@ -324,6 +324,12 @@ export const duration = {
   timerPulse: 1000,
   statusFade: 200,
   actionFade: 300,
+  /**
+   * How long a CPU seat holds the table before its move lands (STO-378). One seat's action per
+   * beat: the bots answer on the felt's own clock rather than inside the seat's transition, so
+   * the chips a bot sends are on their way before the next seat moves.
+   */
+  cpuBeat: 900,
 } as const;
 
 export const easing = {

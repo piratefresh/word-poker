@@ -27,12 +27,23 @@
 # flow can name the tiles of — the deal below taps them by id. `?seed=` pins it: the tiles
 # the flow plays are the ones that hand holds, and every run plays the same hand.
 #
+# The CPU plays on a beat of its own (one seat's action per `duration.cpuBeat`), so the table
+# between two hero actions moves on its own: every step that waits for a bot — the opening
+# bet, the answers to the hero's bet, the window's close — waits for it rather than asserts it
+# on the spot, and the round's walk waits for the hero's own turn instead of tapping the row
+# while a bot holds it.
+#
 # The pinned seed's line, as the engine plays it (the bots are deterministic too):
 #   preflop mira bets 60 → the hero calls; flop jay bets 40 → the hero calls; turn ellis
 #   bets 20 → the hero calls; river everyone checks to the hero, who opens for the minimum
 #   (the slider seeds at `BET $20`) and is called around, which closes the river's round and
 #   opens §19's window. A different seed means different tiles and different bots, and the
 #   assertions below are the ones that would fail first.
+#
+# The felt reaches its row by `id:` rather than by text. Its controls carry test ids
+# (`action-check-call` walks the round and, inside §19's window, is the confirm), because the
+# seat nameplates print CHECK and CALL as status too and a text selector for a control can
+# land on a seat instead — see the selector note in the native flow.
 url: http://localhost:8081/offline?seed=20260919
 name: Offline hand — bet, build a word and pay out
 tags:
@@ -61,42 +72,58 @@ tags:
 - assertVisible:
     text: "COMMUNITY · 0/5"
 
-# The opening bot's bet is on the felt before the hero's first tap: the row states the call
-# the engine says is owed, not a placeholder. This is the seed's line, so a changed seed or
-# table configuration fails here, loudly.
-- assertVisible:
-    text: "CALL $60"
+# The opening bot's bet is on the felt a beat after the deal, and the row states the call the
+# engine says is owed — not a placeholder. This is the seed's line, so a changed seed or table
+# configuration fails here, loudly.
+- extendedWaitUntil:
+    visible: "CALL \\$60"
+    timeout: 20000
 
-# Play the hero's turns to the river. Which control the row arms depends on the bot line —
-# the check when nothing is owed, the call when a bot has bet — so each pass taps whichever
-# of the two is on screen, and the flow waits for the river rather than counting turns.
+# Play the hero's turns to the river. Each pass waits for the hero to hold the table — the
+# seat's own nameplate says so, and the wait also ends when the street turns past the hero — so
+# the loop paces itself against the CPU's beats instead of spinning on a dead row. The control
+# it taps is the row's check-or-call, which is named after the bot line the engine answered, and
+# which §19's window turns into the confirm.
 - repeat:
     while:
       notVisible:
         text: "PHASE 5 · THE RIVER"
     commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          timeout: 40000
+          optional: true
       - runFlow:
           when:
-            visible: "CHECK"
+            visible: "YOUR TURN"
           commands:
             - tapOn:
-                text: "CHECK"
-      - runFlow:
-          when:
-            notVisible: "CHECK"
-          commands:
-            - tapOn:
-                text: "CALL \\$[0-9,]+"
-      - waitForAnimationToEnd
+                id: "action-check-call"
+            - waitForAnimationToEnd
 
 # On the river the bots check to the hero, so the row arms the bet: the slider seeds at the
-# table's minimum bet, and the tap opens the round with it. Real chips move: the bots call,
-# the pot the felt draws grows, and the round's close opens §19's window.
+# table's minimum bet, and the tap opens the round with it. Real chips move: the bots answer it
+# on their beats, the pot the felt draws grows, and the round's close opens §19's window.
+#
+# The assertions are the tap being a real bet and not the silent nothing it once was: the chips
+# reach the middle (480 → 560, the hero's 20 and the three calls), and the row stops offering
+# the hero a bet — with the action refused, the hero would still be the seat to act and
+# `BET $20` would still be on the felt.
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 20000
 - assertVisible:
-    text: "BET $20"
+    text: "BET \\$20"
+- assertVisible:
+    text: "\\$480"
 - tapOn:
-    text: "BET $20"
+    id: "action-wager"
 - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "\\$560"
+    timeout: 20000
+- assertNotVisible:
+    text: "BET \\$20"
 - assertVisible:
     text: "PHASE 5 · THE RIVER"
 
@@ -132,9 +159,10 @@ tags:
     text: "· 4pts"
 
 # §19's window turns the check into the confirm: the word as it stands is locked in, and no
-# second control row carries a confirm of its own.
+# second control row carries a confirm of its own. The row's check carries the id, because the
+# seat it belongs to is not the only word the felt prints.
 - tapOn:
-    text: "CHECK"
+    id: "action-check-call"
 - waitForAnimationToEnd
 
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
