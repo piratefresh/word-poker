@@ -14,7 +14,8 @@ import {
 import { bettingBounds, type BettingBounds } from "../src/betting";
 import { resolveSubmission } from "../src/building";
 import { LETTER_VALUES, type Letter } from "../src/letters";
-import { availableTiles, OfflineActionError, reduce, startHand, type OfflineState } from "../src/offline";
+import { OfflineActionError } from "../src/errors";
+import { availableTiles, reduce, startHand, type OfflineState } from "../src/offline";
 import { TEST_DICTIONARY, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
