@@ -219,6 +219,69 @@ describe("useOnlineGame", () => {
       type: GAME_MESSAGES.confirmWord,
       payload: { submission: { plays } },
     });
+
+    // Optimistically confirmed the instant it is locked in — the builder closes before the server
+    // echoes, so the check cannot fire a second time — and the server's own confirmation reconciles
+    // the same answer.
+    expect(handle.current.words?.confirmed).toBe(true);
+    expect(handle.current.words?.confirmable).toBe(false);
+
+    await act(async () =>
+      room.emit(GAME_EVENTS.privateState, privateState({ word: { status: "confirmed", draft: null, confirmed: { plays } } })),
+    );
+    expect(handle.current.words?.confirmed).toBe(true);
+  });
+
+  test("shows the hero's move at once and darkens the row before the server echoes", async () => {
+    const room = makeRoom(HERO, liveState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+
+    await act(async () => handle.current.fold());
+
+    // The tap is spent: the seat wears the fold and the row goes dark, so nothing invites a second
+    // action while the prediction stands — the server has not answered yet.
+    expect(handle.current.game?.players[0]?.status).toBe("fold");
+    expect(handle.current.game?.betting.canFold).toBe(false);
+    expect(handle.current.game?.betting.canCheck).toBe(false);
+  });
+
+  test("reconciles to the server and re-arms the row when the broadcast moves", async () => {
+    const room = makeRoom(HERO, liveState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+    await act(async () => handle.current.check());
+    expect(handle.current.game?.betting.canCheck).toBe(false);
+
+    // The next hand arrives with a bet to the hero: the spent prediction drops and the row is armed
+    // from the engine's bounds again — no stuck optimistic state.
+    const next = liveState({
+      handCount: 2,
+      seats: new Map<string, unknown>([
+        [HERO, seat(HERO, 0)],
+        [OPPONENT, seat(OPPONENT, 1, { committedThisRound: 100, committedThisHand: 100 })],
+      ]),
+      betting: { active: true, currentBet: 100, minRaise: 100, minBet: 100 },
+    });
+    await act(async () => room.emitState(next));
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+
+    expect(handle.current.game?.betting.canFold).toBe(true);
+    expect(handle.current.game?.betting.callAmount).toBe(100);
+  });
+
+  test("drops the prediction when the server rejects the move", async () => {
+    const room = makeRoom(HERO, liveState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+    await act(async () => handle.current.bet(300));
+    expect(handle.current.game?.betting.canBet).toBe(false);
+
+    await act(async () => room.emit(GAME_EVENTS.rejected, { action: "betting", reason: "not-your-turn" }));
+
+    // The row comes back for another try rather than sitting dark behind a move that never landed.
+    expect(handle.current.game?.betting.canCheck).toBe(true);
+    expect(handle.current.game?.betting.canBet).toBe(true);
   });
 
   test("surfaces a server word rejection as the draft's reason", async () => {

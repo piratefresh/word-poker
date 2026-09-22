@@ -28,6 +28,7 @@ import type {
   GameRejectionEvent,
   LetterMultiplier,
   LetterTile,
+  OnlineBettingAction,
   PlayerId,
   RoomPhase,
   RoundPhase,
@@ -177,6 +178,19 @@ interface PrivateView {
   };
 }
 
+/** The pill the felt wears for a move the server has not echoed yet. */
+type OptimisticPill = "fold" | "check" | "call" | "raise" | "all-in";
+
+/** The hero's own move, held until the authoritative broadcast reconciles it away (server wins). */
+type Pending =
+  | { kind: "betting"; pill: OptimisticPill; viewId: string }
+  | { kind: "confirm"; viewId: string };
+
+/** One turn, one identity: the HUD re-anchors its countdown when this changes. */
+function idOf(view: RoomView): string {
+  return `online-${view.handCount}-${view.phase}-${view.toActSeat ?? view.word?.status ?? "done"}`;
+}
+
 /**
  * Drives one online hand off the live room. Subscribes to the broadcast state and the seat's
  * private state, holds the hero's draft locally, and dispatches every seat action to the room.
@@ -196,10 +210,33 @@ export function useOnlineGame({
   const [priv, setPriv] = useState<PrivateView | null>(null);
   const [heroDraft, setHeroDraft] = useState<readonly TilePlay[]>([]);
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
+  // The hero's own move, shown the instant it is tapped and kept only until the server's own
+  // broadcast catches up — the server always wins on reconcile (AGENTS.md). A move never sticks:
+  // it is tagged with the table id it was made against and dropped the moment that id moves, and a
+  // rejection drops it too, so the row can never sit disabled behind an action the server refused.
+  const [pending, setPending] = useState<Pending | null>(null);
   const onRejectRef = useRef(onReject);
   useEffect(() => {
     onRejectRef.current = onReject;
   }, [onReject]);
+
+  const viewId = view === null ? null : idOf(view);
+  const viewIdRef = useRef(viewId);
+  useEffect(() => {
+    viewIdRef.current = viewId;
+  }, [viewId]);
+
+  // Reconcile: the authoritative broadcast has moved past the optimistic move, so the prediction
+  // is spent. A betting move clears when the table id it was made against changes; a confirmed
+  // word clears when the server's own confirmation lands or the window closes. Cleared in render,
+  // so the felt never shows a frame of both the prediction and the truth it reconciles to.
+  if (pending !== null) {
+    const spent =
+      pending.kind === "betting"
+        ? pending.viewId !== viewId
+        : priv?.word.status === "confirmed" || view?.word?.status !== "open";
+    if (spent) setPending(null);
+  }
 
   // The hand this device is on: a fresh deal clears the draft the last hand left behind, so the
   // strip does not open the new hand holding the old word. Reset as the hand changes, in render —
@@ -218,6 +255,9 @@ export function useOnlineGame({
     const handlePrivate = (payload: unknown) => setPriv(decodePrivate(payload));
     const handleRejected = (payload: unknown) => {
       if (!isGameRejectionEvent(payload)) return;
+      // The server refused the move: drop the prediction so the row comes back for another try,
+      // and — for a word — say why while the seat still has time to fix it.
+      setPending(null);
       if (payload.action !== "betting") setRefusal(payload.reason);
       onRejectRef.current?.(payload);
     };
@@ -242,18 +282,29 @@ export function useOnlineGame({
     [heroId, view],
   );
 
-  const bet = useCallback(
-    (amount: number) => room.send(GAME_MESSAGES.betting, { type: "bet", amount }),
+  // One dispatch path for every betting move: send it, then predict it — the row goes dark and the
+  // seat wears the move's pill at once, against the table id it was made on, so a tap reads as done
+  // before the round trip. The engine's bounds already disabled anything the server would refuse.
+  const dispatchBetting = useCallback(
+    (action: OnlineBettingAction, pill: OptimisticPill) => {
+      room.send(GAME_MESSAGES.betting, action);
+      if (viewIdRef.current !== null) setPending({ kind: "betting", pill, viewId: viewIdRef.current });
+    },
     [room],
+  );
+
+  const bet = useCallback(
+    (amount: number) => dispatchBetting({ type: "bet", amount }, "raise"),
+    [dispatchBetting],
   );
   const raiseTo = useCallback(
-    (amount: number) => room.send(GAME_MESSAGES.betting, { type: "raise", amount }),
-    [room],
+    (amount: number) => dispatchBetting({ type: "raise", amount }, "raise"),
+    [dispatchBetting],
   );
-  const fold = useCallback(() => room.send(GAME_MESSAGES.betting, { type: "fold" }), [room]);
-  const check = useCallback(() => room.send(GAME_MESSAGES.betting, { type: "check" }), [room]);
-  const call = useCallback(() => room.send(GAME_MESSAGES.betting, { type: "call" }), [room]);
-  const allIn = useCallback(() => room.send(GAME_MESSAGES.betting, { type: "allIn" }), [room]);
+  const fold = useCallback(() => dispatchBetting({ type: "fold" }, "fold"), [dispatchBetting]);
+  const check = useCallback(() => dispatchBetting({ type: "check" }, "check"), [dispatchBetting]);
+  const call = useCallback(() => dispatchBetting({ type: "call" }, "call"), [dispatchBetting]);
+  const allIn = useCallback(() => dispatchBetting({ type: "allIn" }, "all-in"), [dispatchBetting]);
 
   /**
    * Replaces the hero's draft with the one the seat has built and judges it for the live preview,
@@ -282,16 +333,23 @@ export function useOnlineGame({
   const confirmWord = useCallback(() => {
     if (heroDraft.length === 0 || view?.word?.status !== "open") return;
     room.send(GAME_MESSAGES.confirmWord, { submission: { plays: [...heroDraft] } });
+    // Lock the builder the instant the word is confirmed, so the check cannot fire twice while the
+    // server's own confirmation is on the wire; it clears when that confirmation lands.
+    if (viewIdRef.current !== null) setPending({ kind: "confirm", viewId: viewIdRef.current });
   }, [heroDraft, room, view]);
 
+  const pendingPill = pending?.kind === "betting" ? pending.pill : null;
+  const pendingConfirm = pending?.kind === "confirm";
+
   const game = useMemo(
-    () => (view === null ? null : toScreenState(view, heroId, priv, heroSeatIndex, heroDraft)),
-    [heroDraft, heroId, heroSeatIndex, priv, view],
+    () => (view === null ? null : toScreenState(view, heroId, priv, heroSeatIndex, heroDraft, pendingPill)),
+    [heroDraft, heroId, heroSeatIndex, pendingPill, priv, view],
   );
 
   const words = useMemo(
-    () => (view === null ? null : wordsOf(view, heroId, priv, heroDraft, refusal, dictionary)),
-    [dictionary, heroDraft, heroId, priv, refusal, view],
+    () =>
+      view === null ? null : wordsOf(view, heroId, priv, heroDraft, refusal, dictionary, pendingConfirm),
+    [dictionary, heroDraft, heroId, pendingConfirm, priv, refusal, view],
   );
 
   return {
@@ -337,6 +395,7 @@ function toScreenState(
   priv: PrivateView | null,
   heroSeatIndex: number,
   heroDraft: readonly TilePlay[],
+  pendingPill: OptimisticPill | null,
 ): GameScreenState | null {
   const phase = roundPhaseOf(view.phase);
   if (phase === null) return null;
@@ -352,12 +411,11 @@ function toScreenState(
   const players: (GamePlayer | null)[] = Array.from({ length: seatCount }, () => null);
   for (const seat of view.seats) {
     if (seat.seat < 0 || seat.seat >= seatCount) continue;
-    players[seat.seat] = toPlayer(seat, view, heroId, actingId, dealerId, winners);
+    players[seat.seat] = toPlayer(seat, view, heroId, actingId, dealerId, winners, pendingPill);
   }
 
   return {
-    // One turn, one identity: the HUD re-anchors its countdown when this changes.
-    id: `online-${view.handCount}-${view.phase}-${view.toActSeat ?? view.word?.status ?? "done"}`,
+    id: idOf(view),
     phase,
     phaseNumber: PHASE_NUMBER[phase],
     secondsRemaining: (wordOpen ? WORD_WINDOW_MS : OFFLINE_TURN_MS) / 1_000,
@@ -372,7 +430,9 @@ function toScreenState(
     privateTiles: priv?.rack ?? [],
     bestScore: best?.score,
     bestWord: best?.word !== undefined && best.word.length > 0 ? best.word : undefined,
-    betting: bettingRow(view, priv, heroSeatIndex, heroDraft),
+    // A move the hero has made but the server has not echoed darkens the row at once: the tap is
+    // spent, and the controls must not invite a second one while the prediction stands.
+    betting: pendingPill !== null ? INERT_BETS : bettingRow(view, priv, heroSeatIndex, heroDraft),
   };
 }
 
@@ -444,6 +504,7 @@ function toPlayer(
   actingId: PlayerId | null,
   dealerId: PlayerId | null,
   winners: readonly PlayerId[],
+  pendingPill: OptimisticPill | null,
 ): GamePlayer {
   const isHero = seat.playerId === heroId;
   return {
@@ -457,7 +518,12 @@ function toPlayer(
     color: colors.players[seat.seat % colors.players.length] ?? palette.amber400,
     ...(seat.playerId === dealerId ? { role: "dealer" as const } : {}),
     ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
-    status: seatStatus(seat, view, actingId, isHero, winners),
+    // The hero wears its just-made move the instant it is tapped; every other seat, and the hero
+    // once the server echoes, reads its status straight off the broadcast.
+    status:
+      isHero && pendingPill !== null
+        ? pendingPill
+        : seatStatus(seat, view, actingId, isHero, winners),
   };
 }
 
@@ -485,12 +551,18 @@ function wordsOf(
   heroDraft: readonly TilePlay[],
   refusal: WordRejectionReason | null,
   dictionary: Dictionary,
+  pendingConfirm: boolean,
 ): WordDraft | null {
   const hero = view.seats.find((seat) => seat.playerId === heroId);
   if (view.phase === "payout" || hero === undefined || hero.folded || hero.sittingOut) return null;
 
-  const confirmed = priv?.word.status === "confirmed";
-  const plays = confirmed && priv?.word.confirmed !== null ? priv?.word.confirmed ?? heroDraft : heroDraft;
+  // Confirmed the moment the seat locks it in — the server's own confirmation is on the wire and
+  // will reconcile the same answer — so the builder closes at once and the check cannot fire twice.
+  const confirmed = pendingConfirm || priv?.word.status === "confirmed";
+  const plays =
+    priv?.word.status === "confirmed" && priv?.word.confirmed !== null
+      ? priv?.word.confirmed ?? heroDraft
+      : heroDraft;
   const available = availableFor(priv, view);
   const resolution = resolveSubmission({ available, submission: { plays: [...plays] } });
   const windowOpen = view.word?.status === "open";
