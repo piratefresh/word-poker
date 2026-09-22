@@ -53,18 +53,7 @@ jest.mock("@/lib/use-dictionary", () => ({ useDictionary: () => null }));
 // routed to, and its two ways out both `dismissTo` the lobby it was pushed from.
 jest.mock("expo-router", () => ({
   router: { dismissTo: (href: string) => mockDismissTo(href) },
-  useFocusEffect: (effect: () => void | (() => void)) => {
-    require("react").useEffect(effect, [effect]);
-  },
   useLocalSearchParams: () => ({ roomId: mockRoomId }),
-}));
-
-// The stage asks Reanimated for the OS reduce-motion preference, and the suite's mock of the
-// library ships the hook as a TODO, so it is layered on: this suite is the screen with motion
-// allowed.
-jest.mock("react-native-reanimated", () => ({
-  ...jest.requireActual<Record<string, unknown>>("react-native-reanimated/mock"),
-  useReducedMotion: () => false,
 }));
 
 /**
