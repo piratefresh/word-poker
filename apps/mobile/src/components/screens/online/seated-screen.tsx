@@ -21,8 +21,12 @@ import {
   leaveTable,
   useActiveRoomId,
   useRoomSession,
+  useSeatedRoom,
   type TableSnapshot,
 } from "@/lib/room-session";
+import { useDictionary } from "@/lib/use-dictionary";
+
+import { OnlineFelt } from "./online-felt";
 
 /** The session always names its failure; these stand in only for the impossible empty one. */
 const REFUSAL_FALLBACK = "Couldn't take that seat.";
@@ -90,6 +94,8 @@ export function SeatedScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const session = useRoomSession();
   const holdsSeat = useActiveRoomId() === roomId;
+  const room = useSeatedRoom(roomId);
+  const dictionary = useDictionary();
   const joinedRoom = useRef<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const leavingOnce = useRef(false);
@@ -128,8 +134,15 @@ export function SeatedScreen() {
   const table =
     session.status === "seated" && session.roomId === roomId ? session.table : undefined;
 
+  // A hand is live once the table leaves the waiting room; only then does the felt have a hand to
+  // draw. The dictionary is loading in parallel (§11 judges the word against it), so a hand that
+  // deals before it lands holds on the table's own card until it arrives, then swaps to the felt.
+  const liveHand = table !== undefined && table.phase !== WAITING_PHASE;
+
   const body =
-    table !== undefined ? (
+    liveHand && room !== null && dictionary !== null ? (
+      <OnlineFelt dictionary={dictionary} onLeave={leave} room={room} />
+    ) : table !== undefined ? (
       <TableFace leaving={leaving} onLeave={leave} table={table} />
     ) : session.status === "error" ? (
       <Notice
