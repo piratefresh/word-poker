@@ -233,6 +233,22 @@ export function useActiveRoomId(): string | null {
 }
 
 /**
+ * The live `Room` this device holds for `roomId`, or null until the seat lands there. The online
+ * felt subscribes to it directly — its synced state, its targeted `privateState`/`rejected`
+ * messages, and its `send` — none of which the flat `TableSnapshot` above can carry. Reactive on
+ * the same store as the rest of the session, so the felt mounts the moment the seat is taken and
+ * falls away with a lost seat. Only the active seat's room is handed out: a second table this
+ * device created (STO-400) is held but is not the one a felt is rendering.
+ */
+export function useSeatedRoom(roomId: string): Room | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => (activeRoomId === roomId ? heldRooms.get(roomId) ?? null : null),
+    () => null,
+  );
+}
+
+/**
  * Create a table with the given config and sit down at it — Colyseus's `create` makes the room and
  * takes the seat in one call. Resolves with the new room's id, which is what a route needs to show
  * the table. A refusal from the server rejects with the sentence it refused with (§2's config).

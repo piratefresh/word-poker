@@ -39,7 +39,15 @@ jest.mock("@/lib/room-session", () => ({
   useRoomSession: () => mockSession,
   useActiveRoomId: () =>
     mockSession.status === "seated" ? (mockSession.roomId ?? null) : null,
+  // This suite is the seat lifecycle, not the live hand: it never hands the felt a room, so the
+  // felt's own suite (online-felt) drives the hand. A live-hand snapshot here still renders the
+  // table's card, which is what these tests read.
+  useSeatedRoom: () => null,
 }));
+
+// The dictionary loads through a dynamic import Jest cannot run, and this suite never reaches
+// the felt that needs it: the seat lifecycle holds the table's card, dictionary or not.
+jest.mock("@/lib/use-dictionary", () => ({ useDictionary: () => null }));
 
 // expo-router reaches a navigation package Jest cannot parse. The screen reads the room it was
 // routed to, and its two ways out both `dismissTo` the lobby it was pushed from.
