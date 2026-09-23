@@ -33,12 +33,12 @@ const SEATS: readonly WindowSeat[] = [
   { seat: 3, playerId: "mira" },
 ];
 
-/** One seat's tiles: two single letters that spell, and a pair that plays both its faces (§10). */
+/** One seat's tiles: two single letters and a choice pair that plays exactly one of its faces (§10). */
 function tilesOf(seat: number): readonly Tile[] {
   return [
     { id: `s${seat}-a`, letter: "A", points: 1 },
     { id: `s${seat}-r`, letter: "R", points: 2 },
-    { id: `s${seat}-th`, letter: "T", points: 1, sequenceLetter: "H", sequencePoints: 4 },
+    { id: `s${seat}-ts`, letter: "T", points: 1, alternativeLetter: "S", alternativePoints: 1 },
   ];
 }
 

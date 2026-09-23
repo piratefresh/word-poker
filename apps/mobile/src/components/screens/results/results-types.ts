@@ -29,9 +29,9 @@ export interface ResultsSeat {
    */
   readonly word: string | null;
   /**
-   * The physical tiles the seat played, in word order (§10) — a sequence tile keeps both its
-   * faces and a choice tile the face it played. Never re-sorted: the word's order *is* this
-   * order, and one sequence tile covers the two letters it prints.
+   * The physical tiles the seat played, in word order (§10) — a choice tile carries both its
+   * faces. Never re-sorted: the word's order *is* this order, and every tile covers the one
+   * letter it played.
    */
   readonly tiles: readonly Tile[];
   /** §7 step 1: the letters' printed values, before any tile multiplier. */

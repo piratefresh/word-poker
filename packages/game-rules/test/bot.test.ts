@@ -258,17 +258,6 @@ function choice(first: Letter, second: Letter): Tile {
   };
 }
 
-/** A fixed-sequence tile: both faces, in printed order, on one physical tile (§10). */
-function sequence(first: Letter, second: Letter): Tile {
-  return {
-    id: `${first}${second}-seq-1`,
-    letter: first,
-    points: LETTER_VALUES[first],
-    sequenceLetter: second,
-    sequencePoints: LETTER_VALUES[second],
-  };
-}
-
 /** The word a submission spells, or `null` when the seat cannot build it at all. */
 function spelled(available: readonly Tile[], submission: WordSubmission): string | null {
   const resolution = resolveSubmission({ available, submission });
@@ -306,14 +295,17 @@ describe("chooseOfflineWord", () => {
     assert.equal(spelled(available, submission ?? { plays: [] }), "SET");
   });
 
-  it("plays a fixed-sequence tile as both of its letters, in order", () => {
-    const available = [sequence("T", "H"), letter("E"), letter("R"), letter("E", 2)];
-    const dictionary = testDictionary(["HER", "THERE", "THREE"]);
+  it("plays the lower-scoring face when that is the one the word needs", () => {
+    const available = [choice("Q", "K"), letter("I"), letter("T")];
+    const dictionary = testDictionary(["KIT"]);
 
     const submission = chooseOfflineWord({ available, dictionary });
 
-    // THERE and THREE tie on both score and length, so the alphabet decides.
-    assert.equal(spelled(available, submission ?? { plays: [] }), "THERE");
+    // Q/K's faces are worth different amounts, and only the cheaper one spells the table's
+    // word: the search has to offer both faces (§10) rather than settle for the higher one.
+    assert.deepEqual(submission, {
+      plays: [{ tileId: "QK-1", chosenFace: "K" }, { tileId: "I-1" }, { tileId: "T-1" }],
+    });
   });
 
   it("plays every physical tile at most once", () => {

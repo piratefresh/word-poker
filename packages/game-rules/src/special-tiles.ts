@@ -1,33 +1,33 @@
 /**
- * Special tiles at deal time (docs/rules/tiles.md §10, docs/rules/scoring.md §9): the
- * fixed-sequence tiles a hand plays with, and the multiplier a dealt tile carries.
+ * Special tiles at deal time (docs/rules/tiles.md §10, docs/rules/scoring.md §9): the choice
+ * tiles the deal places, and the multiplier a dealt tile carries.
  *
- * The 100-tile bag of §6 does not change. It holds the single letters and the two choice
- * tiles, exactly as the rules table says; a fixed-sequence tile is not a bag member but a
- * tile the *system* places, which is what §10 means by "the exact placement is controlled
- * by the game system and may vary each hand". This module is that placement, and it runs
- * on the cut the deal has already made:
+ * The bag holds single letters only, and every two-letter tile is a choice tile (ADR 0005,
+ * §6), so the deal is what puts the two-letter tiles on the table: it draws a hand-level
+ * target and places tiles from the table's pair pool until the hand reaches it, replacing the
+ * tile in each slot and handing the replaced tile back to the deck (§10). This module is that
+ * placement, and it runs on the cut the deal has already made:
  *
- * - It counts the two-letter tiles the shuffle dealt — the choice tiles are bag members,
- *   so a hand shows 0, 1, or 2 of them — and places fixed-sequence tiles from the
- *   configured pool, aiming for §10's "usually one private, usually one community,
- *   occasionally a third" and never crossing §10's cap of three two-letter tiles in a
- *   hand, choice and sequence together. The first placement takes a private slot, the
- *   second a community slot, and a third whatever is left; the tile each placement
- *   replaces goes back to the deck.
+ * - §10's cap counts the seven tiles one seat can play — its two private tiles and the five
+ *   community tiles — and at most three of them are choice tiles. The per-street limits fall
+ *   out of the same count: the flop's three tiles hold 0–2, and the turn and the river hold at
+ *   most one each, because each of those is a single tile.
+ * - The target walks §10's recommendation to aim for two, preferably one private and one
+ *   community, with an occasional third: the first placement takes a private slot, the second
+ *   a community slot, and a third whatever is left open.
  * - It then rolls §9's multiplier for every dealt physical tile, one roll each, in deal
- *   order. High-value letters (8 points and up) carry the slightly higher double chance
- *   §9 allows, and a tile carries at most one multiplier: two would be a stacked modifier
- *   §9 says the game does not have.
+ *   order. A high-value tile — its best printed face worth 5 or more (§6) — carries the
+ *   slightly higher double chance §9 allows, and a tile carries at most one multiplier: two
+ *   would be a stacked modifier §9 says the game does not have.
  *
- * Everything the pass needs arrives as an argument — the dealt tiles, the seeded
- * generator, the table's configuration — so a seed plus a configuration replays the whole
- * deal (`AGENTS.md`). The generator is consumed in one documented order: one roll for the
- * hand's two-letter target, then a slot roll and a pair roll per placed tile, then one
- * roll per dealt tile for §9's multipliers.
+ * Everything the pass needs arrives as an argument — the dealt tiles, the seeded generator,
+ * the table's configuration — so a seed plus a configuration replays the whole deal
+ * (`AGENTS.md`). The generator is consumed in one documented order: one roll for the hand's
+ * two-letter target, then a slot roll and a pair roll per placed tile, then one roll per dealt
+ * tile for §9's multipliers.
  */
 
-import type { LetterMultiplier, SequenceTile, Tile } from "@wordpoker/contracts";
+import type { ChoiceTile, LetterMultiplier, Tile } from "@wordpoker/contracts";
 
 import { LETTER_VALUES, type Letter } from "./letters";
 import { swapAt } from "./tiles";
@@ -35,34 +35,57 @@ import { swapAt } from "./tiles";
 /** §10: across every seat and the board, a hand holds at most three two-letter tiles. */
 export const TWO_LETTER_TILE_LIMIT = 3;
 
-/** §6's top tiers — J and X at 8 points, Q and Z at 10 — the high-value letters of §9. */
-const HIGH_VALUE_POINTS = 8;
+/**
+ * §9's high-value tier: a tile whose best printed face is worth this much or more, which §6
+ * lists as F, H, V, W, Y, K (5), J, X (8) and Q, Z (10).
+ */
+const HIGH_VALUE_POINTS = 5;
+
+/**
+ * §10: how many community tiles the flop holds. The board is the flop's three tiles followed by
+ * the turn and the river (the reveal table in `./offline`), so slots 0–2 are the flop and 3 and
+ * 4 are the single-tile streets.
+ */
+const FLOP_TILES = 3;
+
+/** §10: the flop's three tiles hold at most two choice tiles between them. */
+const FLOP_CHOICE_LIMIT = 2;
 
 /** A tile face's letter as the contract prints it: one capital A–Z, nothing else. */
 const FACE_LETTER = /^[A-Z]$/;
 
 /**
- * The pairs the default table plays with: §10's own examples (TH, ER, IN, ED), one copy
- * each, so a hand can place a given pair at most once.
+ * The pairs the default table plays with: §10's pair pool, one copy each, so a hand can place a
+ * given pair at most once.
+ *
+ * Each pair names two letters; what a face is worth is §6's value for it, read through
+ * {@link faceValue}, so the pool never restates the letter values. The pairs whose faces are
+ * worth different amounts are §10's high-value ones — Q/K (10/5), Z/X (10/8), J/H (8/5).
  */
-export const SEQUENCE_TILE_PAIRS: readonly (readonly [first: string, second: string])[] = [
-  ["T", "H"],
-  ["E", "R"],
-  ["I", "N"],
-  ["E", "D"],
+export const CHOICE_TILE_PAIRS: readonly (readonly [first: string, second: string])[] = [
+  ["A", "E"],
+  ["E", "I"],
+  ["O", "U"],
+  ["A", "I"],
+  ["T", "S"],
+  ["R", "N"],
+  ["D", "T"],
+  ["S", "L"],
+  ["Q", "K"],
+  ["Z", "X"],
+  ["J", "H"],
 ];
 
-/** What a table plays with: the sequence tiles it places, and the multipliers it rolls. */
+/** What a table plays with: the choice-tile pairs it places, and the multipliers it rolls. */
 export interface SpecialTilesConfig {
   /**
-   * The fixed-sequence pairs the deal may place, each `[first, second]` in printed order.
-   * Empty means the table plays the printed set only — no sequence tiles at all.
+   * The pairs the deal may place, each `[first, second]` as the tile prints them. One copy of
+   * each pair per hand; empty means the table places no choice tiles at all.
    */
-  readonly sequencePairs: readonly (readonly [first: string, second: string])[];
+  readonly choicePairs: readonly (readonly [first: string, second: string])[];
   /**
-   * §10's hand-level target for two-letter tiles, as `[count, weight]` pairs: the deal
-   * picks a count by weight and places sequence tiles until the hand reaches it, choice
-   * tiles included. Empty places none.
+   * §10's hand-level target for two-letter tiles, as `[count, weight]` pairs: the deal picks a
+   * count by weight and places choice tiles until the hand reaches it. Empty places none.
    */
   readonly twoLetterTargets: readonly (readonly [count: number, weight: number])[];
   /** §9: the chance an eligible dealt tile becomes a Double Letter tile. */
@@ -74,13 +97,13 @@ export interface SpecialTilesConfig {
 }
 
 /**
- * The configuration the rules recommend, and the one a table starts with: §10's four
- * example pairs, a hand that usually reaches two two-letter tiles (mostly one private and
- * one community, occasionally a third), §9's "approximately 15%" double, a "significantly
- * rarer" triple, and a 5-point bump of extra double chance on the high-value letters.
+ * The configuration the rules recommend, and the one a table starts with: §10's eleven pair
+ * pool, a hand that usually reaches two two-letter tiles (mostly one private and one community,
+ * occasionally a third), §9's "approximately 15%" double, a "significantly rarer" triple, and a
+ * 5-point bump of extra double chance on the high-value letters.
  */
 export const DEFAULT_SPECIAL_TILES: SpecialTilesConfig = {
-  sequencePairs: SEQUENCE_TILE_PAIRS,
+  choicePairs: CHOICE_TILE_PAIRS,
   twoLetterTargets: [
     [1, 10],
     [2, 70],
@@ -91,9 +114,9 @@ export const DEFAULT_SPECIAL_TILES: SpecialTilesConfig = {
   highValueDoubleBonus: 0.05,
 };
 
-/** A table that plays the printed set only: no sequence tiles, no multipliers. */
+/** A table that plays the printed set only: no choice tiles, no multipliers. */
 export const NO_SPECIAL_TILES: SpecialTilesConfig = {
-  sequencePairs: [],
+  choicePairs: [],
   twoLetterTargets: [],
   doubleLetterChance: 0,
   tripleLetterChance: 0,
@@ -101,12 +124,21 @@ export const NO_SPECIAL_TILES: SpecialTilesConfig = {
 };
 
 /** Where one dealt tile sits: the collection that holds it, and its slot in that array. */
-interface Slot {
-  readonly tiles: Tile[];
-  readonly index: number;
-  /** Whether the slot is a seat's private tile or one of the community tiles. */
-  readonly at: "private" | "community";
-}
+type Slot =
+  | {
+      readonly tiles: Tile[];
+      readonly index: number;
+      /** A seat's private tile, in the hand of `seat`. */
+      readonly at: "private";
+      /** Which seat plays it; §10's cap is counted per seat. */
+      readonly seat: number;
+    }
+  | {
+      readonly tiles: Tile[];
+      readonly index: number;
+      /** One of the five community tiles, which every seat plays. */
+      readonly at: "community";
+    };
 
 /** What one deal's special-tile pass produced. */
 export interface SpecialTilesResult {
@@ -120,9 +152,9 @@ export interface SpecialTilesResult {
 
 /** Zero-point values cannot become tiles; a probability outside `[0, 1]` is a bug in the table. */
 function checkConfig(config: SpecialTilesConfig): void {
-  for (const [first, second] of config.sequencePairs) {
+  for (const [first, second] of config.choicePairs) {
     if (!FACE_LETTER.test(first) || !FACE_LETTER.test(second)) {
-      throw new RangeError(`a sequence pair prints two capital A–Z letters, received "${first}${second}"`);
+      throw new RangeError(`a choice pair prints two capital A–Z letters, received "${first}${second}"`);
     }
   }
 
@@ -152,20 +184,18 @@ function faceValue(letter: string): number {
   return LETTER_VALUES[letter as Letter];
 }
 
-/** Whether a two-letter tile of either kind sits in the slot: §10's choice and sequence tiles. */
-function isTwoLetterTile(tile: Tile): boolean {
-  return "alternativeLetter" in tile || "sequenceLetter" in tile;
-}
+/** How many of a run of slots hold a two-letter tile — §10 counts in physical tiles. */
+function twoLetterCount(slots: readonly Slot[]): number {
+  let count = 0;
 
-/** The highest printed value of the tile's faces, which is what §9's high-value test reads. */
-function highestPoints(tile: Tile): number {
-  if ("sequenceLetter" in tile) {
-    return Math.max(tile.points, tile.sequencePoints);
+  for (const slot of slots) {
+    const tile = slot.tiles[slot.index];
+    if (tile !== undefined && "alternativeLetter" in tile) {
+      count += 1;
+    }
   }
-  if ("alternativeLetter" in tile) {
-    return Math.max(tile.points, tile.alternativePoints);
-  }
-  return tile.points;
+
+  return count;
 }
 
 /**
@@ -177,9 +207,9 @@ function highestPoints(tile: Tile): number {
 function dealtSlots(hands: readonly Tile[][], community: Tile[]): Slot[] {
   const slots: Slot[] = [];
 
-  for (const hand of hands) {
+  for (const [seat, hand] of hands.entries()) {
     for (let index = 0; index < hand.length; index += 1) {
-      slots.push({ tiles: hand, index, at: "private" });
+      slots.push({ tiles: hand, index, at: "private", seat });
     }
   }
   for (let index = 0; index < community.length; index += 1) {
@@ -187,17 +217,6 @@ function dealtSlots(hands: readonly Tile[][], community: Tile[]): Slot[] {
   }
 
   return slots;
-}
-
-/** The slots a sequence tile could still be placed in, optionally of one kind only. */
-function openSlots(slots: readonly Slot[], at: "private" | "community" | null): Slot[] {
-  return slots.filter((slot) => {
-    const tile = slot.tiles[slot.index];
-    if (tile === undefined || isTwoLetterTile(tile)) {
-      return false;
-    }
-    return at === null || slot.at === at;
-  });
 }
 
 /** Picks §10's target for this hand: one weighted draw over the configured counts. */
@@ -221,66 +240,117 @@ function rollTarget(targets: SpecialTilesConfig["twoLetterTargets"], rng: () => 
 }
 
 /**
- * Places fixed-sequence tiles into the dealt slots, replacing the tile in each slot.
+ * Places choice tiles into the dealt slots, replacing the tile in each slot.
  *
- * The preferred kind of slot walks §10's recommendation: the first placement takes a
- * private slot, the second a community slot, a third whatever is left. A placement whose
- * preferred kind has no slot left falls back to the other kind rather than skipping — the
- * cap, not the kind, is what must hold.
+ * §10's cap is what every rule below is counted against: a seat plays its two private tiles and
+ * the five community tiles, and at most three of those seven are choice tiles. A private
+ * placement therefore spends one of its own seat's three, while a board placement spends one of
+ * every seat's — and the flop's three tiles hold at most two between them, the turn and the
+ * river one each, which a free single-tile street satisfies by construction.
+ *
+ * The preferred kind of slot walks §10's recommendation: the first placement takes a private
+ * slot, the second a community slot, a third whatever is left. A placement whose preferred kind
+ * has no slot left falls back to the other kind rather than skipping — the cap, not the kind,
+ * is what must hold.
  *
  * @returns The replaced tiles, in the order they were replaced.
  */
-function placeSequences(slots: readonly Slot[], rng: () => number, config: SpecialTilesConfig): Tile[] {
-  const twoLetterCount = slots.filter((slot) => {
-    const tile = slot.tiles[slot.index];
-    return tile !== undefined && isTwoLetterTile(tile);
-  }).length;
+function placeChoices(slots: readonly Slot[], rng: () => number, config: SpecialTilesConfig): Tile[] {
+  const board = slots.filter((slot) => slot.at === "community");
+  const flop = board.filter((slot) => slot.index < FLOP_TILES);
 
-  const placements = Math.min(
-    rollTarget(config.twoLetterTargets, rng),
-    TWO_LETTER_TILE_LIMIT - twoLetterCount,
-    config.sequencePairs.length,
-  );
+  // §10's counts as they stand, and as each placement moves them: the choice tiles a seat holds
+  // privately, one count per seat in seat order, and the choice tiles on the board — which
+  // every seat plays, so they count for all of them. Both are read off the dealt tiles rather
+  // than assumed empty, because a caller may hand over a hand that already carries some.
+  const choicePerSeat: number[] = [];
+  for (const slot of slots) {
+    if (slot.at !== "private") {
+      continue;
+    }
+    const tile = slot.tiles[slot.index];
+    choicePerSeat[slot.seat] =
+      (choicePerSeat[slot.seat] ?? 0) +
+      (tile !== undefined && "alternativeLetter" in tile ? 1 : 0);
+  }
+  let boardChoice = twoLetterCount(board);
+
+  /** The slots §10 still lets a choice tile land in, optionally of one kind only. */
+  const openSlots = (at: "private" | "community" | null): Slot[] =>
+    slots.filter((slot) => {
+      const tile = slot.tiles[slot.index];
+      if (tile === undefined || "alternativeLetter" in tile) {
+        return false;
+      }
+      if (at !== null && slot.at !== at) {
+        return false;
+      }
+      if (slot.at === "community") {
+        // A free turn or river slot is already inside its limit of one, so only the flop's
+        // own limit can close a community slot that holds no two-letter tile yet.
+        if (slot.index < FLOP_TILES && twoLetterCount(flop) >= FLOP_CHOICE_LIMIT) {
+          return false;
+        }
+        // Every seat plays the board, so this placement has to fit in each of their sevens.
+        return choicePerSeat.every((privately) => privately + boardChoice + 1 <= TWO_LETTER_TILE_LIMIT);
+      }
+      return (choicePerSeat[slot.seat] ?? 0) + boardChoice + 1 <= TWO_LETTER_TILE_LIMIT;
+    });
+
+  // The pool is the one bound the rules do not express: a target taller than the pair pool
+  // would otherwise ask the partial Fisher–Yates below for a pair past the end of it. How many
+  // placements §10 actually allows is decided slot by slot, below.
+  const placements = Math.min(rollTarget(config.twoLetterTargets, rng), config.choicePairs.length);
   if (placements <= 0) {
     return [];
   }
 
   // A private copy, so the caller's pool is a record of what the table could place and the
   // partial Fisher–Yates below only reorders this hand's own working list.
-  const pool = config.sequencePairs.slice();
+  const pool = config.choicePairs.slice();
   const displaced: Tile[] = [];
 
   for (let placed = 0; placed < placements; placed += 1) {
     const preferred = placed === 0 ? "private" : placed === 1 ? "community" : null;
-    const ofKind = openSlots(slots, preferred);
-    const open = ofKind.length > 0 ? ofKind : openSlots(slots, null);
-    // Unreachable while the cap counts every two-letter tile already dealt: the cap leaves
-    // at least `placements` slots free, and a hand is always seven or more tiles.
+    const ofKind = openSlots(preferred);
+    const open = ofKind.length > 0 ? ofKind : openSlots(null);
+    // Reachable only from a hand already at §10's cap or with a full flop: the pass stops
+    // where the rules do, and stops without spending a roll it has nowhere to put.
+    if (open.length === 0) {
+      break;
+    }
     const slot = open[Math.floor(rng() * open.length)];
+    // Unreachable while the index is inside `open`, but the read is optional under
+    // `noUncheckedIndexedAccess`, so it is spelled out rather than cast.
     if (slot === undefined) {
-      return displaced;
+      break;
     }
     const pair = swapAt(pool, placed, placed + Math.floor(rng() * (pool.length - placed)));
     const replaced = slot.tiles[slot.index];
     if (replaced !== undefined) {
       displaced.push(replaced);
     }
-    slot.tiles[slot.index] = sequenceTile(pair);
+    slot.tiles[slot.index] = choiceTile(pair);
+    if (slot.at === "community") {
+      boardChoice += 1;
+    } else {
+      choicePerSeat[slot.seat] = (choicePerSeat[slot.seat] ?? 0) + 1;
+    }
   }
 
   return displaced;
 }
 
-/** §10's fixed-sequence tile: both faces in printed order, each worth its §6 value. */
-function sequenceTile([first, second]: readonly [string, string]): SequenceTile {
+/** §10's choice tile: one physical tile printing both faces, each worth its §6 value. */
+function choiceTile([first, second]: readonly [string, string]): ChoiceTile {
   return {
-    // The `-seq-` marker keeps the id out of the bag's namespace: a table may configure
-    // AE or TS as a sequence pair, and `AE-1` is already the bag's choice tile.
-    id: `${first}${second}-seq-1`,
+    // The pair itself names the tile: the pool places each pair once and the bag holds single
+    // letters only, so `AE-1` is a tile of its own on any table (ADR 0005).
+    id: `${first}${second}-1`,
     letter: first,
     points: faceValue(first),
-    sequenceLetter: second,
-    sequencePoints: faceValue(second),
+    alternativeLetter: second,
+    alternativePoints: faceValue(second),
   };
 }
 
@@ -298,7 +368,11 @@ function rollMultipliers(slots: readonly Slot[], rng: () => number, config: Spec
       continue;
     }
 
-    const double = config.doubleLetterChance + (highestPoints(tile) >= HIGH_VALUE_POINTS ? config.highValueDoubleBonus : 0);
+    // §9's high-value tier reads the best face the tile prints: either face of a choice pair,
+    // or the one letter of a plain tile.
+    const bestFace =
+      "alternativeLetter" in tile ? Math.max(tile.points, tile.alternativePoints) : tile.points;
+    const double = config.doubleLetterChance + (bestFace >= HIGH_VALUE_POINTS ? config.highValueDoubleBonus : 0);
     const roll = rng();
     const multiplier: LetterMultiplier | undefined =
       roll < config.tripleLetterChance
@@ -314,11 +388,11 @@ function rollMultipliers(slots: readonly Slot[], rng: () => number, config: Spec
 }
 
 /**
- * Applies the table's special tiles to a deal's cut: sequence placement, then multipliers.
+ * Applies the table's special tiles to a deal's cut: choice placement, then multipliers.
  *
- * Copies on the way in, like every other engine step: the arrays handed back are the
- * caller's, and the deal they were built from is left as evidence of what was drawn before
- * the pass touched it.
+ * Copies on the way in, like every other engine step: the arrays handed back are the caller's,
+ * and the deal they were built from is left as evidence of what was drawn before the pass
+ * touched it.
  *
  * @param options The dealt hands and board, the seeded generator, and the table's config.
  * @returns The same shape with the pass applied, plus the tiles it displaced.
@@ -341,7 +415,7 @@ export function applySpecialTiles({
   const board = community.slice();
   const slots = dealtSlots(hands, board);
 
-  const displaced = placeSequences(slots, rng, config);
+  const displaced = placeChoices(slots, rng, config);
   rollMultipliers(slots, rng, config);
 
   return { privateTiles: hands, community: board, displaced };

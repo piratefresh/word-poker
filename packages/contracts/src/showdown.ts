@@ -20,7 +20,7 @@ import type { PlayerId } from "./players";
 export const SHOWDOWN_DECIDERS = [
   /** §7's final score, highest first — the ladder's starting order. */
   "final-score",
-  /** §21.1: the word with the most letters; a two-letter tile counts both of them. */
+  /** §21.1: the word with the most letters — one per tile, the face a choice tile played (§10). */
   "word-length",
   /** §21.2: the highest *printed* letter value; tile multipliers do not count. */
   "highest-letter",

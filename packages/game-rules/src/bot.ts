@@ -168,8 +168,8 @@ function better(candidate: Candidate, best: Candidate): boolean {
 }
 
 /**
- * The ways one tile can be played (§10): a choice tile names the face it plays, and every
- * other tile — single letter or fixed sequence — plays the faces it prints.
+ * The ways one tile can be played (§10): a choice tile names the face it plays — both faces
+ * are offered, because either may be the one a word needs — and a single letter plays itself.
  */
 function faceOptions(tile: Tile): readonly TilePlay[] {
   return "alternativeLetter" in tile

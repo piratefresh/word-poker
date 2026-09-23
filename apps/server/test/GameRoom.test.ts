@@ -260,7 +260,7 @@ describe("GameRoom", () => {
       }
       assert.strictEqual(room.state.wordWindow.status, "open", "the hand reaches the word window");
 
-      const draftTile = beforeWord.rack.find((tile) => !("sequenceLetter" in tile));
+      const draftTile = beforeWord.rack.find((tile) => !("alternativeLetter" in tile));
       assert.ok(draftTile, "the fixture gives the reconnecting seat a single-letter tile");
       const draft = {
         plays: [
