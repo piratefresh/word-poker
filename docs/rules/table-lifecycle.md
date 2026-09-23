@@ -4,9 +4,14 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 
 ---
 
-# 27. Re-Buy Rules
+# 27. Re-Buys and Top-Ups
 
-A player may re-buy only when their Table Stack reaches zero.
+A player may add Wallet Coins to their Table Stack between hands, by a re-buy or a top-up,
+as long as the total they have brought to the table stays within the Buy-In Cap (§2).
+
+## Re-Buy
+
+A re-buy is offered when the player's Table Stack reaches zero.
 
 When this happens, display:
 
@@ -15,31 +20,39 @@ When this happens, display:
 [ RE-BUY ]
 [ LEAVE TABLE ]
 
-## Re-Buy Conditions
+## Top-Up
 
-- Re-buy is allowed only between hands.
-- Re-buy is never allowed during an active hand.
-- The re-buy amount is always the table's fixed buy-in.
-- There is no re-buy slider.
-- Partial re-buys are not allowed.
-- The full buy-in is deducted from the Wallet.
-- The full buy-in becomes the new Table Stack.
+A player whose Table Stack is above zero may top it up between hands.
+
+## Conditions
+
+- Re-buys and top-ups are allowed only between hands.
+- They are never allowed during an active hand.
+- The amount is chosen with the same control as joining (§4).
+- A re-buy must be at least the bottom of the tier's buy-in range.
+- The amount cannot exceed the player's Wallet Balance or their remaining Buy-In Cap.
+- The amount is deducted from the Wallet and added to the Table Stack.
 
 ## Example
 
-Table buy-in: 5,000 Coins
-Wallet Balance: 12,000 Coins
+Tier: Intermediate (2,000 – 5,000, Buy-In Cap 5,000)
+Brought so far: 3,000 Coins
 Table Stack: 0 Coins
+Wallet Balance: 12,000 Coins
 
-After re-buy:
+The player may re-buy for 2,000 Coins at most: the cap has 5,000 − 3,000 = 2,000 left.
 
-- Wallet Balance: 7,000 Coins
-- Table Stack: 5,000 Coins
+After re-buying 2,000:
 
-If the player's Wallet Balance is below the table buy-in:
+- Wallet Balance: 10,000 Coins
+- Table Stack: 2,000 Coins
+- Brought so far: 5,000 Coins — the cap is used up
+
+If the player cannot re-buy — their Wallet Balance or their remaining Buy-In Cap is below the
+bottom of the range:
 
 - Re-Buy is disabled.
-- The player must leave the table.
+- The player must leave the table, or move up to a higher stake tier.
 - The seat becomes available.
 
 ---
@@ -62,6 +75,8 @@ When leaving:
 - The seat becomes available.
 - The player is removed from the table.
 
+Leaving does not reset the player's Buy-In Cap for that table session (§2).
+
 ## Example
 
 Wallet Balance: 135,000 Coins
@@ -83,21 +98,27 @@ When a player disconnects:
 - Their seat remains reserved.
 - Their Table Stack remains at the table.
 - Their Wallet Balance is unchanged.
-- They are automatically folded when action reaches them.
-- They cannot win new pots after being folded.
+- The hand continues for the remaining players.
 
-The default reconnect timeout is three minutes.
+## During a Hand
 
-The timeout must be configurable.
+- **Betting:** when action reaches the disconnected seat, its turn clock runs as usual (§15).
+  If the player has not reconnected and acted when it expires, the seat is folded.
+- **Word Building:** a disconnected seat that has not confirmed a word by the end of the
+  window scores 0 (§11, §19).
+- Chips already committed to the pot stay in the pot.
+- A folded seat cannot win the current hand's pots.
 
-## Reconnecting Before Timeout
+## Reconnecting
+
+The default reconnect timeout is three minutes. The timeout must be configurable.
 
 If the player reconnects before the timeout expires:
 
 - They return to the same seat.
 - Their Table Stack is preserved.
-- They may resume during the current hand if they have not already folded.
-- If auto-fold already occurred, they must wait for the next hand.
+- They may resume during the current hand if they have not been folded.
+- If they were folded, they wait for the next hand.
 
 ## Timeout Expiration
 
@@ -108,3 +129,25 @@ If the player does not reconnect before the timeout expires:
 - Their seat becomes available.
 - Chips already committed to an active pot remain in the pot.
 - Only uncommitted remaining stack is returned.
+
+## Idle Players
+
+A player is **idle** when their turn clock has expired on three consecutive betting turns
+(the number is configurable), whether they are connected or not.
+
+- An idle player is removed from the table when the current hand ends.
+- Their remaining Table Stack is returned to their Wallet.
+- Their seat becomes available.
+
+## Table Closing
+
+- **One player left:** when only one player remains seated, a 60-second countdown begins. If
+  no other player joins before it ends, the table closes.
+- **No players left:** a table with no seated players closes.
+- When a table closes, any remaining player keeps their chips: their Table Stack is returned
+  to their Wallet, as if they had left (§28).
+- A closed table ends its table session; the Buy-In Cap resets with the next session (§2).
+
+<!-- Not yet in code: the disconnected seat's turn clock (the room folds it as soon as action
+     reaches it, ADR 0003 — changed by ADR 0006), idle removal, the one-player countdown and
+     table closing, top-ups, and the Buy-In Cap. -->

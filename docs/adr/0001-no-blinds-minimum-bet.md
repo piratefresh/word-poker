@@ -1,7 +1,10 @@
 # No blinds — the first voluntary bet opens at the table minimum
 
-Word Poker has no blinds, antes, or forced bets (§13, §5), so every betting round opens
-on checks until some seat voluntarily bets. For online tables, the opening minimum is 2% of
+> **Superseded by [ADR 0004](0004-blinds.md).** Word Poker now has blinds.
+
+Word Poker has no blinds, antes, or forced bets (§13 and §5 as they read before
+[ADR 0004](0004-blinds.md)), so every betting round opens on checks until some seat
+voluntarily bets. For online tables, the opening minimum is 2% of
 the table's fixed buy-in: 10, 100, or 1,000 chips for the 500, 5,000, and 50,000 buy-in
 presets. The server derives and publishes that value; clients do not choose it.
 

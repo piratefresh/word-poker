@@ -1,119 +1,105 @@
-# Two-Letter Tiles, Word Validation & Length
+# Choice Tiles, Word Validation & Length
 
 Part of the [Word Poker rules](../FINAL_RULES.md).
 
 ---
 
-# 10. Two-Letter Tiles
+# 10. Two-Letter Choice Tiles
 
-## What Is a Two-Letter Tile?
+## What Is a Choice Tile?
 
-A two-letter tile contains two letters on one physical tile.
+A choice tile is one physical tile printed with two letters, such as A/E or Q/K.
 
-Examples:
+- Both letters are visible to the player.
+- It counts as one tile.
+- When building a word, the player plays **one** of the two letters — not both.
 
-- TH
-- ER
-- IN
-- ED
+Every two-letter tile in Word Poker is a choice tile. There are no fixed-sequence tiles that
+play both letters, and no three-letter or four-letter tiles (ADR 0005).
 
-Both letters are displayed together.
+## Choice Tile Rules
 
-The tile counts as one physical tile but provides two letters when building a word.
+- The player picks exactly one face each time the tile is played.
+- The picked letter is the one that counts: for its point value, for word length, and for
+  the Full Rack Bonus.
+- The other letter is not used, not scored, and counts toward nothing.
+- The tile counts as one tile, and one letter, for the Full Rack Bonus.
+- A multiplier on the tile applies to the picked letter (§9).
+- A choice tile may appear as a private tile or a community tile.
 
-## Two-Letter Tile Rules
-
-- Both letters must be used together.
-- The letters cannot be separated.
-- The order printed on the tile must be preserved.
-- Each letter scores independently.
-- The tile counts as one tile for the Full Rack Bonus.
-- A two-letter tile may appear as a private tile or community tile.
-- Three-letter and four-letter tiles are not allowed.
+Players will naturally pick whichever face scores higher, unless the word they are building
+only works with the lower one.
 
 ### Example
 
-A TH tile contributes:
+A Q/K tile plays as Q (10 points) or K (5 points).
 
-- T = 2 points
-- H = 5 points
+In QUIT it plays as Q: 10 points.
+In KIT it plays as K: 5 points.
 
-Total value:
+If the Q/K tile has a Double Letter multiplier and plays as Q: 10 × 2 = **20 points**.
 
-2 + 5 = **7 points**
+## Choice Tile Frequency
 
-If the TH tile has a Double Letter multiplier:
+Count the seven tiles one seat can play — its two private tiles and the five community tiles.
 
-(2 + 5) × 2 = **14 points**
+- At most **three** of those seven are choice tiles. This cap is never crossed — every limit
+  below sits under it, and a placement stops once the seat's seven reach three.
+- The deal aims for **two**, preferably one private and one community, and occasionally
+  deals a third.
+- A seat's two private tiles may hold 0–2 choice tiles.
+- The flop may hold 0–2, the turn at most one, and the river at most one.
 
-## Two-Letter Tile Frequency
+A table may run a lower frequency (0–1 per hand) instead: [Formats](formats.md) §40.
 
-A hand may contain a maximum of three two-letter tiles across:
+### How the deal places them
 
-- All private tiles dealt to players
-- All five community tiles
+The tile bag holds single letters only ([Letter Values, Scoring & Multipliers](scoring.md)
+§6); choice tiles are placed by the deal:
 
-Recommended distribution:
+- The deal draws a hand-level target and places choice tiles until the hand reaches it.
+- A placement replaces the tile in the slot it lands on, and the replaced tile returns to the
+  deck, so a seat still holds exactly two private tiles and the board still five.
+- A placement never lets any seat's seven tiles hold more than three choice tiles.
+- The pair pool and the target weights are table settings, so a table can change its choice
+  tiles without touching the bag.
+- Placement runs on the deal's seeded generator, so the same seed and configuration deal the
+  same tiles, server and client alike.
 
-- Usually one private two-letter tile
-- Usually one community two-letter tile
-- Occasionally a third two-letter tile
-- Never more than three total
+## The Pair Pool
 
-The exact placement is controlled by the game system and may vary each hand.
+The default pool, one copy of each:
 
-### Where the two-letter tiles come from
-
-The 100-tile bag ([Letter Values, Scoring & Multipliers](scoring.md) §6) holds the two
-two-letter **choice** tiles (A/E, T/S) as ordinary members, so a shuffle can show either,
-both, or neither of them. Fixed-sequence tiles are **not** bag members: the deal places
-them, which is what "controlled by the game system" means here.
-
-The placement is the deal-time pass in `packages/game-rules/src/special-tiles.ts`:
-
-- The deal draws a hand-level target for two-letter tiles and places sequence tiles until
-  the hand reaches it, counting the choice tiles the shuffle already dealt. The default
-  target is two — usually one private and one community — with a third occasionally.
-- §10's cap of three is never crossed, counted across every seat and the board together.
-- A placement replaces the tile in the slot it lands on and the replaced tile returns to
-  the deck, so a seat still holds exactly two private tiles and the board still five.
-- The pair pool is a table setting — the default is TH, ER, IN, ED, one copy each — as are
-  the target weights, so a table can change its two-letter tiles without touching the bag.
-- Placement runs on the deal's seeded generator, so the same seed and configuration deal
-  the same tiles, server and client alike.
-
-## Example Choice Tiles
-
-### Vowel Choices
+### Vowel Pairs
 
 - A/E
 - E/I
 - O/U
 - A/I
 
-### Consonant Choices
+### Consonant Pairs
 
 - T/S
 - R/N
 - D/T
 - S/L
 
-### High-Value Choices
+### High-Value Pairs
 
-- Q/K
-- Z/X
-- J/H
+- Q/K (10 / 5)
+- Z/X (10 / 8)
+- J/H (8 / 5)
 
-Choice tiles and fixed two-letter sequence tiles should be treated as separate tile types.
+## Display
 
-A fixed sequence tile such as TH must use both letters in that order.
+Choice tiles must look special: a distinct color or a subtle animation that sets them apart
+from single-letter tiles.
 
-A choice tile such as A/E allows the player to choose either A or E when submitting the word. It does not provide both letters.
+While a word is being built, the tile must clearly show which face is picked.
 
-The UI must clearly distinguish between:
-
-- Fixed two-letter sequence tiles
-- Either-or choice tiles
+<!-- Not yet in code: the engine still deals fixed-sequence tiles (TH, ER, IN, ED) from its
+     placement pool and holds A/E and T/S in the bag (`packages/game-rules/src/special-tiles.ts`,
+     STO-325; `packages/contracts/src/tiles.ts`: `SequenceTile`). ADR 0005 removes them. -->
 
 ---
 
@@ -121,14 +107,14 @@ The UI must clearly distinguish between:
 
 A submitted word must:
 
-- Contain at least 2 letters
+- Contain 2 to 7 letters
 - Use only letters provided by the selected tiles
-- Respect the printed order of fixed two-letter tiles
+- Play exactly one face of each choice tile it uses
 - Use each physical tile no more than once
 - Appear in the configured dictionary
 - Be submitted before the reveal timer expires
 
-Supported dictionaries may include:
+Supported dictionaries (Scrabble word lists):
 
 - TWL
 - SOWPODS
@@ -141,8 +127,6 @@ The player receives 0 points when:
 
 - The word is not in the selected dictionary
 - The word uses unavailable letters
-- A two-letter tile is split
-- A fixed sequence is reversed
 - A tile is used more than once
 - The player submits after the timer expires
 - The player submits no word
@@ -157,14 +141,9 @@ ladder places every seat, and the high-value draw settles the seats that all hav
 
 # 12. Word Length
 
-A word must contain at least 2 letters.
+A word must contain at least 2 and at most 7 letters.
 
-The normal maximum is determined by the available tiles:
+Every tile, choice tiles included, plays exactly one letter, so a word has one letter per
+tile used. Seven tiles make at most a seven-letter word.
 
-- Seven single-letter tiles can create up to a seven-letter word.
-- Two-letter tiles may allow a word to contain more than seven letters.
-- The player may never use more physical tiles than are available.
-
-For example, seven physical tiles containing two two-letter tiles could create a nine-letter word.
-
-The Full Rack Bonus is based on using all seven physical tiles, not on the number of letters in the final word.
+The Full Rack Bonus is based on using all seven physical tiles (§7).
