@@ -253,7 +253,11 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       return;
     }
 
-    this.foldDisconnectedTurns();
+    // §28/§29's removal: a seat that is really gone — a clean leave, or a reconnect hold that
+    // has run out — is folded out of the hand in progress. That is not §15's clock: a seat that
+    // has merely dropped keeps its place and runs its turn clock like a connected one, and the
+    // deadline folds it if it is still to act when its clock runs out (§29, ADR 0006).
+    this.authoritative.foldDepartedSeat(client.sessionId, this.now());
     this.project();
   }
 
@@ -281,7 +285,6 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
     try {
       this.authoritative.dispatch(action, this.now());
-      this.foldDisconnectedTurns();
       this.syncStacks();
       this.project();
       this.sendPrivateStates();
@@ -304,11 +307,6 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         throw error;
       }
     }
-  }
-
-  private foldDisconnectedTurns() {
-    if (this.game === null) return;
-    this.authoritative.foldDisconnectedTurns(this.livePlayerIds(), this.now());
   }
 
   /** The room's one clock: every deadline is checked here, on the timestep, so nothing is armed
@@ -351,21 +349,19 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       if (actor === undefined) return;
       const binding = this.bindingFor(actor.id);
 
-      // A dropped seat is folded by the room's connection-aware path, regardless of whether it
-      // owes chips. It must never receive an action or a timeout event after it disconnected.
-      if (binding?.connected !== true) {
-        this.foldDisconnectedTurns();
-        this.project();
-        this.sendPrivateStates();
-        return;
-      }
-
+      // §15/ADR 0006: an expired turn folds, idle or dropped — a dropped seat runs this same
+      // clock and is folded here, not when action reached it. §29's hold keeps its seat; the
+      // only seat folded before its clock is one that is really gone, which onLeave folds.
       this.authoritative.timeoutTurn(this.now());
-      this.foldDisconnectedTurns();
       this.syncStacks();
       this.project();
       this.sendPrivateStates();
-      this.sendRejection(binding.client, { action: "betting", reason: "turn-timeout" });
+
+      // A connected seat is told its turn expired. A dropped one has no client left to tell,
+      // and must not receive an event after it disconnected (ADR 0003).
+      if (binding?.connected === true) {
+        this.sendRejection(binding.client, { action: "betting", reason: "turn-timeout" });
+      }
     } catch (error) {
       console.error("turn timeout failed", error);
     }
@@ -496,14 +492,6 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
   private bindingFor(playerId: string) {
     return this.bindings.get(playerId);
-  }
-
-  private livePlayerIds(): ReadonlySet<string> {
-    return new Set(
-      this.orderedBindings()
-        .filter((binding) => binding.present && binding.connected)
-        .map((binding) => binding.playerId),
-    );
   }
 
   private projectionBindings(): ProjectionBinding[] {

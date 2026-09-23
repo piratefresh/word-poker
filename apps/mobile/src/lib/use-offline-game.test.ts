@@ -357,7 +357,7 @@ describe("useOfflineGame — the hero's clocks", () => {
     expect(result.current.game.players[0]?.stack).toBe(1_000);
   });
 
-  test("checks on the deadline when nothing is owed", async () => {
+  test("folds on the deadline when nothing is owed", async () => {
     const result = await table();
     // Pre-flop the hero owes the big blind. Call it, and the table reaches the flop, where a
     // checked round leaves the hero owing nothing.
@@ -372,12 +372,16 @@ describe("useOfflineGame — the hero's clocks", () => {
     await act(async () => {
       jest.advanceTimersByTime(60_100);
     });
-    await passedToTheHero(result);
+    // The fold is the table's action like any other, so the bots answer it on their beats.
+    for (let step = 0; step < 40 && result.current.game.phase === "flop"; step += 1) {
+      await beat();
+    }
 
-    // The auto-check took the turn like any other action — it moved no chips, kept the hero in the
-    // hand, and closed the flop's round.
-    expect(result.current.game.phase).toBe("turn");
-    expect(result.current.game.players[0]?.status).not.toBe("fold");
+    // §15/ADR 0006: an expired turn folds even when the seat owed nothing and a check was there
+    // for it, so the hero's clock ends its hand rather than passing the turn on for free — and
+    // the chips it had already committed stay in the pot.
+    expect(result.current.game.players[0]?.status).toBe("fold");
+    expect(result.current.words).toBeNull();
     expect(result.current.game.pot).toBeGreaterThanOrEqual(atRest);
   });
 });
