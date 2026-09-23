@@ -198,7 +198,11 @@ function TableFace({
 
           <Spacer size={spacing.sm} />
           <Stat label="BUY-IN" testID="seated-buy-in" value={formatAmount(table.buyIn)} />
-          <Stat label="MIN BET" testID="seated-min-bet" value={formatAmount(table.minBet)} />
+          <Stat
+            label="BLINDS"
+            testID="seated-blinds"
+            value={`${formatAmount(table.smallBlind)} / ${formatAmount(table.bigBlind)}`}
+          />
           <Stat label="SEATS" testID="seated-seats" value={`${table.seats} / ${table.maxSeats}`} />
           <Spacer size={spacing.md} />
 

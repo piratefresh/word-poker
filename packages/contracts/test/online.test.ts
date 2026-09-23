@@ -54,7 +54,7 @@ describe("online state and rejection shapes", () => {
   it("carries a server clock with every deadline", () => {
     const snapshot: GameTableState = {
       now: 1_000,
-      table: { name: "Test", buyIn: 500, minBet: 10, maxSeats: 2 },
+      table: { name: "Test", buyIn: 500, smallBlind: 5, bigBlind: 10, maxSeats: 2 },
       phase: "preflop",
       sessionOver: false,
       handCount: 1,

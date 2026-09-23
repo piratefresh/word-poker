@@ -90,7 +90,7 @@ function seat(playerId: string, index: number, over: Record<string, unknown> = {
 /** A live preflop hand with the hero to act facing no bet, in the shape `decodeRoom` reads. */
 function liveState(over: Record<string, unknown> = {}) {
   return {
-    table: { name: "Felt", buyIn: 5_000, minBet: 100, maxSeats: 6 },
+    table: { name: "Felt", buyIn: 5_000, smallBlind: 50, bigBlind: 100, maxSeats: 6 },
     phase: "preflop",
     handCount: 1,
     dealerSeat: 0,
@@ -101,7 +101,7 @@ function liveState(over: Record<string, unknown> = {}) {
       [OPPONENT, seat(OPPONENT, 1)],
     ]),
     community: [],
-    betting: { active: true, currentBet: 0, minRaise: 100, minBet: 100 },
+    betting: { active: true, currentBet: 0, minRaise: 100, bigBlind: 100 },
     pots: [{ amount: 0 }],
     wordWindow: { active: false, status: "none", slots: [] },
     result: { available: false, standings: [] },
@@ -207,7 +207,7 @@ describe("useOnlineGame", () => {
 
   test("builds the word the whole hand and locks it in only on confirm", async () => {
     const wordOpen = liveState({
-      betting: { active: false, currentBet: 0, minRaise: 100, minBet: 100 },
+      betting: { active: false, currentBet: 0, minRaise: 100, bigBlind: 100 },
       toActSeat: -1,
       wordWindow: { active: true, status: "open", slots: [{ playerId: HERO, status: "drafting" }] },
     });
@@ -276,7 +276,7 @@ describe("useOnlineGame", () => {
         [HERO, seat(HERO, 0)],
         [OPPONENT, seat(OPPONENT, 1, { committedThisRound: 100, committedThisHand: 100 })],
       ]),
-      betting: { active: true, currentBet: 100, minRaise: 100, minBet: 100 },
+      betting: { active: true, currentBet: 100, minRaise: 100, bigBlind: 100 },
     });
     await act(async () => room.emitState(next));
     await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
@@ -301,7 +301,7 @@ describe("useOnlineGame", () => {
 
   test("surfaces a server word rejection as the draft's reason", async () => {
     const wordOpen = liveState({
-      betting: { active: false, currentBet: 0, minRaise: 100, minBet: 100 },
+      betting: { active: false, currentBet: 0, minRaise: 100, bigBlind: 100 },
       toActSeat: -1,
       wordWindow: { active: true, status: "open", slots: [{ playerId: HERO, status: "drafting" }] },
     });

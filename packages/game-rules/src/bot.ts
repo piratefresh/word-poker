@@ -39,11 +39,11 @@ export const BOT_CALL_THRESHOLD = 100;
 export const BOT_BET_FREQUENCY = 0.2;
 
 /**
- * The sizes the bot opens for — the table's minimum bet and its next two steps. A size the
- * stack cannot cover falls through the tree: the bot never shoves on purpose (that is what
- * an all-in action is for, and the bot does not take it).
+ * The sizes the bot opens for, as multiples of the table's big blind (§22): the minimum bet and
+ * its next two steps. A size the stack cannot cover falls through the tree: the bot never shoves
+ * on purpose (that is what an all-in action is for, and the bot does not take it).
  */
-export const BOT_BET_SIZES = [20, 40, 60] as const;
+export const BOT_BET_STEPS = [1, 2, 3] as const;
 
 /** How often the bot raises rather than settling for a call. */
 export const BOT_RAISE_FREQUENCY = 0.15;
@@ -64,7 +64,7 @@ const BOT_ROLL_SALT = 0x0b07_5eed;
  *
  * On a betting turn the leaves are tried in order, first match acting:
  *
- * 1. checking is free and the roll says bet, for a size the stack covers → `bet`;
+ * 1. no bet is out and the roll says bet, for a size the stack covers → `bet`;
  * 2. checking is free → `check`;
  * 3. facing a bet bigger than the threshold → `fold`;
  * 4. the roll says raise and the stack covers the floor raise → `raise` to the floor;
@@ -100,7 +100,7 @@ export function decideOfflineMove(state: OfflineState, botId: PlayerId): Offline
     throw new OfflineActionError(`no betting round is open at ${state.phase}`);
   }
 
-  const bounds = bettingBounds(state.seats, betting, toAct, state.stakes.minBet);
+  const bounds = bettingBounds(state.seats, betting, toAct, state.stakes.bigBlind);
   if (bounds === null) {
     throw new OfflineActionError(`${botId} cannot act at ${state.phase}`);
   }
@@ -108,9 +108,13 @@ export function decideOfflineMove(state: OfflineState, botId: PlayerId): Offline
   const rng = createRng(handSeed(state) + BOT_ROLL_SALT + ROUND_PHASES.indexOf(state.phase) * 31 + toAct);
   const betRoll = rng();
   const sizeRoll = rng();
-  const size = BOT_BET_SIZES[Math.floor(sizeRoll * BOT_BET_SIZES.length)];
+  const step = BOT_BET_STEPS[Math.floor(sizeRoll * BOT_BET_STEPS.length)];
+  const size = step === undefined ? undefined : step * state.stakes.bigBlind;
 
-  if (bounds.canCheck && betRoll < BOT_BET_FREQUENCY && size !== undefined && size <= acting.stack) {
+  // The opening bet is only the bot's to make when the round has no bet in it yet: pre-flop the
+  // posted big blind is already the Current Bet, so a seat that owes nothing there — the big
+  // blind itself — checks rather than betting at it.
+  if (bounds.canBet && betRoll < BOT_BET_FREQUENCY && size !== undefined && size <= acting.stack) {
     return { type: "bet", playerId: botId, amount: size };
   }
   if (bounds.canCheck) {

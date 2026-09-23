@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { OfflineAction, Tile, WordSubmission } from "@wordpoker/contracts";
 
 import {
-  BOT_BET_SIZES,
+  BOT_BET_STEPS,
   BOT_CALL_THRESHOLD,
   BOT_RAISE_FREQUENCY,
   BOT_BET_FREQUENCY,
@@ -55,19 +55,19 @@ function enabled(bounds: BettingBounds, action: OfflineAction): boolean {
 describe("decideOfflineMove — the scripted line", () => {
   /**
    * One seat's pinned turn for seed 4242: the tree's rolls are a function of the hand's seed,
-   * the street and the seat, so this line is the bot's whole preflop for that table. Re-pin it
-   * only when the tree itself changes.
+   * the street and the seat, so this line is the bot's whole preflop for that table. It starts at
+   * mira, the first dealt-in seat clockwise from the big blind, and ends with the big blind
+   * checking the blind it posted (§15). Re-pin it only when the tree itself changes.
    */
   const OPENING_LINE: readonly {
     readonly phase: OfflineState["phase"];
     readonly seat: number;
     readonly action: OfflineAction;
   }[] = [
-    { phase: "preflop", seat: 1, action: { type: "check", playerId: "ellis" } },
-    { phase: "preflop", seat: 2, action: { type: "bet", playerId: "jay", amount: 60 } },
     { phase: "preflop", seat: 3, action: { type: "call", playerId: "mira" } },
     { phase: "preflop", seat: 0, action: { type: "call", playerId: "hero" } },
     { phase: "preflop", seat: 1, action: { type: "call", playerId: "ellis" } },
+    { phase: "preflop", seat: 2, action: { type: "check", playerId: "jay" } },
   ];
 
   it("plays exactly the pinned line, then lets the street roll", () => {
@@ -83,16 +83,18 @@ describe("decideOfflineMove — the scripted line", () => {
     }
 
     assert.equal(state.phase, "flop");
+    // Every seat ends the pre-flop on the big blind: the small blind pays the difference and the
+    // big blind's own check is what closed the round (§23, §15).
     assert.deepEqual(
       state.seats.map((seat) => seat.committedHand),
-      [60, 60, 60, 60],
+      [20, 20, 20, 20],
     );
   });
 
   it("returns the same move for the same state", () => {
     const state = dealHand();
 
-    assert.deepEqual(decideOfflineMove(state, "ellis"), decideOfflineMove(state, "ellis"));
+    assert.deepEqual(decideOfflineMove(state, "mira"), decideOfflineMove(state, "mira"));
   });
 
   it("refuses to move out of turn, or for a player who is not seated", () => {
@@ -169,7 +171,7 @@ describe("decideOfflineMove — a table of bots", () => {
 
       // The property: every action the tree returns is one the bounds enable, so the engine
       // has no reason to refuse it.
-      const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
+      const bounds = bettingBounds(state.seats, round, index, state.stakes.bigBlind);
       assert.ok(bounds, `seat ${index} can act`);
       assert.ok(enabled(bounds, action), `expected ${JSON.stringify(action)} to be enabled`);
 
@@ -202,11 +204,41 @@ describe("decideOfflineMove — a table of bots", () => {
 
   it("stays inside the tree's own constants", () => {
     // The tree is the policy: these are its numbers, and a change to any of them is a
-    // deliberate change to how bots play (and to the pinned line above).
-    assert.deepEqual([...BOT_BET_SIZES], [20, 40, 60]);
+    // deliberate change to how bots play (and to the pinned line above). Its bet sizes are read
+    // off the table rather than baked in, so the same tree plays a 10/20 and a 50/100 table.
+    assert.deepEqual([...BOT_BET_STEPS], [1, 2, 3]);
     assert.equal(BOT_CALL_THRESHOLD, 100);
     assert.ok(Math.abs(BOT_BET_FREQUENCY - 0.2) < 1e-9);
     assert.ok(Math.abs(BOT_RAISE_FREQUENCY - 0.15) < 1e-9);
+  });
+
+  it("opens for a multiple of the table's big blind, never a buried size", () => {
+    // seed 4242's line, played out by bots: the turn's opening bet is 40 and the river's is 60.
+    // Neither is a literal in the tree — both are the table's own big blind times a step, which
+    // is what lets the same policy sit down at a 50/100 table.
+    let state = dealHand();
+    const bets: number[] = [];
+
+    while (state.phase !== "payout" && bets.length < 2) {
+      if (state.wordWindow?.status === "open") {
+        state = reduce(state, { type: "timeoutWords" }, state.endsAtMs);
+        continue;
+      }
+
+      const index = state.toActIndex;
+      assert.ok(index !== null, "a seat is to act");
+      const seat = state.seats[index];
+      assert.ok(seat, `seat ${index}`);
+      const action = decideOfflineMove(state, seat.id);
+      if (action.type === "bet") bets.push(action.amount);
+      state = reduce(state, action, NOW);
+    }
+
+    assert.deepEqual(bets, [40, 60]);
+    assert.deepEqual(
+      bets.map((amount) => amount / state.stakes.bigBlind),
+      [2, 3],
+    );
   });
 });
 

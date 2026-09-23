@@ -676,7 +676,7 @@ function perspectiveOf(
     heroToAct: heroIndex >= 0 && state.toActIndex === heroIndex,
     turnDurationMs: state.turnDurationMs,
     round: state.betting,
-    minBet: state.stakes.minBet,
+    blinds: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
     community: state.community.map((tile, index) => (index < state.revealed ? tile : null)),
     privateTiles: hero?.privateTiles ?? [],
     available: heroIndex >= 0 ? availableTiles(state, heroIndex) : [],

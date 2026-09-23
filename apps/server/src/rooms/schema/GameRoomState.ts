@@ -19,7 +19,8 @@ export type TileState = SchemaType<typeof TileState>;
 export const TableConfigState = schema({
   name: t.string().default(""),
   buyIn: t.uint32().default(0),
-  minBet: t.uint32().default(0),
+  smallBlind: t.uint32().default(0),
+  bigBlind: t.uint32().default(0),
   maxSeats: t.uint8().default(0),
 }, "TableConfigState");
 export type TableConfigState = SchemaType<typeof TableConfigState>;
@@ -42,7 +43,7 @@ export type SeatState = SchemaType<typeof SeatState>;
 /** The currently open betting numbers. `active` represents the domain null. */
 export const BettingState = schema({
   active: t.boolean().default(false),
-  minBet: t.uint32().default(0),
+  bigBlind: t.uint32().default(0),
   currentBet: t.uint32().default(0),
   minRaise: t.uint32().default(0),
 }, "BettingState");

@@ -82,7 +82,8 @@ export class GameRoomProjection {
     const table: TableConfigState = this.state.table;
     table.name = input.table.name;
     table.buyIn = input.table.buyIn;
-    table.minBet = input.table.minBet;
+    table.smallBlind = input.table.smallBlind;
+    table.bigBlind = input.table.bigBlind;
     table.maxSeats = input.table.maxSeats;
 
     this.state.phase = input.game?.phase ?? WAITING_PHASE;
@@ -125,12 +126,14 @@ export class GameRoomProjection {
     const projection: BettingState = this.state.betting;
     const betting = input.game?.betting;
     projection.active = betting !== null && betting !== undefined;
-    projection.minBet = input.game?.stakes.minBet ?? input.table.minBet;
+    // The round's floor is the table's big blind (§22): the engine's own stakes while a hand is
+    // dealt, and the table's config before the first deal.
+    projection.bigBlind = input.game?.stakes.bigBlind ?? input.table.bigBlind;
     projection.currentBet = betting?.currentBet ?? 0;
     projection.minRaise =
       betting === null || betting === undefined
         ? 0
-        : Math.max(betting.lastRaiseSize, projection.minBet);
+        : Math.max(betting.lastRaiseSize, projection.bigBlind);
   }
 
   private projectPots(input: GameRoomProjectionInput): void {

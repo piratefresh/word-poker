@@ -12,7 +12,7 @@ import {
   type BettingStepStatus,
 } from "../src/betting";
 
-const MIN_BET = 20;
+const BIG_BLIND = 20;
 const START = 1_000;
 
 /** One seat as the machine reads it: all chips in the stack, nothing committed yet. */
@@ -54,7 +54,7 @@ function acting(table: Table): number {
 
 /** Applies an action the test expects to be accepted and returns the table it left behind. */
 function play(table: Table, action: BettingAction): Table {
-  const applied = applyBettingAction(table.seats, table.round, acting(table), action, MIN_BET);
+  const applied = applyBettingAction(table.seats, table.round, acting(table), action, BIG_BLIND);
 
   assert.ok(applied.ok, `expected ${JSON.stringify(action)} to be accepted`);
   return { seats: applied.step.seats, round: applied.step.round, toAct: applied.step.toAct, status: applied.step.status };
@@ -63,7 +63,7 @@ function play(table: Table, action: BettingAction): Table {
 /** Applies an action the test expects to be refused, and proves nothing changed. */
 function refuse(table: Table, action: BettingAction, toAct = acting(table)): BettingRejectionReason {
   const before = structuredClone(table);
-  const applied = applyBettingAction(table.seats, table.round, toAct, action, MIN_BET);
+  const applied = applyBettingAction(table.seats, table.round, toAct, action, BIG_BLIND);
 
   assert.ok(!applied.ok, `expected ${JSON.stringify(action)} to be refused`);
   assert.deepEqual(table, before, "a refusal must not touch the table");
@@ -110,7 +110,7 @@ describe("applyBettingAction — guards", () => {
     const round: BettingRoundState = { currentBet: 0, lastRaiseSize: 0 };
     const before = structuredClone(seats);
 
-    applyBettingAction(seats, round, 0, bet("hero", 20), MIN_BET);
+    applyBettingAction(seats, round, 0, bet("hero", 20), BIG_BLIND);
 
     assert.deepEqual(seats, before);
     assert.deepEqual(round, { currentBet: 0, lastRaiseSize: 0 });
@@ -212,6 +212,55 @@ describe("applyBettingAction — the round walks", () => {
     table = play(table, check("jay"));
     assert.equal(table.status, "round-complete");
     assert.equal(table.toAct, null);
+  });
+
+  it("walks a round the blinds already opened: the small blind calls, the big blind checks (§15, §23)", () => {
+    // Blinds 10 / 20: the small blind has committed 10, the big blind 20 — and that 20 is the
+    // round's opening Current Bet, with the big blind itself still to act.
+    const seats = [
+      seat("hero"),
+      seat("ellis", 990, { committedRound: 10, committedHand: 10 }),
+      seat("jay", 980, { committedRound: 20, committedHand: 20 }),
+    ];
+    let table = facing(seats, { currentBet: BIG_BLIND, lastRaiseSize: 0 }, 0);
+
+    // Nobody may open a bet here: the big blind is already out (§22).
+    assert.equal(refuse(table, bet("hero", 40)), "bet-facing-bet");
+
+    table = play(table, call("hero"));
+    assert.equal(table.seats[0]?.committedRound, 20);
+    assert.equal(table.toAct, 1);
+
+    // The small blind owes the difference and only the difference (§23): 10 of its 20.
+    table = play(table, call("ellis"));
+    assert.equal(table.seats[1]?.committedRound, 20);
+
+    // Back at the big blind, whose own blind is already the Current Bet: its check closes the
+    // round, and the blind it posted stays in the pot.
+    assert.equal(table.toAct, 2);
+    table = play(table, check("jay"));
+
+    assert.equal(table.status, "round-complete");
+    assert.equal(table.seats[2]?.committedRound, 20);
+  });
+
+  it("lets the big blind raise instead of checking, reopening the round (§15)", () => {
+    const seats = [
+      seat("hero", 980, { committedRound: 20, committedHand: 20, actedThisRound: true }),
+      seat("ellis", 990, { committedRound: 10, committedHand: 10, actedThisRound: true }),
+      seat("jay", 980, { committedRound: 20, committedHand: 20 }),
+    ];
+    let table = facing(seats, { currentBet: BIG_BLIND, lastRaiseSize: 0 }, 2);
+
+    table = play(table, raise("jay", 40));
+
+    assert.equal(table.round.currentBet, 40);
+    assert.equal(table.round.lastRaiseSize, 20);
+    // The full raise put every other live seat back on the hook, the seats that had called the
+    // blind included.
+    assert.equal(table.seats[0]?.actedThisRound, false);
+    assert.equal(table.seats[1]?.actedThisRound, false);
+    assert.equal(table.toAct, 0);
   });
 
   it("closes after a bet and a call, heads up", () => {
@@ -372,7 +421,7 @@ describe("applyBettingAction — all-in and short calls", () => {
 
 describe("bettingBounds", () => {
   it("arms the opening bet and the fold, but not call or raise, when no bet is out", () => {
-    const bounds = bettingBounds([seat("hero"), seat("ellis")], { currentBet: 0, lastRaiseSize: 0 }, 0, MIN_BET);
+    const bounds = bettingBounds([seat("hero"), seat("ellis")], { currentBet: 0, lastRaiseSize: 0 }, 0, BIG_BLIND);
 
     assert.deepEqual(bounds, {
       canFold: true,
@@ -382,16 +431,16 @@ describe("bettingBounds", () => {
       canRaise: false,
       canAllIn: true,
       callAmount: 0,
-      minRaiseTo: MIN_BET,
+      minRaiseTo: BIG_BLIND,
       maxRaiseTo: START,
-      minBet: MIN_BET,
+      bigBlind: BIG_BLIND,
       currentBet: 0,
     });
   });
 
   it("bounds a raise by the floor and the stack when facing a bet", () => {
     const seats = [seat("hero", 900, { committedRound: 100 }), seat("ellis", START, { committedRound: 300 })];
-    const bounds = bettingBounds(seats, { currentBet: 300, lastRaiseSize: 200 }, 0, MIN_BET);
+    const bounds = bettingBounds(seats, { currentBet: 300, lastRaiseSize: 200 }, 0, BIG_BLIND);
 
     assert.ok(bounds !== null);
     assert.equal(bounds.canCheck, false);
@@ -405,7 +454,7 @@ describe("bettingBounds", () => {
 
   it("keeps the round's raise closed to a seat that has acted and has not been reopened", () => {
     const seats = [seat("hero", 980, { committedRound: 20, actedThisRound: true }), seat("ellis", START, { committedRound: 40 })];
-    const bounds = bettingBounds(seats, { currentBet: 40, lastRaiseSize: 20 }, 0, MIN_BET);
+    const bounds = bettingBounds(seats, { currentBet: 40, lastRaiseSize: 20 }, 0, BIG_BLIND);
 
     assert.ok(bounds !== null);
     assert.equal(bounds.canRaise, false);
@@ -415,7 +464,7 @@ describe("bettingBounds", () => {
 
   it("closes the raise to a stack that cannot reach the floor", () => {
     const seats = [seat("hero", 30), seat("ellis", START, { committedRound: 40 })];
-    const bounds = bettingBounds(seats, { currentBet: 40, lastRaiseSize: 40 }, 0, MIN_BET);
+    const bounds = bettingBounds(seats, { currentBet: 40, lastRaiseSize: 40 }, 0, BIG_BLIND);
 
     assert.ok(bounds !== null);
     assert.equal(bounds.canRaise, false);
@@ -424,7 +473,7 @@ describe("bettingBounds", () => {
   });
 
   it("refuses a bet the stack cannot pay for", () => {
-    const bounds = bettingBounds([seat("hero", 10), seat("ellis")], { currentBet: 0, lastRaiseSize: 0 }, 0, MIN_BET);
+    const bounds = bettingBounds([seat("hero", 10), seat("ellis")], { currentBet: 0, lastRaiseSize: 0 }, 0, BIG_BLIND);
 
     assert.ok(bounds !== null);
     assert.equal(bounds.canBet, false);
@@ -439,9 +488,9 @@ describe("bettingBounds", () => {
     ];
     const round = { currentBet: 0, lastRaiseSize: 0 };
 
-    assert.equal(bettingBounds(seats, round, 0, MIN_BET), null);
-    assert.equal(bettingBounds(seats, round, 1, MIN_BET), null);
-    assert.equal(bettingBounds(seats, round, 2, MIN_BET), null);
-    assert.equal(bettingBounds(seats, round, 9, MIN_BET), null);
+    assert.equal(bettingBounds(seats, round, 0, BIG_BLIND), null);
+    assert.equal(bettingBounds(seats, round, 1, BIG_BLIND), null);
+    assert.equal(bettingBounds(seats, round, 2, BIG_BLIND), null);
+    assert.equal(bettingBounds(seats, round, 9, BIG_BLIND), null);
   });
 });

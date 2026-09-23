@@ -49,7 +49,7 @@ function perspective(overrides: Partial<HeroPerspective> = {}): HeroPerspective 
     dealerIndex: 1,
     heroToAct: true,
     round: { currentBet: 0, lastRaiseSize: 0 },
-    minBet: 10,
+    blinds: { smallBlind: 5, bigBlind: 10 },
     community: [null, null, null, null, null],
     privateTiles: RACK,
     available: RACK,
@@ -79,7 +79,37 @@ describe("heroView — the felt", () => {
 
     expect(game.players.map((player) => player?.id ?? null)).toEqual(["hero", null, "opp", null]);
     expect(game.players[0]).toMatchObject({ isHero: true, status: "your-turn" });
-    expect(game.players[2]).toMatchObject({ isHero: false, status: "waiting", role: "dealer" });
+    // Heads-up here — two seats in the hand — so the button posts the small blind and the other
+    // seat holds the big blind (§5).
+    expect(game.players[2]).toMatchObject({ isHero: false, status: "waiting", roles: ["dealer", "small-blind"] });
+    expect(game.players[0]?.roles).toEqual(["big-blind"]);
+  });
+
+  test("badges the button and the two seats clockwise from it (§5)", () => {
+    const seats = [seat("hero", 0), seat("sb", 1), seat("bb", 2), seat("utg", 3)];
+    const { game } = heroView(perspective({ seats, dealerIndex: 0 }), LOCAL);
+
+    // Hand 1 at a four-seat table: the button is seat 0, the blinds are seats 1 and 2, and the
+    // seat clockwise from the big blind holds no marker.
+    expect(game.players.map((player) => player?.roles)).toEqual([
+      ["dealer"],
+      ["small-blind"],
+      ["big-blind"],
+      undefined,
+    ]);
+  });
+
+  test("marks no blind for a seat that is sitting the hand out (§5, ADR 0002)", () => {
+    const seats = [seat("hero", 0), seat("busted", 1, { sittingOut: true }), seat("sb", 2), seat("bb", 3)];
+    const { game } = heroView(perspective({ seats, dealerIndex: 0 }), LOCAL);
+
+    // The sitting-out seat is not dealt in, so the button's blinds pass over it.
+    expect(game.players.map((player) => player?.roles)).toEqual([
+      ["dealer"],
+      undefined,
+      ["small-blind"],
+      ["big-blind"],
+    ]);
   });
 
   test("reads the pot off every seat's commitment this hand", () => {

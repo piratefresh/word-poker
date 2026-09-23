@@ -6,7 +6,7 @@
  * the ones the server would have given. A refusal that comes back from the server anyway (a socket
  * that closed, a create the server judged differently) is shown as the server's own sentence.
  *
- * There is no minimum bet field: it is derived from the buy-in server-side (`minBetFor`), so no
+ * There is no blinds field: they are derived from the buy-in server-side (`blindsFor`), so no
  * client can propose stakes §2 does not offer.
  *
  * The name field is a React Native `TextInput` hosted in the universal layout (`RNHostView`, the

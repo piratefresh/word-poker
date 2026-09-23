@@ -81,7 +81,7 @@ function playToFoldOut(dictionary: Dictionary, survivor: string): OfflineState {
     if (acting === undefined) break;
 
     if (acting.id === survivor) {
-      const bounds = bettingBounds(state.seats, state.betting, index, state.stakes.minBet);
+      const bounds = bettingBounds(state.seats, state.betting, index, state.stakes.bigBlind);
       if (bounds === null) break;
       state = reduce(
         state,

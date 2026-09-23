@@ -73,7 +73,14 @@ type Listing = {
   clients: number;
   maxClients: number;
   locked: boolean;
-  metadata: { name: string; buyIn: number; minBet: number; maxSeats: number; status: string };
+  metadata: {
+    name: string;
+    buyIn: number;
+    smallBlind: number;
+    bigBlind: number;
+    maxSeats: number;
+    status: string;
+  };
 };
 
 /** One table as the lobby lists it — a listing entry and the metadata a row draws from it. */
@@ -86,7 +93,8 @@ function table(roomId: string, overrides: Partial<Listing> = {}): Listing {
     metadata: {
       name: `Table ${roomId}`,
       buyIn: 500,
-      minBet: 10,
+      smallBlind: 5,
+      bigBlind: 10,
       maxSeats: 6,
       status: WAITING_PHASE,
     },
@@ -185,7 +193,8 @@ test("lists a table with the stakes, the seats and the state a player picks it b
         ...table("beta").metadata,
         name: "High rollers",
         buyIn: 50_000,
-        minBet: 1_000,
+        smallBlind: 500,
+        bigBlind: 1_000,
       },
     }),
   ]);
@@ -193,12 +202,14 @@ test("lists a table with the stakes, the seats and the state a player picks it b
   const alpha = within(view.getByTestId("lobby-room-alpha"));
   expect(alpha.getByText("Table alpha")).toBeOnTheScreen();
   expect(alpha.getByText("$500")).toBeOnTheScreen();
+  expect(alpha.getByText("$5 / $10 BLINDS")).toBeOnTheScreen();
   expect(alpha.getByText("1 / 6")).toBeOnTheScreen();
   expect(alpha.getByText("WAITING")).toBeOnTheScreen();
 
   const beta = within(view.getByTestId("lobby-room-beta"));
   expect(beta.getByText("High rollers")).toBeOnTheScreen();
   expect(beta.getByText("$50,000")).toBeOnTheScreen();
+  expect(beta.getByText("$500 / $1,000 BLINDS")).toBeOnTheScreen();
   expect(beta.getByText("6 / 6")).toBeOnTheScreen();
 
   expect(view.queryByTestId("lobby-empty")).toBeNull();
@@ -239,7 +250,7 @@ test("offers the table already held as a way back, not as a join", async () => {
   const mine = view.getByTestId("lobby-room-mine");
   expect(within(mine).getByText("YOUR TABLE")).toBeOnTheScreen();
   expect(mine.props.accessibilityLabel).toBe(
-    "Your table, Table mine, $500 buy-in, 1 of 6 seats taken, waiting for players",
+    "Your table, Table mine, $500 buy-in, blinds $5 and $10, 1 of 6 seats taken, waiting for players",
   );
 
   const theirs = view.getByTestId("lobby-room-theirs");

@@ -237,11 +237,14 @@ The winning player:
 - Receives the entire eligible pot
 - Begins the next hand with the awarded chips in their Table Stack
 
-<!-- Not yet in code: blinds. The betting-round machine still opens every round on checks
-     with a "minimum bet" of 2% of the buy-in (ADR 0001, superseded by ADR 0004).
-     Contract status: §22–§26 are implemented in the shared engine. The wire vocabulary —
+<!-- Contract status: §22–§26 are implemented in the shared engine, blinds included. Every hand
+     opens with both blinds posted before the deal (§5, §14; `startHand` in
+     `packages/game-rules/src/offline.ts`, STO-466), the posted big blind is the first round's
+     opening Current Bet and the table's minimum bet, and the raise floor is
+     `currentBet + max(lastRaiseSize, bigBlind)`. The wire vocabulary —
      the action union, the refusal reasons, and the pot/seat shapes — is
-     `packages/contracts/src/betting.ts` (STO-336). The stack model is
+     `packages/contracts/src/betting.ts` (STO-336), with the table's blinds on
+     `packages/contracts/src/rooms.ts` (`blindsFor`, ADR 0004). The stack model is
      `packages/game-rules/src/chips.ts` (`commitChips`/`awardChips`, STO-337), and the
      betting-round machine — legality, the current bet, the minimum bet, the raise
      floor, and the reopen rule for full vs short all-in raises — is
@@ -253,4 +256,4 @@ The winning player:
      reveal entirely (`judged: []`, STO-342). The offline round machine wires all of it in
      (`packages/game-rules/src/offline.ts`, STO-343) with the bot policy in `src/bot.ts`
      (STO-344), and the offline felt renders it (`apps/mobile/src/lib/use-offline-game.ts`,
-     STO-345). The offline table's stakes are ADR 0002. -->
+     STO-345). The offline table's stack is ADR 0002 and its blinds are ADR 0004. -->
