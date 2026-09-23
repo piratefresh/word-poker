@@ -132,16 +132,16 @@ describe("<ResultCard />", () => {
     expect(view.queryByLabelText(getTileAccessibilityLabel(seat.tiles[2]))).toBeNull();
   });
 
-  test("draws a ten-letter word out of eight tiles", async () => {
+  test("draws §12's longest word, seven letters out of seven tiles", async () => {
     const seat = longWordSnapshot.seats[0];
     const view = await render(<ResultCard seat={seat} />);
 
-    expect(view.getByText("THREATENED")).toBeOnTheScreen();
+    expect(view.getByText("MARKETS")).toBeOnTheScreen();
     expect(
       view.getAllByTestId(new RegExp(`^result-card-${seat.playerId}-tile-\\d+$`), {
         includeHiddenElements: true,
       }),
-    ).toHaveLength(8);
+    ).toHaveLength(7);
   });
 
   test("prints the same card on a motion beat as it does settled", async () => {

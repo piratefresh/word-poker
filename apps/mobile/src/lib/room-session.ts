@@ -31,7 +31,8 @@ const MATCHMAKE_EXPIRED = 524;
 export interface TableSnapshot {
   readonly name: string;
   readonly buyIn: number;
-  readonly minBet: number;
+  readonly smallBlind: number;
+  readonly bigBlind: number;
   readonly maxSeats: number;
   /** Seats taken right now. A seat is a connection, so this is live. */
   readonly seats: number;
@@ -64,7 +65,8 @@ interface TableState {
   table: {
     name: string;
     buyIn: number;
-    minBet: number;
+    smallBlind: number;
+    bigBlind: number;
     maxSeats: number;
   };
   phase: RoomPhase;
@@ -112,7 +114,8 @@ function tableOf(state: unknown): TableSnapshot {
   return {
     name: table.table.name,
     buyIn: table.table.buyIn,
-    minBet: table.table.minBet,
+    smallBlind: table.table.smallBlind,
+    bigBlind: table.table.bigBlind,
     maxSeats: table.table.maxSeats,
     seats: table.seats.size,
     phase: table.phase,

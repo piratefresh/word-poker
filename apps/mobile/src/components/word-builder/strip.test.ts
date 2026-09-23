@@ -19,7 +19,7 @@ import {
 const ENTRIES: readonly StripEntry[] = [
   { tile: { id: "p-a", letter: "A", points: 1 }, ownership: "private" },
   { tile: { id: "p-r", letter: "R", points: 2 }, ownership: "private" },
-  { tile: { id: "c-th", letter: "T", points: 1, sequenceLetter: "H", sequencePoints: 4 }, ownership: "community" },
+  { tile: { id: "c-ts", letter: "T", points: 1, alternativeLetter: "S", alternativePoints: 1 }, ownership: "community" },
   { tile: { id: "c-z", letter: "Z", points: 10 }, ownership: "community" },
 ];
 
@@ -34,8 +34,8 @@ const plays = (draft: readonly TilePlay[]): readonly string[] =>
 
 describe("the strip's order", () => {
   test("moves a tile to the place it was dropped on, and only there", () => {
-    expect(ids(move(ENTRIES, 0, 2))).toEqual(["p-r", "c-th", "p-a", "c-z"]);
-    expect(ids(move(ENTRIES, 3, 0))).toEqual(["c-z", "p-a", "p-r", "c-th"]);
+    expect(ids(move(ENTRIES, 0, 2))).toEqual(["p-r", "c-ts", "p-a", "c-z"]);
+    expect(ids(move(ENTRIES, 3, 0))).toEqual(["c-z", "p-a", "p-r", "c-ts"]);
 
     // A place the strip has not got — the drag began when the hand was longer — is the order it
     // already had, never a throw and never a tile lost.
@@ -46,11 +46,11 @@ describe("the strip's order", () => {
 
   test("reads a drop's places back into the order they describe", () => {
     // The kit hands back `{ id: place }`; the strip is the ids sorted by the place they landed on.
-    expect(orderFromPositions({ "p-a": 2, "p-r": 0, "c-th": 3, "c-z": 1 })).toEqual([
+    expect(orderFromPositions({ "p-a": 2, "p-r": 0, "c-ts": 3, "c-z": 1 })).toEqual([
       "p-r",
       "c-z",
       "p-a",
-      "c-th",
+      "c-ts",
     ]);
   });
 
@@ -74,11 +74,11 @@ describe("the strip's order", () => {
     // Fisher–Yates with the generator pinned swaps every tile with the one before it.
     const random = jest.spyOn(Math, "random").mockReturnValue(0);
     try {
-      const held = new Set(["p-a", "c-th"]);
+      const held = new Set(["p-a", "c-ts"]);
       const shuffled = shuffleUnheld(ENTRIES, held);
 
-      // p-a and c-th keep the places they sit in (0 and 2); p-r and c-z are dealt around them.
-      expect(ids(shuffled)).toEqual(["p-a", "c-z", "c-th", "p-r"]);
+      // p-a and c-ts keep the places they sit in (0 and 2); p-r and c-z are dealt around them.
+      expect(ids(shuffled)).toEqual(["p-a", "c-z", "c-ts", "p-r"]);
       // Every tile is still there, so a shuffle never loses one.
       expect([...ids(shuffled)].sort()).toEqual([...ids(ENTRIES)].sort());
     } finally {

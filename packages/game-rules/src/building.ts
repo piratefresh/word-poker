@@ -8,11 +8,10 @@
  * and the configured dictionary; everything else is decided here, from those two arguments
  * and nothing else. No clock: the deadline is the reducer's business (STO-324).
  *
- * Refusals carry §11's reasons. Two are deliberately not produced here, and the split is
- * the honest one rather than a branch that cannot fire: `timer-expired` belongs to the
- * caller's clock, and §12's upper bound is structural — a submission can play neither more
- * tiles nor more letters than `available` holds, since every play must name a distinct tile
- * from that set.
+ * Refusals carry §11's reasons. Only `timer-expired` is deliberately not produced here: it
+ * belongs to the caller's clock. §12's ceiling is checked here beside its floor, so a caller
+ * that hands over more tiles than a table deals — a test, a replay, a future mode — gets the
+ * word refused by name rather than accepted for being buildable.
  */
 
 import type {
@@ -40,38 +39,18 @@ type Resolution =
 /** §12: a word is at least two letters. */
 const MIN_WORD_LETTERS = 2;
 
+/** §12: and at most seven — every tile, choice tiles included, plays exactly one letter. */
+const MAX_WORD_LETTERS = 7;
+
 /**
  * What a play's named face gives, checked against the faces the tile prints.
  *
- * A play may name a face for any tile, and naming one is how a client says what it thinks
- * it is playing: a choice tile must name the face it plays (`E` for A/E), and a sequence
- * tile may name its first letter or the printed pair but nothing that would take one letter
- * out of the pair or turn it around (§10).
+ * A single letter has nothing to name and plays itself; a choice tile must name the face it
+ * plays (`E` for A/E) and may name only that — the letter it does not play is not used, not
+ * scored, and counts toward nothing (§10).
  */
 function resolvePlay(tile: Tile, play: TilePlay): Resolution {
   const face = play.chosenFace;
-
-  if ("sequenceLetter" in tile) {
-    const printed = `${tile.letter}${tile.sequenceLetter}`;
-    if (face === undefined || face === tile.letter || face === printed) {
-      return {
-        ok: true,
-        play: {
-          tileId: tile.id,
-          letters: [
-            { letter: tile.letter, points: tile.points },
-            { letter: tile.sequenceLetter, points: tile.sequencePoints },
-          ],
-          ...(tile.multiplier === undefined ? {} : { multiplier: tile.multiplier }),
-        },
-      };
-    }
-    // The second face on its own is a split attempt; the pair backwards is a reversal.
-    if (face === tile.sequenceLetter || face === tile.sequenceLetter + tile.letter) {
-      return { ok: false, reason: face === tile.sequenceLetter ? "two-letter-split" : "sequence-reversed" };
-    }
-    return { ok: false, reason: "uses-unavailable-letters" };
-  }
 
   if ("alternativeLetter" in tile) {
     if (face !== tile.letter && face !== tile.alternativeLetter) {
@@ -169,10 +148,11 @@ export function spellSubmission({ available, submission }: ResolveSubmissionOpti
  * with these reasons while the seat still has time to fix it; `evaluateWord` adds §11's list
  * check on top for the showdown, so the two can never disagree about what is buildable.
  *
- * The plays are resolved in submission order, which is the word's order, and a sequence tile
- * puts both of its letters where it sits. A play naming a tile that is not in `available`, or
- * the same tile twice, is refused before anything is spelled — a word built on a tile the
- * seat does not hold is not a word, whatever the dictionary says about the letters.
+ * The plays are resolved in submission order, which is the word's order, and every play puts
+ * exactly one letter where it sits — the face a choice tile names, or the letter a plain tile
+ * prints (§10). A play naming a tile that is not in `available`, or the same tile twice, is
+ * refused before anything is spelled — a word built on a tile the seat does not hold is not a
+ * word, whatever the dictionary says about the letters.
  */
 export function resolveSubmission({
   available,
@@ -211,6 +191,9 @@ export function resolveSubmission({
 
   if (word.length < MIN_WORD_LETTERS) {
     return { ok: false, reason: "too-short" };
+  }
+  if (word.length > MAX_WORD_LETTERS) {
+    return { ok: false, reason: "too-long" };
   }
 
   return { ok: true, word, tiles };

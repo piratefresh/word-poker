@@ -16,7 +16,7 @@ export {
   ROOM_NAME_MAX_LENGTH,
   isBuyInPreset,
   isGameRoomMetadata,
-  minBetFor,
+  blindsFor,
   roomSummaryFromListing,
   tableStatus,
   validateRoomCreateOptions,
@@ -34,7 +34,6 @@ export type {
   ChoiceTile,
   LetterMultiplier,
   LetterTile,
-  SequenceTile,
   Tile,
 } from "./tiles";
 export {

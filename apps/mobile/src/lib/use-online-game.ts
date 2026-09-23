@@ -44,7 +44,7 @@ import {
   WAITING_PHASE,
   isGameRejectionEvent,
 } from "@wordpoker/contracts";
-import { DEFAULT_STAKES, resolveSubmission, type Dictionary } from "@wordpoker/game-rules";
+import { resolveSubmission, type Dictionary } from "@wordpoker/game-rules";
 
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import type { WordDraft } from "@/components/word-builder";
@@ -136,12 +136,14 @@ interface RoomView {
   phase: RoomPhase;
   handCount: number;
   maxSeats: number;
+  /** The table's own blinds (§5, ADR 0004), off the config the room broadcasts. */
+  blinds: { smallBlind: number; bigBlind: number };
   /** Engine seat index of the dealer / the seat to act, mapped to a playerId below. */
   dealerSeat: number | null;
   toActSeat: number | null;
   seats: readonly SeatView[];
   community: readonly Tile[];
-  betting: { currentBet: number; minRaise: number; minBet: number } | null;
+  betting: { currentBet: number; minRaise: number; bigBlind: number } | null;
   pots: readonly number[];
   word: { status: "open" | "settled"; slots: readonly WordSlotView[] } | null;
   result: { winner: PlayerId; standings: readonly ResultStandingView[] } | null;
@@ -410,14 +412,14 @@ function perspectiveOf(
     actingIndex: view.toActSeat,
     dealerIndex: view.dealerSeat,
     heroToAct: priv?.isYourTurn === true,
-    // The wire's `minRaise` is already `max(lastRaiseSize, minBet)`, and the engine's raise floor
-    // is `currentBet + max(lastRaiseSize, minBet)`, so passing it as `lastRaiseSize` reproduces
-    // the same floor the server used.
+    // The wire's `minRaise` is already `max(lastRaiseSize, bigBlind)`, and the engine's raise
+    // floor is `currentBet + max(lastRaiseSize, bigBlind)`, so passing it as `lastRaiseSize`
+    // reproduces the same floor the server used.
     round:
       view.betting === null
         ? null
         : { currentBet: view.betting.currentBet, lastRaiseSize: view.betting.minRaise },
-    minBet: view.betting?.minBet ?? DEFAULT_STAKES.minBet,
+    blinds: { smallBlind: view.blinds.smallBlind, bigBlind: view.betting?.bigBlind ?? view.blinds.bigBlind },
     community: view.community,
     privateTiles: priv?.rack ?? [],
     available: availableFor(priv, view),
@@ -460,6 +462,7 @@ function decodeRoom(state: unknown): RoomView | null {
     phase: (state.phase as RoomPhase) ?? WAITING_PHASE,
     handCount: numberOf(state.handCount),
     maxSeats: numberOf(table.maxSeats),
+    blinds: { smallBlind: numberOf(table.smallBlind), bigBlind: numberOf(table.bigBlind) },
     dealerSeat: sentinelSeat(state.dealerSeat),
     toActSeat: sentinelSeat(state.toActSeat),
     seats: decodeSeats(state.seats),
@@ -469,7 +472,7 @@ function decodeRoom(state: unknown): RoomView | null {
         ? {
             currentBet: numberOf(betting.currentBet),
             minRaise: numberOf(betting.minRaise),
-            minBet: numberOf(betting.minBet),
+            bigBlind: numberOf(betting.bigBlind),
           }
         : null,
     pots: iterate(state.pots).map((pot) => numberOf((pot as Record<string, unknown>).amount)),
@@ -548,13 +551,6 @@ function decodeTile(value: unknown): Tile {
       ...base,
       alternativeLetter: stringOf(record.alternativeLetter),
       alternativePoints: numberOf(record.alternativePoints),
-    };
-  }
-  if (record.kind === "sequence") {
-    return {
-      ...base,
-      sequenceLetter: stringOf(record.sequenceLetter),
-      sequencePoints: numberOf(record.sequencePoints),
     };
   }
   return base;

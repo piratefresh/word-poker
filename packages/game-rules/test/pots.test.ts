@@ -241,4 +241,30 @@ describe("resolvePayout", () => {
 
     assert.deepEqual(resolvePayout(options), resolvePayout(options));
   });
+
+  it("gives both layers to one seat when the same tied seats contest them (§21.3, §25)", () => {
+    // A folded seat's ten chips merge into the layer above them, so both layers here are
+    // contested by the same two seats — and both tied on nothing. §21.3's draw belongs to the
+    // tied seats and their words, not to the pot: were each layer seeded its own draw, two
+    // identical hands could split the main pot and the side pot between them.
+    const { payout } = resolvePayout({
+      seats: [seat("hero", 10, { folded: true }), seat("ellis", 1_000), seat("jay", 1_000)],
+      judged: [judged("ellis", 1, 0), judged("jay", 2, 0)],
+      dealerSeat: 0,
+      handSeed: 20260919,
+    });
+
+    assert.deepEqual(payout.pots.map((pot) => pot.eligible), [
+      ["ellis", "jay"],
+      ["ellis", "jay"],
+    ]);
+    const winners = payout.pots.map((pot) => pot.winners);
+    assert.deepEqual(winners[1], winners[0], "one draw settles every layer the group contests");
+    assert.equal(winners[0]?.length, 1);
+
+    // The winner takes both layers, the loser keeps nothing, and the folded blind stays lost.
+    assert.deepEqual(payout.stackDeltas.map((delta) => delta.end).sort((a, b) => a - b), [
+      0, 990, 2_010,
+    ]);
+  });
 });

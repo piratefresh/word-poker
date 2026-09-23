@@ -41,6 +41,7 @@ import type {
   ChipFlight,
   GamePlayer,
   GameScreenState,
+  PlayerRole,
   PlayerStatus,
 } from "@/components/screens/game/game-types";
 import type { SeatCount } from "@/components/table";
@@ -91,7 +92,12 @@ export interface HeroPerspective {
   turnDurationMs?: number;
   /** The open betting round, or null between rounds and inside §19's window. */
   round: BettingRoundState | null;
-  minBet: number;
+  /**
+   * The table's blinds (§5, ADR 0004): the big blind is also the table's minimum bet (§22), so it
+   * is the floor and the slider's step; the small blind is the other half of §30's table
+   * information.
+   */
+  blinds: { smallBlind: number; bigBlind: number };
   /** The board as the felt draws it: an unrevealed card is null. */
   community: readonly (Tile | null)[];
   privateTiles: readonly Tile[];
@@ -140,7 +146,7 @@ export interface HeroView {
 const INERT_BETS: BettingState = {
   minRaise: 0,
   maxRaise: 0,
-  raiseStep: DEFAULT_STAKES.minBet,
+  raiseStep: DEFAULT_STAKES.bigBlind,
   raiseAmount: 0,
   canFold: false,
   canCheck: false,
@@ -191,8 +197,6 @@ export function isUnbuildable(reason: WordRejectionReason): boolean {
   return (
     reason === "tile-reused" ||
     reason === "uses-unavailable-letters" ||
-    reason === "two-letter-split" ||
-    reason === "sequence-reversed" ||
     reason === "too-long"
   );
 }
@@ -207,11 +211,12 @@ export function isUnbuildable(reason: WordRejectionReason): boolean {
 function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
   const winners = winnerIds(p.result);
   const best = p.result?.standings[0];
+  const blinds = blindSeats(p.seats, p.dealerIndex);
 
   const players: (GamePlayer | null)[] = Array.from({ length: p.seatCount }, () => null);
   p.seats.forEach((seat, index) => {
     if (seat.place < 0 || seat.place >= p.seatCount) return;
-    players[seat.place] = player(p, local, seat, index, winners);
+    players[seat.place] = player(p, local, seat, index, winners, blinds);
   });
 
   return {
@@ -230,6 +235,7 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
     community: p.community,
     privateTiles: p.privateTiles,
     bestScore: best?.score,
+    blinds: p.blinds,
     // The felt's "winning word" line: the ladder's top place is the word that took the pot, and
     // §11's reasons mean a seat can top the table without one (the §21.3 draw) — then there is no
     // word to show. A fold-out has no reveal at all and nothing to show (§26).
@@ -257,12 +263,12 @@ function bettingRow(p: HeroPerspective, local: HeroLocal): BettingState {
 
   const hero = p.seats[p.heroIndex];
   if (p.heroToAct && p.round !== null && hero !== undefined) {
-    const bounds = bettingBounds(p.seats, p.round, p.heroIndex, p.minBet);
+    const bounds = bettingBounds(p.seats, p.round, p.heroIndex, p.blinds.bigBlind);
     if (bounds !== null) {
       return {
         minRaise: bounds.minRaiseTo,
         maxRaise: bounds.maxRaiseTo,
-        raiseStep: p.minBet,
+        raiseStep: p.blinds.bigBlind,
         raiseAmount: bounds.minRaiseTo,
         canFold: bounds.canFold,
         canCheck: bounds.canCheck,
@@ -284,24 +290,65 @@ function bettingRow(p: HeroPerspective, local: HeroLocal): BettingState {
   return { ...INERT_BETS, canCheck: true, primary: "confirm" };
 }
 
+/** Which seats hold the blinds: engine indexes, or null when the table has no blind to mark. */
+interface BlindSeats {
+  smallBlind: number | null;
+  bigBlind: number | null;
+}
+
+/**
+ * The first seat at or clockwise from `from` that is dealt into the hand — the engine's own walk
+ * (`offline.ts`), repeated here because the felt marks the blinds rather than being told them.
+ */
+function nextDealtInSeat(seats: readonly HeroSeat[], from: number): number | null {
+  for (let offset = 0; offset < seats.length; offset += 1) {
+    const index = (from + offset) % seats.length;
+    if (seats[index]?.sittingOut === false) return index;
+  }
+
+  return null;
+}
+
+/**
+ * The two blind seats (§5): the dealt-in seats clockwise from the button, with the button posting
+ * the small blind heads-up. Position, not a field the state carries — what a seat does with its
+ * chips is the engine's, and this only says which two nameplates the felt badges. Heads-up the
+ * button is both, which is why a seat carries a list of roles rather than one.
+ */
+function blindSeats(seats: readonly HeroSeat[], dealerIndex: number | null): BlindSeats {
+  const dealtIn = seats.filter((seat) => !seat.sittingOut).length;
+  if (dealerIndex === null || dealtIn < 2) return { smallBlind: null, bigBlind: null };
+
+  const smallBlind = dealtIn === 2 ? dealerIndex : nextDealtInSeat(seats, dealerIndex + 1);
+  const bigBlind = smallBlind === null ? null : nextDealtInSeat(seats, smallBlind + 1);
+
+  return { smallBlind, bigBlind };
+}
+
 function player(
   p: HeroPerspective,
   local: HeroLocal,
   seat: HeroSeat,
   index: number,
   winners: readonly PlayerId[],
+  blinds: BlindSeats,
 ): GamePlayer {
   const isHero = index === p.heroIndex;
+  const roles: PlayerRole[] = [];
+  if (index === p.dealerIndex) roles.push("dealer");
+  if (index === blinds.smallBlind) roles.push("small-blind");
+  if (index === blinds.bigBlind) roles.push("big-blind");
+
   return {
     id: seat.id,
     name: seat.name,
     initials: seat.initials,
-    // The felt badges this seat "· YOU" and the HUD names it in the spoken turn phrase.
     isHero,
     stack: seat.stack,
     color: seat.color,
-    // No blinds exist (ADR 0001), so the button is the only role a seat can hold.
-    ...(index === p.dealerIndex ? { role: "dealer" as const } : {}),
+    // The button and the two blinds ride on position (§5): the dealer marker rotates with the
+    // button, and heads-up one seat holds both.
+    ...(roles.length === 0 ? {} : { roles }),
     // What the seat has committed this round, drawn as the chip beside it.
     ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
     // The hero wears its just-made move the instant it is tapped; every other seat, and the hero

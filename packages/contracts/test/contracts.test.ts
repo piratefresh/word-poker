@@ -82,22 +82,15 @@ describe("wire shapes", () => {
       points: 1,
       alternativePoints: 2,
     } satisfies Tile;
-    const sequence = {
-      id: "t3",
-      letter: "T",
-      sequenceLetter: "H",
-      points: 2,
-      sequencePoints: 5,
-    } satisfies Tile;
-    const dealt: Record<PlayerId, Tile[]> = { "session-1": [plain, choice, sequence] };
+    const dealt: Record<PlayerId, Tile[]> = { "session-1": [plain, choice] };
 
     assert.deepEqual(JSON.parse(JSON.stringify(dealt)), dealt);
   });
 
-  it("lets building tell a sequence tile from a choice tile", () => {
-    // The whole point of the union: an A/E tile and a TH tile are not the same shape, and
-    // the discriminator is which second face the tile carries, not a flag either could
-    // carry wrongly. A `satisfies Tile` on the wrong shape is a compile error.
+  it("tells a choice tile from a single letter by the second face it carries", () => {
+    // The whole point of the union: an A/E tile and a plain A are not the same shape, and the
+    // discriminator is the second face the tile carries, not a flag either could carry
+    // wrongly. A `satisfies Tile` on the wrong shape is a compile error.
     const choice = {
       id: "ae-1",
       letter: "A",
@@ -105,12 +98,10 @@ describe("wire shapes", () => {
       points: 1,
       alternativePoints: 1,
     } satisfies Tile;
-    const sequence = { id: "th-1", letter: "T", sequenceLetter: "H", points: 2, sequencePoints: 5 } satisfies Tile;
+    const plain = { id: "a-1", letter: "A", points: 1 } satisfies Tile;
 
     assert.ok("alternativeLetter" in choice);
-    assert.ok(!("sequenceLetter" in choice));
-    assert.ok("sequenceLetter" in sequence);
-    assert.ok(!("alternativeLetter" in sequence));
+    assert.ok(!("alternativeLetter" in plain));
   });
 
   it("carries a printed multiplier on the physical tile", () => {
@@ -253,8 +244,6 @@ describe("word submissions", () => {
       "too-long",
       "uses-unavailable-letters",
       "tile-reused",
-      "two-letter-split",
-      "sequence-reversed",
       "not-in-dictionary",
       "timer-expired",
     ]);

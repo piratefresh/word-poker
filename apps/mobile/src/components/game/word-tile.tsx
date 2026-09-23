@@ -36,9 +36,8 @@ import {
 
 /**
  * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
- * this module's own `Tile` is the renderer). A tile is one of three shapes — a single
- * letter, a choice pair (A/E), or a printed sequence (TH) — and the component reads the
- * second face from whichever the tile carries.
+ * this module's own `Tile` is the renderer). A tile is one of two shapes — a single letter, or
+ * a choice pair (A/E) — and the component reads the second face from the choice shape.
  */
 export type TileData = WireTile;
 export type TileSide = "front" | "back";
@@ -126,38 +125,32 @@ const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
   "triple-letter": "3L",
 };
 
+/** §10's choice tiles wear an accent no single letter does: the pair is one tile, not two. */
+const CHOICE_ACCENT = palette.violet400;
+
 /**
- * The second face a tile prints, with the mark that says how the two play together: a
- * slash means either face (`A/E`), nothing means both in order (`TH`). Absent on a
- * single-letter tile.
+ * The second face a choice tile prints — `E` for A/E — or null on a single-letter tile, which
+ * has only the one face to show (§10).
  */
-function secondFace(tile: TileData): { letter: string; separator: string } | null {
-  if ("sequenceLetter" in tile) return { letter: tile.sequenceLetter, separator: "" };
-  if ("alternativeLetter" in tile) return { letter: tile.alternativeLetter, separator: "/" };
-  return null;
+function secondFace(tile: TileData): string | null {
+  return "alternativeLetter" in tile ? tile.alternativeLetter : null;
 }
 
 /**
- * What the face shows as the tile's value: both letters of a sequence (they always play
- * together), the one value of a single letter, and a choice tile's separate values only
- * when its faces disagree — A/E showing `1`, a hypothetical Q/K showing `10/5`.
+ * What the face shows as the tile's value: the one value of a single letter, and a choice
+ * tile's separate values only when its faces disagree — A/E showing `1`, a Q/K showing `10/5`.
  */
 function facePoints(tile: TileData): readonly number[] {
-  if ("sequenceLetter" in tile) return [tile.points + tile.sequencePoints];
   if ("alternativeLetter" in tile && tile.alternativePoints !== tile.points) {
     return [tile.points, tile.alternativePoints];
   }
   return [tile.points];
 }
 
+/** §39: a tile read aloud gives both faces of a choice tile, its points, and its multiplier. */
 export function getTileAccessibilityLabel(tile: TileData): string {
   const second = secondFace(tile);
-  const letters =
-    second === null
-      ? tile.letter
-      : "sequenceLetter" in tile
-        ? `${tile.letter} then ${second.letter}`
-        : `${tile.letter} or ${second.letter}`;
+  const letters = second === null ? tile.letter : `${tile.letter} or ${second}`;
   const values = facePoints(tile);
   const points = values.length === 1 && values[0] === 1 ? "1 point" : `${values.join(" or ")} points`;
   return `${letters}, ${points}${tile.multiplier ? `, ${tile.multiplier.replace("-", " ")}` : ""}`;
@@ -480,6 +473,14 @@ export function Tile({
         >
           <LinearGradient {...gradients.tile} style={styles.faceFill}>
             <View style={styles.paperHighlight} />
+            {second === null ? null : (
+              // §10: a choice tile has to look special. The pair wears an accent strip no
+              // single letter does, over the tile's own ownership border.
+              <View
+                style={[styles.choiceAccent, { height: Math.max(2, metrics.badgeSize / 2) }]}
+                testID="tile-choice-accent"
+              />
+            )}
             {multiplierLabel ? (
               <View
                 style={[
@@ -511,16 +512,12 @@ export function Tile({
               </Text>
               {second === null ? null : (
                 <>
-                  {second.separator === "" ? null : (
-                    <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>
-                      {second.separator}
-                    </Text>
-                  )}
+                  <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>/</Text>
                   <Text
                     maxFontSizeMultiplier={1.2}
                     style={[styles.letter, { fontSize: metrics.alternateSize }]}
                   >
-                    {second.letter}
+                    {second}
                   </Text>
                 </>
               )}
@@ -599,6 +596,13 @@ const styles = StyleSheet.create({
   paperHighlight: {
     backgroundColor: "rgba(255,255,255,0.35)",
     height: "38%",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  choiceAccent: {
+    backgroundColor: CHOICE_ACCENT,
     left: 0,
     position: "absolute",
     right: 0,

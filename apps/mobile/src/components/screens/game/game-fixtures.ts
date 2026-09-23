@@ -4,9 +4,10 @@ import type { GameScreenState } from "./game-types";
  * The tutorial's reference hand: one deterministic state, so the lesson's felt, seats,
  * and tiles all render the same board instead of drifting apart.
  *
- * The board is a flop the hero has not answered: three seats are in for the minimum bet and
- * the hero is on the clock owing that call, which is the state that arms every control the
- * felt has (fold, call, raise, all-in) without inventing a side pot.
+ * The board is a flop the hero has not answered: the table opened with its blinds — 10 / 20, so
+ * every seat is in for the big blind and the hero is on the clock owing a call of it — which is
+ * the state that arms every control the felt has (fold, call, raise, all-in) without inventing a
+ * side pot. The seats' markers are §5's, derivable from the button the hero holds.
  */
 export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
   id: "demo-hand-flop",
@@ -29,7 +30,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
       stack: 980,
       color: "#b8a6f0",
       status: "your-turn",
-      role: "dealer",
+      roles: ["dealer"],
       isHero: true,
     },
     {
@@ -39,6 +40,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
       stack: 980,
       color: "#e07a5f",
       status: "waiting",
+      roles: ["small-blind"],
       bet: 20,
     },
     {
@@ -48,6 +50,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
       stack: 980,
       color: "#f05b91",
       status: "waiting",
+      roles: ["big-blind"],
       bet: 20,
     },
     {
@@ -73,6 +76,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
   ],
   bestWord: "ROW",
   bestScore: 8,
+  blinds: { smallBlind: 10, bigBlind: 20 },
   betting: {
     minRaise: 40,
     maxRaise: 980,

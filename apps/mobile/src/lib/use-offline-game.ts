@@ -356,9 +356,9 @@ export function useOfflineGame({
    * reordering the word, naming the other face of a choice tile. The draft is the client's own
    * the whole hand, so this holds it here and judges it against `game-rules` for the live
    * preview; a draft those tiles cannot build (the same tile twice, a letter the seat does not
-   * hold, a sequence out of order) is refused and the draft the seat had is the one that stays,
-   * exactly as §19's window will refuse it. Once the window is open the engine is kept in step
-   * too, so a clock that runs out scores the word the seat had built.
+   * hold, a word past §12's seven letters) is refused and the draft the seat had is the one that
+   * stays, exactly as §19's window will refuse it. Once the window is open the engine is kept in
+   * step too, so a clock that runs out scores the word the seat had built.
    */
   const setDraft = useCallback(
     (next: readonly TilePlay[]) => {
@@ -676,7 +676,7 @@ function perspectiveOf(
     heroToAct: heroIndex >= 0 && state.toActIndex === heroIndex,
     turnDurationMs: state.turnDurationMs,
     round: state.betting,
-    minBet: state.stakes.minBet,
+    blinds: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
     community: state.community.map((tile, index) => (index < state.revealed ? tile : null)),
     privateTiles: hero?.privateTiles ?? [],
     available: heroIndex >= 0 ? availableTiles(state, heroIndex) : [],

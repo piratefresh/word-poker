@@ -21,17 +21,16 @@ export interface TilePlay {
   /** The id of the dealt tile; the engine looks the tile up rather than trusting a letter. */
   tileId: string;
   /**
-   * Which printed face a choice tile plays — `E` for A/E. Absent on tiles with only one way
-   * to play: a single letter plays itself, and a sequence tile always plays both faces in
-   * the printed order.
+   * Which printed face the tile plays — `E` for A/E (§10). Required on a choice tile, and
+   * absent on a single letter, which plays itself and has no other face to name.
    */
   chosenFace?: string;
 }
 
 /**
- * A word as a seat submits it: the tiles in word order, where one sequence tile covers the
- * two letters it prints. `plays: []` is well formed — an empty submission is a word the
- * engine gets to refuse, not a payload it gets to throw away.
+ * A word as a seat submits it: the tiles in word order, one letter per tile. `plays: []` is
+ * well formed — an empty submission is a word the engine gets to refuse, not a payload it
+ * gets to throw away.
  */
 export interface WordSubmission {
   readonly plays: readonly TilePlay[];
@@ -77,16 +76,12 @@ export const WORD_REJECTION_REASONS = [
   "empty-submission",
   /** Fewer than the two letters of §12. */
   "too-short",
-  /** More letters than the tiles on the table can spell. */
+  /** More than §12's ceiling of seven letters. */
   "too-long",
   /** A played tile is not one this seat holds, or is asked for a face it does not print. */
   "uses-unavailable-letters",
   /** The same physical tile was played twice. */
   "tile-reused",
-  /** A two-letter tile was split — one of its letters left out. */
-  "two-letter-split",
-  /** A sequence tile was played backwards or out of order. */
-  "sequence-reversed",
   /** Not in the configured list (§11). */
   "not-in-dictionary",
   /** Submitted after the reveal timer expired. */
@@ -106,9 +101,9 @@ export interface TileLetter {
 export interface TilePlayResolution {
   readonly tileId: string;
   /**
-   * The letters this tile contributes, in word order: one, or both of a sequence tile,
-   * each with its own printed value. A sequence tile's two faces need not be worth the
-   * same, and scoring adds them letter by letter (§6, §7).
+   * The letters this tile contributes to the word — exactly one, the face it played, with
+   * that face's printed value (§6, §10). A run rather than a single value so the whole word
+   * reads as tile by tile, and scoring carries a letter's multiplier beside it (§7).
    */
   readonly letters: readonly TileLetter[];
   /** The tile's printed multiplier, when it has one (§7, §9). */
