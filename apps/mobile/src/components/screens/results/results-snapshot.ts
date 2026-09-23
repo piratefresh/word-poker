@@ -9,7 +9,7 @@
  *
  * The tiles are physical and in word order: the reveal's resolutions name the tile behind
  * every letter, and this looks each one up in the tiles that seat actually built from, so a
- * sequence tile arrives as the one tile it is rather than two letters (STO-379 decision 6).
+ * choice tile arrives as the one tile it is rather than as two letters (STO-379 decision 6).
  */
 
 import type { PlayerId, Tile } from "@wordpoker/contracts";

@@ -1,7 +1,7 @@
 import { schema, t, type SchemaType } from "@colyseus/schema";
 import { WAITING_PHASE } from "@wordpoker/contracts";
 
-/** A tile projection. `kind` names the variant; the secondary fields are empty unless the kind uses them. */
+/** A tile projection. `kind` names the variant; `alternative*` is empty unless the kind is `choice`. */
 export const TileState = schema({
   kind: t.string().default("letter"),
   id: t.string().default(""),
@@ -9,8 +9,6 @@ export const TileState = schema({
   points: t.uint8().default(0),
   alternativeLetter: t.string().default(""),
   alternativePoints: t.uint8().default(0),
-  sequenceLetter: t.string().default(""),
-  sequencePoints: t.uint8().default(0),
   multiplier: t.string().default(""),
 }, "TileState");
 export type TileState = SchemaType<typeof TileState>;

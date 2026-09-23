@@ -548,8 +548,11 @@ function TileContent({
   const { entry, held, chosenFace } = datum;
   const { tile, ownership } = entry;
   const choice = "alternativeLetter" in tile ? tile : null;
+  // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
+  // held choice tile says the face the word is playing and not only the pair it prints.
+  const playing = choice !== null && held && chosenFace !== undefined ? `, playing ${chosenFace}` : "";
   const label = held
-    ? `${getTileAccessibilityLabel(tile)}, in your word, tap to take it back`
+    ? `${getTileAccessibilityLabel(tile)}${playing}, in your word, tap to take it back`
     : `${getTileAccessibilityLabel(tile)}, tap to play it`;
 
   return (

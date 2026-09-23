@@ -112,9 +112,7 @@ export const DRAW_SEED_SALT = 0x5eed_21;
  */
 export function showdownDrawPool(twoLetterDrawTiles: boolean): Tile[] {
   const bag = createTileBag();
-  return twoLetterDrawTiles
-    ? bag
-    : bag.filter((tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile));
+  return twoLetterDrawTiles ? bag : bag.filter((tile) => !("alternativeLetter" in tile));
 }
 
 /** A seat with the three numbers §21's comparison steps read off its score. */
@@ -144,18 +142,15 @@ const COMPARISON_STEPS: readonly ComparisonStep[] = [
  * What a drawn tile is worth in §21.3: the value printed on it, with both faces counting for
  * a two-letter tile, as §21.3 specifies ("use the combined printed value").
  *
- * That covers every tile the bag can hold: a sequence tile prints T and H, a choice tile
- * prints both of its faces, and a single letter prints one. A choice pair whose faces are
- * worth different amounts — the rules' Q/K — is therefore drawn at Q+K, not at the face a
- * player would have picked, because a draw has no face to pick.
+ * That covers every tile a hand can hold: a choice tile prints both of its faces, and a single
+ * letter prints one. A choice pair whose faces are worth different amounts — the rules' Q/K —
+ * is therefore drawn at Q+K, not at the face a player would have picked, because a draw has no
+ * face to pick.
  *
  * Exported because it is the other half of what §21.3 leaves open, alongside the pool: a
  * reveal that shows the draw should value it the way the ladder did.
  */
 export function showdownDrawValue(tile: Tile): number {
-  if ("sequenceLetter" in tile) {
-    return tile.points + tile.sequencePoints;
-  }
   if ("alternativeLetter" in tile) {
     return tile.points + tile.alternativePoints;
   }

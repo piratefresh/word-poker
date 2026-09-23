@@ -51,20 +51,19 @@ const PINNED_POINTS: Readonly<Record<number, string>> = {
 };
 
 /**
- * The single-letter tiles of one letter, in bag order. Telling the two-letter tiles apart
- * is the point of naming this at all: the two choice tiles carry `letter` `A` and `T`, so
- * a plain `letter` filter would count them as another copy of those letters and quietly
- * make every count below wrong.
+ * The single-letter bag of §6, and the only tiles a hand's tiles come from besides the deal's
+ * choice tiles. One entry per letter, so a count filter is enough: no two-letter tile can wear
+ * a single letter's id.
  */
 function letterTiles(bag: readonly Tile[], letter: string): Tile[] {
-  return bag.filter((tile) => tile.letter === letter && !("alternativeLetter" in tile));
+  return bag.filter((tile) => tile.letter === letter);
 }
 
 describe("createTileBag", () => {
   it("matches the pinned distribution letter for letter", () => {
     const bag = createTileBag();
 
-    assert.equal(TILE_BAG_SIZE, 100);
+    assert.equal(TILE_BAG_SIZE, 98);
     assert.equal(bag.length, TILE_BAG_SIZE);
 
     let expectedSize = 0;
@@ -83,6 +82,8 @@ describe("createTileBag", () => {
         `${letter} points`,
       );
     }
+
+    assert.equal(expectedSize, TILE_BAG_SIZE);
   });
 
   it("values every letter at the tier the rules doc lists", () => {
@@ -102,23 +103,11 @@ describe("createTileBag", () => {
     }
   });
 
-  it("accounts for the whole bag in the table plus the two choice tiles", () => {
+  it("holds single letters and nothing else — the deal places the choice tiles (§10)", () => {
     const bag = createTileBag();
-    const singleLetters = bag.filter((tile) => !("alternativeLetter" in tile));
-    const choiceTiles = bag.filter((tile) => "alternativeLetter" in tile);
-    const counted = Object.values(PINNED_DISTRIBUTION).reduce((total, [copies]) => total + copies, 0);
 
-    assert.equal(counted, 98);
-    assert.equal(singleLetters.length, counted);
-    assert.equal(choiceTiles.length, 2);
-    assert.equal(singleLetters.length + choiceTiles.length, TILE_BAG_SIZE);
-  });
-
-  it("ends the bag with the two two-letter choice tiles, each face valued", () => {
-    assert.deepEqual(createTileBag().slice(-2), [
-      { id: "AE-1", letter: "A", alternativeLetter: "E", points: 1, alternativePoints: 1 },
-      { id: "TS-1", letter: "T", alternativeLetter: "S", points: 2, alternativePoints: 2 },
-    ]);
+    assert.ok(bag.every((tile) => !("alternativeLetter" in tile)), "the bag holds a two-letter tile");
+    assert.deepEqual([...new Set(bag.map((tile) => tile.letter))].sort(), [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"]);
   });
 
   it("gives every tile an id of its own", () => {
@@ -169,7 +158,7 @@ describe("draw", () => {
     // event rather than a refactor side effect.
     const { drawn } = draw(createTileBag(), 5, createRng(20260919));
 
-    assert.deepEqual(drawn.map((tile) => tile.id), ["T-5", "I-4", "B-2", "U-1", "A-7"]);
+    assert.deepEqual(drawn.map((tile) => tile.id), ["T-3", "I-3", "B-2", "T-6", "A-7"]);
   });
 
   it("takes a different set of tiles for different seeds", () => {
@@ -221,13 +210,13 @@ describe("draw", () => {
 
   it("refuses to overdraw, naming the request and what is left", () => {
     assert.throws(() => draw(createTileBag(), TILE_BAG_SIZE + 1, createRng(1)), NotEnoughTilesError);
-    assert.throws(() => draw(createTileBag(), TILE_BAG_SIZE + 1, createRng(1)), /cannot draw 101 tiles/);
-    assert.throws(() => draw(createTileBag(), TILE_BAG_SIZE + 1, createRng(1)), /holds 100/);
+    assert.throws(() => draw(createTileBag(), TILE_BAG_SIZE + 1, createRng(1)), /cannot draw 99 tiles/);
+    assert.throws(() => draw(createTileBag(), TILE_BAG_SIZE + 1, createRng(1)), /holds 98/);
 
     // The limit is the bag in hand, not the size of a fresh bag: the rest of a deal is a
     // bag too, and asking it for one tile too many is the same mistake.
     const { rest } = draw(createTileBag(), 10, createRng(2));
-    assert.throws(() => draw(rest, rest.length + 1, createRng(3)), /holds 90/);
+    assert.throws(() => draw(rest, rest.length + 1, createRng(3)), /holds 88/);
   });
 
   it("rejects a count that is not a non-negative whole number", () => {

@@ -162,7 +162,7 @@ describe("buildResultsSnapshot", () => {
     const available = availableTiles(deal, 0);
     const spelled = available
       .slice(0, 2)
-      .map((tile) => ("sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter))
+      .map((tile) => tile.letter)
       .join("");
     const dictionary = testDictionary([spelled]);
     const state = playOutHand(dictionary);
