@@ -191,8 +191,6 @@ export function isUnbuildable(reason: WordRejectionReason): boolean {
   return (
     reason === "tile-reused" ||
     reason === "uses-unavailable-letters" ||
-    reason === "two-letter-split" ||
-    reason === "sequence-reversed" ||
     reason === "too-long"
   );
 }

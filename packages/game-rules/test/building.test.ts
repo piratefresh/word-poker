@@ -41,9 +41,6 @@ const A_E: Tile = { id: "AE-1", letter: "A", points: 1, alternativeLetter: "E", 
 /** A choice pair whose faces are worth different amounts — the reason `alternativePoints` exists. */
 const Q_K: Tile = { id: "QK-1", letter: "Q", points: 10, alternativeLetter: "K", alternativePoints: 5 };
 
-/** A §10 fixed-sequence tile: both letters, in this order, never split or reversed. */
-const T_H: Tile = { id: "TH-1", letter: "T", points: 2, sequenceLetter: "H", sequencePoints: 5 };
-
 function play(tile: Tile, chosenFace?: string): { tileId: string; chosenFace?: string } {
   return chosenFace === undefined ? { tileId: tile.id } : { tileId: tile.id, chosenFace };
 }
@@ -65,10 +62,10 @@ describe("spellSubmission — the letters typed so far", () => {
     );
   });
 
-  it("spells a sequence tile as both of its letters, and a choice tile as the face it played", () => {
-    const available = [T_H, A_E, Q_K];
+  it("spells a choice tile as the face it played, and a plain tile as its letter", () => {
+    const available = [SINGLE.t, A_E, Q_K];
 
-    assert.equal(spellSubmission({ available, submission: { plays: [play(T_H)] } }), "TH");
+    assert.equal(spellSubmission({ available, submission: { plays: [play(SINGLE.t)] } }), "T");
     assert.equal(spellSubmission({ available, submission: { plays: [play(A_E, "E")] } }), "E");
     assert.equal(spellSubmission({ available, submission: { plays: [play(Q_K, "K")] } }), "K");
   });
@@ -210,48 +207,6 @@ describe("evaluateWord — choice tiles (§10)", () => {
   });
 });
 
-describe("evaluateWord — fixed-sequence tiles (§10)", () => {
-  it("plays both letters where the tile sits, in printed order", () => {
-    // THE only exists with T and H adjacent and in that order; the H cannot be moved.
-    const available = [T_H, SINGLE.e];
-    const submission: WordSubmission = { plays: [play(T_H), play(SINGLE.e)] };
-
-    const evaluation = evaluateWord({ available, submission, dictionary: dictionaryOf("THE", "EHT") });
-
-    assert.ok(evaluation.valid);
-    assert.equal(evaluation.word, "THE");
-    assert.deepEqual(evaluation.tiles[0]?.letters, [
-      { letter: "T", points: 2 },
-      { letter: "H", points: 5 },
-    ]);
-  });
-
-  it("accepts the name of the printed pair, and of its first letter", () => {
-    const available = [T_H, SINGLE.e];
-    const dictionary = dictionaryOf("THE");
-
-    for (const face of [undefined, "T", "TH"]) {
-      const evaluation = evaluateWord({ available, submission: { plays: [play(T_H, face), play(SINGLE.e)] }, dictionary });
-      assert.ok(evaluation.valid, `face ${JSON.stringify(face)}`);
-      assert.equal(evaluation.word, "THE");
-    }
-  });
-
-  it("refuses a split or a reversal, naming which one it was", () => {
-    const available = [T_H, SINGLE.e];
-    const dictionary = dictionaryOf("THE");
-
-    const split = evaluateWord({ available, submission: { plays: [play(T_H, "H"), play(SINGLE.e)] }, dictionary });
-    assert.equal(refusal(split), "two-letter-split");
-
-    const reversed = evaluateWord({ available, submission: { plays: [play(T_H, "HT"), play(SINGLE.e)] }, dictionary });
-    assert.equal(refusal(reversed), "sequence-reversed");
-
-    const unavailable = evaluateWord({ available, submission: { plays: [play(T_H, "X"), play(SINGLE.e)] }, dictionary });
-    assert.equal(refusal(unavailable), "uses-unavailable-letters");
-  });
-});
-
 describe("evaluateWord — refusals (§11)", () => {
   it("refuses an empty submission before anything else", () => {
     assert.equal(
@@ -312,19 +267,24 @@ describe("evaluateWord — refusals (§11)", () => {
     );
   });
 
-  it("lets a word run past seven letters when a two-letter tile is in play (§12)", () => {
-    // Seven physical tiles, eight letters: the ceiling is the felt, not a constant. The
-    // Full Rack Bonus counts the seven tiles, not the eight letters (scoring owns it).
-    const available = [T_H, A_E, SINGLE.w, SINGLE.o, SINGLE.r, SINGLE.k, SINGLE.s];
-    const submission: WordSubmission = {
-      plays: [play(T_H), play(SINGLE.w), play(SINGLE.o), play(A_E, "E"), play(SINGLE.r), play(SINGLE.k), play(SINGLE.s)],
-    };
+  it("accepts §12's seven-letter limit and refuses the eighth letter by name", () => {
+    // Every tile, choice tiles included, plays exactly one letter (§10), so the ceiling is a
+    // word-length rule and not a property of the felt: a caller that hands over more tiles
+    // than a table deals still gets the word refused rather than accepted for being buildable.
+    const seven = [SINGLE.w, SINGLE.o, SINGLE.r, SINGLE.k, SINGLE.m, SINGLE.a, SINGLE.t];
+    const sevenPlays: WordSubmission = { plays: seven.map((tile) => play(tile)) };
 
-    const evaluation = evaluateWord({ available, submission, dictionary: dictionaryOf("THWOERKS") });
+    const atLimit = evaluateWord({ available: seven, submission: sevenPlays, dictionary: dictionaryOf("WORKMAT") });
 
-    assert.ok(evaluation.valid);
-    assert.equal(evaluation.word, "THWOERKS");
-    assert.equal(evaluation.word.length, 8);
-    assert.equal(evaluation.tiles.length, 7);
+    assert.ok(atLimit.valid);
+    assert.equal(atLimit.word.length, 7);
+
+    const eight = [...seven, SINGLE.e];
+    const eightPlays: WordSubmission = { plays: eight.map((tile) => play(tile)) };
+
+    assert.equal(
+      refusal(evaluateWord({ available: eight, submission: eightPlays, dictionary: dictionaryOf("WORKMATE") })),
+      "too-long",
+    );
   });
 });

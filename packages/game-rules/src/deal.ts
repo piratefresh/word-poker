@@ -60,11 +60,11 @@ export function shuffle(bag: readonly Tile[], rng: () => number): Tile[] {
  * rather than keyed by player id on purpose: the caller knows the seating, and the same
  * seed must reproduce the same table no matter who ends up sitting in which seat.
  *
- * The cut is then handed to the table's special tiles: §10's fixed-sequence tiles are
- * placed into it and §9's multipliers rolled onto it, from the same seeded generator
- * (`./special-tiles`). A table that plays none passes {@link NO_SPECIAL_TILES} and gets
- * the bare cut back. `rest` is the shuffle's remainder followed by the tiles the
- * placements replaced, in the order they were replaced — the deck a hand did not show.
+ * The cut is then handed to the table's special tiles: §10's choice tiles are placed into it
+ * and §9's multipliers rolled onto it, from the same seeded generator (`./special-tiles`). A
+ * table that plays none passes {@link NO_SPECIAL_TILES} and gets the bare cut back. `rest` is
+ * the shuffle's remainder followed by the tiles the placements replaced, in the order they
+ * were replaced — the deck a hand did not show.
  *
  * @param options The `seed` every participant replays, the number of seated players, and
  *   the table's special-tile configuration.

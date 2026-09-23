@@ -34,7 +34,6 @@ export type {
   ChoiceTile,
   LetterMultiplier,
   LetterTile,
-  SequenceTile,
   Tile,
 } from "./tiles";
 export {

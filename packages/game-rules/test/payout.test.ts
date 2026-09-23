@@ -21,22 +21,17 @@ const OPENING_BET = 20;
  */
 const DEAL = dealHand({ seed: SEED, playerCount: SEATS.length });
 
-/** Plays every tile of a hand, in the order given, and spells the word they print (§10). */
+/**
+ * Plays every tile of a hand, in the order given, and spells the word they print (§10): a
+ * choice tile plays the first face it prints, and a single letter plays itself.
+ */
 function spell(tiles: readonly Tile[]): { submission: WordSubmission; word: string } {
   const plays: TilePlay[] = [];
   let word = "";
 
   for (const tile of tiles) {
-    if ("alternativeLetter" in tile) {
-      plays.push({ tileId: tile.id, chosenFace: tile.letter });
-      word += tile.letter;
-    } else if ("sequenceLetter" in tile) {
-      plays.push({ tileId: tile.id });
-      word += `${tile.letter}${tile.sequenceLetter}`;
-    } else {
-      plays.push({ tileId: tile.id });
-      word += tile.letter;
-    }
+    plays.push("alternativeLetter" in tile ? { tileId: tile.id, chosenFace: tile.letter } : { tileId: tile.id });
+    word += tile.letter;
   }
 
   return { submission: { plays }, word };
@@ -67,8 +62,9 @@ const DICTIONARY = testDictionary([HERO_WORD.word, OTHER_WORD.word]);
 function expectedScore(tiles: readonly Tile[]): number {
   return tiles.reduce((total, tile) => {
     const factor = tile.multiplier === "triple-letter" ? 3 : tile.multiplier === "double-letter" ? 2 : 1;
-    const faces = "sequenceLetter" in tile ? [tile.points, tile.sequencePoints] : [tile.points];
-    return total + faces.reduce((sum, points) => sum + points * factor, 0);
+    // One letter per tile (§10), and this fixture plays the face a tile prints first, which is
+    // the one `points` carries.
+    return total + tile.points * factor;
   }, 0);
 }
 

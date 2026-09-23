@@ -42,11 +42,9 @@ function playOf(tile: Tile): { tileId: string; chosenFace?: string } {
     : { tileId: tile.id };
 }
 
-/** The word a list of the hero's tiles spells (§10): a sequence tile prints both letters. */
+/** The word a list of the hero's tiles spells when each plays the face it prints first (§10). */
 function spells(tiles: readonly Tile[]): string {
-  return tiles
-    .map((tile) => ("sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter))
-    .join("");
+  return tiles.map((tile) => tile.letter).join("");
 }
 
 /** The hero's own two tiles, as the deal will give them for this seed, spelled as one word. */
@@ -62,8 +60,8 @@ function heroWord(seed = SEED): string {
 function expectedScore(tiles: readonly Tile[]): number {
   const total = tiles.reduce((sum, tile) => {
     const factor = tile.multiplier === "triple-letter" ? 3 : tile.multiplier === "double-letter" ? 2 : 1;
-    const faces = "sequenceLetter" in tile ? [tile.points, tile.sequencePoints] : [tile.points];
-    return sum + faces.reduce((letters, points) => letters + points * factor, 0);
+    // One letter per tile, and this suite's drafts play the face a tile prints first (§10).
+    return sum + tile.points * factor;
   }, 0);
 
   // §7.3's rack bonus: every one of the seven physical tiles, and none of the two here.
@@ -608,8 +606,8 @@ describe("useOfflineGame — §19's window", () => {
     const before = result.current.words;
     expect(before?.word).toBe(heroWord());
 
-    // The strip's order is the word's order, so a reorder arrives as the same tiles in the
-    // other sequence: the letters read the other way and the score does not move.
+    // The strip's order is the word's order, so a reorder arrives as the same tiles the other
+    // way round: the letters read backwards and the score does not move.
     await act(async () => {
       result.current.setDraft([plays[1], plays[0]].filter((play) => play !== undefined));
     });

@@ -219,22 +219,22 @@ describe("rankShowdown — §21.3: the high-value tile draw", () => {
     assert.deepEqual(
       first.standings.map((standing) => [standing.playerId, standing.place, standing.decidedBy, standing.compared]),
       [
-        ["one", 1, "tile-draw", 4],
-        ["two", 2, "tile-draw", 2],
+        ["one", 1, "tile-draw", 2],
+        ["two", 2, "tile-draw", 1],
       ],
     );
 
-    // A different seed draws the same two tiles the other way round, and hands the hand to
-    // the other seat: the winner comes out of the draw, not out of the seat numbers.
-    const other = rankShowdown({ entries: identical(), rng: createRng(13) });
+    // A different seed draws other tiles and hands the hand to the other seat: the winner comes
+    // out of the draw, not out of the seat numbers.
+    const other = rankShowdown({ entries: identical(), rng: createRng(5) });
 
     assert.deepEqual(other.standings.map((standing) => standing.playerId), ["two", "one"]);
-    assert.deepEqual(other.comparisons.at(-1)?.values.map((value) => value.value), [4, 2]);
+    assert.deepEqual(other.comparisons.at(-1)?.values.map((value) => value.value), [3, 1]);
   });
 
-  it("draws from the single-letter bag when the table disables two-letter draws", () => {
-    // Same seats, same seed: with the two-letter tiles out of the pool, the round draws
-    // different tiles (3 and 1) than it does from the whole bag (2 and 1).
+  it("draws the same tiles whether or not two-letter draws are enabled", () => {
+    // §6/ADR 0005: the bag holds single letters only, so the pool is the whole bag either way —
+    // the configuration still names the rule, and the deal is what puts choice tiles on a table.
     const ranking = rankShowdown({
       entries: identical(),
       rng: createRng(21),
@@ -242,6 +242,7 @@ describe("rankShowdown — §21.3: the high-value tile draw", () => {
     });
 
     assert.deepEqual(ranking.comparisons.at(-1)?.values.map((value) => value.value), [3, 1]);
+    assert.deepEqual(ranking.standings.map((standing) => standing.playerId), ["two", "one"]);
   });
 
   it("ranks a served tie identically under both exhausted-draw policies", () => {
@@ -264,8 +265,8 @@ describe("rankShowdown — §21 with no valid word anywhere (STO-326)", () => {
     assert.deepEqual(
       ranking.standings.map((standing) => [standing.playerId, standing.place, standing.score, standing.decidedBy, standing.compared]),
       [
-        ["two", 1, 0, "tile-draw", 5],
-        ["one", 2, 0, "tile-draw", 2],
+        ["one", 1, 0, "tile-draw", 4],
+        ["two", 2, 0, "tile-draw", 1],
       ],
     );
     // The score step still compared — three seats, all on 0 — but the two word steps had
@@ -276,18 +277,18 @@ describe("rankShowdown — §21 with no valid word anywhere (STO-326)", () => {
   it("settles three zero-score seats by repeated draws", () => {
     const ranking = rankShowdown({
       entries: [entry("one", 0), entry("two", 1), entry("three", 2)],
-      rng: createRng(11),
+      rng: createRng(2),
     });
 
     assert.deepEqual(
       ranking.standings.map((standing) => [standing.playerId, standing.place, standing.decidedBy, standing.compared]),
       [
-        ["one", 1, "tile-draw", 2],
-        ["two", 2, "tile-draw", 1],
-        ["three", 3, "tile-draw", 1],
+        ["one", 1, "tile-draw", 8],
+        ["three", 2, "tile-draw", 5],
+        ["two", 3, "tile-draw", 2],
       ],
     );
-    // Two seats drew 2 and went again; one of them took the hand on the second round.
+    // All three drew 1, so all three went again; the second round separated them.
     assert.deepEqual(
       ranking.comparisons.map((comparison) => [comparison.step, comparison.round]),
       [
@@ -325,14 +326,15 @@ describe("rankShowdown — the exhausted-draw fallback (§25)", () => {
 });
 
 describe("showdownDrawPool — §21.3's draw pool", () => {
-  it("is the whole bag, or the single-letter bag alone when two-letter draws are disabled", () => {
+  it("is the bag itself either way, and the bag holds single letters only", () => {
     const full = showdownDrawPool(true);
     const single = showdownDrawPool(false);
 
+    // §6/ADR 0005: no two-letter tile is a bag member, so a table that disables two-letter
+    // draws draws from the same 98 tiles as one that allows them.
     assert.equal(full.length, TILE_BAG_SIZE);
-    assert.equal(full.filter((tile) => "alternativeLetter" in tile).length, 2);
-    assert.equal(single.length, TILE_BAG_SIZE - 2);
-    assert.ok(single.every((tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile)));
+    assert.equal(single.length, TILE_BAG_SIZE);
+    assert.ok(full.every((tile) => !("alternativeLetter" in tile)), "the bag holds a two-letter tile");
   });
 });
 
@@ -343,9 +345,11 @@ describe("showdownDrawValue — what a drawn tile is worth (§21.3)", () => {
       showdownDrawValue({ id: "AE-1", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1 }),
       2,
     );
+    // §21.3 reads the combined printed value, so a pair whose faces differ is drawn whole —
+    // there is no face to pick in a draw (§10).
     assert.equal(
-      showdownDrawValue({ id: "TH-1", letter: "T", points: 2, sequenceLetter: "H", sequencePoints: 5 }),
-      7,
+      showdownDrawValue({ id: "QK-1", letter: "Q", points: 10, alternativeLetter: "K", alternativePoints: 5 }),
+      15,
     );
   });
 });

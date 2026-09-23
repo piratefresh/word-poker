@@ -59,15 +59,13 @@ The bag holds no two-letter tiles. Choice tiles are placed by the deal from the 
 pair pool, which is where §10's frequency and its cap of three are enforced —
 [Choice Tiles](tiles.md) §10.
 
-<!-- Not yet in code: the engine still holds A/E and T/S in a 100-tile bag and places
-     fixed-sequence tiles at deal time; §10's choice-only deal replaces both.
-     Contract status: the fixed-sequence tile shape and the letter-multiplier field exist on
-     the tile contract (`packages/contracts/src/tiles.ts`: `SequenceTile`, `LetterMultiplier`);
-     word-building honours §10 (`packages/game-rules/src/building.ts`, STO-301/STO-329) and
-     §6–§9 scoring is implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's
-     per-letter breakdown), with §6's values pinned to the table above by a drift-guard test.
-     Deal-time generation is implemented in `packages/game-rules/src/special-tiles.ts`
-     (STO-325): §10's sequence placement and §9's multiplier rolls. -->
+<!-- Contract status: the bag is the 98 single-letter tiles above, with §6's values pinned to
+     the table by a drift-guard test (`packages/game-rules/src/tiles.ts`, STO-467). §10's choice
+     tiles are placed by the deal rather than held in the bag
+     (`packages/game-rules/src/special-tiles.ts`), which is also where §9's multiplier rolls
+     live. Word-building honours §10–§12 (`packages/game-rules/src/building.ts`), and scoring is
+     implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's per-letter
+     breakdown). -->
 
 ---
 

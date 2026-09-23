@@ -72,9 +72,8 @@ jest.mock("@/lib/offline-seed", () => ({
   randomSeed: () => mockRandomSeed(),
 }));
 
-const HERO_WORD = HERO_TILES.map((tile) =>
-  "sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter,
-).join("");
+/** The word the hero's taps spell: every tile plays the face it prints first (§10). */
+const HERO_WORD = HERO_TILES.map((tile) => tile.letter).join("");
 
 /** The table's vocabulary, injected: the drawer this screen loads holds the hero's word. */
 let mockDictionary: Dictionary | null = testDictionary([HERO_WORD]);
@@ -296,8 +295,7 @@ describe("<OfflineGameScreen />", () => {
 
     // One line of text over the rack, and nothing but the line: the strip below it is the
     // word, so the preview only has to be legible.
-    const letters = "sequenceLetter" in first ? `${first.letter}${first.sequenceLetter}` : first.letter;
-    expect(view.getByTestId("word-builder-word")).toHaveTextContent(letters);
+    expect(view.getByTestId("word-builder-word")).toHaveTextContent(first.letter);
   });
 
   test("plays a word from the rack, then pays out through the results into the next hand", async () => {

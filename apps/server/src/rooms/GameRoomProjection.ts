@@ -222,15 +222,12 @@ export class GameRoomProjection {
 
 function projectTile(tile: Tile): TileState {
   const projected = new TileState();
-  projected.kind =
-    "alternativeLetter" in tile ? "choice" : "sequenceLetter" in tile ? "sequence" : "letter";
+  projected.kind = "alternativeLetter" in tile ? "choice" : "letter";
   projected.id = tile.id;
   projected.letter = tile.letter;
   projected.points = tile.points;
   projected.alternativeLetter = "alternativeLetter" in tile ? tile.alternativeLetter : "";
   projected.alternativePoints = "alternativePoints" in tile ? tile.alternativePoints : 0;
-  projected.sequenceLetter = "sequenceLetter" in tile ? tile.sequenceLetter : "";
-  projected.sequencePoints = "sequencePoints" in tile ? tile.sequencePoints : 0;
   projected.multiplier = tile.multiplier ?? "";
   return projected;
 }

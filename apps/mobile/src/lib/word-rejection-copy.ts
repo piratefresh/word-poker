@@ -2,7 +2,7 @@
  * word-rejection-copy.ts — §11's refusal reasons as a seat reads them.
  *
  * The `Record` is exhaustive on purpose: a reason added to the contract becomes a compile error
- * here rather than a blank line on screen. None of the copy is the wire string — `two-letter-split`
+ * here rather than a blank line on screen. None of the copy is the wire string — `too-long`
  * names a branch in the engine, not something to hand a player.
  *
  * It lives in `lib/` rather than beside one of its readers because two surfaces say the same
@@ -19,8 +19,6 @@ export const WORD_REJECTION_COPY: Record<WordRejectionReason, string> = {
   "too-long": "More letters than the tiles can spell",
   "uses-unavailable-letters": "Those letters are not in your tiles",
   "tile-reused": "Each tile plays once",
-  "two-letter-split": "A two-letter tile keeps its letters together",
-  "sequence-reversed": "A sequence tile plays in the order it prints",
   "not-in-dictionary": "Not in the dictionary",
   "timer-expired": "The window closed",
 };

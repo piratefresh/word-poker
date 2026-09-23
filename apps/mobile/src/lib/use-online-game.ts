@@ -550,13 +550,6 @@ function decodeTile(value: unknown): Tile {
       alternativePoints: numberOf(record.alternativePoints),
     };
   }
-  if (record.kind === "sequence") {
-    return {
-      ...base,
-      sequenceLetter: stringOf(record.sequenceLetter),
-      sequencePoints: numberOf(record.sequencePoints),
-    };
-  }
   return base;
 }
 
