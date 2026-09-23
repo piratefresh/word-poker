@@ -47,7 +47,8 @@ stay in the showdown, so several of them can tie on 0:
 - The high-value tile draw (3) separates them, exactly as it separates any other tie.
 
 Nothing is carried or refunded: the pot goes to the seat the draw picks, and every pot is
-settled by the same ladder (§25).
+settled by the same ladder (§25). A tie is settled once for the seats that share it: every
+pot those seats contest is awarded by that one draw.
 
 If only one seat remains because the others folded, §26 awards that seat the pot without a
 showdown — there is no tie to break, and no tile is drawn.
@@ -61,14 +62,14 @@ one printed value.
   the only way to run out of tiles is to draw the whole bag, which is refused rather than
   reusing one.
 
-<!-- Not yet in code: `packages/game-rules/src/showdown.ts` still ranks by the retired
-     highest-letter step and restarts a tied draw instead of adding to it, and its pool holds
-     the two-letter tiles.
-     Contract status: the ladder is implemented in `packages/game-rules/src/showdown.ts`
-     (`rankShowdown`, STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values
-     behind `showdownDrawPool` / `showdownDrawValue`; the ranking's wire shape is
-     `packages/contracts/src/showdown.ts`. The no-valid-word case above was resolved by
-     STO-326 before the ranking was written. -->
+<!-- Contract status: the whole of §21 ships. The ladder is
+     `packages/game-rules/src/showdown.ts` (`rankShowdown`,
+     STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values behind
+     `showdownDrawPool` / `showdownDrawValue`, and the ranking's wire shape is
+     `packages/contracts/src/showdown.ts`. The retired highest-letter step, the draw that adds
+     a round's tile to the seat's running total, the single-letter pool, and the one draw a
+     tied group gets across every pot it contests are STO-468; the no-valid-word case above
+     was resolved by STO-326 before the ranking was written. -->
 
 ---
 
