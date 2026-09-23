@@ -5,7 +5,7 @@
  * The result is a ranking, not a winner: pot settlement walks it (each pot is settled by the
  * same ladder, §25) and the reveal shows it, so every seat needs a place and the comparison
  * that put it there. Steps are named rather than numbered because these cross the wire into
- * logs and UI copy — `"highest-letter"` says what happened, and reordering the ladder can
+ * logs and UI copy — `"word-length"` says what happened, and reordering the ladder can
  * never renumber a step a client already understands.
  */
 
@@ -22,9 +22,7 @@ export const SHOWDOWN_DECIDERS = [
   "final-score",
   /** §21.1: the word with the most letters — one per tile, the face a choice tile played (§10). */
   "word-length",
-  /** §21.2: the highest *printed* letter value; tile multipliers do not count. */
-  "highest-letter",
-  /** §21.3: one temporary tile each, highest printed value wins, repeated until it does not tie. */
+  /** §21.3: one tile each per round, added to the seat's draw total, highest total first. */
   "tile-draw",
 ] as const;
 
@@ -43,9 +41,9 @@ export interface ShowdownStanding {
   /** The comparison this seat's place came out of. */
   readonly decidedBy: ShowdownDecider;
   /**
-   * What `decidedBy` compared for this seat: the final score, the word's letter count, the
-   * highest printed letter value, or the tile it drew. `null` when the seat had no word to
-   * compare (§11) — which is the case the draw exists to settle.
+   * What `decidedBy` compared for this seat: the final score, the word's letter count, or
+   * §21.3's running draw total. `null` when the seat had no word to compare (§11) — which is
+   * the case the draw exists to settle — and when the draw could not run at all.
    */
   readonly compared: number | null;
 }
@@ -63,10 +61,14 @@ export interface ShowdownComparisonValue {
  * Every seat still in the tie appears in `values`, best first, so a reveal can show the
  * whole group rather than only who won it; `advanced` is the group that stayed tied on top
  * and went on to the next step (or, on a draw round, to the next draw).
+ *
+ * On a `"tile-draw"` pass the values are §21.3's running totals, not the round's own tiles:
+ * a round's tile adds to what the seat had already drawn, so a later round reports a larger
+ * number and the seat the round places is the seat leading on everything it has drawn.
  */
 export interface ShowdownComparison {
   readonly step: ShowdownDecider;
-  /** Which draw round this was, counting from 1; the three comparison steps are always 1. */
+  /** Which draw round this was, counting from 1; a comparison step is always 1. */
   readonly round: number;
   readonly values: readonly ShowdownComparisonValue[];
   readonly advanced: readonly PlayerId[];
