@@ -61,14 +61,13 @@ one printed value.
   the only way to run out of tiles is to draw the whole bag, which is refused rather than
   reusing one.
 
-<!-- Not yet in code: `packages/game-rules/src/showdown.ts` still ranks by the retired
-     highest-letter step and restarts a tied draw instead of adding to it, and its pool holds
-     the two-letter tiles.
-     Contract status: the ladder is implemented in `packages/game-rules/src/showdown.ts`
-     (`rankShowdown`, STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values
-     behind `showdownDrawPool` / `showdownDrawValue`; the ranking's wire shape is
-     `packages/contracts/src/showdown.ts`. The no-valid-word case above was resolved by
-     STO-326 before the ranking was written. -->
+<!-- Contract status: the whole of §21 ships. The ladder is
+     `packages/game-rules/src/showdown.ts` (`rankShowdown`,
+     STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values behind
+     `showdownDrawPool` / `showdownDrawValue`, and the ranking's wire shape is
+     `packages/contracts/src/showdown.ts`. The retired highest-letter step, the draw that adds
+     a round's tile to the seat's running total, and the single-letter pool are STO-468; the
+     no-valid-word case above was resolved by STO-326 before the ranking was written. -->
 
 ---
 
