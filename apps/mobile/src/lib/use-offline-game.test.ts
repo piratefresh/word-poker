@@ -232,6 +232,8 @@ describe("useOfflineGame — the dealt table", () => {
       canAllIn: true,
       allInAmount: 1_000,
       currentBet: 0,
+      primary: "check",
+      wager: "bet",
     });
   });
 

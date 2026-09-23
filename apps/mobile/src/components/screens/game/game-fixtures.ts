@@ -86,5 +86,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
     canAllIn: true,
     allInAmount: 980,
     currentBet: 20,
+    primary: "call",
+    wager: "raise",
   },
 };

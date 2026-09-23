@@ -415,6 +415,8 @@ describe("<OfflineGameScreen />", () => {
       bet: jest.fn(),
       call: jest.fn(),
       raiseTo: jest.fn(),
+      primary: jest.fn(),
+      wager: jest.fn(),
       allIn: jest.fn(),
       setDraft: jest.fn(),
       confirmWord: jest.fn(),

@@ -288,10 +288,12 @@ function BettingControls({
       state.minRaise + (event.nativeEvent.locationX / trackWidth) * range,
     );
   };
-  const callLabel = state.canCheck ? "CHECK" : `CALL $${(state.callAmount ?? 0).toLocaleString()}`;
+  // §19's window keeps the check's own word on the confirm: the row's check is what locks it in.
+  const callLabel =
+    state.primary === "call" ? `CALL $${(state.callAmount ?? 0).toLocaleString()}` : "CHECK";
   // The same slider opens the round or raises it: with no bet out the action is a bet, and
   // the amount is the round total either way (§22).
-  const wagerLabel = state.canBet ? "BET" : "RAISE";
+  const wagerLabel = state.wager === "bet" ? "BET" : "RAISE";
   return (
     <View style={styles.betting}>
       <View style={styles.raiseRow}>

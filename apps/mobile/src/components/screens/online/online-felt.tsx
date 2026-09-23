@@ -13,7 +13,6 @@
  * released, then back to the lobby.
  */
 
-import { useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
@@ -34,19 +33,11 @@ export function OnlineFelt({
   /** Release the seat and leave the table — the felt's own way out (§3). */
   onLeave: () => void;
 }) {
-  const { game, words, fold, check, call, raiseTo, allIn, setDraft, confirmWord } = useOnlineGame({
+  const { game, words, fold, primary, allIn, wager, setDraft } = useOnlineGame({
     room,
     dictionary,
   });
   const connection = useRoomConnection(room);
-
-  // §19's window turns the felt's check into the confirm; on every other turn it is the engine's
-  // own check or call, whichever the row armed — the same choice the offline felt makes.
-  const checkOrCall = useCallback(() => {
-    if (words?.confirmable) confirmWord();
-    else if (game?.betting.canCheck) check();
-    else call();
-  }, [call, check, confirmWord, game?.betting.canCheck, words?.confirmable]);
 
   const reconnecting = connection === "reconnecting";
 
@@ -73,9 +64,10 @@ export function OnlineFelt({
             game={game}
             onAllIn={allIn}
             onBack={onLeave}
-            onCheckOrCall={checkOrCall}
+            onBet={wager}
+            onCheckOrCall={primary}
             onFold={fold}
-            onRaise={raiseTo}
+            onRaise={wager}
             rack={
               <>
                 <WordPreview />

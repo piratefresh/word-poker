@@ -6,8 +6,9 @@
  * seats, the chips, the pots and the one word builder never learn whether they are online or
  * offline (AGENTS.md — never a second builder). It reads two streams from the room: the public
  * broadcast schema every seat shares, and the `privateState` message that carries this seat's
- * own rack and draft, and it maps both into the felt's `GameScreenState` and the builder's
- * `WordDraft`.
+ * own rack and draft, and decodes both into a `HeroPerspective` — the Hero View
+ * (`@/lib/hero-view`), shared with the offline adapter, maps that into the felt's
+ * `GameScreenState` and the builder's `WordDraft`.
  *
  * Authority is the server's, never this file's: the room owns every mutation and the state it
  * broadcasts is the truth. The action row is armed from the engine's own `bettingBounds`, run
@@ -43,48 +44,22 @@ import {
   WAITING_PHASE,
   isGameRejectionEvent,
 } from "@wordpoker/contracts";
-import {
-  DEFAULT_STAKES,
-  OFFLINE_TURN_MS,
-  WORD_WINDOW_MS,
-  bettingBounds,
-  resolveSubmission,
-  scoreWord,
-  spellSubmission,
-  type BettingRoundState,
-  type BettingSeatState,
-  type Dictionary,
-  type SubmissionResolution,
-} from "@wordpoker/game-rules";
+import { DEFAULT_STAKES, resolveSubmission, type Dictionary } from "@wordpoker/game-rules";
 
-import { PHASE_NUMBER } from "@/components/hud";
-import type {
-  BettingState,
-  GamePlayer,
-  GameScreenState,
-  PlayerStatus,
-} from "@/components/screens/game/game-types";
+import type { GameScreenState } from "@/components/screens/game/game-types";
 import type { WordDraft } from "@/components/word-builder";
 import { colors, palette } from "@/constants/theme";
+import {
+  feltControls,
+  heroView,
+  isUnbuildable,
+  type HeroPerspective,
+  type OptimisticPill,
+} from "@/lib/hero-view";
 
 /** The felt draws 4–6 seats; a smaller table still shows as a four-seat felt with empty places. */
 const MIN_FELT_SEATS = 4;
 const MAX_FELT_SEATS = 6;
-
-/** The row when the hero cannot act: every control dark, the slider's own step kept live. */
-const INERT_BETS: BettingState = {
-  minRaise: 0,
-  maxRaise: 0,
-  raiseStep: DEFAULT_STAKES.minBet,
-  raiseAmount: 0,
-  canFold: false,
-  canCheck: false,
-  canRaise: false,
-  canBet: false,
-  canAllIn: false,
-  allInAmount: 0,
-  currentBet: 0,
-};
 
 /**
  * The minimal surface of a Colyseus `Room` this adapter drives: its own seat id, its synced
@@ -120,6 +95,10 @@ export interface OnlineGame {
   raiseTo: (amount: number) => void;
   /** Commits the hero's exact remaining Table Stack (§22). */
   allIn: () => void;
+  /** The row's check/call button: the confirm inside §19's window, else the check or call it is armed for. */
+  primary: () => void;
+  /** The felt's bet/raise slider: `bet` while nothing is out, `raiseTo` otherwise. */
+  wager: (amount: number) => void;
   /** Replaces the hero's draft with the one the seat has built. */
   setDraft: (plays: readonly TilePlay[]) => void;
   /** Confirms the hero's draft as its word (§19). */
@@ -177,9 +156,6 @@ interface PrivateView {
     confirmed: readonly TilePlay[] | null;
   };
 }
-
-/** The pill the felt wears for a move the server has not echoed yet. */
-type OptimisticPill = "fold" | "check" | "call" | "raise" | "all-in";
 
 /** The hero's own move, held until the authoritative broadcast reconciles it away (server wins). */
 type Pending =
@@ -277,11 +253,6 @@ export function useOnlineGame({
     };
   }, [room]);
 
-  const heroSeatIndex = useMemo(
-    () => (view === null ? -1 : engineOrder(view.seats).findIndex((seat) => seat.playerId === heroId)),
-    [heroId, view],
-  );
-
   // One dispatch path for every betting move: send it, then predict it — the row goes dark and the
   // seat wears the move's pill at once, against the table id it was made on, so a tap reads as done
   // before the round trip. The engine's bounds already disabled anything the server would refuse.
@@ -341,20 +312,33 @@ export function useOnlineGame({
   const pendingPill = pending?.kind === "betting" ? pending.pill : null;
   const pendingConfirm = pending?.kind === "confirm";
 
-  const game = useMemo(
-    () => (view === null ? null : toScreenState(view, heroId, priv, heroSeatIndex, heroDraft, pendingPill)),
-    [heroDraft, heroId, heroSeatIndex, pendingPill, priv, view],
+  const perspective = useMemo(
+    () => (view === null ? null : perspectiveOf(view, priv, heroId, dictionary)),
+    [dictionary, heroId, priv, view],
   );
-
-  const words = useMemo(
+  const hero = useMemo(
     () =>
-      view === null ? null : wordsOf(view, heroId, priv, heroDraft, refusal, dictionary, pendingConfirm),
-    [dictionary, heroDraft, heroId, pendingConfirm, priv, refusal, view],
+      perspective === null
+        ? null
+        : heroView(perspective, { draft: heroDraft, refusal, pendingPill, pendingConfirm }),
+    [heroDraft, pendingConfirm, pendingPill, perspective, refusal],
+  );
+  const game = hero?.game ?? null;
+
+  // The row's two shared controls, bound at the tap to whatever move the row is armed for.
+  const betting = game?.betting ?? null;
+  const primary = useCallback(
+    () => feltControls(betting, { confirm: confirmWord, check, call, bet, raiseTo }).primary(),
+    [bet, betting, call, check, confirmWord, raiseTo],
+  );
+  const wager = useCallback(
+    (amount: number) => feltControls(betting, { confirm: confirmWord, check, call, bet, raiseTo }).wager(amount),
+    [bet, betting, call, check, confirmWord, raiseTo],
   );
 
   return {
     game,
-    words,
+    words: hero?.words ?? null,
     phase: view?.phase ?? WAITING_PHASE,
     fold,
     check,
@@ -362,6 +346,8 @@ export function useOnlineGame({
     call,
     raiseTo,
     allIn,
+    primary,
+    wager,
     setDraft,
     confirmWord,
   };
@@ -372,94 +358,28 @@ function engineOrder(seats: readonly SeatView[]): readonly SeatView[] {
   return [...seats].sort((a, b) => a.seat - b.seat);
 }
 
-/** Whether a draft is one the tiles cannot build at all (§10), as against merely unfinished. */
-function isUnbuildable(reason: WordRejectionReason): boolean {
-  return (
-    reason === "tile-reused" ||
-    reason === "uses-unavailable-letters" ||
-    reason === "two-letter-split" ||
-    reason === "sequence-reversed" ||
-    reason === "too-long"
-  );
-}
-
 /** The tiles the hero may build from: its private rack and the revealed community (§10). */
 function availableFor(priv: PrivateView | null, view: RoomView | null): readonly Tile[] {
   return [...(priv?.rack ?? []), ...(view?.community ?? [])];
 }
 
-/** Everything the felt needs, mapped off the broadcast snapshot and the seat's private rack. */
-function toScreenState(
+/**
+ * The room as the Hero View reads it: the broadcast seats in engine order, placed on the felt by
+ * their seat number, and the hero's turn and word slot off the seat's own private message. Null
+ * while the table is still the waiting room — there is no hand to draw.
+ */
+function perspectiveOf(
   view: RoomView,
-  heroId: PlayerId,
   priv: PrivateView | null,
-  heroSeatIndex: number,
-  heroDraft: readonly TilePlay[],
-  pendingPill: OptimisticPill | null,
-): GameScreenState | null {
+  heroId: PlayerId,
+  dictionary: Dictionary,
+): HeroPerspective | null {
   const phase = roundPhaseOf(view.phase);
   if (phase === null) return null;
 
-  const order = engineOrder(view.seats);
-  const actingId = view.toActSeat === null ? null : order[view.toActSeat]?.playerId ?? null;
-  const dealerId = view.dealerSeat === null ? null : order[view.dealerSeat]?.playerId ?? null;
-  const winners = winnerIds(view.result);
-  const best = view.result?.standings[0];
-  const wordOpen = view.word?.status === "open";
-  const seatCount = feltSeatCount(view.maxSeats);
-
-  const players: (GamePlayer | null)[] = Array.from({ length: seatCount }, () => null);
-  for (const seat of view.seats) {
-    if (seat.seat < 0 || seat.seat >= seatCount) continue;
-    players[seat.seat] = toPlayer(seat, view, heroId, actingId, dealerId, winners, pendingPill);
-  }
-
-  return {
-    id: idOf(view),
-    handId: idOf(view),
-    // The chip layer's flights are the offline adapter's only, so far: the room's felt draws none.
-    flights: [],
-    phase,
-    phaseNumber: PHASE_NUMBER[phase],
-    secondsRemaining: (wordOpen ? WORD_WINDOW_MS : OFFLINE_TURN_MS) / 1_000,
-    seatCount,
-    players,
-    // Every chip committed this hand, in §25's layers: the main pot first, side pots above it.
-    pot: view.seats.reduce((total, seat) => total + seat.committedHand, 0),
-    sidePots: view.pots.slice(1),
-    // The server owns the session's end (§27/§28); the online felt plays on until it says so.
-    sessionOver: false,
-    community: view.community.map((tile) => tile),
-    privateTiles: priv?.rack ?? [],
-    bestScore: best?.score,
-    bestWord: best?.word !== undefined && best.word.length > 0 ? best.word : undefined,
-    // A move the hero has made but the server has not echoed darkens the row at once: the tap is
-    // spent, and the controls must not invite a second one while the prediction stands.
-    betting: pendingPill !== null ? INERT_BETS : bettingRow(view, priv, heroSeatIndex, heroDraft),
-  };
-}
-
-/** Which seats the settled hand paid: the ladder's first place, or §26's one survivor. */
-function winnerIds(result: RoomView["result"]): readonly PlayerId[] {
-  if (result === null) return [];
-  if (result.standings.length === 0) return [result.winner];
-  return result.standings.filter((standing) => standing.place === 1).map((standing) => standing.playerId);
-}
-
-/**
- * The action row, armed from the engine's own `bettingBounds` run over the broadcast seats — the
- * client renders what the engine would allow, never a legality of its own (AGENTS.md). It is the
- * hero's turn only when the private state says so; §19's window turns the check into the confirm,
- * armed as soon as the hero has a draft to lock in.
- */
-function bettingRow(
-  view: RoomView,
-  priv: PrivateView | null,
-  heroSeatIndex: number,
-  heroDraft: readonly TilePlay[],
-): BettingState {
-  if (priv?.isYourTurn === true && view.betting !== null && heroSeatIndex >= 0) {
-    const seats: BettingSeatState[] = engineOrder(view.seats).map((seat) => ({
+  const seats = engineOrder(view.seats).map((seat) => {
+    const isHero = seat.playerId === heroId;
+    return {
       id: seat.playerId,
       stack: seat.tableStack,
       committedRound: seat.committedRound,
@@ -468,128 +388,50 @@ function bettingRow(
       allIn: seat.allIn,
       sittingOut: seat.sittingOut,
       actedThisRound: seat.actedThisRound,
-    }));
+      place: seat.seat,
+      // Anonymous seats until identity lands (Epic B): the hero is unnamed so the felt's "· YOU"
+      // badge is the only word on it, opponents are numbered by their seat.
+      name: isHero ? "You" : `Seat ${seat.seat + 1}`,
+      initials: isHero ? "YOU" : `S${seat.seat + 1}`,
+      color: colors.players[seat.seat % colors.players.length] ?? palette.amber400,
+    };
+  });
+  const heroWord = priv?.word.status;
+
+  return {
+    id: idOf(view),
+    handId: `online-hand-${view.handCount}`,
+    // The chip layer's flights are the offline adapter's only, so far: the room's felt draws none.
+    flights: [],
+    phase,
+    seatCount: feltSeatCount(view.maxSeats),
+    seats,
+    heroIndex: seats.findIndex((seat) => seat.id === heroId),
+    actingIndex: view.toActSeat,
+    dealerIndex: view.dealerSeat,
+    heroToAct: priv?.isYourTurn === true,
     // The wire's `minRaise` is already `max(lastRaiseSize, minBet)`, and the engine's raise floor
     // is `currentBet + max(lastRaiseSize, minBet)`, so passing it as `lastRaiseSize` reproduces
     // the same floor the server used.
-    const round: BettingRoundState = {
-      currentBet: view.betting.currentBet,
-      lastRaiseSize: view.betting.minRaise,
-    };
-    const hero = seats[heroSeatIndex];
-    const bounds = bettingBounds(seats, round, heroSeatIndex, view.betting.minBet);
-    if (bounds !== null && hero !== undefined) {
-      return {
-        minRaise: bounds.minRaiseTo,
-        maxRaise: bounds.maxRaiseTo,
-        raiseStep: view.betting.minBet,
-        raiseAmount: bounds.minRaiseTo,
-        canFold: bounds.canFold,
-        canCheck: bounds.canCheck,
-        ...(bounds.callAmount > 0 ? { callAmount: bounds.callAmount } : {}),
-        canRaise: bounds.canRaise,
-        canBet: bounds.canBet,
-        canAllIn: bounds.canAllIn,
-        allInAmount: hero.stack,
-        currentBet: bounds.currentBet,
-      };
-    }
-  }
-
-  const drafting = view.word?.status === "open" && priv?.word.status === "drafting";
-  return { ...INERT_BETS, canCheck: drafting === true && heroDraft.length > 0 };
-}
-
-function toPlayer(
-  seat: SeatView,
-  view: RoomView,
-  heroId: PlayerId,
-  actingId: PlayerId | null,
-  dealerId: PlayerId | null,
-  winners: readonly PlayerId[],
-  pendingPill: OptimisticPill | null,
-): GamePlayer {
-  const isHero = seat.playerId === heroId;
-  return {
-    id: seat.playerId,
-    // Anonymous seats until identity lands (Epic B): the hero is unnamed so the felt's "· YOU"
-    // badge is the only word on it, opponents are numbered by their seat.
-    name: isHero ? "You" : `Seat ${seat.seat + 1}`,
-    initials: isHero ? "YOU" : `S${seat.seat + 1}`,
-    isHero,
-    stack: seat.tableStack,
-    color: colors.players[seat.seat % colors.players.length] ?? palette.amber400,
-    ...(seat.playerId === dealerId ? { role: "dealer" as const } : {}),
-    ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
-    // The hero wears its just-made move the instant it is tapped; every other seat, and the hero
-    // once the server echoes, reads its status straight off the broadcast.
-    status:
-      isHero && pendingPill !== null
-        ? pendingPill
-        : seatStatus(seat, view, actingId, isHero, winners),
+    round:
+      view.betting === null
+        ? null
+        : { currentBet: view.betting.currentBet, lastRaiseSize: view.betting.minRaise },
+    minBet: view.betting?.minBet ?? DEFAULT_STAKES.minBet,
+    community: view.community,
+    privateTiles: priv?.rack ?? [],
+    available: availableFor(priv, view),
+    word: {
+      open: view.word?.status === "open",
+      hero: heroWord === undefined || heroWord === "none" ? null : heroWord,
+      confirmedPlays: priv?.word.confirmed ?? null,
+    },
+    result: view.result,
+    sidePots: view.pots.slice(1),
+    // The server owns the session's end (§27/§28); the online felt plays on until it says so.
+    sessionOver: false,
+    dictionary,
   };
-}
-
-function seatStatus(
-  seat: SeatView,
-  view: RoomView,
-  actingId: PlayerId | null,
-  isHero: boolean,
-  winners: readonly PlayerId[],
-): PlayerStatus {
-  if (view.phase === "payout" && winners.includes(seat.playerId)) return "winner";
-  if (seat.sittingOut) return "busted";
-  if (seat.folded) return "fold";
-  if (seat.allIn) return "all-in";
-  if (view.phase === "payout") return "waiting";
-  if (actingId !== seat.playerId) return "waiting";
-  return isHero ? "your-turn" : "thinking";
-}
-
-/** §11 on the hero's draft, for the live preview — the same read the offline adapter gives. */
-function wordsOf(
-  view: RoomView,
-  heroId: PlayerId,
-  priv: PrivateView | null,
-  heroDraft: readonly TilePlay[],
-  refusal: WordRejectionReason | null,
-  dictionary: Dictionary,
-  pendingConfirm: boolean,
-): WordDraft | null {
-  const hero = view.seats.find((seat) => seat.playerId === heroId);
-  if (view.phase === "payout" || hero === undefined || hero.folded || hero.sittingOut) return null;
-
-  // Confirmed the moment the seat locks it in — the server's own confirmation is on the wire and
-  // will reconcile the same answer — so the builder closes at once and the check cannot fire twice.
-  const confirmed = pendingConfirm || priv?.word.status === "confirmed";
-  const plays =
-    priv?.word.status === "confirmed" && priv?.word.confirmed !== null
-      ? priv?.word.confirmed ?? heroDraft
-      : heroDraft;
-  const available = availableFor(priv, view);
-  const resolution = resolveSubmission({ available, submission: { plays: [...plays] } });
-  const windowOpen = view.word?.status === "open";
-
-  return {
-    plays,
-    word: spellSubmission({ available, submission: { plays: [...plays] } }),
-    score: resolution.ok ? scoreWord(resolution.tiles) : null,
-    reason: refusal ?? previewReason(plays.length, resolution, dictionary),
-    confirmed,
-    open: !confirmed,
-    confirmable: !confirmed && windowOpen && priv?.word.status === "drafting",
-  };
-}
-
-/** §11's answer for a draft that has not been confirmed; an empty or partial draft is not a refusal. */
-function previewReason(
-  played: number,
-  resolution: SubmissionResolution,
-  dictionary: Dictionary,
-): WordRejectionReason | null {
-  if (played === 0) return null;
-  if (!resolution.ok) return resolution.reason === "too-short" ? null : resolution.reason;
-  return dictionary.isWord(resolution.word) ? null : "not-in-dictionary";
 }
 
 /** The table's phase as a round phase, or null while it is still the waiting room. */

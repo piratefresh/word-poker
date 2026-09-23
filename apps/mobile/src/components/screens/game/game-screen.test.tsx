@@ -163,6 +163,8 @@ test("calls the wager action the button is labelled with", async () => {
           canBet: true,
           callAmount: undefined,
           currentBet: 0,
+          primary: "check",
+          wager: "bet",
         },
       }}
       onBet={onBet}

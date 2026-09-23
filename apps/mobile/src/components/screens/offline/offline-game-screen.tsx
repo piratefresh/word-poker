@@ -45,12 +45,21 @@ import { useOfflineGame } from "@/lib/use-offline-game";
  * hand after the first derives its seed from this one, and a render that drew again would
  * deal the table a second time mid-session.
  */
-export function OfflineGameScreen() {
+export function OfflineGameScreen({
+  turnDurationMs,
+}: {
+  /** Overrides how long a seat has to act. Only the tuning route passes one. */
+  turnDurationMs?: number;
+} = {}) {
   const dictionary = useDictionary();
 
   return (
     <View style={styles.screen}>
-      {dictionary === null ? <LoadingTable /> : <OfflineTable dictionary={dictionary} />}
+      {dictionary === null ? (
+        <LoadingTable />
+      ) : (
+        <OfflineTable dictionary={dictionary} turnDurationMs={turnDurationMs} />
+      )}
     </View>
   );
 }
@@ -64,18 +73,20 @@ function LoadingTable() {
   );
 }
 
-function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
+function OfflineTable({
+  dictionary,
+  turnDurationMs,
+}: {
+  dictionary: Dictionary;
+  turnDurationMs?: number;
+}) {
   const params = useLocalSearchParams<{ seed?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
-  const { game, words, results, deal, fold, check, bet, call, raiseTo, allIn, setDraft, confirmWord, endChipFlight, sessionOver, newGame } =
-    useOfflineGame({ seed, dictionary });
+  const { game, words, results, deal, fold, primary, allIn, wager, setDraft, endChipFlight, sessionOver, newGame } =
+    useOfflineGame({ seed, dictionary, turnDurationMs });
   const payout = game.phase === "payout";
-  // §19's window turns the felt's check into the confirm: while the seat may still lock its
-  // word in, the check is what locks it. On every other turn the same button is the engine's
-  // own check or call, whichever the row armed.
-  const checkOrCall = words?.confirmable ? confirmWord : game.betting.canCheck ? check : call;
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.
@@ -105,13 +116,13 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
           bettingLeading={<WordShuffleButton />}
           game={game}
           onAllIn={allIn}
-          // The felt's wager control names its own action, so the engine actions line up with
-          // it one to one: BET opens the round, RAISE answers it (§22).
-          onBet={bet}
-          onCheckOrCall={checkOrCall}
+          // The wager slider names its own action, and `wager` dispatches the one it names: BET
+          // opens the round, RAISE answers it (§22).
+          onBet={wager}
+          onCheckOrCall={primary}
           onChipFlightEnd={endChipFlight}
           onFold={fold}
-          onRaise={raiseTo}
+          onRaise={wager}
           rack={
             // The draft reads above the rack it is built from: one line of text over the
             // strip, drawn by the builder and placed by the felt's own rack slot.

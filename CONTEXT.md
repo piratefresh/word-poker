@@ -58,3 +58,8 @@ _Avoid_: reveal (that is the UI moment).
 
 **Busted**: a seat whose Table Stack reached zero; it sits out the session's remaining hands.
 _Avoid_: broke, eliminated.
+
+## The felt
+
+**Hero View**: the table as one seat sees it — its rack, its turn, its draft — mapped to what the felt draws and the word builder reads; both the offline and online adapters decode into it (`apps/mobile/src/lib/hero-view.ts`).
+_Avoid_: player view, client state.

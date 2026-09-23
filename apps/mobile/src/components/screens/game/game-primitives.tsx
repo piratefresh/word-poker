@@ -176,10 +176,14 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
   const statusColor = winner ? colors.goldHi : active ? colors.gold : colors.success;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
+  // A seat's chip sits on the side of it that faces the pot, so the eye reads the money going in.
+  // At the top and bottom of the table that side is straight down and straight up: a chip below
+  // the top seat clears its nameplate and status, where a chip level with them would cover the
+  // one word that says what the seat just did.
   const betStyle =
     Math.abs(anchor.x - 0.5) > Math.abs(anchor.y - 0.5)
       ? { left: anchor.x < 0.5 ? 72 : -3, top: 22 }
-      : { left: 34, top: anchor.y < 0.5 ? 45 : -13 };
+      : { left: 34, top: anchor.y < 0.5 ? SEAT_STACK_HEIGHT - 4 : -13 };
   return (
     <View style={[styles.seat, out && styles.folded]}>
       <View style={styles.avatarWrap}>
@@ -339,13 +343,16 @@ export function ActionButton({
         pressed && styles.pressed,
       ]}
       testID={testID}>
+      {/* The fill is a layer, not a wrapper: a wrapper sized in percentages would make the
+          button's own content width indeterminate, and the button would then ignore its label
+          and collapse to the width floor. `action` clips it to the rounded corners. */}
       {gold ? (
-        <LinearGradient {...gradients.goldButton} style={styles.actionGradient}>
-          {content}
-        </LinearGradient>
-      ) : (
-        content
-      )}
+        <LinearGradient
+          {...gradients.goldButton}
+          style={[StyleSheet.absoluteFill, styles.goldFill]}
+        />
+      ) : null}
+      {content}
     </Pressable>
   );
 }
@@ -531,15 +538,16 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   wideAction: { flex: 1.35 },
-  compactAction: { flex: 0, paddingHorizontal: 10 },
+  /**
+   * Hugs its label rather than sharing the row. The basis has to be restated: `action`'s `flex: 1`
+   * compiles to a `0%` basis, and overwriting only grow and shrink would leave the button sized
+   * by nothing at all — the label could never set its width and it would collapse to the floor.
+   */
+  compactAction: { flexBasis: "auto", flexGrow: 0, flexShrink: 0, minWidth: 96, paddingHorizontal: 12 },
   dangerAction: { borderColor: "rgba(255,93,78,0.4)" },
   goldAction: { borderColor: colors.goldDeep },
-  actionGradient: {
-    alignItems: "center",
-    height: "100%",
-    justifyContent: "center",
-    width: "100%",
-  },
+  /** The gold fill sits under the label and never takes a pointer. */
+  goldFill: { pointerEvents: "none" },
   actionText: {
     color: colors.text,
     fontFamily: fonts.sansBold,

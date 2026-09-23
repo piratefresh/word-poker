@@ -62,6 +62,13 @@ export interface BettingState {
   allInAmount: number;
   /** The highest amount committed this round, for labelling call and raise. */
   currentBet: number;
+  /**
+   * The move the check/call button makes: the engine's check or call, or — inside §19's window —
+   * the confirm. The label and the tap both read this, so they cannot disagree.
+   */
+  primary: "confirm" | "check" | "call";
+  /** The move the one bet/raise slider makes: a bet opens the round, a raise answers one (§22). */
+  wager: "bet" | "raise";
 }
 
 /**

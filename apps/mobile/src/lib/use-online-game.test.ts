@@ -194,6 +194,17 @@ describe("useOnlineGame", () => {
     ]);
   });
 
+  test("opens an unbet round with the felt's wager as a bet, never a raise the room refuses", async () => {
+    const room = makeRoom(HERO, liveState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+    expect(handle.current.game?.betting.canBet).toBe(true);
+
+    await act(async () => handle.current.wager(300));
+
+    expect(room.sends).toEqual([{ type: GAME_MESSAGES.betting, payload: { type: "bet", amount: 300 } }]);
+  });
+
   test("builds the word the whole hand and locks it in only on confirm", async () => {
     const wordOpen = liveState({
       betting: { active: false, currentBet: 0, minRaise: 100, minBet: 100 },
