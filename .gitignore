@@ -68,3 +68,6 @@ package-lock.json
 /skills/
 /.claude/skills/
 /.pi/skills/
+# the omp harness's own state — per-machine config and the secret-obfuscator mapping
+# AGENTS.md refers to. Never shared, and never committed.
+/.omp/

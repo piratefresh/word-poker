@@ -69,7 +69,7 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
-  const { game, words, results, deal, fold, check, bet, call, raiseTo, allIn, setDraft, confirmWord, sessionOver, newGame } =
+  const { game, words, results, deal, fold, check, bet, call, raiseTo, allIn, setDraft, confirmWord, endChipFlight, sessionOver, newGame } =
     useOfflineGame({ seed, dictionary });
   const payout = game.phase === "payout";
   // §19's window turns the felt's check into the confirm: while the seat may still lock its
@@ -105,7 +105,11 @@ function OfflineTable({ dictionary }: { dictionary: Dictionary }) {
           bettingLeading={<WordShuffleButton />}
           game={game}
           onAllIn={allIn}
+          // The felt's wager control names its own action, so the engine actions line up with
+          // it one to one: BET opens the round, RAISE answers it (§22).
+          onBet={bet}
           onCheckOrCall={checkOrCall}
+          onChipFlightEnd={endChipFlight}
           onFold={fold}
           onRaise={raiseTo}
           rack={

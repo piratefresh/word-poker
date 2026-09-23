@@ -45,16 +45,12 @@ export {
 } from "./bot";
 export type { ChooseWordOptions } from "./bot";
 export {
-  BettingRejectionError,
   OFFLINE_TURN_MS,
-  OfflineActionError,
   availableTiles,
   handSeed,
   reduce,
   revealedCount,
   startHand,
-  WORD_WINDOW_MS,
-  WordRejectionError,
 } from "./offline";
 export type {
   HandResult,
@@ -62,9 +58,14 @@ export type {
   OfflineStanding,
   OfflineState,
   StartHandOptions,
-  WordSlot,
-  WordWindow,
 } from "./offline";
+export {
+  BettingRejectionError,
+  OfflineActionError,
+  WordRejectionError,
+} from "./errors";
+export { WORD_WINDOW_MS } from "./word-window";
+export type { WordSlot, WordWindow } from "./word-window";
 export { scoreWord } from "./scoring";
 export { awardChips, commitChips } from "./chips";
 export type { ChipSeat, CommitResult } from "./chips";

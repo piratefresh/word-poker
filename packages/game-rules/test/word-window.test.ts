@@ -1,106 +1,116 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { Tile, TilePlay, WordSubmission } from "@wordpoker/contracts";
+import type { OfflineAction, PlayerId, Tile, WordSubmission } from "@wordpoker/contracts";
 
+import { OfflineActionError, WordRejectionError } from "../src/errors";
 import {
-  BettingRejectionError,
-  OfflineActionError,
-  reduce,
-  startHand,
   WORD_WINDOW_MS,
-  WordRejectionError,
-  type OfflineState,
+  applyWord,
+  openWindow,
+  timeout,
+  type WindowSeat,
+  type WindowTable,
   type WordSlot,
-} from "../src/offline";
-import { TEST_DICTIONARY, cloneState } from "./fixtures";
-
-const SEATS = ["hero", "ellis", "jay", "mira"] as const;
-const SEED = 20260919;
-const NOW = 1_000_000;
-
-/** How many actions a checked hand takes to reach the river's close: four streets, every seat. */
-const CHECKS_TO_RIVER_END = SEATS.length * 4;
-
-/** Checks every seat through every street: §19's window opens on the river's last check. */
-function checkAround(state: OfflineState, fromMs = NOW): OfflineState {
-  let next = state;
-  let step = 0;
-
-  while (next.wordWindow?.status !== "open" && next.phase !== "payout") {
-    const index = next.toActIndex;
-    assert.ok(index !== null, "a seat is to act");
-    const seat = next.seats[index];
-    assert.ok(seat, `seat ${index}`);
-    next = reduce(next, { type: "check", playerId: seat.id }, fromMs + step);
-    step += 1;
-    assert.ok(step <= CHECKS_TO_RIVER_END, "a checked hand is four streets of checks");
-  }
-
-  return next;
-}
+  type WordWindow,
+} from "../src/word-window";
 
 /**
- * A hand dealt at `nowMs` and walked past its streets to the river's close, where §19's word
- * window opens. `wordBuilding` is the table's §19 configuration.
+ * §19's window on its own: the module is handed four seats and a clock, and everything below is
+ * a literal. No hand is dealt, no street is walked, and the tiles are the ones this file writes
+ * down — which is the point of the seam: the window's rules are about slots and the clock, and
+ * the only thing it needs from a hand is what a seat holds.
  */
-function atWindow(nowMs = NOW, wordBuilding: { autoSubmitDrafts?: boolean } = {}): OfflineState {
-  const dealt = startHand({ seed: SEED, players: SEATS, nowMs, wordBuilding, dictionary: TEST_DICTIONARY });
-  return checkAround(dealt, nowMs);
+
+const NOW = 1_000_000;
+/** The deadline the whole table shares, as `openWindow` arms it. */
+const ENDS_AT = NOW + WORD_WINDOW_MS;
+
+const SEATS: readonly WindowSeat[] = [
+  { seat: 0, playerId: "hero" },
+  { seat: 1, playerId: "ellis" },
+  { seat: 2, playerId: "jay" },
+  { seat: 3, playerId: "mira" },
+];
+
+/** One seat's tiles: two single letters that spell, and a pair that plays both its faces (§10). */
+function tilesOf(seat: number): readonly Tile[] {
+  return [
+    { id: `s${seat}-a`, letter: "A", points: 1 },
+    { id: `s${seat}-r`, letter: "R", points: 2 },
+    { id: `s${seat}-th`, letter: "T", points: 1, sequenceLetter: "H", sequencePoints: 4 },
+  ];
 }
 
-/** One tile played: a choice tile must name the face it plays (§10), the others may not. */
-function play(tile: Tile): TilePlay {
-  return "alternativeLetter" in tile ? { tileId: tile.id, chosenFace: tile.letter } : { tileId: tile.id };
+/** The word a seat builds: its own two letters, in the order it plays them. */
+function wordOf(seat: number): WordSubmission {
+  return { plays: [{ tileId: `s${seat}-a` }, { tileId: `s${seat}-r` }] };
 }
 
-/** A submission this seat can build: its first two private tiles, in the order they were dealt. */
-function twoTiles(state: OfflineState, seatIndex: number): WordSubmission {
-  const seat = state.seats[seatIndex];
-  return { plays: (seat?.privateTiles ?? []).slice(0, 2).map(play) };
+type WordAction = Extract<OfflineAction, { type: "draftWord" | "confirmWord" }>;
+
+/** What the module reads for one action: the slots, the shared clock, and each seat's tiles. */
+function tableFor(
+  window: WordWindow,
+  options: { autoSubmitDrafts?: boolean; tilesFor?: (seat: number) => readonly Tile[] } = {},
+): WindowTable {
+  return {
+    slots: window.slots,
+    endsAtMs: ENDS_AT,
+    autoSubmitDrafts: options.autoSubmitDrafts ?? false,
+    tilesFor: options.tilesFor ?? tilesOf,
+  };
 }
 
-/** One private tile of a seat, for the submissions that play a single letter. */
-function firstTile(state: OfflineState, seatIndex: number): Tile {
-  const tile = state.seats[seatIndex]?.privateTiles[0];
-  assert.ok(tile, `seat ${seatIndex} holds a private tile`);
-  return tile;
+/** An open window and the table it is read through, which every case below starts from. */
+function opened(options: { autoSubmitDrafts?: boolean } = {}): {
+  window: WordWindow;
+  table: WindowTable;
+} {
+  const { window, endsAtMs } = openWindow(SEATS, NOW);
+  assert.equal(endsAtMs, ENDS_AT, "one clock for the whole table");
+  return { window, table: tableFor(window, options) };
 }
 
-/** A tile of the hand that plays one letter — what a one-letter draft is made of (§10). */
-function singleLetterTile(state: OfflineState, seatIndex: number): Tile {
-  const found = (state.seats[seatIndex]?.privateTiles ?? []).find(
-    (tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile),
-  );
-  assert.ok(found, `seat ${seatIndex} holds a single-letter tile`);
-  return found;
+/** One action through the module, with the table the next action reads — what a hand does between them. */
+function step(
+  from: { window: WordWindow; table: WindowTable },
+  action: WordAction,
+  nowMs = ENDS_AT - 1,
+): { window: WordWindow; table: WindowTable } {
+  const window = applyWord(from.table, action, nowMs);
+  return { window, table: { ...from.table, slots: window.slots } };
 }
 
-/** The slot a seat holds in the window; the test names the seat, the slot names itself. */
-function slotOf(state: OfflineState, seatIndex: number): WordSlot {
-  const slot = (state.wordWindow?.slots ?? []).find((candidate) => candidate.seat === seatIndex);
-  assert.ok(slot, `seat ${seatIndex} has a slot in the window`);
+/** §19's clock run out. */
+function closed(
+  from: { window: WordWindow; table: WindowTable },
+  nowMs = ENDS_AT,
+): { window: WordWindow; table: WindowTable } {
+  const window = timeout(from.table, nowMs);
+  return { window, table: { ...from.table, slots: window.slots } };
+}
+
+/** The slot a seat holds; the test names the seat, the slot names itself. */
+function slotOf(window: WordWindow, playerId: PlayerId): WordSlot {
+  const slot = window.slots.find((candidate) => candidate.playerId === playerId);
+  assert.ok(slot, `${playerId} holds a slot in the window`);
   return slot;
 }
 
 /** The word a seat confirmed, or `null` when it confirmed none — which §11 scores 0. */
-function confirmedWord(state: OfflineState, seatIndex: number): WordSubmission | null {
-  const slot = slotOf(state, seatIndex);
+function confirmed(window: WordWindow, playerId: PlayerId): WordSubmission | null {
+  const slot = slotOf(window, playerId);
   return slot.status === "confirmed" ? slot.submission : null;
 }
 
-describe("the word window — §19, between the river and the payout", () => {
-  it("opens on the river's last check: a slot per seat, on one shared clock", () => {
-    const state = atWindow();
+describe("§19's word window", () => {
+  it("opens one slot per seat handed in, in seat order, on one clock", () => {
+    const { window } = opened();
 
-    assert.equal(state.phase, "river");
-    assert.equal(state.revealed, 5);
-    assert.equal(state.toActIndex, null);
-    assert.equal(state.betting, null);
-    assert.equal(state.endsAtMs, NOW + CHECKS_TO_RIVER_END - 1 + WORD_WINDOW_MS);
-    assert.equal(state.wordWindow?.status, "open");
+    assert.equal(window.status, "open");
     assert.deepEqual(
-      (state.wordWindow?.slots ?? []).map((slot) => [slot.seat, slot.playerId]),
+      window.slots.map((slot) => [slot.seat, slot.playerId]),
       [
         [0, "hero"],
         [1, "ellis"],
@@ -109,219 +119,222 @@ describe("the word window — §19, between the river and the payout", () => {
       ],
     );
     assert.ok(
-      (state.wordWindow?.slots ?? []).every((slot) => slot.status === "drafting" && slot.draft === null),
+      window.slots.every((slot) => slot.status === "drafting" && slot.draft === null),
       "every seat starts with an empty draft",
+    );
+
+    // The caller owns who is in the hand: a seat it leaves out has no slot, and never will.
+    const two = openWindow(SEATS.slice(0, 2), NOW);
+    assert.deepEqual(
+      two.window.slots.map((slot) => slot.playerId),
+      ["hero", "ellis"],
     );
   });
 
   it("lets a seat edit its draft until it confirms, and locks the confirmed word", () => {
-    const opened = atWindow();
-    const first = twoTiles(opened, 0);
+    const opened_ = opened();
+    const first = wordOf(0);
+    const drafted = step(opened_, { type: "draftWord", playerId: "hero", submission: first });
 
-    const drafted = reduce(
-      opened,
-      { type: "draftWord", playerId: "hero", submission: first },
-      opened.endsAtMs - 2,
-    );
-    const draftedSlot = slotOf(drafted, 0);
+    const draftedSlot = slotOf(drafted.window, "hero");
     assert.equal(draftedSlot.status, "drafting");
     assert.deepEqual(draftedSlot.status === "drafting" ? draftedSlot.draft : null, first);
 
     const edited: WordSubmission = { plays: [...first.plays].reverse() };
-    const confirmed = reduce(
-      drafted,
-      { type: "confirmWord", playerId: "hero", submission: edited },
-      opened.endsAtMs - 1,
-    );
-    assert.deepEqual(confirmedWord(confirmed, 0), edited);
+    const confirmed_ = step(drafted, { type: "confirmWord", playerId: "hero", submission: edited });
+    assert.deepEqual(confirmed(confirmed_.window, "hero"), edited);
 
     assert.throws(
-      () =>
-        reduce(
-          confirmed,
-          { type: "confirmWord", playerId: "hero", submission: first },
-          opened.endsAtMs - 1,
-        ),
+      () => step(confirmed_, { type: "confirmWord", playerId: "hero", submission: first }),
       OfflineActionError,
     );
-    assert.deepEqual(confirmedWord(confirmed, 0), edited);
+    assert.deepEqual(confirmed(confirmed_.window, "hero"), edited);
+  });
+
+  it("clears the draft when a seat asks for an empty one", () => {
+    const opened_ = step(opened(), { type: "draftWord", playerId: "hero", submission: wordOf(0) });
+    const cleared = step(opened_, { type: "draftWord", playerId: "hero", submission: { plays: [] } });
+
+    assert.deepEqual(slotOf(cleared.window, "hero"), {
+      seat: 0,
+      playerId: "hero",
+      status: "drafting",
+      draft: null,
+    });
+  });
+
+  it("judges a draft against the tiles the caller hands it, and no others", () => {
+    const { table } = opened();
+    const rackless: WindowTable = { ...table, tilesFor: () => [] };
+
+    assert.throws(
+      () => applyWord(rackless, { type: "confirmWord", playerId: "hero", submission: wordOf(0) }, NOW),
+      (error: unknown) => error instanceof WordRejectionError && error.reason === "uses-unavailable-letters",
+    );
   });
 
   it("refuses a word the seat cannot build, with §11's reason", () => {
-    const opened = atWindow();
+    const { table } = opened();
 
     assert.throws(
       () =>
-        reduce(
-          opened,
+        applyWord(
+          table,
           { type: "confirmWord", playerId: "hero", submission: { plays: [{ tileId: "ZZ-9" }] } },
-          opened.endsAtMs - 1,
+          NOW,
         ),
       (error: unknown) => error instanceof WordRejectionError && error.reason === "uses-unavailable-letters",
     );
 
     assert.throws(
       () =>
-        reduce(
-          opened,
-          { type: "confirmWord", playerId: "hero", submission: { plays: [play(firstTile(opened, 0))] } },
-          opened.endsAtMs - 1,
+        applyWord(
+          table,
+          { type: "confirmWord", playerId: "hero", submission: { plays: [{ tileId: "s0-a" }] } },
+          NOW,
         ),
+      (error: unknown) => error instanceof WordRejectionError && error.reason === "too-short",
+    );
+  });
+
+  it("takes a one-letter draft, because §12's floor is about the word a seat stands behind", () => {
+    const opened_ = opened();
+    const one: WordSubmission = { plays: [{ tileId: "s0-a" }] };
+
+    const drafted = step(opened_, { type: "draftWord", playerId: "hero", submission: one }, NOW);
+    assert.deepEqual(slotOf(drafted.window, "hero"), {
+      seat: 0,
+      playerId: "hero",
+      status: "drafting",
+      draft: one,
+    });
+
+    // The floor waits for the confirm, which is the moment the draft becomes the seat's word.
+    assert.throws(
+      () => step(drafted, { type: "confirmWord", playerId: "hero", submission: one }, NOW),
       (error: unknown) => error instanceof WordRejectionError && error.reason === "too-short",
     );
   });
 
   it("accepts a word a millisecond before the deadline, and refuses one at it as timer-expired", () => {
-    const opened = atWindow();
-    const submission = twoTiles(opened, 0);
+    const { table } = opened();
 
-    const justInTime = reduce(
-      opened,
-      { type: "confirmWord", playerId: "hero", submission },
-      opened.endsAtMs - 1,
+    const justInTime = applyWord(
+      table,
+      { type: "confirmWord", playerId: "hero", submission: wordOf(0) },
+      ENDS_AT - 1,
     );
-    assert.deepEqual(confirmedWord(justInTime, 0), submission);
+    assert.deepEqual(confirmed(justInTime, "hero"), wordOf(0));
 
     assert.throws(
-      () => reduce(opened, { type: "confirmWord", playerId: "hero", submission }, opened.endsAtMs),
+      () => applyWord(table, { type: "confirmWord", playerId: "hero", submission: wordOf(0) }, ENDS_AT),
       (error: unknown) => error instanceof WordRejectionError && error.reason === "timer-expired",
     );
   });
 
-  it("pays out only once every seat has confirmed or run out of time", () => {
-    const opened = atWindow();
-    const hero = reduce(
-      opened,
-      { type: "confirmWord", playerId: "hero", submission: twoTiles(opened, 0) },
-      opened.endsAtMs - 1,
-    );
-
-    // The hero is done, and the table is not: the other seats still have the clock.
-    assert.equal(hero.phase, "river");
-    assert.equal(hero.wordWindow?.status, "open");
-
-    const payout = reduce(hero, { type: "timeoutWords" }, hero.endsAtMs);
-
-    assert.equal(payout.phase, "payout");
-    assert.equal(payout.toActIndex, null);
-    assert.deepEqual(confirmedWord(payout, 0), twoTiles(opened, 0));
-    assert.ok(
-      SEATS.slice(1).every((_, offset) => slotOf(payout, offset + 1).status === "timed-out"),
-      "every seat that never confirmed is out of time",
-    );
-  });
-
-  it("closes as soon as every seat has confirmed, without running the clock down", () => {
-    let state = atWindow();
-
-    for (const [index, playerId] of SEATS.entries()) {
-      state = reduce(
-        state,
-        { type: "confirmWord", playerId, submission: twoTiles(state, index) },
-        state.endsAtMs - 5_000,
-      );
-    }
-
-    assert.equal(state.phase, "payout");
-    assert.equal(state.wordWindow?.status, "settled");
-    assert.ok(
-      SEATS.every((_, index) => confirmedWord(state, index) !== null),
-      "every confirmed word survives the close",
-    );
-  });
-
-  it("refuses a timeout while the seats still have time, and a second one after the close", () => {
-    const opened = atWindow();
-
-    assert.throws(() => reduce(opened, { type: "timeoutWords" }, opened.endsAtMs - 1), OfflineActionError);
-
-    const payout = reduce(opened, { type: "timeoutWords" }, opened.endsAtMs);
-    assert.throws(() => reduce(payout, { type: "timeoutWords" }, payout.endsAtMs + 1), OfflineActionError);
-  });
-
-  it("refuses a betting action while the window is open, and a word for a seat outside it", () => {
-    const opened = atWindow();
+  it("refuses a word for a seat the window does not hold, and one from a seat out of time", () => {
+    const { table } = opened();
 
     assert.throws(
-      () => reduce(opened, { type: "check", playerId: "hero" }, opened.endsAtMs - 1),
-      (error: unknown) => error instanceof BettingRejectionError && error.reason === "hand-over",
+      () => applyWord(table, { type: "draftWord", playerId: "ghost", submission: wordOf(0) }, NOW),
+      OfflineActionError,
     );
+
+    const selfTimedOut: WindowTable = {
+      ...table,
+      slots: table.slots.map((slot) =>
+        slot.playerId === "hero" ? { seat: slot.seat, playerId: slot.playerId, status: "timed-out" } : slot,
+      ),
+    };
     assert.throws(
-      () =>
-        reduce(
-          opened,
-          { type: "draftWord", playerId: "ghost", submission: twoTiles(opened, 0) },
-          opened.endsAtMs - 1,
-        ),
+      () => applyWord(selfTimedOut, { type: "draftWord", playerId: "hero", submission: wordOf(0) }, NOW),
       OfflineActionError,
     );
   });
 
+  it("stays open while a seat is still drafting, however many have confirmed", () => {
+    let current = opened();
+    for (const [index, seat] of SEATS.entries()) {
+      if (index === SEATS.length - 1) break;
+      current = step(current, { type: "confirmWord", playerId: seat.playerId, submission: wordOf(index) });
+    }
+
+    assert.equal(current.window.status, "open");
+    assert.equal(slotOf(current.window, "mira").status, "drafting");
+  });
+
+  it("closes as soon as every slot has a word on it, without running the clock down", () => {
+    let current = opened();
+    for (const [index, seat] of SEATS.entries()) {
+      current = step(
+        current,
+        { type: "confirmWord", playerId: seat.playerId, submission: wordOf(index) },
+        ENDS_AT - 5_000,
+      );
+    }
+
+    assert.equal(current.window.status, "settled");
+    assert.ok(
+      SEATS.every((seat) => confirmed(current.window, seat.playerId) !== null),
+      "every confirmed word survives the close",
+    );
+  });
+
+  it("closes on the clock with every seat that never confirmed out of time", () => {
+    const opened_ = step(opened(), { type: "confirmWord", playerId: "hero", submission: wordOf(0) });
+    const { window } = closed(opened_);
+
+    assert.equal(window.status, "settled");
+    assert.deepEqual(confirmed(window, "hero"), wordOf(0));
+    assert.ok(
+      SEATS.slice(1).every((seat) => slotOf(window, seat.playerId).status === "timed-out"),
+      "every seat that never confirmed is out of time",
+    );
+  });
+
+  it("refuses to close while the seats still have time", () => {
+    const { table } = opened();
+
+    assert.throws(() => timeout(table, ENDS_AT - 1), OfflineActionError);
+  });
+
   it("confirms a seat's open draft for it at the deadline only when the table opted in", () => {
-    const optedIn = atWindow(NOW, { autoSubmitDrafts: true });
-    const drafted = reduce(
-      optedIn,
-      { type: "draftWord", playerId: "ellis", submission: twoTiles(optedIn, 1) },
-      optedIn.endsAtMs - 1,
+    const optedIn = step(
+      opened({ autoSubmitDrafts: true }),
+      { type: "draftWord", playerId: "ellis", submission: wordOf(1) },
     );
 
-    assert.deepEqual(
-      confirmedWord(reduce(drafted, { type: "timeoutWords" }, drafted.endsAtMs), 1),
-      twoTiles(optedIn, 1),
-    );
+    assert.deepEqual(confirmed(closed(optedIn).window, "ellis"), wordOf(1));
 
     // The rules' default: the player must confirm, so the draft dies with the clock.
-    const byDefault = atWindow();
-    const leftOpen = reduce(
-      byDefault,
-      { type: "draftWord", playerId: "ellis", submission: twoTiles(byDefault, 1) },
-      byDefault.endsAtMs - 1,
+    const byDefault = step(opened(), { type: "draftWord", playerId: "ellis", submission: wordOf(1) });
+    const timedOut = closed(byDefault).window;
+
+    assert.equal(confirmed(timedOut, "ellis"), null);
+    assert.equal(slotOf(timedOut, "ellis").status, "timed-out");
+  });
+
+  it("does not auto-submit a draft those tiles cannot build, even when the table opted in", () => {
+    // A one-tile draft is one the window accepted (§12's floor belongs to the confirm), and
+    // §12 refuses it at the close just the same: the seat runs out with no word.
+    const opened_ = step(
+      opened({ autoSubmitDrafts: true }),
+      { type: "draftWord", playerId: "ellis", submission: { plays: [{ tileId: "s1-a" }] } },
     );
-    const timedOut = reduce(leftOpen, { type: "timeoutWords" }, leftOpen.endsAtMs);
+    const settled = closed(opened_).window;
 
-    assert.equal(confirmedWord(timedOut, 1), null);
-    assert.equal(slotOf(timedOut, 1).status, "timed-out");
+    assert.equal(confirmed(settled, "ellis"), null);
+    assert.equal(slotOf(settled, "ellis").status, "timed-out");
   });
 
-  it("carries the option into the next hand, whose window has not opened yet", () => {
-    const optedIn = atWindow(NOW, { autoSubmitDrafts: true });
-    const payout = reduce(optedIn, { type: "timeoutWords" }, optedIn.endsAtMs);
-    const next = reduce(payout, { type: "deal" }, NOW);
+  it("never mutates the slots it was handed", () => {
+    const opened_ = opened();
+    const before = structuredClone(opened_.table.slots);
 
-    assert.equal(next.wordWindow, null);
-    assert.equal(next.autoSubmitDrafts, true);
-  });
+    applyWord(opened_.table, { type: "confirmWord", playerId: "hero", submission: wordOf(0) }, ENDS_AT - 1);
+    applyWord(opened_.table, { type: "draftWord", playerId: "ellis", submission: wordOf(1) }, ENDS_AT - 1);
+    timeout(opened_.table, ENDS_AT);
 
-  it("takes a one-letter draft, because §12's floor is about the word a seat stands behind", () => {
-    const state = atWindow();
-    const one: WordSubmission = { plays: [play(singleLetterTile(state, 0))] };
-
-    const drafted = reduce(state, { type: "draftWord", playerId: "hero", submission: one }, NOW);
-    assert.deepEqual(slotOf(drafted, 0), { seat: 0, playerId: "hero", status: "drafting", draft: one });
-
-    // The floor waits for the confirm, which is the moment the draft becomes the seat's word.
-    assert.throws(
-      () => reduce(drafted, { type: "confirmWord", playerId: "hero", submission: one }, NOW),
-      (error: unknown) => error instanceof WordRejectionError && error.reason === "too-short",
-    );
-  });
-
-  it("clears the draft when a seat asks for an empty one", () => {
-    const state = atWindow();
-    const drafted = reduce(state, { type: "draftWord", playerId: "hero", submission: twoTiles(state, 0) }, NOW);
-
-    const cleared = reduce(drafted, { type: "draftWord", playerId: "hero", submission: { plays: [] } }, NOW);
-
-    assert.deepEqual(slotOf(cleared, 0), { seat: 0, playerId: "hero", status: "drafting", draft: null });
-  });
-
-  it("never mutates the state it was handed", () => {
-    const opened = atWindow();
-    const before = cloneState(opened);
-
-    reduce(opened, { type: "confirmWord", playerId: "hero", submission: twoTiles(opened, 0) }, opened.endsAtMs - 1);
-    reduce(opened, { type: "timeoutWords" }, opened.endsAtMs);
-
-    assert.deepEqual(opened, before);
+    assert.deepEqual(opened_.table.slots, before);
   });
 });

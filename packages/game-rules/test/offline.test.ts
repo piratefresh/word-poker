@@ -4,17 +4,16 @@ import { describe, it } from "node:test";
 import { ROUND_PHASES, type OfflineAction } from "@wordpoker/contracts";
 
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "../src/deal";
+import { BettingRejectionError, OfflineActionError } from "../src/errors";
 import {
-  BettingRejectionError,
   OFFLINE_TURN_MS,
-  OfflineActionError,
   reduce,
   revealedCount,
   startHand,
-  WORD_WINDOW_MS,
   type OfflineState,
   type StartHandOptions,
 } from "../src/offline";
+import { WORD_WINDOW_MS } from "../src/word-window";
 import { TEST_DICTIONARY, cloneState } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;

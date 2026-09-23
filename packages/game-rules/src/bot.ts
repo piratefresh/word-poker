@@ -27,7 +27,8 @@ import {
 import { bettingBounds } from "./betting";
 import { resolveSubmission } from "./building";
 import type { Dictionary } from "./dictionary";
-import { OfflineActionError, handSeed, type OfflineState } from "./offline";
+import { OfflineActionError } from "./errors";
+import { handSeed, type OfflineState } from "./offline";
 import { createRng } from "./rng";
 import { scoreWord } from "./scoring";
 

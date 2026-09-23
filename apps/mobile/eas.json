@@ -13,6 +13,18 @@
     },
     "production": {
       "autoIncrement": true
+    },
+    "e2e-test": {
+      "withoutCredentials": true,
+      "env": {
+        "EXPO_PUBLIC_E2E_AUTH_BYPASS": "1"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

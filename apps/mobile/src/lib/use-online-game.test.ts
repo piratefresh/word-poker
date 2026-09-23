@@ -10,6 +10,10 @@ import {
 import { testDictionary } from "./dictionary-fixtures";
 import { useOnlineGame, type GameRoomLike, type OnlineGame } from "./use-online-game";
 
+// The HUD barrel reaches the motion loop gate, which imports expo-router — a navigation package
+// Jest cannot parse. Nothing here renders a screen, so the gate's hook has nothing to do.
+jest.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
+
 const HERO = "hero-sess";
 const OPPONENT = "opp-sess";
 

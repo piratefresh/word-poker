@@ -416,6 +416,9 @@ function toScreenState(
 
   return {
     id: idOf(view),
+    handId: idOf(view),
+    // The chip layer's flights are the offline adapter's only, so far: the room's felt draws none.
+    flights: [],
     phase,
     phaseNumber: PHASE_NUMBER[phase],
     secondsRemaining: (wordOpen ? WORD_WINDOW_MS : OFFLINE_TURN_MS) / 1_000,

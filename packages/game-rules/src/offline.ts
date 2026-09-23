@@ -9,6 +9,9 @@
  * of the payout; the hand pays out once every seat still in it has confirmed a word or run out
  * of time, and §25's pots are layered, ranked and paid in the same transition.
  *
+ * §19's window is its own module (`word-window.ts`): this file opens it, hands it the table on
+ * every word action, and settles the hand when it closes. The window's own rules are not here.
+ *
  * Two ends of the hand are short-circuits rather than rounds. A fold-out — one seat left
  * un-folded — goes straight to the pot with no reveal and no window (§26). An all-in run-out
  * has no seat left to act on the streets still to come, so one action rolls through them all
@@ -30,7 +33,6 @@
 import {
   ROUND_PHASES,
   type BettingAction,
-  type BettingRejectionReason,
   type OfflineAction,
   type PayoutResult,
   type PlayerId,
@@ -39,7 +41,6 @@ import {
   type ShowdownStanding,
   type Tile,
   type WordRejectionReason,
-  type WordSubmission,
 } from "@wordpoker/contracts";
 
 import {
@@ -50,25 +51,25 @@ import {
   type BettingSeatState,
   type Stakes,
 } from "./betting";
-import { evaluateWord, resolveSubmission } from "./building";
+import { evaluateWord } from "./building";
 import { dealHand } from "./deal";
 import type { Dictionary } from "./dictionary";
+import {
+  BettingRejectionError,
+  OfflineActionError,
+} from "./errors";
 import { resolvePayout, type JudgedSeat } from "./pots";
 import { createRng } from "./rng";
 import { scoreWord } from "./scoring";
 import { DRAW_SEED_SALT, rankShowdown } from "./showdown";
+import * as wordWindow from "./word-window";
+import type { WindowSeat, WindowTable, WordSlot, WordWindow } from "./word-window";
 
 /**
  * How long a seat's betting turn lasts on the injected clock. Online and offline use the same
  * one-minute budget.
  */
 export const OFFLINE_TURN_MS = 60_000;
-
-/**
- * How long §19's word window stays open. One clock for the whole table: the rules give the
- * seats sixty seconds between them, not sixty each.
- */
-export const WORD_WINDOW_MS = 60_000;
 
 /**
  * The seed the current hand replays from: the table's seed stepped once per hand, so the
@@ -97,47 +98,6 @@ const REVEALED_BY_PHASE: Readonly<Record<RoundPhase, number>> = {
 export interface OfflineSeat extends BettingSeatState {
   readonly privateTiles: readonly Tile[];
 }
-
-/**
- * One seat's slot in §19's window: the word it is working on, the word it committed to, or
- * the fact that its time ran out with no confirmed word — which §11 scores as 0 points.
- *
- * A slot only ever belongs to a seat that is still in the hand: a folded seat builds no word,
- * and neither does a seat sitting the hand out. `seat` is the seat's index in `seats`, which
- * is what lets the window judge a slot against the tiles of the seat it belongs to.
- */
-export type WordSlot =
-  | {
-      readonly seat: number;
-      readonly playerId: PlayerId;
-      /** What the seat has typed so far; `null` until it drafts anything. Editable. */
-      readonly status: "drafting";
-      readonly draft: WordSubmission | null;
-    }
-  | {
-      readonly seat: number;
-      readonly playerId: PlayerId;
-      /** The word the seat confirmed. A confirmed word is locked and never replaced. */
-      readonly status: "confirmed";
-      readonly submission: WordSubmission;
-    }
-  | {
-      readonly seat: number;
-      readonly playerId: PlayerId;
-      /** The window closed with nothing confirmed: this seat has no word (§11). */
-      readonly status: "timed-out";
-    };
-
-/**
- * §19's word window (§19, `docs/rules/hand-flow.md`).
- *
- * `slots` holds one slot per seat still in the hand, in seat order. The settled window stays
- * in the state: it is the record of what each seat submitted, and the reveal and the pot are
- * read off it after the hand has moved on.
- */
-export type WordWindow =
-  | { readonly status: "open"; readonly slots: readonly WordSlot[] }
-  | { readonly status: "settled"; readonly slots: readonly WordSlot[] };
 
 /**
  * One seat's word at the reveal: §21's place, plus what the seat actually submitted and why
@@ -260,52 +220,6 @@ export interface StartHandOptions {
   /** The seat holding the dealer button. Absent means seat 0, the first hand's button. */
   dealerSeat?: number;
   turnDurationMs?: number;
-}
-
-/**
- * An action that does not fit the state it was handed — dealing mid-hand, betting outside a
- * round, drafting for a seat that is not in the window. Named so a caller can tell an engine
- * refusal from a programming error, and the message names where the table was.
- */
-export class OfflineActionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "OfflineActionError";
-  }
-}
-
-/**
- * A word action the engine refused the way §11 refuses a submission: the payload never became
- * the seat's word, and `reason` says why. Separate from {@link OfflineActionError} because
- * this one is the player's to fix — a word too short, a tile they do not hold, a clock they
- * missed — while the other means the action did not fit the table at all.
- */
-export class WordRejectionError extends OfflineActionError {
-  /** §11's reason, ready to be shown to the seat that sent it. */
-  readonly reason: WordRejectionReason;
-
-  constructor(reason: WordRejectionReason) {
-    super(`the word was refused: ${reason}`);
-    this.name = "WordRejectionError";
-    this.reason = reason;
-  }
-}
-
-/**
- * A betting action the engine refused the way §15 refuses one: the chips never moved, and
- * `reason` says why. The betting twin of {@link WordRejectionError}, and for the same reason:
- * "it is not your turn" is the table's answer, not a programming error — the seat can only
- * fix it by acting when its turn comes again.
- */
-export class BettingRejectionError extends OfflineActionError {
-  /** §15/§22/§23's reason, ready to be shown to the seat that sent it. */
-  readonly reason: BettingRejectionReason;
-
-  constructor(reason: BettingRejectionReason) {
-    super(`the betting action was refused: ${reason}`);
-    this.name = "BettingRejectionError";
-    this.reason = reason;
-  }
 }
 
 /** How many community tiles the phase has face up. */
@@ -548,13 +462,25 @@ function rollStreets(state: OfflineState, nowMs: number): OfflineState {
 
 /** §19's window opening on the whole table: one clock, one slot per seat still in the hand. */
 function openWordWindow(state: OfflineState, nowMs: number): OfflineState {
-  return {
-    ...state,
-    toActIndex: null,
-    betting: null,
-    endsAtMs: nowMs + WORD_WINDOW_MS,
-    wordWindow: { status: "open", slots: emptySlots(state) },
-  };
+  const { window, endsAtMs } = wordWindow.openWindow(inHandSeats(state), nowMs);
+
+  return { ...state, toActIndex: null, betting: null, endsAtMs, wordWindow: window };
+}
+
+/**
+ * The seats §19's window holds a slot for, in seat order: every seat still in the hand. A
+ * folded seat has no word to build and a sitting-out seat is not in the hand at all; an all-in
+ * seat does build one — all its chips are in the pot, but §19 is still its.
+ */
+function inHandSeats(state: OfflineState): readonly WindowSeat[] {
+  const seats: WindowSeat[] = [];
+
+  state.seats.forEach((seat, index) => {
+    if (seat.folded || seat.sittingOut) return;
+    seats.push({ seat: index, playerId: seat.id });
+  });
+
+  return seats;
 }
 
 /**
@@ -583,26 +509,13 @@ function foldOut(state: OfflineState, nowMs: number): OfflineState {
   };
 }
 
-/** One drafting slot per seat still in the hand, in seat order, the moment the window opens. */
-function emptySlots(state: OfflineState): readonly WordSlot[] {
-  const slots: WordSlot[] = [];
-
-  state.seats.forEach((seat, index) => {
-    // A folded seat has no word to build and a sitting-out seat is not in the hand at all;
-    // an all-in seat does build one — all its chips are in the pot, but §19 is still its.
-    if (seat.folded || seat.sittingOut) return;
-    slots.push({ seat: index, playerId: seat.id, status: "drafting", draft: null });
-  });
-
-  return slots;
-}
-
-/** Drafts or confirms one seat's word inside §19's window. */
-function applyWord(
-  state: OfflineState,
-  action: Extract<OfflineAction, { type: "draftWord" | "confirmWord" }>,
-  nowMs: number,
-): OfflineState {
+/**
+ * §19's window as the hand holds it, or a refusal naming where the table is. These two are the
+ * hand's refusals rather than the window's: there is no window yet, or the settled one is the
+ * record the hand has already moved past. The window's own refusals — a late word, a seat it
+ * does not hold — belong to the module, which is handed a window that is open.
+ */
+function openWindowOf(state: OfflineState): Extract<WordWindow, { status: "open" }> {
   const window = state.wordWindow;
   if (window === null) {
     throw new OfflineActionError(
@@ -614,58 +527,34 @@ function applyWord(
       "the word window has closed: a settled hand's words are the record it left behind",
     );
   }
-  if (nowMs >= state.endsAtMs) {
-    // The clock is the first thing checked, because it is what the seat ran out of: a word
-    // that arrives late is refused as late, however good it is (§19).
-    throw new WordRejectionError("timer-expired");
-  }
 
-  const index = window.slots.findIndex((slot) => slot.playerId === action.playerId);
-  const slot = window.slots[index];
-  if (slot === undefined) {
-    throw new OfflineActionError(`${action.playerId} is not in the word window`);
-  }
-  if (slot.status === "confirmed") {
-    throw new OfflineActionError(
-      `${action.playerId} has confirmed a word, and a confirmed word cannot be replaced`,
-    );
-  }
-  if (slot.status === "timed-out") {
-    throw new OfflineActionError(`${action.playerId} is out of time; the window does not reopen`);
-  }
+  return window;
+}
 
-  const slots = [...window.slots];
+/**
+ * §19's window as the module reads it: the slots it holds, the clock the whole table shares, the
+ * table's auto-submit setting, and the tiles each seat will be judged against — the seat's own
+ * plus the board, which is what `availableTiles` answers for the bot and the felt too.
+ */
+function table(state: OfflineState, slots: readonly WordSlot[]): WindowTable {
+  return {
+    slots,
+    endsAtMs: state.endsAtMs,
+    autoSubmitDrafts: state.autoSubmitDrafts,
+    tilesFor: (seat) => availableTiles(state, seat),
+  };
+}
 
-  // §19's draft is a sliding one, and clearing it is part of editing it: an empty submission
-  // is how a seat says it has typed nothing. §11 refuses an empty *word*, and that refusal
-  // still lands on a confirm below — a seat that confirms nothing never confirms at all.
-  if (action.type === "draftWord" && action.submission.plays.length === 0) {
-    slots[index] = { seat: slot.seat, playerId: slot.playerId, status: "drafting", draft: null };
-  } else {
-    const resolution = resolveSubmission({
-      available: availableTiles(state, slot.seat),
-      submission: action.submission,
-    });
+/** Drafts or confirms one seat's word inside §19's window, and settles the hand if that closed it. */
+function applyWord(
+  state: OfflineState,
+  action: Extract<OfflineAction, { type: "draftWord" | "confirmWord" }>,
+  nowMs: number,
+): OfflineState {
+  const open = openWindowOf(state);
+  const window = wordWindow.applyWord(table(state, open.slots), action, nowMs);
 
-    // §12's floor is a rule about the word a seat stands behind, not about what it is typing:
-    // a draft of one tile is a word in progress, and the floor is applied again at the confirm
-    // — the moment the submission becomes the seat's word, and the moment `slots` is built.
-    const typing = action.type === "draftWord" && !resolution.ok && resolution.reason === "too-short";
-    if (!resolution.ok && !typing) {
-      throw new WordRejectionError(resolution.reason);
-    }
-
-    slots[index] =
-      action.type === "confirmWord"
-        ? { seat: slot.seat, playerId: slot.playerId, status: "confirmed", submission: action.submission }
-        : { seat: slot.seat, playerId: slot.playerId, status: "drafting", draft: action.submission };
-  }
-
-  const next: OfflineState = { ...state, wordWindow: { status: "open", slots } };
-
-  // Every seat that has a word has confirmed one, so there is nobody left to wait for: the
-  // window's deadline is a deadline, not a stay, and the hand moves on (§19).
-  return slots.every((candidate) => candidate.status === "confirmed") ? settleWindow(next) : next;
+  return window.status === "settled" ? settleWindow(state, window) : { ...state, wordWindow: window };
 }
 
 /**
@@ -675,36 +564,20 @@ function applyWord(
  * back, so the reveal has every seat's word without another round trip.
  */
 function timeoutWords(state: OfflineState, nowMs: number): OfflineState {
-  const window = state.wordWindow;
-  if (window === null) {
-    throw new OfflineActionError(`no word window has opened at ${state.phase}`);
-  }
-  if (window.status === "settled") {
-    throw new OfflineActionError(
-      "the word window has already closed; a second timeout has nothing left to settle",
-    );
-  }
-  if (nowMs < state.endsAtMs) {
-    throw new OfflineActionError(
-      `the word window still has ${state.endsAtMs - nowMs}ms to run, so the seats may still confirm`,
-    );
-  }
+  const open = openWindowOf(state);
 
-  return settleWindow(state);
+  return settleWindow(state, wordWindow.timeout(table(state, open.slots), nowMs));
 }
 
 /**
- * Closes §19's window: seats that never confirmed are out of time — or, when the table opted
- * into auto-submit, have the draft they left behind confirmed for them — and the hand moves
- * on to the payout, judged and settled. The slots outlive the close because the reveal reads
- * them.
+ * Settles §19's window on the hand: the closed window the module handed back is the record the
+ * reveal reads, and §21's whole-table ladder and §25's pots run in the same transition that
+ * closed it. Seats that never confirmed are already out of time — or, when the table opted into
+ * auto-submit, already hold the draft they left behind. The slots outlive the close because the
+ * reveal reads them.
  */
-function settleWindow(state: OfflineState): OfflineState {
-  const window = state.wordWindow;
-  if (window === null || window.status === "settled") return state;
-
-  const slots = window.slots.map((slot) => closeSlot(slot, state));
-  const { result, seats } = judgeWindow(state, slots);
+function settleWindow(state: OfflineState, window: Extract<WordWindow, { status: "settled" }>): OfflineState {
+  const { result, seats } = judgeWindow(state, window.slots);
 
   return {
     ...state,
@@ -712,7 +585,7 @@ function settleWindow(state: OfflineState): OfflineState {
     seats,
     toActIndex: null,
     betting: null,
-    wordWindow: { status: "settled", slots },
+    wordWindow: window,
     result,
   };
 }
@@ -804,23 +677,6 @@ function judgeWindow(state: OfflineState, slots: readonly WordSlot[]): WindowSet
     },
     seats,
   };
-}
-
-/** How one seat's slot ends when the window closes (§19). */
-function closeSlot(slot: WordSlot, state: OfflineState): WordSlot {
-  if (slot.status !== "drafting") return slot;
-
-  const draft = slot.draft;
-  if (draft !== null && state.autoSubmitDrafts && isBuildable(state, slot.seat, draft)) {
-    return { seat: slot.seat, playerId: slot.playerId, status: "confirmed", submission: draft };
-  }
-
-  return { seat: slot.seat, playerId: slot.playerId, status: "timed-out" };
-}
-
-/** Whether a submission can be built from what this seat holds at all (§10–§12, no dictionary). */
-function isBuildable(state: OfflineState, seatIndex: number, submission: WordSubmission): boolean {
-  return resolveSubmission({ available: availableTiles(state, seatIndex), submission }).ok;
 }
 
 /**

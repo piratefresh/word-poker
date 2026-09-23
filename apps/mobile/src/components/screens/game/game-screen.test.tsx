@@ -14,6 +14,9 @@ jest.mock("react-native-safe-area-context", () =>
 // only when it is given no `onBack`, which every test here supplies.
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => false), replace: jest.fn() },
+  // The HUD's loop gate reads this to learn whether its screen is on top, and a suite stands
+  // in for a screen that is: with nothing to run, the gate keeps its focused default.
+  useFocusEffect: () => undefined,
 }));
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
@@ -136,15 +139,17 @@ test("hands a pressed action on to its handler", async () => {
   expect(onCheckOrCall).toHaveBeenCalledTimes(1);
 });
 
-test("labels the wager button with the action it would take", async () => {
+test("calls the wager action the button is labelled with", async () => {
+  const onBet = jest.fn();
   const onRaise = jest.fn();
-  const view = await renderScreen({ onRaise });
+  const view = await renderScreen({ onBet, onRaise });
 
   // Facing a bet, the slider raises: the amount is the round total it would raise to.
   await fireEvent.press(view.getByText("RAISE $40"));
   expect(onRaise).toHaveBeenCalledWith(40);
+  expect(onBet).not.toHaveBeenCalled();
 
-  // With no bet out, the same slider opens the round, and the button says so.
+  // With no bet out, the same slider opens the round — a bet, not a raise of nothing.
   await view.rerender(
     <GameScreen
       game={{
@@ -160,12 +165,14 @@ test("labels the wager button with the action it would take", async () => {
           currentBet: 0,
         },
       }}
+      onBet={onBet}
       onRaise={onRaise}
     />,
   );
 
   await fireEvent.press(view.getByText("BET $20"));
-  expect(onRaise).toHaveBeenCalledWith(20);
+  expect(onBet).toHaveBeenCalledWith(20);
+  expect(onRaise).toHaveBeenCalledTimes(1);
 });
 
 test("asks before committing the whole stack, and only commits on the confirm", async () => {
