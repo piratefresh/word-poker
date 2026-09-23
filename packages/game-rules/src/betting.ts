@@ -9,10 +9,11 @@
  *
  * Three conventions the rules leave implicit are pinned here:
  *
- * - **No blinds** (ADR 0001): a round opens with every seat committed 0 and `currentBet` 0,
- *   and the first voluntary bet must be at least the table's `minBet`. The raise floor is
- *   `currentBet + max(lastRaiseSize, minBet)`, so a bet both opens the round and sets the
- *   first increment.
+ * - **The big blind is the table's minimum bet** (§22, ADR 0004): the machine is handed the round
+ *   already open — `startHand` posts the blinds before it deals (§5, §14) — and the floor it
+ *   enforces is the big blind. The raise floor is `currentBet + max(lastRaiseSize, bigBlind)`,
+ *   so on the first round, where the posted big blind is already the `currentBet`, the smallest
+ *   raise is to two big blinds, and the first bet of every later round must reach one.
  * - **Amounts are raise-to round totals**, never increments (§22): `bet`'s and `raise`'s
  *   `amount` is what the seat's `committedRound` becomes.
  * - **A full raise reopens the action** to every other live seat; a short all-in that raises
@@ -31,16 +32,22 @@ import type {
 
 import { commitChips, type ChipSeat } from "./chips";
 
-/** The offline table's stakes; online rooms derive their minimum from the room buy-in (§22, ADR 0001). */
-export const DEFAULT_STAKES = { minBet: 20, startingStack: 1_000 } as const;
+/**
+ * The offline table's stakes: its blinds and the stack it seats every player on (§5, ADR 0002,
+ * ADR 0004). Online rooms derive their blinds from the room buy-in instead.
+ */
+export const DEFAULT_STAKES = { smallBlind: 10, bigBlind: 20, startingStack: 1_000 } as const;
 
 /** The betting settings a table fixes before it seats anyone. */
 export interface Stakes {
+  /** Posted before the deal by the first seat clockwise from the button (§5, §14). */
+  smallBlind: number;
   /**
-   * The minimum bet: the floor for a round's first voluntary bet, and half of the raise
-   * floor. A raise-to must reach `currentBet + max(lastRaiseSize, minBet)`.
+   * Posted before the deal by the next seat clockwise: the first round's opening Current Bet,
+   * and the table's minimum bet — the floor for a later round's first voluntary bet, and half
+   * of the raise floor. A raise-to must reach `currentBet + max(lastRaiseSize, bigBlind)`.
    */
-  minBet: number;
+  bigBlind: number;
 }
 
 /** One seat's chips plus where it stands in the hand — what the machine reads. */
@@ -98,15 +105,15 @@ export interface BettingBounds {
   minRaiseTo: number;
   /** The largest raise-to the stack can cover: `committedRound + stack`. */
   maxRaiseTo: number;
-  /** The table's minimum bet, for a control that labels the opening bet. */
-  minBet: number;
+  /** The table's minimum bet — its big blind, for a control that labels the opening bet. */
+  bigBlind: number;
   /** The round's current bet, for a control that labels call and raise. */
   currentBet: number;
 }
 
 /** The raise floor: the current bet plus at least the last full raise's increment (§22). */
-function raiseFloor(round: BettingRoundState, minBet: number): number {
-  return round.currentBet + Math.max(round.lastRaiseSize, minBet);
+function raiseFloor(round: BettingRoundState, bigBlind: number): number {
+  return round.currentBet + Math.max(round.lastRaiseSize, bigBlind);
 }
 
 /**
@@ -151,7 +158,7 @@ export function applyBettingAction<Seat extends BettingSeatState>(
   round: BettingRoundState,
   toAct: number,
   action: BettingAction,
-  minBet: number,
+  bigBlind: number,
 ): BettingApply<Seat> {
   const actor = seats[toAct];
   if (actor === undefined || actor.id !== action.playerId) {
@@ -163,7 +170,7 @@ export function applyBettingAction<Seat extends BettingSeatState>(
 
   const { committedRound, stack } = actor;
   const { currentBet } = round;
-  const floor = raiseFloor(round, minBet);
+  const floor = raiseFloor(round, bigBlind);
   const allInTo = committedRound + stack;
 
   /** Chips this action moves from the stack, already clamped to what the seat holds. */
@@ -186,7 +193,7 @@ export function applyBettingAction<Seat extends BettingSeatState>(
 
     case "bet": {
       if (currentBet > 0) return { ok: false, reason: "bet-facing-bet" };
-      if (action.amount < minBet) return { ok: false, reason: "below-min-bet" };
+      if (action.amount < bigBlind) return { ok: false, reason: "below-min-bet" };
       if (action.amount > stack) return { ok: false, reason: "insufficient-stack" };
       commit = action.amount;
       raiseTo = action.amount;
@@ -299,7 +306,7 @@ export function bettingBounds(
   seats: readonly BettingSeatState[],
   round: BettingRoundState,
   seatIndex: number,
-  minBet: number,
+  bigBlind: number,
 ): BettingBounds | null {
   const seat = seats[seatIndex];
   if (seat === undefined || seat.folded || seat.allIn || seat.sittingOut) return null;
@@ -309,15 +316,15 @@ export function bettingBounds(
   return {
     canFold: true,
     canCheck: seat.committedRound === round.currentBet,
-    canBet: round.currentBet === 0 && seat.stack >= minBet,
+    canBet: round.currentBet === 0 && seat.stack >= bigBlind,
     canCall: seat.committedRound < round.currentBet,
     canRaise:
-      round.currentBet > 0 && !seat.actedThisRound && maxRaiseTo >= raiseFloor(round, minBet),
+      round.currentBet > 0 && !seat.actedThisRound && maxRaiseTo >= raiseFloor(round, bigBlind),
     canAllIn: seat.stack > 0,
     callAmount: Math.max(0, round.currentBet - seat.committedRound),
-    minRaiseTo: raiseFloor(round, minBet),
+    minRaiseTo: raiseFloor(round, bigBlind),
     maxRaiseTo,
-    minBet,
+    bigBlind,
     currentBet: round.currentBet,
   };
 }

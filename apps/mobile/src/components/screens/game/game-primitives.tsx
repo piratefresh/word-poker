@@ -44,6 +44,8 @@ const STATUS_LABEL: Record<PlayerStatus, string> = {
 };
 const ROLE_LABEL: Record<PlayerRole, string> = {
   dealer: "D",
+  "small-blind": "SB",
+  "big-blind": "BB",
 };
 
 const SEAT_STACK_HEIGHT = 92;
@@ -196,9 +198,13 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
           ]}>
           <Text style={styles.initials}>{seat.initials}</Text>
         </View>
-        {seat.role ? (
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{ROLE_LABEL[seat.role]}</Text>
+        {seat.roles?.length ? (
+          <View style={styles.roleRow}>
+            {seat.roles.map((role) => (
+              <View key={role} style={styles.roleBadge}>
+                <Text style={styles.roleText}>{ROLE_LABEL[role]}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
       </View>
@@ -230,11 +236,25 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
  * main pot is the headline and every side pot is a line under it, because each is contested
  * by a different set of seats and a single merged total would claim otherwise.
  */
-export function Pot({ amount, sidePots = [] }: { amount: number; sidePots?: readonly number[] }) {
+export function Pot({
+  amount,
+  sidePots = [],
+  blinds,
+}: {
+  amount: number;
+  sidePots?: readonly number[];
+  /** §30's Blinds: the table's two forced bets, drawn under the pot it opened. */
+  blinds?: { smallBlind: number; bigBlind: number };
+}) {
   return (
     <View style={styles.pot} testID="pot">
       <Text style={styles.potLabel}>POT</Text>
       <Text style={styles.potAmount}>{`$${amount.toLocaleString()}`}</Text>
+      {blinds ? (
+        <Text style={styles.blindsAmount} testID="felt-blinds">
+          {`BLINDS $${blinds.smallBlind.toLocaleString()} / $${blinds.bigBlind.toLocaleString()}`}
+        </Text>
+      ) : null}
       {sidePots.map((side, index) => (
         <Text
           key={`side-pot-${index}`}
@@ -434,6 +454,15 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   initials: { color: "#0c1410", fontFamily: fonts.sansBlack, fontSize: 12 },
+  /** The seat's markers, pinned to the avatar's corner and growing away from it: D, SB, BB. */
+  roleRow: {
+    flexDirection: "row",
+    gap: 2,
+    position: "absolute",
+    right: -6,
+    top: -4,
+    zIndex: 2,
+  },
   roleBadge: {
     alignItems: "center",
     backgroundColor: colors.textBright,
@@ -442,11 +471,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 17,
     justifyContent: "center",
-    position: "absolute",
-    right: -6,
-    top: -4,
     width: 17,
-    zIndex: 2,
   },
   roleText: { color: colors.onGold, fontFamily: fonts.monoBold, fontSize: 7 },
   playerName: {
@@ -504,6 +529,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
   },
   potAmount: { color: colors.gold, fontFamily: fonts.serifBold, fontSize: 26, lineHeight: 30 },
+  /** §30's Blinds, quiet under the pot: table information, not a headline. */
+  blindsAmount: {
+    color: colors.textDim,
+    fontFamily: fonts.mono,
+    fontSize: 8,
+    letterSpacing: 1.4,
+  },
   sidePotAmount: {
     color: colors.textDim,
     fontFamily: fonts.mono,

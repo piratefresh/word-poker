@@ -6,7 +6,7 @@ import {
   GAME_MESSAGES,
   WAITING_PHASE,
   isGameMessagePayload,
-  minBetFor,
+  blindsFor,
   validateRoomCreateOptions,
   type GameRejectionEvent,
   type GameRoomMetadata,
@@ -133,7 +133,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     }
 
     const { name, buyIn, maxSeats } = validation.options;
-    this.table = { name, buyIn, minBet: minBetFor(buyIn), maxSeats };
+    this.table = { name, buyIn, ...blindsFor(buyIn), maxSeats };
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 
@@ -175,7 +175,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.engine = new AuthoritativeGame({
       seed: this.seed,
       dictionary: this.dictionary,
-      minBet: this.table.minBet,
+      blinds: { smallBlind: this.table.smallBlind, bigBlind: this.table.bigBlind },
       turnDurationMs: this.turnDuration,
     });
     this.setTimestep(() => this.onTick(), this.tickMs);

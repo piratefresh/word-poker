@@ -20,7 +20,7 @@ import type { PlayerId } from "./players";
 export const SHOWDOWN_DECIDERS = [
   /** §7's final score, highest first — the ladder's starting order. */
   "final-score",
-  /** §21.1: the word with the most letters; a choice tile contributes the face played (§10). */
+  /** §21.1: the word with the most letters — one per tile, the face a choice tile played (§10). */
   "word-length",
   /** §21.3: one tile each per round, added to the seat's draw total, highest total first. */
   "tile-draw",

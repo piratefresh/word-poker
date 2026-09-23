@@ -81,7 +81,7 @@ function playToFoldOut(dictionary: Dictionary, survivor: string): OfflineState {
     if (acting === undefined) break;
 
     if (acting.id === survivor) {
-      const bounds = bettingBounds(state.seats, state.betting, index, state.stakes.minBet);
+      const bounds = bettingBounds(state.seats, state.betting, index, state.stakes.bigBlind);
       if (bounds === null) break;
       state = reduce(
         state,
@@ -162,7 +162,7 @@ describe("buildResultsSnapshot", () => {
     const available = availableTiles(deal, 0);
     const spelled = available
       .slice(0, 2)
-      .map((tile) => ("sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter))
+      .map((tile) => tile.letter)
       .join("");
     const dictionary = testDictionary([spelled]);
     const state = playOutHand(dictionary);

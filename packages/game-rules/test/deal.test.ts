@@ -160,8 +160,8 @@ describe("dealHand", () => {
   });
 
   it("refuses a table the bag cannot serve rather than dealing a short hand", () => {
-    // 100 tiles = 2 per seat + 5 community, so 47 seats fits exactly and 48 does not.
-    const seated = 47;
+    // 98 tiles = 2 per seat + 5 community, so 46 seats fits and 47 does not.
+    const seated = 46;
     const dealt = dealHand({ seed: SEED, playerCount: seated, specialTiles: NO_SPECIAL_TILES });
 
     assert.equal(dealt.privateTiles.length, seated);

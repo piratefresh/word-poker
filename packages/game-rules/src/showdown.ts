@@ -110,7 +110,7 @@ export const DRAW_SEED_SALT = 0x5eed_21;
  */
 export function showdownDrawPool(): Tile[] {
   return createTileBag().filter(
-    (tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile),
+    (tile) => !("alternativeLetter" in tile),
   );
 }
 
@@ -151,9 +151,6 @@ const COMPARISON_STEPS: readonly ComparisonStep[] = [
  * reveal that shows the draw should value it the way the ladder did.
  */
 export function showdownDrawValue(tile: Tile): number {
-  if ("sequenceLetter" in tile) {
-    return tile.points + tile.sequencePoints;
-  }
   if ("alternativeLetter" in tile) {
     return tile.points + tile.alternativePoints;
   }

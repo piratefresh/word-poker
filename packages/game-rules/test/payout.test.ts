@@ -11,7 +11,11 @@ const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
 const NOW = 1_000_000;
 
-/** The opening bet every seat calls: enough for a real pot without changing the deal. */
+/**
+ * The commitment every seat ends the hand on: the big blind, called around. Enough for a real pot
+ * without changing the deal — pre-flop the blinds are already out, so every other seat owes the
+ * big blind and the big blind itself merely checks (§23).
+ */
 const OPENING_BET = 20;
 
 /**
@@ -21,22 +25,17 @@ const OPENING_BET = 20;
  */
 const DEAL = dealHand({ seed: SEED, playerCount: SEATS.length });
 
-/** Plays every tile of a hand, in the order given, and spells the word they print (§10). */
+/**
+ * Plays every tile of a hand, in the order given, and spells the word they print (§10): a
+ * choice tile plays the first face it prints, and a single letter plays itself.
+ */
 function spell(tiles: readonly Tile[]): { submission: WordSubmission; word: string } {
   const plays: TilePlay[] = [];
   let word = "";
 
   for (const tile of tiles) {
-    if ("alternativeLetter" in tile) {
-      plays.push({ tileId: tile.id, chosenFace: tile.letter });
-      word += tile.letter;
-    } else if ("sequenceLetter" in tile) {
-      plays.push({ tileId: tile.id });
-      word += `${tile.letter}${tile.sequenceLetter}`;
-    } else {
-      plays.push({ tileId: tile.id });
-      word += tile.letter;
-    }
+    plays.push("alternativeLetter" in tile ? { tileId: tile.id, chosenFace: tile.letter } : { tileId: tile.id });
+    word += tile.letter;
   }
 
   return { submission: { plays }, word };
@@ -67,15 +66,17 @@ const DICTIONARY = testDictionary([HERO_WORD.word, OTHER_WORD.word]);
 function expectedScore(tiles: readonly Tile[]): number {
   return tiles.reduce((total, tile) => {
     const factor = tile.multiplier === "triple-letter" ? 3 : tile.multiplier === "double-letter" ? 2 : 1;
-    const faces = "sequenceLetter" in tile ? [tile.points, tile.sequencePoints] : [tile.points];
-    return total + faces.reduce((sum, points) => sum + points * factor, 0);
+    // One letter per tile (§10), and this fixture plays the face a tile prints first, which is
+    // the one `points` carries.
+    return total + tile.points * factor;
   }, 0);
 }
 
 /**
- * A hand walked to the river's close, where §19's window opens: the first actor opens for the
- * minimum, every seat calls it, and the streets after it are checked around. Every seat ends
- * the hand on the same 20-chip commitment, so the hand has one 80-chip pot to award.
+ * A hand walked to the river's close, where §19's window opens: the blinds are called around
+ * pre-flop — the big blind checking its own blind — and every street after is checked around.
+ * Every seat ends the hand on the same 20-chip commitment, so the hand has one 80-chip pot to
+ * award.
  */
 function atWindow(wordBuilding?: { autoSubmitDrafts?: boolean }): OfflineState {
   let state = startHand({
@@ -95,14 +96,11 @@ function atWindow(wordBuilding?: { autoSubmitDrafts?: boolean }): OfflineState {
     assert.ok(seat, `seat ${index}`);
     assert.ok(round, "a betting round is open");
 
-    const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
+    const bounds = bettingBounds(state.seats, round, index, state.stakes.bigBlind);
     assert.ok(bounds, `seat ${index} can act`);
-    const action =
-      step === 0
-        ? ({ type: "bet", playerId: seat.id, amount: OPENING_BET } as const)
-        : bounds.canCheck
-          ? ({ type: "check", playerId: seat.id } as const)
-          : ({ type: "call", playerId: seat.id } as const);
+    const action = bounds.canCheck
+      ? ({ type: "check", playerId: seat.id } as const)
+      : ({ type: "call", playerId: seat.id } as const);
 
     state = reduce(state, action, NOW + step);
     step += 1;
@@ -235,9 +233,15 @@ describe("payout — §11's judging and §21's ladder", () => {
     assert.equal(next.result, null);
     assert.equal(next.wordWindow, null);
     assert.equal(next.dealerSeat, 1);
+    // What the last hand left, and then the new hand's blinds off the seats that post them: the
+    // button moved to seat 1, so the small blind is seat 2's and the big blind seat 3's (§5).
     assert.deepEqual(
       next.seats.map((seat) => seat.stack),
-      [1_060, 980, 980, 980],
+      [1_060, 980, 970, 960],
+    );
+    assert.deepEqual(
+      next.seats.map((seat) => seat.committedHand),
+      [0, 0, 10, 20],
     );
   });
 });

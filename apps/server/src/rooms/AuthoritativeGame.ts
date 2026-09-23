@@ -10,7 +10,8 @@ import type { OfflineAction } from "@wordpoker/contracts";
 export interface AuthoritativeGameOptions {
   readonly seed: number;
   readonly dictionary: Dictionary;
-  readonly minBet: number;
+  /** The table's blinds (§5, ADR 0004), derived from its buy-in when the room was created. */
+  readonly blinds: { readonly smallBlind: number; readonly bigBlind: number };
   readonly turnDurationMs: number;
 }
 
@@ -38,7 +39,7 @@ export class AuthoritativeGame {
       players: players.map((player) => player.playerId),
       nowMs,
       dictionary: this.options.dictionary,
-      stakes: { minBet: this.options.minBet },
+      stakes: { smallBlind: this.options.blinds.smallBlind, bigBlind: this.options.blinds.bigBlind },
       stacks: players.map((player) => ({ playerId: player.playerId, stack: player.stack })),
       dealerSeat,
       turnDurationMs: this.options.turnDurationMs,

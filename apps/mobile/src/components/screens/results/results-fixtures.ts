@@ -150,25 +150,24 @@ export const splitSnapshot: ResultsSnapshot = snapshotFixture({
 });
 
 /**
- * The card's overflow: TEN LETTERS out of eight physical tiles and a name long enough to have to
- * truncate rather than push the score off the card.
+ * The card's widest legal case: SEVEN LETTERS out of seven physical tiles — §12's ceiling and
+ * §7's full rack — with a name long enough to have to truncate rather than push the score off
+ * the card.
  *
- * `THREATENED` is spelled by two sequence tiles (`TH`, `ED`) and the bag's `A/E` choice tile played
- * as `A` — the two shapes the tile contract has (STO-379 decision 6). Eight tiles is more than §7's
- * rack deals (two private and five community); the fixture is a drawing fixture, and a card has to
- * hold whatever the seat played, so it is deliberately the wide case rather than the legal one.
+ * `MARKETS` is spelled by §10's `A/E` choice tile played as `A` and six single letters, which is
+ * what one tile per letter buys: the longest word a hand can build is the seven tiles it holds.
  */
 export const longWordSnapshot: ResultsSnapshot = snapshotFixture({
   seats: [
     seatFixture({
       name: "Aurelio Vandermeer",
       color: colors.players[3],
-      word: "THREATENED",
-      tiles: threatenedTiles(),
-      base: 20,
+      word: "MARKETS",
+      tiles: marketsTiles(),
+      base: 17,
       mult: 0,
-      rack: 0,
-      total: 20,
+      rack: 10,
+      total: 27,
       takesPot: true,
     }),
     seatFixture({
@@ -331,19 +330,18 @@ function thickTiles(): Tile[] {
 }
 
 /**
- * `THREATENED`, ten letters out of eight tiles: `TH` and `ED` are sequence tiles and play both
- * their faces in the printed order (§10), the bag's `A/E` is the one choice tile and plays as `A`,
- * and five single letters fill the middle. Printed values add up to 20 with no multiplier.
+ * `MARKETS`, seven letters out of seven tiles: `M4 K5 R2 T2 S2`, one `E1`, and §10's `A/E`
+ * choice tile played as `A` for 1. Printed values add up to 17, and using all seven physical
+ * tiles adds §7.3's `+10` — the card's widest legal word.
  */
-function threatenedTiles(): Tile[] {
+function marketsTiles(): Tile[] {
   return [
-    { id: "TH-1", letter: "T", points: 2, sequenceLetter: "H", sequencePoints: 5 },
-    { id: "R-4", letter: "R", points: 2 },
-    { id: "E-3", letter: "E", points: 1 },
+    { id: "M-1", letter: "M", points: 4 },
     { id: "AE-1", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1 },
-    { id: "T-2", letter: "T", points: 2 },
-    { id: "E-4", letter: "E", points: 1 },
-    { id: "N-3", letter: "N", points: 2 },
-    { id: "ED-1", letter: "E", points: 1, sequenceLetter: "D", sequencePoints: 3 },
+    { id: "R-1", letter: "R", points: 2 },
+    { id: "K-1", letter: "K", points: 5 },
+    { id: "E-1", letter: "E", points: 1 },
+    { id: "T-1", letter: "T", points: 2 },
+    { id: "S-1", letter: "S", points: 2 },
   ];
 }

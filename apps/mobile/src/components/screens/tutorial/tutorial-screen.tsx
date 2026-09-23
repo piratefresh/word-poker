@@ -285,7 +285,9 @@ function TutorialScreenBody() {
           layoutConfig={{ seatRadius: { x: 0.98, y: 0.96 }, potY: 0.5 }}
           railWidth={3}
           renderCommunity={() => null}
-          renderPot={() => <Pot amount={FOUR_PLAYER_FLOP_FIXTURE.pot} />}
+          renderPot={() => (
+            <Pot amount={FOUR_PLAYER_FLOP_FIXTURE.pot} blinds={FOUR_PLAYER_FLOP_FIXTURE.blinds} />
+          )}
           renderSeat={PlayerSeat}
           seatCount={FOUR_PLAYER_FLOP_FIXTURE.seatCount}
           seats={FOUR_PLAYER_FLOP_FIXTURE.players}

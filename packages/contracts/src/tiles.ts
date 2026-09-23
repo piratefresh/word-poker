@@ -2,17 +2,16 @@
  * A tile as it crosses the wire: its identity, the face or faces it prints, and what each
  * face is worth.
  *
- * Three shapes, because the rules give three kinds of tile three different behaviours
- * (docs/rules/tiles.md §10): a single letter plays itself; a **choice** tile (A/E, T/S)
- * plays either face — one letter per submission, never both; a **sequence** tile (TH, ER)
- * plays both faces, in the printed order, and may not be split or reversed. The union is
- * the point: building and scoring can tell the kinds apart from the type alone, rather
- * than from a flag all three would have to agree on.
+ * Two shapes, because the rules give two kinds of tile two different behaviours
+ * (docs/rules/tiles.md §10): a single letter plays itself; a **choice** tile (A/E, Q/K)
+ * plays either face — one letter per submission, never both. Every two-letter tile is a
+ * choice tile (ADR 0005). The union is the point: building and scoring can tell the kinds
+ * apart from the type alone, rather than from a flag both would have to agree on.
  *
  * Values are per face (`points`, plus the second face's own) because faces need not agree:
- * A/E and T/S happen to be equal-valued, and the rules' choice pairs include Q/K, which
- * are not. `LetterMultiplier` rides on the tile because a multiplier belongs to the
- * physical tile (§9) — print it once and every letter on the tile carries it.
+ * some pairs are equal-valued, and the rules' pair pool includes Q/K, which are not.
+ * `LetterMultiplier` rides on the tile because a multiplier belongs to the physical tile
+ * (§9) — print it once and every letter on the tile carries it.
  */
 
 /** A printed letter multiplier (§7): the tile's letters score double, or triple. */
@@ -37,13 +36,5 @@ export interface ChoiceTile extends LetterTile {
   alternativePoints: number;
 }
 
-/** A two-letter tile played as both faces, in the printed order: TH is T then H. */
-export interface SequenceTile extends LetterTile {
-  /** The second face, printed immediately after the first. */
-  sequenceLetter: string;
-  /** What the sequence's second face is worth. */
-  sequencePoints: number;
-}
-
-/** Every tile a bag can hold: the 98 single letters and the two-letter tiles (§6, §10). */
-export type Tile = LetterTile | ChoiceTile | SequenceTile;
+/** Every tile a hand can hold: the bag's single letters, and the deal's choice tiles (§6, §10). */
+export type Tile = LetterTile | ChoiceTile;

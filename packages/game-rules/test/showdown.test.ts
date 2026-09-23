@@ -346,7 +346,7 @@ describe("showdownDrawPool — §21.3's draw pool", () => {
   it("is the bag's single-letter half, with every two-letter tile left out", () => {
     const pool = showdownDrawPool();
 
-    assert.ok(pool.every((tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile)));
+    assert.ok(pool.every((tile) => !("alternativeLetter" in tile)));
     // §6's distribution: 98 single-letter copies across A–Z, and nothing else.
     assert.equal(pool.length, 98);
   });
@@ -359,9 +359,11 @@ describe("showdownDrawValue — what a drawn tile is worth (§21.3)", () => {
       showdownDrawValue({ id: "AE-1", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1 }),
       2,
     );
+    // §21.3 reads the combined printed value, so a pair whose faces differ is drawn whole —
+    // there is no face to pick in a draw (§10).
     assert.equal(
-      showdownDrawValue({ id: "TH-1", letter: "T", points: 2, sequenceLetter: "H", sequencePoints: 5 }),
-      7,
+      showdownDrawValue({ id: "QK-1", letter: "Q", points: 10, alternativeLetter: "K", alternativePoints: 5 }),
+      15,
     );
   });
 });
