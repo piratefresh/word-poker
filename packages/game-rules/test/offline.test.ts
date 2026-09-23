@@ -189,13 +189,20 @@ describe("reduce — the betting round", () => {
     assert.equal(state.endsAtMs, NOW + 5_000 + OFFLINE_TURN_MS);
   });
 
-  it("auto-checks an idle seat when its turn expires", () => {
+  it("folds an idle seat when its turn expires, even with nothing owed (§15, ADR 0006)", () => {
     const state = dealHand();
+    const { index } = actingSeat(state);
+    assert.equal(
+      state.seats[index]?.committedRound,
+      state.betting?.currentBet,
+      "the actor owed nothing and could have checked",
+    );
+
     const timedOut = reduce(state, { type: "timeoutTurn" }, state.endsAtMs);
 
-    assert.equal(timedOut.seats[1]?.actedThisRound, true);
-    assert.equal(timedOut.seats[1]?.folded, false);
-    assert.equal(timedOut.toActIndex, 2);
+    assert.equal(timedOut.seats[index]?.folded, true, "the expiry folds rather than checks");
+    assert.equal(timedOut.seats[index]?.actedThisRound, true);
+    assert.equal(timedOut.toActIndex, index + 1, "the hand goes on with the seats that remain");
   });
 
   it("auto-folds an idle seat that owes chips when its turn expires", () => {

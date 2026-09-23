@@ -144,8 +144,10 @@ stay in the pot. A disconnected seat gets the same clock as a connected one befo
 A pre-selected action (§36) acts the moment the turn begins, so a seat that pre-selected
 Check does not time out.
 
-<!-- Not yet in code: the engine auto-checks a seat that owes nothing and folds a disconnected
-     seat as soon as action reaches it (ADR 0003). ADR 0006 changes both. -->
+<!-- In code: an expired turn folds — even a seat that owed nothing and could have checked, and
+     whether the seat is idle or disconnected (ADR 0006). A disconnected seat keeps its seat and
+     runs its own clock before it folds (§29). Still owed: §29's idle removal (three consecutive
+     expirations) and its one-player countdown that closes the table. -->
 
 ## End of a Betting Round
 

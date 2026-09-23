@@ -49,12 +49,19 @@ export class AuthoritativeGame {
     this.current = reduce(this.requireState(), action, nowMs);
   }
 
-  foldDisconnectedTurns(livePlayerIds: ReadonlySet<string>, nowMs: number): void {
-    while (this.current !== null && this.current.toActIndex !== null) {
-      const actor = this.current.seats[this.current.toActIndex];
-      if (actor === undefined || livePlayerIds.has(actor.id)) return;
-      this.current = reduce(this.current, { type: "foldTurn" }, nowMs);
-    }
+  /**
+   * §28/§29's removal, not §15's clock: a seat that is really gone — a clean leave, or a
+   * reconnect hold that has run out — is folded out of the hand in progress when it is the
+   * seat on the turn. A seat that has merely dropped is not this: it keeps its seat and runs
+   * its own turn clock like a connected one, and the deadline folds it (§29, ADR 0006).
+   */
+  foldDepartedSeat(playerId: string, nowMs: number): void {
+    const state = this.current;
+    if (state === null || state.toActIndex === null) return;
+    if (state.seats[state.toActIndex]?.id !== playerId) return;
+
+    // `foldTurn` is legal at any point of the clock, so a departure cannot race the deadline.
+    this.current = reduce(state, { type: "foldTurn" }, nowMs);
   }
 
   timeoutWords(nowMs: number): void {

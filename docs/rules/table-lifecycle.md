@@ -148,6 +148,8 @@ A player is **idle** when their turn clock has expired on three consecutive bett
   to their Wallet, as if they had left (§28).
 - A closed table ends its table session; the Buy-In Cap resets with the next session (§2).
 
-<!-- Not yet in code: the disconnected seat's turn clock (the room folds it as soon as action
-     reaches it, ADR 0003 — changed by ADR 0006), idle removal, the one-player countdown and
-     table closing, top-ups, and the Buy-In Cap. -->
+<!-- In code: a disconnected seat keeps its seat and runs its own turn clock, folding when that
+     clock expires rather than as soon as action reaches it (ADR 0006); a seat that is really
+     gone — a clean leave, or a reconnect hold that has run out — is folded out of a running hand.
+     Still owed: idle removal (three consecutive expirations), the one-player countdown and table
+     closing, top-ups, and the Buy-In Cap. -->

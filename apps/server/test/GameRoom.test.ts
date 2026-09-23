@@ -141,9 +141,56 @@ describe("GameRoom", () => {
       assert.ok(room.state.result.standings.length > 0);
     });
 
-    it("folds a disconnected actor instead of pausing the hand", async () => {
+    it("runs a dropped seat's own turn clock and folds it at the deadline (§29)", async () => {
       const room = await colyseus.createRoom("game", {
         name: "Disconnect test",
+        buyIn: 500,
+        maxSeats: 2,
+        seed: 456,
+        turnDuration: 300,
+        tickMs: 5,
+        payoutDelay: 10,
+      });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      assert.strictEqual(room.state.phase, "preflop", "full table starts");
+
+      const actorSeat = room.state.toActSeat;
+      const actorId = [...room.state.seats.values()].find((seat) => seat.seat === actorSeat)?.playerId;
+      assert.ok(actorId, "the disconnecting seat has an id");
+      const actor = [first, second].find((client) => client.sessionId === actorId);
+      assert.ok(actor);
+      const other = [first, second].find((client) => client.sessionId !== actorId);
+      assert.ok(other);
+
+      // Drop the connection for real — no consented leave. §29 keeps the seat and its stack for
+      // the reconnect hold, and the seat keeps its turn: it is not folded when action reaches it.
+      actor.reconnection.enabled = false;
+      actor.connection.close();
+      for (let tick = 0; tick < 40 && room.state.seats.get(actorId)?.connected !== false; tick += 1) {
+        await room.waitForNextTimestep();
+      }
+
+      const held = room.state.seats.get(actorId);
+      assert.strictEqual(held?.connected, false, "the drop reached the room");
+      assert.strictEqual(held?.seat, actorSeat, "the dropped seat keeps its reserved spot");
+      assert.strictEqual(held?.hasFolded, false, "a dropped seat is not folded on arrival");
+      assert.strictEqual(room.state.toActSeat, actorSeat, "the hand waits on the seat's own clock");
+      assert.ok(room.state.turnDeadline > room.state.now, "the dropped seat's clock is running");
+
+      for (let tick = 0; tick < 120 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
+        await room.waitForNextTimestep();
+      }
+
+      assert.strictEqual(room.state.seats.get(actorId)?.hasFolded, true, "it folds at its deadline");
+      assert.strictEqual(room.state.seats.get(actorId)?.seat, actorSeat, "the spot stays reserved");
+      assert.strictEqual(room.state.phase, "payout", "heads-up fold-out pays the other seat");
+      assert.strictEqual(room.state.seats.get(other.sessionId)?.hasFolded, false);
+    });
+
+    it("folds a seat that leaves for good out of the running hand (§28, §29)", async () => {
+      const room = await colyseus.createRoom("game", {
+        name: "Leave test",
         buyIn: 500,
         maxSeats: 2,
         seed: 456,
@@ -153,13 +200,22 @@ describe("GameRoom", () => {
       assert.strictEqual(room.state.phase, "preflop", "full table starts");
 
       const actorId = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
-      assert.ok(actorId, "the disconnecting seat has an id");
+      assert.ok(actorId, "the leaving seat has an id");
       const actor = [first, second].find((client) => client.sessionId === actorId);
       assert.ok(actor);
+
+      // A consented leave, not a drop: this seat is gone for good, so the room takes it out of
+      // the hand in progress (§28/§29's removal) instead of waiting on a clock it will never
+      // answer. Its committed chips stay in the pot, and the seat keeps its own place in the
+      // schema while the hand it left finishes.
       await actor.leave();
       await room.waitForNextPatch();
-      assert.strictEqual(room.state.seats.get(actorId)?.hasFolded, true);
-      assert.notStrictEqual(room.state.phase, "waiting", "a missing actor does not pause the hand");
+
+      assert.strictEqual(room.state.seats.get(actorId)?.hasFolded, true, "the departed seat folds");
+      assert.notStrictEqual(room.state.phase, "waiting", "the hand runs on for the seats that remain");
+      const other = [first, second].find((client) => client.sessionId !== actorId);
+      assert.ok(other);
+      assert.strictEqual(room.state.seats.get(other.sessionId)?.hasFolded, false);
     });
 
     it("folds a seat dropped on its own turn once the tick reaches its deadline (§29)", async () => {
@@ -300,7 +356,7 @@ describe("GameRoom", () => {
       );
     });
 
-    it("auto-checks an idle actor at the configured turn deadline", async () => {
+    it("folds an idle actor at the configured turn deadline, even with nothing owed", async () => {
       const room = await colyseus.createRoom("game", {
         name: "Timeout test",
         buyIn: 500,
@@ -319,14 +375,14 @@ describe("GameRoom", () => {
       const timeout = new Promise<GameRejectionEvent>((resolve) => {
         actor.onMessage(GAME_EVENTS.rejected, (payload) => resolve(payload as GameRejectionEvent));
       });
-      for (let tick = 0; tick < 10 && room.state.toActSeat === actorSeat; tick += 1) {
+      for (let tick = 0; tick < 10 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
         await room.waitForNextTimestep();
       }
 
-      assert.notStrictEqual(room.state.toActSeat, actorSeat, "the server advances after the deadline");
+      // §15/ADR 0006: the expiry folds, even though this seat owed nothing and could have
+      // checked, and the seat is told its turn expired.
+      assert.strictEqual(room.state.seats.get(actorId)?.hasFolded, true, "nothing owed still folds");
       assert.deepStrictEqual(await timeout, { action: "betting", reason: "turn-timeout" });
-      assert.equal(room.state.seats.get(actorId)?.hasFolded, false, "nothing owed auto-checks");
-      assert.ok(room.state.turnDeadline > room.state.now, "the next actor has a fresh deadline");
     });
 
     it("returns the table to waiting when the session cannot pay another hand", async () => {

@@ -324,7 +324,7 @@ describe("useOfflineGame — the dealt table", () => {
 });
 
 describe("useOfflineGame — the hero's clocks", () => {
-  test("checks on the deadline when checking is free", async () => {
+  test("folds on the deadline even when checking was free", async () => {
     const result = await table();
     await passedToTheHero(result);
     expect(row(result).canCheck).toBe(true);
@@ -332,14 +332,16 @@ describe("useOfflineGame — the hero's clocks", () => {
     await act(async () => {
       jest.advanceTimersByTime(60_100);
     });
-    // The auto-check is the table's action like any other, so the bots answer it on their beats.
-    await passedToTheHero(result);
+    // The fold is the table's action like any other, so the bots answer it on their beats.
+    for (let step = 0; step < 40 && result.current.game.phase === "preflop"; step += 1) {
+      await beat();
+    }
 
-    // The auto-check completed the preflop round and the bots answered: the table is on the
-    // flop with the hero's commitment untouched.
-    expect(result.current.game.phase).toBe("flop");
-    expect(result.current.game.players[0]?.status).toBe("your-turn");
-    expect(result.current.game.pot).toBe(0);
+    // §15/ADR 0006: an expired turn folds, so the seat that owed nothing is never silently
+    // checked — the hero's clock took the hand, and the table plays on without it.
+    expect(result.current.game.players[0]?.status).toBe("fold");
+    expect(result.current.words).toBeNull();
+    expect(result.current.game.phase).not.toBe("preflop");
   });
 
   test("folds on the deadline when a bet is owed", async () => {
