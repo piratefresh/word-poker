@@ -1,6 +1,6 @@
 /**
- * room-row.tsx — one table as §3's browser lists it: its name, its fixed buy-in, the seats taken
- * of the seats it has, and a way in.
+ * room-row.tsx — one table as §3's browser lists it: its name, its fixed buy-in, the blinds that
+ * buy-in derives, the seats taken of the seats it has, and a way in.
  *
  * The card is the screen's primary control, so it is a React Native `Pressable` hosted inside the
  * universal layout (`RNHostView`, the library's own bridge for exactly this). `@expo/ui`'s
@@ -43,10 +43,15 @@ export type RoomRowProps = {
   onPress: () => void;
 };
 
+/** The blinds as §3's card states them: the two numbers, smallest first. */
+function blindsLabel(room: RoomSummary): string {
+  return `${formatAmount(room.metadata.smallBlind)} / ${formatAmount(room.metadata.bigBlind)} BLINDS`;
+}
+
 /** The table as a sentence, for a screen reader and for Maestro's `id:` matcher. */
 function spokenLabel(room: RoomSummary, yours: boolean): string {
   const status = tableStatus(room.metadata) === "waiting" ? "waiting for players" : "a hand in play";
-  const table = `${room.metadata.name}, ${formatAmount(room.metadata.buyIn)} buy-in, ${room.clients} of ${room.maxClients} seats taken, ${status}`;
+  const table = `${room.metadata.name}, ${formatAmount(room.metadata.buyIn)} buy-in, blinds ${formatAmount(room.metadata.smallBlind)} and ${formatAmount(room.metadata.bigBlind)}, ${room.clients} of ${room.maxClients} seats taken, ${status}`;
   if (yours) return `Your table, ${table}`;
   if (room.clients >= room.maxClients) return `Full table, ${table}`;
   if (room.locked) return `Unavailable table, ${table}`;
@@ -97,6 +102,10 @@ export function RoomRow({ room, yours = false, disabled = false, onPress }: Room
             {room.clients} / {room.maxClients}
           </Text>
         </View>
+
+        <Text style={styles.blinds} testID={`lobby-room-blinds-${room.roomId}`}>
+          {blindsLabel(room)}
+        </Text>
 
         <Text style={[styles.action, yours && styles.actionYours, taken && styles.actionTaken]}>
           {actionLabel(room, yours, taken)}
@@ -168,6 +177,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.caption,
     letterSpacing: 1.2,
     marginLeft: "auto",
+  },
+  /** §3's Blinds: the table's two forced bets, under the buy-in it derives them from. */
+  blinds: {
+    color: colors.textDim,
+    fontFamily: fonts.mono,
+    fontSize: fontSize.micro,
+    letterSpacing: 1.6,
   },
   action: {
     color: colors.gold,

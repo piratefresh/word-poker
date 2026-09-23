@@ -7,6 +7,7 @@ import {
   GAME_MESSAGES,
   WAITING_PHASE,
   type GameRejectionEvent,
+  type OnlineBettingAction,
   type PrivateSeatState,
 } from "@wordpoker/contracts";
 
@@ -72,6 +73,16 @@ describe("GameRoom", () => {
         [...room.state.seats.values()].find((seat) => seat.seat === seatNumber)?.playerId;
       const clientForPlayer = (playerId: string) =>
         clients.find((client) => client.sessionId === playerId);
+      /**
+       * The move the row offers a seat: call what it owes, else check (§23). Pre-flop the blinds
+       * are already out, so the first actor of every hand owes the big blind.
+       */
+      const moveFor = (playerId: string): OnlineBettingAction => {
+        const seat = room.state.seats.get(playerId);
+        const round = room.state.betting;
+        assert.ok(seat && round, "an open round and a seated actor");
+        return seat.committedThisRound < round.currentBet ? { type: "call" } : { type: "check" };
+      };
 
       const actorId = playerForSeat(room.state.toActSeat);
       assert.ok(actorId, "the server chooses the first actor");
@@ -85,7 +96,7 @@ describe("GameRoom", () => {
       other.send(GAME_MESSAGES.betting, { type: "check" });
       assert.deepStrictEqual(await rejection, { action: "betting", reason: "not-your-turn" });
 
-      actor.send(GAME_MESSAGES.betting, { type: "check" });
+      actor.send(GAME_MESSAGES.betting, moveFor(actorId));
       await room.waitForNextPatch();
       assert.strictEqual(privateStates.size, 2, "each connection receives its private state");
       for (const client of clients) {
@@ -112,7 +123,7 @@ describe("GameRoom", () => {
         assert.ok(currentActorId, "the server has an actor");
         const currentActor = clientForPlayer(currentActorId);
         assert.ok(currentActor);
-        currentActor.send(GAME_MESSAGES.betting, { type: "check" });
+        currentActor.send(GAME_MESSAGES.betting, moveFor(currentActorId));
         await room.waitForNextPatch();
         if (room.state.phase in revealedFor) {
           assert.strictEqual(
@@ -278,12 +289,19 @@ describe("GameRoom", () => {
         [...room.state.seats.values()].find((seat) => seat.seat === seatNumber)?.playerId;
       const clientForPlayer = (playerId: string) =>
         [first, second].find((client) => client.sessionId === playerId);
+      /** Call what the seat owes, else check — pre-flop the first actor owes the big blind (§23). */
+      const moveFor = (playerId: string): OnlineBettingAction => {
+        const seat = room.state.seats.get(playerId);
+        const round = room.state.betting;
+        assert.ok(seat && round, "an open round and a seated actor");
+        return seat.committedThisRound < round.currentBet ? { type: "call" } : { type: "check" };
+      };
 
       // Make one legal move so both private snapshots have arrived before the test starts
       // comparing state. The first seat is deliberately the one that reconnects below.
       const openingActorId = playerForSeat(room.state.toActSeat);
       assert.ok(openingActorId);
-      clientForPlayer(openingActorId)?.send(GAME_MESSAGES.betting, { type: "check" });
+      clientForPlayer(openingActorId)?.send(GAME_MESSAGES.betting, moveFor(openingActorId));
       await room.waitForNextPatch();
 
       const beforeWord = privateStates.get(first.sessionId);
@@ -293,12 +311,12 @@ describe("GameRoom", () => {
       for (let action = 0; action < 20 && room.state.wordWindow.status !== "open"; action += 1) {
         const actorId = playerForSeat(room.state.toActSeat);
         assert.ok(actorId, "the server has an actor");
-        clientForPlayer(actorId)?.send(GAME_MESSAGES.betting, { type: "check" });
+        clientForPlayer(actorId)?.send(GAME_MESSAGES.betting, moveFor(actorId));
         await room.waitForNextPatch();
       }
       assert.strictEqual(room.state.wordWindow.status, "open", "the hand reaches the word window");
 
-      const draftTile = beforeWord.rack.find((tile) => !("sequenceLetter" in tile));
+      const draftTile = beforeWord.rack.find((tile) => !("alternativeLetter" in tile));
       assert.ok(draftTile, "the fixture gives the reconnecting seat a single-letter tile");
       const draft = {
         plays: [
@@ -362,20 +380,44 @@ describe("GameRoom", () => {
         buyIn: 500,
         maxSeats: 2,
         seed: 789,
-        turnDuration: 20,
+        turnDuration: 200,
         tickMs: 5,
       });
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
+
+      // Heads-up the button posts the small blind, so the small blind is the first actor and the
+      // turn its call hands on is the big blind's option — the seat that owes nothing (§15).
+      const smallBlindSeat = room.state.toActSeat;
+      const smallBlindId = [...room.state.seats.values()].find((seat) => seat.seat === smallBlindSeat)?.playerId;
+      assert.ok(smallBlindId, "the small blind is to act first");
+      const smallBlind = [first, second].find((client) => client.sessionId === smallBlindId);
+      assert.ok(smallBlind);
+      smallBlind.send(GAME_MESSAGES.betting, { type: "call" });
+      await room.waitForNextPatch();
+
       const actorSeat = room.state.toActSeat;
       const actorId = [...room.state.seats.values()].find((seat) => seat.seat === actorSeat)?.playerId;
+      console.log("DEBUG", {
+        smallBlindSeat,
+        smallBlindId,
+        actorSeat,
+        phase: room.state.phase,
+        seats: [...room.state.seats.values()].map((s) => ({
+          seat: s.seat,
+          id: s.playerId,
+          committed: s.committedThisRound,
+          folded: s.hasFolded,
+        })),
+      });
+      assert.ok(actorId && actorId !== smallBlindId, "the big blind's option is the turn left");
       const actor = [first, second].find((client) => client.sessionId === actorId);
-      assert.ok(actorId && actor);
+      assert.ok(actor);
 
       const timeout = new Promise<GameRejectionEvent>((resolve) => {
         actor.onMessage(GAME_EVENTS.rejected, (payload) => resolve(payload as GameRejectionEvent));
       });
-      for (let tick = 0; tick < 10 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
+      for (let tick = 0; tick < 80 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
         await room.waitForNextTimestep();
       }
 
@@ -383,6 +425,7 @@ describe("GameRoom", () => {
       // checked, and the seat is told its turn expired.
       assert.strictEqual(room.state.seats.get(actorId)?.hasFolded, true, "nothing owed still folds");
       assert.deepStrictEqual(await timeout, { action: "betting", reason: "turn-timeout" });
+
     });
 
     it("returns the table to waiting when the session cannot pay another hand", async () => {
@@ -492,7 +535,8 @@ describe("GameRoom", () => {
       assert.strictEqual(room.maxClients, 6, "the seat cap is the room's own");
       assert.strictEqual(room.state.table.name, "High Stakes");
       assert.strictEqual(room.state.table.buyIn, 50_000);
-      assert.strictEqual(room.state.table.minBet, 1_000, "ADR 0001: 2% of the buy-in");
+      assert.strictEqual(room.state.table.smallBlind, 500, "ADR 0004: 1% of the buy-in");
+      assert.strictEqual(room.state.table.bigBlind, 1_000, "ADR 0004: 2% of the buy-in");
       assert.strictEqual(room.state.table.maxSeats, 6);
     });
 
@@ -502,7 +546,8 @@ describe("GameRoom", () => {
       assert.deepStrictEqual(room.metadata, {
         name: "Beginner",
         buyIn: 500,
-        minBet: 10,
+        smallBlind: 5,
+        bigBlind: 10,
         maxSeats: 2,
         status: "waiting",
       });
@@ -617,7 +662,8 @@ describe("GameRoom", () => {
       assert.deepStrictEqual(listed.metadata, {
         name: "Sunset",
         buyIn: 5_000,
-        minBet: 100,
+        smallBlind: 50,
+        bigBlind: 100,
         maxSeats: 3,
         status: WAITING_PHASE,
       });
@@ -648,10 +694,15 @@ describe("GameRoom", () => {
       await followed.until((rows) => rows.has(table.roomId), "the new table");
 
       const first = await colyseus.connectTo(table);
-      await colyseus.connectTo(table);
+      const second = await colyseus.connectTo(table);
       await followed.until((rows) => rows.get(table.roomId)!.locked === true, "the table to lock");
 
-      await first.leave();
+      // Heads-up the button posts the small blind and is the seat the hand opens on, so the seat
+      // whose drop the table holds rather than folds is the big blind — the one not to act (§15).
+      assert.strictEqual(table.state.seats.get(first.sessionId)?.seat, 0);
+      assert.strictEqual(table.state.seats.get(second.sessionId)?.seat, 1);
+      assert.strictEqual(table.state.toActSeat, 0, "the small blind opens the hand");
+      await second.leave();
       const reopened = (await followed.until((rows) => rows.get(table.roomId)!.locked !== true, "the seat to free"))!
         .get(table.roomId)!;
       assert.strictEqual(reopened.clients, 1);

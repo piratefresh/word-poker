@@ -99,7 +99,7 @@ export const BETTING_REJECTION_REASONS = [
   "no-bet-to-call",
   /** Betting is illegal once the round has a current bet — that is a raise (§15, §22). */
   "bet-facing-bet",
-  /** A first bet below the table's minimum bet (§22, MIN_BET). */
+  /** A first bet below the table's minimum bet — its big blind (§22). */
   "below-min-bet",
   /** A raise smaller than the raise floor — unless it is a short all-in (§31). */
   "below-min-raise",
@@ -130,8 +130,11 @@ export interface SeatChips {
 
 /** The round's numbers, as the felt states them (§22). */
 export interface RoundChips {
-  /** The minimum bet: the floor for the round's first voluntary bet. */
-  readonly minBet: number;
+  /**
+   * The round's floor: the table's minimum bet, which is its big blind (§22, §5). Every later
+   * round's first bet must reach it, and the raise floor is built from it.
+   */
+  readonly bigBlind: number;
   /** The highest amount committed by any live seat this round (§23). */
   readonly currentBet: number;
   /** The raise increment floor; a raise-to is `currentBet + minRaise` (§22). */

@@ -72,9 +72,8 @@ jest.mock("@/lib/offline-seed", () => ({
   randomSeed: () => mockRandomSeed(),
 }));
 
-const HERO_WORD = HERO_TILES.map((tile) =>
-  "sequenceLetter" in tile ? `${tile.letter}${tile.sequenceLetter}` : tile.letter,
-).join("");
+/** The word the hero's taps spell: every tile plays the face it prints first (§10). */
+const HERO_WORD = HERO_TILES.map((tile) => tile.letter).join("");
 
 /** The table's vocabulary, injected: the drawer this screen loads holds the hero's word. */
 let mockDictionary: Dictionary | null = testDictionary([HERO_WORD]);
@@ -233,10 +232,10 @@ describe("<OfflineGameScreen />", () => {
     // The badge only lands on the felt if the mapped state flags the hero's seat.
     expect(view.getByText(/· YOU/)).toBeOnTheScreen();
 
-    // The pinned hand's first bot opens for 60, so the felt states a real call and a real pot
-    // — the numbers the engine counted, not a placeholder row.
-    expect(control(view, "action-check-call").getByText("CALL $60")).toBeOnTheScreen();
-    expect(view.getByTestId("pot")).toHaveTextContent(/\$60/);
+    // The pinned hand posts 10 / 20 and then raises to 40, so the felt states a real call and a
+    // real pot — the numbers the engine counted, not a placeholder row.
+    expect(control(view, "action-check-call").getByText("CALL $40")).toBeOnTheScreen();
+    expect(view.getByTestId("pot")).toHaveTextContent(/\$70/);
     expect(view.getByText("ALL IN · $1,000")).toBeOnTheScreen();
   });
 
@@ -280,8 +279,8 @@ describe("<OfflineGameScreen />", () => {
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
     expect(control(view, "action-fold").getByText("FOLD")).toBeOnTheScreen();
-    expect(control(view, "action-check-call").getByText("CALL $60")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("RAISE $120")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("CALL $40")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("RAISE $60")).toBeOnTheScreen();
     expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
@@ -296,8 +295,7 @@ describe("<OfflineGameScreen />", () => {
 
     // One line of text over the rack, and nothing but the line: the strip below it is the
     // word, so the preview only has to be legible.
-    const letters = "sequenceLetter" in first ? `${first.letter}${first.sequenceLetter}` : first.letter;
-    expect(view.getByTestId("word-builder-word")).toHaveTextContent(letters);
+    expect(view.getByTestId("word-builder-word")).toHaveTextContent(first.letter);
   });
 
   test("plays a word from the rack, then pays out through the results into the next hand", async () => {
@@ -368,9 +366,9 @@ describe("<OfflineGameScreen />", () => {
     // hero's 20 and the three calls it drew, each on its own beat — which is the engine's own
     // `bet`. A raise with nothing to raise is refused, and a refused action is dropped where
     // nothing moved, which is exactly how this tap used to do nothing: the pot stood still at
-    // 480, and a refused bet would have left the hero holding the turn with `BET $20` on the row.
-    expect(before).toBe(480);
-    expect(potAmount(view)).toBe(560);
+    // 400, and a refused bet would have left the hero holding the turn with `BET $20` on the row.
+    expect(before).toBe(400);
+    expect(potAmount(view)).toBe(480);
     // The row has stopped offering the hero a bet: with the round closed there is no amount to
     // name, so the wager falls back to its inert label and the call has gone quiet.
     expect(control(view, "action-wager").getByText("RAISE $0")).toBeOnTheScreen();

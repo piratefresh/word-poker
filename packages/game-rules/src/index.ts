@@ -6,9 +6,9 @@ export { createRng } from "./rng";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
 export {
+  CHOICE_TILE_PAIRS,
   DEFAULT_SPECIAL_TILES,
   NO_SPECIAL_TILES,
-  SEQUENCE_TILE_PAIRS,
   TWO_LETTER_TILE_LIMIT,
   applySpecialTiles,
 } from "./special-tiles";
@@ -39,7 +39,7 @@ export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
 export { decideOfflineMove, chooseOfflineWord } from "./bot";
 export {
   BOT_BET_FREQUENCY,
-  BOT_BET_SIZES,
+  BOT_BET_STEPS,
   BOT_CALL_THRESHOLD,
   BOT_RAISE_FREQUENCY,
 } from "./bot";

@@ -17,7 +17,7 @@ import { TILE_BAG_SIZE } from "../src/tiles";
 /**
  * One word's §7 breakdown, built straight from its printed letters — the shape scoring hands
  * the showdown. A multiplier is applied to the letter's `value` and never to its
- * `baseValue`, which is the distinction §21.2 turns on.
+ * `baseValue`, which is where §7 puts the two numbers apart.
  */
 function word(
   letters: readonly (readonly [letter: string, baseValue: number, multiplier?: LetterMultiplier])[],
@@ -133,22 +133,7 @@ describe("rankShowdown — §21.1: longest valid word", () => {
     );
   });
 
-  it("counts both letters of a two-letter tile", () => {
-    // TH prints two letters over one physical tile: 2 + 5 = 7, exactly what three one-letter
-    // tiles are worth here — so the count, not the score, is what ranks them.
-    const ranking = rankShowdown({
-      entries: [
-        entry("th", 0, word([["T", 2], ["H", 5]])),
-        entry("three", 1, word([["K", 5], ["A", 1], ["O", 1]])),
-      ],
-      rng: createRng(4),
-    });
-
-    assert.deepEqual(ranking.standings.map((standing) => standing.playerId), ["three", "th"]);
-    assert.equal(ranking.comparisons[1]?.values.length, 2);
-  });
-
-  it("passes seats tied on length down to the letter comparison", () => {
+  it("passes seats tied on length to the draw", () => {
     const ranking = rankShowdown({
       entries: [
         entry("q", 0, word([["Q", 10], ["A", 1]])),
@@ -157,59 +142,102 @@ describe("rankShowdown — §21.1: longest valid word", () => {
       rng: createRng(6),
     });
 
+    // Equal scores and equal lengths leave §21's word steps spent, so §21.3 draws — and its
+    // tiles, not the letters in either word, are what the seats end up compared on.
     assert.deepEqual(ranking.comparisons.map((comparison) => comparison.step), [
       "final-score",
       "word-length",
-      "highest-letter",
+      "tile-draw",
     ]);
-  });
-});
-
-describe("rankShowdown — §21.2: highest single printed letter", () => {
-  it("ranks a word containing Q above one containing J", () => {
-    const ranking = rankShowdown({
-      entries: [
-        entry("j", 0, word([["J", 8], ["D", 3]])),
-        entry("q", 1, word([["Q", 10], ["A", 1]])),
-      ],
-      rng: createRng(7),
-    });
-
     assert.deepEqual(
       ranking.standings.map((standing) => [standing.playerId, standing.decidedBy, standing.compared]),
       [
-        ["q", "highest-letter", 10],
-        ["j", "highest-letter", 8],
-      ],
-    );
-  });
-
-  it("compares the printed value, so a multiplier does not inflate it", () => {
-    // The doubled K is worth 10 to §7 and 5 to §21.2 — which is exactly why the step exists.
-    const ranking = rankShowdown({
-      entries: [
-        entry("doubled-k", 0, word([["K", 5, "double-letter"], ["A", 1]])),
-        entry("j", 1, word([["J", 8], ["D", 3]])),
-      ],
-      rng: createRng(8),
-    });
-
-    assert.deepEqual(
-      ranking.standings.map((standing) => [standing.playerId, standing.score, standing.compared]),
-      [
-        ["j", 11, 8],
-        ["doubled-k", 11, 5],
+        ["q", "tile-draw", 4],
+        ["j", "tile-draw", 1],
       ],
     );
   });
 });
 
 describe("rankShowdown — §21.3: the high-value tile draw", () => {
-  /** Two seats identical all the way down: same score, same length, same best letter. */
+  /** Two seats identical the whole way down: same score and same length, so the draw decides. */
   const identical = (): ShowdownEntry[] => [
     entry("one", 0, word([["T", 2], ["A", 1], ["D", 3]])),
     entry("two", 1, word([["T", 2], ["A", 1], ["D", 3]])),
   ];
+
+  it("adds a round's tile to what the seat has already drawn, as §21.3's example does", () => {
+    // The rules' own worked example — A then Z is 11, A then T is 3 — on a seed that deals
+    // it: both seats take a 1, draw again, and the second tile adds to the first.
+    const ranking = rankShowdown({
+      entries: [
+        entry("ana", 0, word([["T", 2], ["A", 1], ["D", 3]])),
+        entry("ben", 1, word([["T", 2], ["A", 1], ["D", 3]])),
+      ],
+      rng: createRng(369),
+    });
+
+    assert.deepEqual(
+      ranking.comparisons
+        .filter((comparison) => comparison.step === "tile-draw")
+        .map((comparison) => [
+          comparison.round,
+          comparison.values.map((value) => [value.playerId, value.value]),
+        ]),
+      [
+        [1, [["ana", 1], ["ben", 1]]],
+        [
+          2,
+          [
+            ["ana", 11],
+            ["ben", 3],
+          ],
+        ],
+      ],
+    );
+    assert.deepEqual(
+      ranking.standings.map((standing) => [standing.playerId, standing.place, standing.compared]),
+      [
+        ["ana", 1, 11],
+        ["ben", 2, 3],
+      ],
+    );
+  });
+
+  it("draws again only among the seats sharing the highest total", () => {
+    const ranking = rankShowdown({
+      entries: [
+        entry("one", 0, word([["T", 2], ["A", 1], ["D", 3]])),
+        entry("two", 1, word([["T", 2], ["A", 1], ["D", 3]])),
+        entry("three", 2, word([["T", 2], ["A", 1], ["D", 3]])),
+      ],
+      rng: createRng(42),
+    });
+
+    // One and three tie on 5 and draw on; two is beaten on 1 and is placed. The later rounds
+    // report running totals, so a seat's number only grows: 6 is 5 + 1 for both of them.
+    assert.deepEqual(
+      ranking.comparisons
+        .filter((comparison) => comparison.step === "tile-draw")
+        .map((comparison) => [
+          comparison.round,
+          comparison.values.map((value) => [value.playerId, value.value]),
+        ]),
+      [
+        [1, [["one", 5], ["three", 5], ["two", 1]]],
+        [2, [["one", 6], ["three", 6]]],
+        [3, [["one", 10], ["three", 8]]],
+      ],
+    );
+    assert.deepEqual(
+      ranking.standings.map((standing) => [standing.playerId, standing.place, standing.compared]),
+      [
+        ["one", 1, 10],
+        ["three", 2, 8],
+        ["two", 3, 1],
+      ],
+    );
+  });
 
   it("replays the same draw for the same seed, and lets the seed pick the winner", () => {
     const first = rankShowdown({ entries: identical(), rng: createRng(7) });
@@ -219,29 +247,17 @@ describe("rankShowdown — §21.3: the high-value tile draw", () => {
     assert.deepEqual(
       first.standings.map((standing) => [standing.playerId, standing.place, standing.decidedBy, standing.compared]),
       [
-        ["one", 1, "tile-draw", 4],
-        ["two", 2, "tile-draw", 2],
+        ["one", 1, "tile-draw", 6],
+        ["two", 2, "tile-draw", 5],
       ],
     );
 
     // A different seed draws the same two tiles the other way round, and hands the hand to
     // the other seat: the winner comes out of the draw, not out of the seat numbers.
-    const other = rankShowdown({ entries: identical(), rng: createRng(13) });
+    const other = rankShowdown({ entries: identical(), rng: createRng(21) });
 
     assert.deepEqual(other.standings.map((standing) => standing.playerId), ["two", "one"]);
-    assert.deepEqual(other.comparisons.at(-1)?.values.map((value) => value.value), [4, 2]);
-  });
-
-  it("draws from the single-letter bag when the table disables two-letter draws", () => {
-    // Same seats, same seed: with the two-letter tiles out of the pool, the round draws
-    // different tiles (3 and 1) than it does from the whole bag (2 and 1).
-    const ranking = rankShowdown({
-      entries: identical(),
-      rng: createRng(21),
-      twoLetterDrawTiles: false,
-    });
-
-    assert.deepEqual(ranking.comparisons.at(-1)?.values.map((value) => value.value), [3, 1]);
+    assert.deepEqual(other.comparisons.at(-1)?.values.map((value) => value.value), [3, 1]);
   });
 
   it("ranks a served tie identically under both exhausted-draw policies", () => {
@@ -264,36 +280,38 @@ describe("rankShowdown — §21 with no valid word anywhere (STO-326)", () => {
     assert.deepEqual(
       ranking.standings.map((standing) => [standing.playerId, standing.place, standing.score, standing.decidedBy, standing.compared]),
       [
-        ["two", 1, 0, "tile-draw", 5],
-        ["one", 2, 0, "tile-draw", 2],
+        ["one", 1, 0, "tile-draw", 4],
+        ["two", 2, 0, "tile-draw", 1],
       ],
     );
-    // The score step still compared — three seats, all on 0 — but the two word steps had
-    // nothing to read on any of them (§11), so they were not decisions and are not recorded.
+    // The score step still compared — both seats on 0 — but the word steps had nothing to
+    // read on either of them (§11), so they were not decisions and are not recorded.
     assert.deepEqual(ranking.comparisons.map((comparison) => comparison.step), ["final-score", "tile-draw"]);
   });
 
-  it("settles three zero-score seats by repeated draws", () => {
+  it("settles three zero-score seats by repeated draws, adding up each round", () => {
     const ranking = rankShowdown({
       entries: [entry("one", 0), entry("two", 1), entry("three", 2)],
-      rng: createRng(11),
+      rng: createRng(42),
     });
 
     assert.deepEqual(
       ranking.standings.map((standing) => [standing.playerId, standing.place, standing.decidedBy, standing.compared]),
       [
-        ["one", 1, "tile-draw", 2],
-        ["two", 2, "tile-draw", 1],
-        ["three", 3, "tile-draw", 1],
+        ["one", 1, "tile-draw", 10],
+        ["three", 2, "tile-draw", 8],
+        ["two", 3, "tile-draw", 1],
       ],
     );
-    // Two seats drew 2 and went again; one of them took the hand on the second round.
+    // All three drew; the two left sharing the highest total drew again; one of them took
+    // the hand on the round after that.
     assert.deepEqual(
       ranking.comparisons.map((comparison) => [comparison.step, comparison.round]),
       [
         ["final-score", 1],
         ["tile-draw", 1],
         ["tile-draw", 2],
+        ["tile-draw", 3],
       ],
     );
   });
@@ -325,14 +343,12 @@ describe("rankShowdown — the exhausted-draw fallback (§25)", () => {
 });
 
 describe("showdownDrawPool — §21.3's draw pool", () => {
-  it("is the whole bag, or the single-letter bag alone when two-letter draws are disabled", () => {
-    const full = showdownDrawPool(true);
-    const single = showdownDrawPool(false);
+  it("is the bag's single-letter half, with every two-letter tile left out", () => {
+    const pool = showdownDrawPool();
 
-    assert.equal(full.length, TILE_BAG_SIZE);
-    assert.equal(full.filter((tile) => "alternativeLetter" in tile).length, 2);
-    assert.equal(single.length, TILE_BAG_SIZE - 2);
-    assert.ok(single.every((tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile)));
+    assert.ok(pool.every((tile) => !("alternativeLetter" in tile)));
+    // §6's distribution: 98 single-letter copies across A–Z, and nothing else.
+    assert.equal(pool.length, 98);
   });
 });
 
@@ -343,9 +359,11 @@ describe("showdownDrawValue — what a drawn tile is worth (§21.3)", () => {
       showdownDrawValue({ id: "AE-1", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1 }),
       2,
     );
+    // §21.3 reads the combined printed value, so a pair whose faces differ is drawn whole —
+    // there is no face to pick in a draw (§10).
     assert.equal(
-      showdownDrawValue({ id: "TH-1", letter: "T", points: 2, sequenceLetter: "H", sequencePoints: 5 }),
-      7,
+      showdownDrawValue({ id: "QK-1", letter: "Q", points: 10, alternativeLetter: "K", alternativePoints: 5 }),
+      15,
     );
   });
 });

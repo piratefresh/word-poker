@@ -5,9 +5,9 @@
  * contributed and their printed values — and walks §7: add the letters (step 1), let each
  * tile's Double/Triple Letter multiplier apply to every letter it printed (step 2), then add
  * the flat Full Rack Bonus when all seven physical tiles were used (step 3). It consumes the
- * resolution rather than the word string, so the face a choice tile played and the two
- * letters of a sequence tile are already pinned by the time anything is added up: scoring
- * never re-reads a tile, and cannot disagree with building about what was spelled.
+ * resolution rather than the word string, so the face a choice tile played is already pinned
+ * by the time anything is added up: scoring never re-reads a tile, and cannot disagree with
+ * building about what was spelled.
  *
  * Who wins the table is not here: that is §21's ladder in `./showdown`, which ranks every
  * seat by these scores and breaks the ties.
@@ -51,9 +51,9 @@ const FULL_RACK_BONUS = 10;
  *
  * The letters come out in word order with their multipliers already applied, so the reveal
  * UI can put a value on every tile it draws, and `letterScore` is exactly the sum of those
- * values. The Full Rack Bonus counts physical tiles, never letters: a sequence tile is one
- * tile however many letters it prints, so a nine-letter word built from seven tiles still
- * earns the bonus, and a seven-letter word built from six does not.
+ * values. The Full Rack Bonus counts physical tiles, never letters — and since every tile,
+ * choice tiles included, plays exactly one letter (§10), seven tiles is also §12's longest
+ * possible word: a rack played in full is a seven-letter word with the bonus on it.
  *
  * @param tiles The played tiles as `evaluateWord` resolved them, in word order.
  * @returns The §7 breakdown: per-letter values, the modified letter score, the rack bonus,

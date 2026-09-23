@@ -5,9 +5,12 @@
  * the same action sequence always produce the same hand. Each street — `preflop → flop → turn
  * → river` — runs a real betting round (`betting.ts`, §15): seats fold, check, bet, call,
  * raise or shove, the street rolls only when the round closes, and the board reveals 0/3/4/5
- * community tiles on the way. When the river's round closes, §19's word window opens instead
- * of the payout; the hand pays out once every seat still in it has confirmed a word or run out
- * of time, and §25's pots are layered, ranked and paid in the same transition.
+ * community tiles on the way. The first round opens with the blinds already posted (§5, §14):
+ * `startHand` commits them before it deals, so the pre-flop turn starts at the seat clockwise
+ * from the big blind and that round's Current Bet is the big blind (§15, §23). When the river's
+ * round closes, §19's word window opens instead of the payout; the hand pays out once every seat
+ * still in it has confirmed a word or run out of time, and §25's pots are layered, ranked and
+ * paid in the same transition.
  *
  * §19's window is its own module (`word-window.ts`): this file opens it, hands it the table on
  * every word action, and settles the hand when it closes. The window's own rules are not here.
@@ -52,6 +55,7 @@ import {
   type Stakes,
 } from "./betting";
 import { evaluateWord } from "./building";
+import { commitChips } from "./chips";
 import { dealHand } from "./deal";
 import type { Dictionary } from "./dictionary";
 import {
@@ -149,8 +153,9 @@ export interface OfflineState {
   endsAtMs: number;
   turnDurationMs: number;
   /**
-   * The seat holding the dealer button: turn order starts at the first live seat clockwise
-   * from it, and it steps one seat per completed hand. No blinds ride on it (ADR 0001).
+   * The seat holding the dealer button: the blinds ride on it (§5), pre-flop order starts at the
+   * first dealt-in seat clockwise from the big blind, later streets at the first dealt-in seat
+   * clockwise from it, and it steps one dealt-in seat per completed hand.
    */
   dealerSeat: number;
   /**
@@ -207,9 +212,9 @@ export interface StartHandOptions {
     autoSubmitDrafts?: boolean;
   };
   /**
-   * The table's betting settings. Absent means `DEFAULT_STAKES`: a 20-chip minimum bet and a
-   * 1,000-chip starting stack — settings, not buried literals. Online room stakes are derived
-   * from the room buy-in instead (ADR 0001, ADR 0002).
+   * The table's betting settings. Absent means `DEFAULT_STAKES`: 10 / 20 blinds and a
+   * 1,000-chip starting stack — settings, not buried literals (ADR 0002, ADR 0004). Online room
+   * stakes are derived from the room buy-in instead.
    */
   stakes?: Partial<Stakes & { startingStack: number }>;
   /**
@@ -274,7 +279,9 @@ export function startHand({
     };
   });
 
-  const button = dealerSeat ?? 0;
+  // The button rides on the blinds, so it is the first dealt-in seat at or clockwise from the
+  // one asked for: a seat that is sitting the session out never holds it (§5, ADR 0002).
+  const button = nextDealtInSeat(seats, dealerSeat ?? 0);
   const ready = seats.filter((seat) => !seat.sittingOut).length;
   if (ready < 2) {
     throw new OfflineActionError(
@@ -282,31 +289,101 @@ export function startHand({
     );
   }
 
-  // Two seats able to play guarantee the walk from the button finds one of them.
-  const toActIndex = nextActor(seats, 0, button);
-  if (toActIndex === null) {
-    throw new OfflineActionError(`no seat can act at a ${seats.length}-seat table`);
-  }
+  const tableStakes: Stakes = {
+    smallBlind: stakes?.smallBlind ?? DEFAULT_STAKES.smallBlind,
+    bigBlind: stakes?.bigBlind ?? DEFAULT_STAKES.bigBlind,
+  };
+  const blinds = blindSeats(seats, button, ready);
+  const posted = postBlinds(seats, blinds, tableStakes);
 
-  return {
+  // §23: the posted big blind is the round's opening Current Bet — a caller matches the blind
+  // even when the big blind seat could not post all of it (§22's short blind).
+  const betting: BettingRoundState = { currentBet: tableStakes.bigBlind, lastRaiseSize: 0 };
+  // §15: action opens at the first dealt-in seat clockwise from the big blind, which heads-up
+  // is the small blind — the button. The big blind itself is still to act, so it keeps its
+  // option and its check is what closes the round.
+  const toActIndex = nextActor(posted, betting.currentBet, blinds.bigBlind);
+
+  const state: OfflineState = {
     hand: 1,
     seed,
     phase: "preflop",
-    seats,
+    seats: posted,
     community: dealt.community,
     revealed: revealedCount("preflop"),
     toActIndex,
     endsAtMs: nowMs + turnDurationMs,
     turnDurationMs,
     dealerSeat: button,
-    betting: { currentBet: 0, lastRaiseSize: 0 },
+    betting,
     sessionOver: false,
-    stakes: { minBet: stakes?.minBet ?? DEFAULT_STAKES.minBet },
+    stakes: tableStakes,
     autoSubmitDrafts: wordBuilding?.autoSubmitDrafts ?? false,
     wordWindow: null,
     dictionary,
     result: null,
   };
+
+  // Nobody left to act means the whole table is all in on the posts alone: the streets below
+  // have nothing to bet, so the hand rolls straight to §19's window, exactly as it does when
+  // the last round closes with everyone all in (§13's all-in run-out).
+  return toActIndex === null ? rollStreets(state, nowMs) : state;
+}
+
+/**
+ * The first seat at or clockwise from `from` that is dealt into the hand. The button and both
+ * blinds ride on the deal, so none of them ever lands on a seat that is sitting the hand out
+ * (§5).
+ */
+function nextDealtInSeat(seats: readonly OfflineSeat[], from: number): number {
+  for (let offset = 0; offset < seats.length; offset += 1) {
+    const index = (from + offset) % seats.length;
+    if (seats[index]?.sittingOut === false) return index;
+  }
+
+  throw new OfflineActionError("no seat is dealt into the hand");
+}
+
+/**
+ * The two seats the blinds fall on (§5): the two dealt-in seats clockwise from the button.
+ * Heads-up is the exception the rule names — the button posts the small blind and the other seat
+ * the big blind, which is the same pair read the other way round.
+ */
+function blindSeats(
+  seats: readonly OfflineSeat[],
+  button: number,
+  dealtIn: number,
+): { smallBlind: number; bigBlind: number } {
+  const smallBlind = dealtIn === 2 ? button : nextDealtInSeat(seats, button + 1);
+
+  return { smallBlind, bigBlind: nextDealtInSeat(seats, smallBlind + 1) };
+}
+
+/**
+ * Posts both blinds before any tile is dealt (§5, §14), through the chips model's own commit so
+ * the posts are the seats' Committed This Round and Committed This Hand like any other bet. A
+ * seat whose stack is smaller than its blind posts all of it and is all in (§22) — the round's
+ * opening Current Bet is still the full big blind (§23).
+ */
+function postBlinds(
+  seats: readonly OfflineSeat[],
+  blinds: { smallBlind: number; bigBlind: number },
+  stakes: Stakes,
+): readonly OfflineSeat[] {
+  return seats.map((seat, index) => {
+    const blind =
+      index === blinds.smallBlind ? stakes.smallBlind : index === blinds.bigBlind ? stakes.bigBlind : 0;
+    if (blind === 0) return seat;
+
+    const committed = commitChips(seat, blind);
+    return {
+      ...seat,
+      stack: committed.seat.stack,
+      committedRound: committed.seat.committedRound,
+      committedHand: committed.seat.committedHand,
+      allIn: committed.seat.stack === 0,
+    };
+  });
 }
 
 /**
@@ -364,7 +441,7 @@ function applyBetting(
     throw new BettingRejectionError("turn-timeout");
   }
 
-  const applied = applyBettingAction(state.seats, round, state.toActIndex, action, state.stakes.minBet);
+  const applied = applyBettingAction(state.seats, round, state.toActIndex, action, state.stakes.bigBlind);
   if (!applied.ok) {
     throw new BettingRejectionError(applied.reason);
   }
@@ -711,8 +788,10 @@ function nextPhase(phase: RoundPhase): RoundPhase {
  * hands.
  *
  * Every seat carries its Table Stack into the new hand and the dealer button steps one seat
- * clockwise. When fewer than two seats can still pay a hand, no hand is dealt: the state is
- * returned with `sessionOver` set, which is the session's end-state (ADR 0002).
+ * clockwise — `startHand` moves it on again from a seat that is no longer dealt in, so it lands
+ * on the next seat that plays, the blinds riding on it (§5). When fewer than two seats can still
+ * pay a hand, no hand is dealt: the state is returned with `sessionOver` set, which is the
+ * session's end-state (ADR 0002).
  */
 function nextHand(state: OfflineState, nowMs: number): OfflineState {
   if (state.sessionOver) {
@@ -732,7 +811,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     nowMs,
     dictionary: state.dictionary,
     wordBuilding: { autoSubmitDrafts: state.autoSubmitDrafts },
-    stakes: { minBet: state.stakes.minBet },
+    stakes: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
     turnDurationMs: state.turnDurationMs,
   });
 

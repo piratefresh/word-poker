@@ -1,7 +1,7 @@
 import { schema, t, type SchemaType } from "@colyseus/schema";
 import { WAITING_PHASE } from "@wordpoker/contracts";
 
-/** A tile projection. `kind` names the variant; the secondary fields are empty unless the kind uses them. */
+/** A tile projection. `kind` names the variant; `alternative*` is empty unless the kind is `choice`. */
 export const TileState = schema({
   kind: t.string().default("letter"),
   id: t.string().default(""),
@@ -9,8 +9,6 @@ export const TileState = schema({
   points: t.uint8().default(0),
   alternativeLetter: t.string().default(""),
   alternativePoints: t.uint8().default(0),
-  sequenceLetter: t.string().default(""),
-  sequencePoints: t.uint8().default(0),
   multiplier: t.string().default(""),
 }, "TileState");
 export type TileState = SchemaType<typeof TileState>;
@@ -19,7 +17,8 @@ export type TileState = SchemaType<typeof TileState>;
 export const TableConfigState = schema({
   name: t.string().default(""),
   buyIn: t.uint32().default(0),
-  minBet: t.uint32().default(0),
+  smallBlind: t.uint32().default(0),
+  bigBlind: t.uint32().default(0),
   maxSeats: t.uint8().default(0),
 }, "TableConfigState");
 export type TableConfigState = SchemaType<typeof TableConfigState>;
@@ -42,7 +41,7 @@ export type SeatState = SchemaType<typeof SeatState>;
 /** The currently open betting numbers. `active` represents the domain null. */
 export const BettingState = schema({
   active: t.boolean().default(false),
-  minBet: t.uint32().default(0),
+  bigBlind: t.uint32().default(0),
   currentBet: t.uint32().default(0),
   minRaise: t.uint32().default(0),
 }, "BettingState");

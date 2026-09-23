@@ -10,10 +10,9 @@
  * Folded seats are not entries here at all: §20 keeps them out of the showdown, so there is
  * nothing to rank and no flag to get wrong.
  *
- * Three of the ladder's four steps read their number off the score — the final total that
- * orders the field, the letter count (§21.1, where a two-letter tile counts both letters),
- * and the highest printed letter value (§21.2, which is why scoring carries
- * `WordLetterScore.baseValue` beside the multiplied `value`). Only §21.3's draw needs
+ * The ladder reads its first steps off the score — the final total that orders the field,
+ * then the letter count (§21.1, where a choice tile contributes the one face that was
+ * played, §10) — and §21.3's draw settles whatever those leave tied. Only the draw needs
  * something the score does not hold, and it is the one step that consumes randomness: it
  * draws from the injected `rng` (AGENTS.md), so a seed replays a tie-break exactly as it
  * replays a deal, and a showdown that never reaches the draw consumes no randomness at all.
@@ -27,7 +26,6 @@ import type {
   ShowdownRanking,
   ShowdownStanding,
   Tile,
-  WordLetterScore,
   WordScore,
 } from "@wordpoker/contracts";
 
@@ -56,11 +54,6 @@ export interface RankShowdownOptions {
   /** §21.3's draw, from the seeded generator `createRng` builds. */
   readonly rng: () => number;
   /**
-   * §21.3's configuration: whether a two-letter tile may come out of a tie-break draw. The
-   * rules allow it; a table that disables it draws from the single-letter bag alone.
-   */
-  readonly twoLetterDrawTiles?: boolean;
-  /**
    * What the draw does when its pool runs out with a tie still unbroken. `"throw"` (the
    * default) refuses — the pool outlasts any run of tied draws a real table can produce —
    * while `"tie"` leaves the still-tied seats on one shared place, which is what lets §25's
@@ -82,9 +75,9 @@ export class NoContestantsError extends Error {
  * The §21.3 draw used its whole pool.
  *
  * Unreachable for any table the bag can seat: a round takes one tile per still-tied seat, so
- * a hundred tiles outlast any run of tied draws a real table can produce. It is refused
- * rather than papered over, because the alternative — drawing a tile that was already drawn
- * and discarded — would rank the seats by a value the rules do not give them.
+ * the bag outlasts any run of tied draws a real table can produce. It is refused rather than
+ * papered over, because the alternative — drawing a tile that was already drawn and
+ * discarded — would rank the seats by a value the rules do not give them.
  */
 export class DrawPoolExhaustedError extends Error {
   constructor(tiles: number) {
@@ -104,27 +97,29 @@ export class DrawPoolExhaustedError extends Error {
 export const DRAW_SEED_SALT = 0x5eed_21;
 
 /**
- * §21.3's draw pool: a fresh, unshuffled bag, or the single-letter bag when the table's
- * configuration disables two-letter tiles in tie-break draws.
+ * §21.3's draw pool: a fresh, unshuffled single-letter bag (§6).
+ *
+ * §21 "The Draw's Pool" is explicit that the draw comes out of the single-letter bag, so
+ * the two-letter tiles a deal can hold are not in it: every drawn tile then prints exactly
+ * one value, which is what the draw ranks the seats by. The bag is filtered rather than
+ * built here, so the pool's copies and ids stay the ones `createTileBag` gives every other
+ * tile of the table.
  *
  * Exported because the pool is half of what §21.3 leaves open — which tiles can come out of
- * it — and a caller that configures the draw should be able to see what it configured.
+ * it — and a caller that shows the draw should be able to see what it drew from.
  */
-export function showdownDrawPool(twoLetterDrawTiles: boolean): Tile[] {
-  const bag = createTileBag();
-  return twoLetterDrawTiles
-    ? bag
-    : bag.filter((tile) => !("alternativeLetter" in tile) && !("sequenceLetter" in tile));
+export function showdownDrawPool(): Tile[] {
+  return createTileBag().filter(
+    (tile) => !("alternativeLetter" in tile),
+  );
 }
 
-/** A seat with the three numbers §21's comparison steps read off its score. */
+/** A seat with the numbers §21's comparison steps read off its score. */
 interface Contestant {
   readonly entry: ShowdownEntry;
   readonly score: number;
   /** §21.1: how many letters the word has; `null` when there is no valid word to count. */
   readonly length: number | null;
-  /** §21.2: the highest *printed* letter value; `null` when there is no word to read it off. */
-  readonly highest: number | null;
 }
 
 /** One comparison step of the ladder: its name, and the number it ranks a seat by. */
@@ -133,46 +128,33 @@ interface ComparisonStep {
   readonly valueOf: (contestant: Contestant) => number | null;
 }
 
-/** §21's three comparison steps, in the order the rules apply them. The draw follows them. */
+/**
+ * §21's comparison steps, in the order the rules apply them. The draw follows them.
+ *
+ * The rules revision left the ladder these two word steps — the final score, then the
+ * letter count — and everything they leave tied goes to §21.3.
+ */
 const COMPARISON_STEPS: readonly ComparisonStep[] = [
   { step: "final-score", valueOf: (contestant) => contestant.score },
   { step: "word-length", valueOf: (contestant) => contestant.length },
-  { step: "highest-letter", valueOf: (contestant) => contestant.highest },
 ];
 
 /**
- * What a drawn tile is worth in §21.3: the value printed on it, with both faces counting for
- * a two-letter tile, as §21.3 specifies ("use the combined printed value").
+ * What a drawn tile is worth in §21.3: the value printed on the face it shows.
  *
- * That covers every tile the bag can hold: a sequence tile prints T and H, a choice tile
- * prints both of its faces, and a single letter prints one. A choice pair whose faces are
- * worth different amounts — the rules' Q/K — is therefore drawn at Q+K, not at the face a
- * player would have picked, because a draw has no face to pick.
+ * §21's "The Draw's Pool" draws from the single-letter bag, so a tile the ladder draws is a
+ * single letter and its value is its `points`. The two-letter shapes the wire can carry are
+ * valued at both their faces, because a draw holding one would have no face to pick — the
+ * rules' Q/K would be drawn at Q + K.
  *
  * Exported because it is the other half of what §21.3 leaves open, alongside the pool: a
  * reveal that shows the draw should value it the way the ladder did.
  */
 export function showdownDrawValue(tile: Tile): number {
-  if ("sequenceLetter" in tile) {
-    return tile.points + tile.sequencePoints;
-  }
   if ("alternativeLetter" in tile) {
     return tile.points + tile.alternativePoints;
   }
   return tile.points;
-}
-
-/** §21.2's number: the highest value printed on any of the word's letters, multipliers aside. */
-function highestPrinted(letters: readonly WordLetterScore[]): number | null {
-  let highest: number | null = null;
-
-  for (const letter of letters) {
-    if (highest === null || letter.baseValue > highest) {
-      highest = letter.baseValue;
-    }
-  }
-
-  return highest;
 }
 
 /** One seat's number at one step: the value it offered, or `null` when it had none to offer. */
@@ -197,7 +179,6 @@ interface Subgroup {
 export function rankShowdown({
   entries,
   rng,
-  twoLetterDrawTiles = true,
   exhaustedDrawPolicy = "throw",
 }: RankShowdownOptions): ShowdownRanking {
   if (entries.length === 0) {
@@ -215,12 +196,9 @@ export function rankShowdown({
   let drawRound = 0;
 
   const drawTile = (): Tile => {
-    pool ??= shuffle(
-      showdownDrawPool(twoLetterDrawTiles),
-      // The configuration is read once, at the first draw, so a pool cannot be swapped
-      // out from under a tie-break partway through.
-      rng,
-    );
+    // The pool is shuffled once, on the first tile the tie-break needs, so every later
+    // round takes the next tile of the same bag rather than a fresh order.
+    pool ??= shuffle(showdownDrawPool(), rng);
 
     const tile = pool[drawnTiles];
     if (tile === undefined) {
@@ -319,24 +297,38 @@ export function rankShowdown({
     }
   };
 
-  /** §21.3: one tile each, highest printed value first, repeated until the tie is broken. */
-  const draw = (group: readonly Contestant[]): void => {
+  /**
+   * §21.3's draw: one tile each, highest printed value first, and a round's tile **adds** to
+   * what a seat has already drawn.
+   *
+   * The seats that share the highest total draw on — a seat on a lower total has already
+   * lost the place they are drawing for — and any seats still tied among themselves draw on
+   * for their own places. So `totals` rides down through every round of the group: each
+   * comparison reports the seats' running totals rather than the tile the round happened to
+   * draw. Drawing goes on until one seat leads.
+   */
+  const draw = (
+    group: readonly Contestant[],
+    totals: Map<Contestant, number> = new Map(),
+  ): void => {
     drawRound += 1;
 
     // The pool is built here as well as inside `drawTile`, so that `"tie"` asks its question
     // of the same shuffled pool `"throw"` would have drawn from — and so that a tie the
     // pool cannot serve is settled before any tile of this round is taken.
-    pool ??= shuffle(showdownDrawPool(twoLetterDrawTiles), rng);
+    pool ??= shuffle(showdownDrawPool(), rng);
     if (exhaustedDrawPolicy === "tie" && pool.length - drawnTiles < group.length) {
       placeTied(group);
       return;
     }
 
     // One draw per still-tied seat, in the group's order — seat order, all the way down.
-    const ranked: RankedSeat[] = group.map((contestant) => ({
-      contestant,
-      value: showdownDrawValue(drawTile()),
-    }));
+    const ranked: RankedSeat[] = group.map((contestant) => {
+      const total = (totals.get(contestant) ?? 0) + showdownDrawValue(drawTile());
+      totals.set(contestant, total);
+
+      return { contestant, value: total };
+    });
 
     const { values, subgroups } = split(ranked);
     comparisons.push({ step: "tile-draw", round: drawRound, values, advanced: idsOf(subgroups[0]) });
@@ -347,8 +339,9 @@ export function rankShowdown({
         place(only, "tile-draw", subgroup.value);
         continue;
       }
-      // Still tied on the draw: §21.3 says repeat until there is a winner.
-      draw(subgroup.members);
+      // Still tied on the highest total: §21.3 says those seats draw again, adding to what
+      // they have already drawn.
+      draw(subgroup.members, totals);
     }
   };
 
@@ -365,7 +358,7 @@ export function rankShowdown({
     const ranked = group.map((contestant) => ({ contestant, value: step.valueOf(contestant) }));
     const { values, subgroups } = split(ranked);
 
-    // A step none of these seats can be compared at — §21.1 and §21.2 read a word, and a
+    // A step none of these seats can be compared at — §21's word steps read a word, and a
     // seat with no valid word has none (§11) — is not a decision, so it is not recorded as
     // one, and the group carries on to the step that can separate it.
     if (subgroups.length === 1 && (subgroups[0]?.value ?? null) === null) {
@@ -386,7 +379,6 @@ export function rankShowdown({
       entry,
       score: entry.word?.total ?? 0,
       length: entry.word?.letters.length ?? null,
-      highest: entry.word === undefined ? null : highestPrinted(entry.word.letters),
     }));
 
   // A field of one has nothing to tie with: §7's score is the whole ranking, and no tile is

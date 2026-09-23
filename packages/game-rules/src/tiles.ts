@@ -14,8 +14,8 @@ import type { Tile } from "@wordpoker/contracts";
 
 import { LETTER_VALUES, type Letter } from "./letters";
 
-/** How many tiles a fresh bag holds: 98 single letters plus the two two-letter tiles. */
-export const TILE_BAG_SIZE = 100;
+/** How many tiles a fresh bag holds: the 98 single letters of §6, and nothing else. */
+export const TILE_BAG_SIZE = 98;
 
 /**
  * Raised when a draw asks for more tiles than the bag still holds.
@@ -72,33 +72,14 @@ const SINGLE_LETTER_TILES: readonly (readonly [letter: Letter, copies: number])[
 ];
 
 /**
- * The two two-letter choice tiles, as
- * `[letter, alternativeLetter, points, alternativePoints]`.
- *
- * A choice tile plays as either of its faces, and the face the player picked is the one
- * that scores (§10), so each face carries its own value rather than a single number for
- * the tile. Both pairs shipped here happen to be equal-valued — A/E are 1 and 1, T/S are
- * 2 and 2 — and the rules' other pairs (Q/K) are not, which is why the field exists. They
- * are bag members like any other, which is what caps a hand at two of them.
- */
-const TWO_LETTER_TILES: readonly (readonly [
-  letter: string,
-  alternativeLetter: string,
-  points: number,
-  alternativePoints: number,
-])[] = [
-  ["A", "E", 1, 1],
-  ["T", "S", 2, 2],
-];
-
-/**
  * Builds a fresh, unshuffled bag of {@link TILE_BAG_SIZE} tiles.
  *
- * Single letters come out A–Z, each letter's copies numbered from 1 (`A-1` … `A-9`), then
- * the two two-letter tiles (`AE-1`, `TS-1`). The bag's order is therefore a property of
- * the table, not of when tiles were built, and the ids are built from the letter rather
- * than a running counter so a tile stays identifiable in a log, a test failure, or a
- * serialize-and-inspect: `#37` would say nothing about what it is.
+ * Single letters come out A–Z, each letter's copies numbered from 1 (`A-1` … `A-9`). The bag
+ * holds single letters only (ADR 0005): the deal places choice tiles from the table's pair
+ * pool, so nothing two-letter is ever a bag member (`./special-tiles`). The bag's order is
+ * therefore a property of the table, not of when tiles were built, and the ids are built from
+ * the letter rather than a running counter so a tile stays identifiable in a log, a test
+ * failure, or a serialize-and-inspect: `#37` would say nothing about what it is.
  *
  * @returns A new array of new tile objects every call — two tables must never share tile
  *   objects, because a bag is mutable state in the hands of whoever receives it.
@@ -111,16 +92,6 @@ export function createTileBag(): Tile[] {
     for (let copy = 1; copy <= copies; copy += 1) {
       bag.push({ id: `${letter}-${copy}`, letter, points });
     }
-  }
-
-  for (const [letter, alternativeLetter, points, alternativePoints] of TWO_LETTER_TILES) {
-    bag.push({
-      id: `${letter}${alternativeLetter}-1`,
-      letter,
-      points,
-      alternativeLetter,
-      alternativePoints,
-    });
   }
 
   return bag;

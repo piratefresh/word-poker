@@ -1,26 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { Tile, TilePlayResolution } from "@wordpoker/contracts";
+import type { TilePlayResolution } from "@wordpoker/contracts";
 
 import { scoreWord } from "../src/scoring";
-
-/**
- * Builds a tile the way the bag deals one: a single letter, or — when a second face is
- * given — the choice tile shape `@wordpoker/contracts` pins, with both faces valued.
- */
-function tile(letter: string, points: number, alternativeLetter?: string): Tile {
-  if (alternativeLetter === undefined) {
-    return { id: letter, letter, points };
-  }
-  return {
-    id: `${letter}/${alternativeLetter}`,
-    letter,
-    points,
-    alternativeLetter,
-    alternativePoints: points,
-  };
-}
 
 /** The shape the build step hands to scoring: a tile's letters, each with its own value. */
 function played(
@@ -67,17 +50,9 @@ describe("scoreWord — §7 step 1: letter values", () => {
     );
   });
 
-  it("scores a sequence tile's two letters independently", () => {
-    // TH prints T (2) and H (5): the tile is worth both letters, not one of them doubled.
-    const score = scoreWord([played("TH-1", [["T", 2], ["H", 5]])]);
-
-    assert.equal(score.letterScore, 7);
-    assert.deepEqual(score.letters.map((letter) => letter.letter), ["T", "H"]);
-  });
-
   it("scores only the face a choice tile played", () => {
     // The two faces of a Q/K pair are not equal: playing the K carries K's 5, and the Q's
-    // 10 is never on this word to score.
+    // 10 is never on this word to score (§10).
     const score = scoreWord([played("QK-1", [["K", 5]])]);
 
     assert.equal(score.letterScore, 5);
@@ -104,12 +79,15 @@ describe("scoreWord — §7 step 2: multipliers", () => {
     ]);
   });
 
-  it("applies the multiplier to every letter a sequence tile prints", () => {
-    // §9: the multiplier belongs to the physical tile, so both of TH's faces carry it.
-    const score = scoreWord([played("TH-1", [["T", 2], ["H", 5]], "double-letter")]);
+  it("applies the multiplier to the face a choice tile played (§9)", () => {
+    // §9: the multiplier belongs to the physical tile, and §10 makes it apply to the face that
+    // was played — so a doubled Q/K played as K is worth K's 5 twice, not Q's 10.
+    const score = scoreWord([played("QK-1", [["K", 5]], "double-letter")]);
 
-    assert.equal(score.letterScore, 14);
-    assert.deepEqual(score.letters.map((letter) => letter.value), [4, 10]);
+    assert.equal(score.letterScore, 10);
+    assert.deepEqual(score.letters, [
+      { letter: "K", baseValue: 5, multiplier: "double-letter", value: 10 },
+    ]);
   });
 
   it("leaves a tile without a multiplier at its printed value", () => {
@@ -139,32 +117,33 @@ describe("scoreWord — §7 step 3: the Full Rack Bonus", () => {
     assert.equal(score.total, 28);
   });
 
-  it("counts physical tiles, not letters, in both directions", () => {
-    // Seven tiles printing eight letters: TH is one tile, so the rack is complete.
+  it("counts the tiles played, so seven earn the bonus and six do not", () => {
+    // §7.3: the rack is the two private tiles and the five community ones, and one letter per
+    // tile (§10) means a full rack is a seven-letter word — the longest §12 allows.
     const sevenTiles = scoreWord([
-      played("TH-1", [["T", 2], ["H", 5]]),
-      played("A-1", [["A", 1]]),
       played("W-1", [["W", 5]]),
       played("O-1", [["O", 1]]),
-      played("E-1", [["E", 1]]),
       played("R-1", [["R", 2]]),
-      played("S-1", [["S", 2]]),
+      played("K-1", [["K", 5]]),
+      played("M-1", [["M", 4]]),
+      played("A-1", [["A", 1]]),
+      played("T-1", [["T", 2]]),
     ]);
 
-    assert.equal(sevenTiles.letters.length, 8);
+    assert.equal(sevenTiles.letters.length, 7);
     assert.equal(sevenTiles.fullRackBonus, 10);
 
-    // Six tiles printing seven letters: one tile left behind costs the bonus.
+    // One tile left behind costs the bonus, whatever the six letters are worth.
     const sixTiles = scoreWord([
-      played("TH-1", [["T", 2], ["H", 5]]),
-      played("A-1", [["A", 1]]),
       played("W-1", [["W", 5]]),
       played("O-1", [["O", 1]]),
-      played("E-1", [["E", 1]]),
       played("R-1", [["R", 2]]),
+      played("K-1", [["K", 5]]),
+      played("M-1", [["M", 4]]),
+      played("A-1", [["A", 1]]),
     ]);
 
-    assert.equal(sixTiles.letters.length, 7);
+    assert.equal(sixTiles.letters.length, 6);
     assert.equal(sixTiles.fullRackBonus, 0);
   });
 });

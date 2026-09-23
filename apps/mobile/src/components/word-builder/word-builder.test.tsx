@@ -28,10 +28,10 @@ const PRIVATE_TILES: readonly Tile[] = [
   },
 ];
 
-/** The board as a street leaves it: a sequence tile, a slot the next street fills, and a
+/** The board as a street leaves it: a choice tile, a slot the next street fills, and a
  *  doubled letter. */
 const BOARD: readonly (Tile | null)[] = [
-  { id: "c-th", letter: "T", points: 1, sequenceLetter: "H", sequencePoints: 4 },
+  { id: "c-ts", letter: "T", points: 1, alternativeLetter: "S", alternativePoints: 1 },
   null,
   { id: "c-l", letter: "L", points: 1, multiplier: "double-letter" },
 ];
@@ -57,7 +57,7 @@ const SCORE: WordScore = {
 const FULL_RACK: WordScore = { ...SCORE, fullRackBonus: 10, total: 13 };
 
 /** The strip's tiles, in the order the strip draws them for those fixtures. */
-const STRIP = ["p-a", "p-ae", "c-th", "c-l"];
+const STRIP = ["p-a", "p-ae", "c-ts", "c-l"];
 
 async function renderBuilder(overrides: Partial<WordBuilderProps> = {}) {
   const props = builderProps(overrides);
@@ -101,7 +101,7 @@ function stripOrder(view: RenderResult): readonly string[] {
     .map((tile) => String(tile.props.testID).replace("word-builder-tile-", ""));
 }
 
-/** The letters a draft spells, as the engine would report them: a sequence prints both (§10). */
+/** The letters a draft spells, as the engine would report them: one letter per tile (§10). */
 function spell(community: readonly (Tile | null)[], plays: readonly TilePlay[]): string {
   const dealt = [...PRIVATE_TILES, ...community.filter((tile) => tile !== null)];
 
@@ -109,7 +109,6 @@ function spell(community: readonly (Tile | null)[], plays: readonly TilePlay[]):
     .flatMap((play) => {
       const tile = dealt.find((candidate) => candidate.id === play.tileId);
       if (tile === undefined) return [];
-      if ("sequenceLetter" in tile) return [`${tile.letter}${tile.sequenceLetter}`];
       return [play.chosenFace ?? tile.letter];
     })
     .join("");
@@ -183,17 +182,18 @@ describe("<WordBuilder />", () => {
     await fireEvent.press(view.getByTestId("word-builder-face-p-ae-E"));
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "p-ae", chosenFace: "E" }]);
 
-    // A sequence tile plays both letters in the printed order, so it names no face.
-    await fireEvent.press(view.getByTestId("word-builder-tile-c-th"));
-    expect(onDraft).toHaveBeenCalledWith([{ tileId: "c-th" }]);
+    // A choice tile's body plays the face it prints first, and its chips name the other one (§10).
+    await fireEvent.press(view.getByTestId("word-builder-tile-c-ts"));
+    expect(onDraft).toHaveBeenCalledWith([{ tileId: "c-ts", chosenFace: "T" }]);
   });
 
   test("takes a played tile back out on a tap, and reads it as held while it is in", async () => {
     const { onDraft, view } = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
 
-    // Held tiles are the lit ones, and they say what a tap would do to them.
+    // Held tiles are the lit ones, and they say what a tap would do to them — a choice tile
+    // naming the face the word is playing (§39).
     expect(view.getByTestId("word-builder-tile-p-ae").props.accessibilityLabel).toBe(
-      "A or E, 1 point, in your word, tap to take it back",
+      "A or E, 1 point, playing E, in your word, tap to take it back",
     );
     expect(StyleSheet.flatten(view.getByTestId("word-builder-tile-p-ae").props.style).opacity).not.toBe(
       opacity.muted,
@@ -257,13 +257,13 @@ describe("<WordBuilder />", () => {
     try {
       const { onDraft, view } = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
       // Each tile sits where it was dealt: the word is p-ae and c-l, but neither jumps the strip.
-      expect(stripOrder(view)).toEqual(["p-a", "p-ae", "c-th", "c-l"]);
+      expect(stripOrder(view)).toEqual(["p-a", "p-ae", "c-ts", "c-l"]);
 
       await fireEvent.press(view.getByTestId("word-builder-shuffle"));
 
       // The word's own tiles keep the places they sit in — a shuffle is not an undo — and the
       // rest are dealt around them.
-      expect(stripOrder(view)).toEqual(["c-th", "p-ae", "p-a", "c-l"]);
+      expect(stripOrder(view)).toEqual(["c-ts", "p-ae", "p-a", "c-l"]);
       expect(onDraft).not.toHaveBeenCalled();
     } finally {
       random.mockRestore();
@@ -278,12 +278,12 @@ describe("<WordBuilder />", () => {
       const view = await render(<Rack boards={[BOARD, [...BOARD, { id: "c-z", letter: "Z", points: 10 }]]} />);
 
       await fireEvent.press(view.getByTestId("word-builder-shuffle"));
-      expect(stripOrder(view)).toEqual(["p-ae", "c-th", "c-l", "p-a"]);
+      expect(stripOrder(view)).toEqual(["p-ae", "c-ts", "c-l", "p-a"]);
 
       // A redraw that changes the tiles — the case the MVP's builder merged for — leaves the
       // seat's arrangement alone, and the street's new tile lands at the end of the strip.
       await fireEvent.press(view.getByTestId("next-street"));
-      expect(stripOrder(view)).toEqual(["p-ae", "c-th", "c-l", "p-a", "c-z"]);
+      expect(stripOrder(view)).toEqual(["p-ae", "c-ts", "c-l", "p-a", "c-z"]);
     } finally {
       random.mockRestore();
     }
@@ -353,7 +353,7 @@ describe("<WordBuilder />", () => {
       plays: [
         { tileId: "p-a" },
         { tileId: "p-ae" },
-        { tileId: "c-th" },
+        { tileId: "c-ts" },
       ],
       score: SCORE,
       word: "AE",
@@ -366,7 +366,6 @@ describe("<WordBuilder />", () => {
 
   test.each([
     ["not-in-dictionary", "Not in the dictionary"],
-    ["two-letter-split", "A two-letter tile keeps its letters together"],
     ["timer-expired", "The window closed"],
     ["tile-reused", "Each tile plays once"],
   ] as const)("reads the %s refusal as a line, not a wire string", async (reason, copy) => {
