@@ -61,9 +61,11 @@ revealed community tiles, word-window status, and the payout result.
 
 The room sends each connection a separate `privateState` event containing that seat's rack and
 word draft. The synchronized community is sliced to the engine's revealed count, so unrevealed
-tiles never cross the public boundary. A disconnected actor is folded when its turn is reached;
-the hand does not pause for a missing client. An idle actor is auto-checked or auto-folded by the
-server's configurable turn clock, and receives a targeted `turn-timeout` rejection event.
+tiles never cross the public boundary. A disconnected actor keeps its seat and runs the same turn
+clock as a connected one, so the hand does not pause for a missing client. An expired turn always
+folds the actor (§15, ADR 0006) — whatever it owed, whether or not it could have checked — and a
+connected actor receives a targeted `turn-timeout` rejection event. A seat that is really gone, by
+a clean leave or an expired reconnect hold, is folded out of the running hand (§28/§29).
 
 Every deadline is checked on the room's own timestep loop, so a test paces the room by choosing
 the tick. The room options are `turnDuration` (60 s default), `tickMs` (50 ms default),

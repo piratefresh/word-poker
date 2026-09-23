@@ -464,7 +464,12 @@ function applyBetting(
   return rollStreets({ ...state, seats: step.seats, betting: step.round }, nowMs);
 }
 
-/** Apply the server-owned deadline action to the current betting actor. */
+/**
+ * Apply the server-owned deadline action to the current betting actor. §15 and ADR 0006: an
+ * expired turn folds, always — even a seat that owed nothing and could have checked, and even
+ * one that has dropped, which runs its own clock before it folds (§29). Pre-selecting check
+ * (§36) is how a player avoids the clock; nothing here auto-checks on the seat's behalf.
+ */
 function timeoutTurn(state: OfflineState, nowMs: number): OfflineState {
   if (state.betting === null || state.toActIndex === null) {
     throw new OfflineActionError(`no betting turn is open at ${where(state)}`);
@@ -475,21 +480,14 @@ function timeoutTurn(state: OfflineState, nowMs: number): OfflineState {
     );
   }
 
-  const actor = state.seats[state.toActIndex];
-  if (actor === undefined) {
-    throw new OfflineActionError("the betting turn names no seat");
-  }
-
-  const action: BettingAction =
-    actor.committedRound === state.betting.currentBet
-      ? { type: "check", playerId: actor.id }
-      : { type: "fold", playerId: actor.id };
-  return applyBetting(state, action, nowMs, true);
+  // The clock is this action's whole difference from `foldTurn`: the outcome is the same fold.
+  return foldTurn(state, nowMs);
 }
 
-/** §29's server-owned fold of the acting seat. The seat is not there to act, so the turn's
- * deadline cannot make the fold illegal — unlike a voluntary fold, this is legal at any point
- * of the clock, including after it has run out. */
+/** §28/§29's server-owned fold of the acting seat: it is gone for good — a clean leave, or a
+ * reconnect hold that ran out — rather than merely idle. The seat is not there to act, so the
+ * turn's deadline cannot make the fold illegal — unlike a voluntary fold, this is legal at any
+ * point of the clock, including after it has run out. */
 function foldTurn(state: OfflineState, nowMs: number): OfflineState {
   if (state.betting === null || state.toActIndex === null) {
     throw new OfflineActionError(`no betting turn is open at ${where(state)}`);

@@ -349,21 +349,19 @@ describe("reduce — the betting round", () => {
     assert.equal(state.endsAtMs, NOW + 5_000 + OFFLINE_TURN_MS);
   });
 
-  it("auto-checks the big blind's option when its turn expires", () => {
+  it("folds the big blind's option when its turn expires, though it owed nothing (§15, ADR 0006)", () => {
     const state = play(dealHand(), [
       { type: "call", playerId: "mira" },
       { type: "call", playerId: "hero" },
       { type: "call", playerId: "ellis" },
     ]);
 
-    // The big blind owes nothing, so an idle clock there checks rather than folding — and that
-    // check is what closes the round (§15), so the street rolls with every seat matched.
+    // The big blind owes nothing and could have checked; the rules revision folds it anyway, so
+    // the round closes on the fold rather than on a check the seat never chose.
     const timedOut = reduce(state, { type: "timeoutTurn" }, state.endsAtMs);
 
-    assert.equal(timedOut.seats[BIG_BLIND_SEAT]?.folded, false);
-    assert.equal(timedOut.seats[BIG_BLIND_SEAT]?.committedHand, BIG_BLIND);
-    assert.equal(timedOut.phase, "flop");
-    assert.deepEqual(timedOut.seats.map((seat) => seat.committedRound), [0, 0, 0, 0]);
+    assert.equal(timedOut.seats[BIG_BLIND_SEAT]?.folded, true);
+    assert.equal(timedOut.phase, "flop", "the seats that matched roll the street on");
   });
 
   it("auto-folds an idle seat that owes chips when its turn expires", () => {

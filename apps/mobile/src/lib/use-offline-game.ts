@@ -408,8 +408,8 @@ export function useOfflineGame({
   }, [act, state.wordWindow, state.endsAtMs]);
 
   // A betting turn belongs to the table's clock too: when the hero's clock runs out the engine's
-  // own `timeoutTurn` settles the turn — it checks when the committed amount already matches the
-  // bet and folds otherwise — and the bots answer on their beat as they answer a tap.
+  // own `timeoutTurn` folds the seat, whatever it owed and whether or not it could have checked
+  // (§15, ADR 0006) — and the bots answer on their beat as they answer a tap.
   useEffect(() => {
     const index = state.toActIndex;
     if (state.betting === null || index === null || state.seats[index]?.id !== HERO_ID) return;
