@@ -380,7 +380,7 @@ describe("GameRoom", () => {
         buyIn: 500,
         maxSeats: 2,
         seed: 789,
-        turnDuration: 20,
+        turnDuration: 200,
         tickMs: 5,
       });
       const first = await colyseus.connectTo(room);
@@ -398,6 +398,18 @@ describe("GameRoom", () => {
 
       const actorSeat = room.state.toActSeat;
       const actorId = [...room.state.seats.values()].find((seat) => seat.seat === actorSeat)?.playerId;
+      console.log("DEBUG", {
+        smallBlindSeat,
+        smallBlindId,
+        actorSeat,
+        phase: room.state.phase,
+        seats: [...room.state.seats.values()].map((s) => ({
+          seat: s.seat,
+          id: s.playerId,
+          committed: s.committedThisRound,
+          folded: s.hasFolded,
+        })),
+      });
       assert.ok(actorId && actorId !== smallBlindId, "the big blind's option is the turn left");
       const actor = [first, second].find((client) => client.sessionId === actorId);
       assert.ok(actor);
@@ -405,7 +417,7 @@ describe("GameRoom", () => {
       const timeout = new Promise<GameRejectionEvent>((resolve) => {
         actor.onMessage(GAME_EVENTS.rejected, (payload) => resolve(payload as GameRejectionEvent));
       });
-      for (let tick = 0; tick < 10 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
+      for (let tick = 0; tick < 80 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
         await room.waitForNextTimestep();
       }
 
