@@ -42,13 +42,6 @@ export interface PotContest {
 }
 
 /**
- * How far apart two layers' draw rngs are kept. Any stride works as long as it never lets
- * two layers' streams collide; this one is odd and unrelated to the seed salt, so layer `i`
- * names a different stream than the hand's own.
- */
-const POT_SEED_STRIDE = 0x9e37;
-
-/**
  * Layers a hand's committed chips into the main pot and its side pots (§25).
  *
  * Levels are the distinct `committedHand` amounts, walked ascending; each level's slice is
@@ -182,10 +175,12 @@ export function resolvePayout<Seat extends BettingSeatState>({
   const survivor = foldOut ? seats.findIndex((seat) => !seat.folded && !seat.sittingOut) : -1;
   const words = new Map(judged.map((entry) => [entry.seat, entry]));
 
-  pots.forEach((pot, index) => {
-    // Each layer is ranked independently (§25), from its own draw stream: pot `i`'s rng is
-    // the hand's draw seed stepped `i` strides, so the main pot of a one-layer hand draws
-    // from exactly the stream the reveal's ladder does.
+  pots.forEach((pot) => {
+    // Each layer is ranked independently (§25) — but only its *eligibility* is its own. §21.3's
+    // draw is a property of the tied seats and their words, not of the pot, so every pot the
+    // same tied group contests draws the same tiles: two seats with identical words cannot win
+    // the main pot and lose the side pot on two different draws, and the reveal's ladder, which
+    // draws this same stream, can never name a different winner than the pot does.
     const ranking = foldOut
       ? null
       : rankShowdown({
@@ -200,7 +195,7 @@ export function resolvePayout<Seat extends BettingSeatState>({
               },
             ];
           }),
-          rng: createRng(handSeed + DRAW_SEED_SALT + index * POT_SEED_STRIDE),
+          rng: createRng(handSeed + DRAW_SEED_SALT),
           exhaustedDrawPolicy: "tie",
         });
 
