@@ -59,14 +59,18 @@ export function LetterTile({
   tile,
   size,
   dimmed = false,
+  dealDelayMs = 0,
 }: {
   tile: LetterTileData;
   size: number;
   dimmed?: boolean;
+  /** The beat this tile waits for before it deals, from the row it sits in. */
+  dealDelayMs?: number;
 }) {
   return (
     <Tile
-      animation="none"
+      animation="deal"
+      dealDelayMs={dealDelayMs}
       dimmed={dimmed}
       ownership="neutral"
       side="front"
@@ -80,6 +84,23 @@ export function EmptyTile({ size }: { size: number }) {
   return <View style={[styles.emptyTile, { width: size, height: size * 1.18 }]} />;
 }
 
+/** The flop turns three tiles together; every street after it turns one. */
+const FLOP_TILES = 3;
+
+/**
+ * The beat a community slot deals on: the slot's place in its own batch. The engine turns the
+ * flop's three at once and one tile on each later street, so a slot's beat is its index inside
+ * that batch and nothing else — and, read off the slot rather than remembered per render, it is
+ * the same on every later render, so a later street deals its own tile and never an earlier one.
+ *
+ * The batch is derived from the deal's shape (`revealed` is 0, 3, 4 or 5) rather than from how
+ * many slots happen to be filled: every slot a batch fills has all the slots before it filled
+ * too, so a count of them would read 0 for all three of the flop's tiles.
+ */
+function communityDealDelayMs(index: number): number {
+  return (index < FLOP_TILES ? index : 0) * duration.tileStagger;
+}
+
 export function CommunityStrip({ tiles }: { tiles: readonly (LetterTileData | null)[] }) {
   const five = Array.from({ length: 5 }, (_, index) => tiles[index] ?? null);
   return (
@@ -90,9 +111,14 @@ export function CommunityStrip({ tiles }: { tiles: readonly (LetterTileData | nu
       <View style={styles.tileRow}>
         {five.map((tile, index) =>
           tile ? (
-            <LetterTile key={tile.id} tile={tile} size={42} />
+            <LetterTile
+              dealDelayMs={communityDealDelayMs(index)}
+              key={`community-${index}`}
+              size={42}
+              tile={tile}
+            />
           ) : (
-            <EmptyTile key={`community-empty-${index}`} size={42} />
+            <EmptyTile key={`community-${index}`} size={42} />
           ),
         )}
       </View>
@@ -109,13 +135,24 @@ export function PlayerRack({
 }) {
   return (
     <View accessibilityLabel="Your letter rack" style={styles.rack}>
-      {privateTiles.map((tile) => (
-        <LetterTile key={tile.id} tile={tile} size={36} />
+      {privateTiles.map((tile, index) => (
+        <LetterTile
+          dealDelayMs={index * duration.holeStagger}
+          key={tile.id}
+          size={36}
+          tile={tile}
+        />
       ))}
       {Array.from({ length: 5 }, (_, index) => community[index] ?? null).map(
         (tile, index) =>
           tile ? (
-            <LetterTile key={`rack-${tile.id}`} tile={tile} size={36} dimmed />
+            <LetterTile
+              dealDelayMs={communityDealDelayMs(index)}
+              dimmed
+              key={`rack-${index}`}
+              size={36}
+              tile={tile}
+            />
           ) : (
             <EmptyTile key={`rack-empty-${index}`} size={36} />
           ),
