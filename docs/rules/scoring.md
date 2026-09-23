@@ -20,9 +20,9 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 
 ## Tile Bag Distribution
 
-The bag the engine deals from holds **100 tiles**: 98 single-letter tiles in the standard
-English distribution, plus two two-letter choice tiles. Counts below are what the engine
-builds; the bag is shuffled with an injected seed, so the same seed deals the same hand.
+The bag the engine deals from holds **98 single-letter tiles** in the standard English
+distribution. Counts below are what the engine builds; the bag is shuffled with an injected
+seed, so the same seed deals the same hand.
 
 | Tile | Letters | Count | Points | Notes                                                                |
 | ---- | ------- | ----: | -----: | -------------------------------------------------------------------- |
@@ -52,16 +52,16 @@ builds; the bag is shuffled with an injected seed, so the same seed deals the sa
 | X    | X       |     1 |      8 |                                                                      |
 | Y    | Y       |     2 |      5 |                                                                      |
 | Z    | Z       |     1 |     10 |                                                                      |
-| A/E  | A or E  |     1 |      1 | Two-letter choice tile — plays as A or E, scores the value of the chosen face |
-| T/S  | T or S  |     1 |      2 | Two-letter choice tile — plays as T or S, scores the value of the chosen face |
 
-**Total: 100 tiles** (98 single-letter + 2 two-letter).
+**Total: 98 tiles**, all single-letter.
 
-The bag holds the two two-letter **choice** tiles and no fixed-sequence tiles: those are
-placed by the deal, and the combined cap of three two-letter tiles in a hand is enforced
-there — [Two-Letter Tiles](tiles.md) §10.
+The bag holds no two-letter tiles. Choice tiles are placed by the deal from the table's
+pair pool, which is where §10's frequency and its cap of three are enforced —
+[Choice Tiles](tiles.md) §10.
 
-<!-- Contract status: the fixed-sequence tile shape and the letter-multiplier field exist on
+<!-- Not yet in code: the engine still holds A/E and T/S in a 100-tile bag and places
+     fixed-sequence tiles at deal time; §10's choice-only deal replaces both.
+     Contract status: the fixed-sequence tile shape and the letter-multiplier field exist on
      the tile contract (`packages/contracts/src/tiles.ts`: `SequenceTile`, `LetterMultiplier`);
      word-building honours §10 (`packages/game-rules/src/building.ts`, STO-301/STO-329) and
      §6–§9 scoring is implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's
@@ -99,7 +99,8 @@ Possible multiplier tiles include:
 - Double Letter
 - Triple Letter
 
-The multiplier applies to every letter printed on that tile.
+The multiplier applies to the letter the tile plays: on a two-letter choice tile, the face
+the player picked (§10).
 
 ### Double Letter Example
 
@@ -130,9 +131,9 @@ The seven available tiles are:
 - Two private tiles
 - Five community tiles
 
-A two-letter tile still counts as one tile for the Full Rack Bonus.
+A two-letter choice tile counts as one tile, and plays one letter, for the Full Rack Bonus.
 
-The player's submitted word may contain more than seven letters only when two-letter tiles are present, but every physical tile must be used to receive the Full Rack Bonus.
+Every tile plays exactly one letter (§10), so a Full Rack word is always seven letters long.
 
 ## Final Score Formula
 
@@ -189,29 +190,25 @@ Final Score: **28 points**
 
 Each eligible tile has a chance to receive a multiplier.
 
-Recommended starting configuration:
-
-- Approximately 15% chance for a tile to become a Double Letter tile
-- Triple Letter tiles should be significantly rarer
-- High-value letters may receive a slightly higher chance of becoming special tiles
-
-The final probabilities should be configurable for balance testing.
+The product spec recommends roughly a 15% Double Letter chance, Triple Letters
+"significantly rarer", and a slightly higher chance for high-value letters; the defaults
+below put numbers on that recommendation.
 
 ### How the deal rolls them
 
-Every physical tile the deal puts on the table is eligible — private or community, single,
-choice, or sequence — and the roll happens once per tile at deal time, on the deal's seeded
+Every physical tile the deal puts on the table is eligible — private or community, single
+or choice — and the roll happens once per tile at deal time, on the deal's seeded
 generator (`packages/game-rules/src/special-tiles.ts`). A tile carries at most one
 multiplier: §9 does not stack them.
 
-The defaults, which put numbers on the recommended configuration above:
+The defaults:
 
-- **Double Letter**: 15% per tile. A high-value tile — its highest printed face worth 8
-  points or more (§6: J, X, Q, Z) — rolls its double at 20% instead.
+- **Double Letter**: 15% per tile. A high-value tile — its highest printed face worth 5
+  points or more (§6: F, H, V, W, Y, K, J, X, Q, Z) — rolls its double at 20% instead.
 - **Triple Letter**: 3% per tile, read first, so a tile that triples never also doubles.
 - Tiles that stay in the deck are not rolled: a multiplier belongs to a tile on the table.
 - Every number here — the two chances and the high-value bump, together with §10's
-  placement pool and target weights — is a table setting, so balance testing changes the
+  pair pool and target weights — is a table setting, so balance testing changes the
   configuration and never the code.
 
 ## Multiplier Rules
@@ -219,6 +216,7 @@ The defaults, which put numbers on the recommended configuration above:
 - A multiplier belongs to the physical tile.
 - The multiplier is visible to the tile's owner or to everyone when it is a community tile.
 - The multiplier applies only when the tile is used.
+- On a choice tile, the multiplier applies to the face the player plays.
 - Unused multiplier tiles provide no points.
 - Multipliers do not multiply the Full Rack Bonus.
 - Multipliers do not stack unless the game explicitly introduces stacked modifiers later.

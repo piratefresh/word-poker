@@ -1,5 +1,7 @@
 # Server-owned betting turn clock
 
+> **Partly superseded by [ADR 0006](0006-betting-timeout-folds.md):** an expired turn now always folds, and a disconnected seat runs the turn clock before it folds. The rest stands.
+
 Online betting turns use a configurable 60-second budget by default. The room owns the deadline,
 and the pure game reducer receives a server-owned `timeoutTurn` action when that deadline expires.
 The action auto-checks a connected seat when its committed amount already matches the current bet;

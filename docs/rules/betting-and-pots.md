@@ -6,46 +6,44 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 
 # 21. Tie-Breaker Rules
 
-Ties are resolved in the following order:
+Seats with equal final scores are separated in this order. A tie-breaker only orders the
+tied seats; it adds nothing to anyone's score.
 
 ## 1. Longest Valid Word
 
 The word containing the most letters wins.
 
-For this tie-breaker, both letters on a two-letter tile count individually.
+A choice tile contributes one letter: the face that was played (§10).
 
-## 2. Highest Single Letter Value
+## 2. (Retired)
 
-Compare the highest-value letter used in each tied word.
-
-Example:
-
-- A word containing Q has a highest letter value of 10.
-- A word containing J has a highest letter value of 8.
-
-The Q word wins.
-
-Tile multipliers do not change the printed letter value for this tie-breaker.
+Earlier rules compared the highest single letter value in each word here. The product spec
+has no such step, so it is no longer part of the ladder. The number is kept so that §21.3
+still names the draw.
 
 ## 3. High-Value Tile Draw
 
-Each tied player receives one random temporary tile.
+Each tied seat draws one random tile. The highest printed value wins.
 
-The player with the highest printed tile value wins.
+If the highest value is still shared, the seats that shared it each draw **another** tile,
+which **adds** to their draw total. The highest total wins.
 
-For two-letter draw tiles, use the combined printed value unless the game configuration disables two-letter tiles in tie-breaker draws.
+### Example
 
-Drawn tiles are discarded after the tie-breaker.
+- Ana and Ben tie on score and on word length.
+- Ana draws A (1). Ben draws A (1). Still tied.
+- Ana draws Z: her total is 1 + 10 = **11**. Ben draws T: his total is 1 + 2 = **3**.
+- Ana wins the tie.
 
-If the draw is still tied, repeat until there is a winner.
+Drawing continues, one tile per still-tied seat, until one seat leads.
 
 ## When No Word Is Valid
 
 A seat whose submission is invalid or missing has no word, and §11 scores it 0. Such seats
 stay in the showdown, so several of them can tie on 0:
 
-- Tie-breakers 1 and 2 both read a word — its length, then its highest printed letter — and a
-  seat with no word has neither, so both steps pass over a group of them.
+- Tie-breaker 1 reads a word's length, and a seat with no word has none, so it passes over
+  a group of them.
 - The high-value tile draw (3) separates them, exactly as it separates any other tie.
 
 Nothing is carried or refunded: the pot goes to the seat the draw picks, and every pot is
@@ -56,18 +54,17 @@ showdown — there is no tie to break, and no tile is drawn.
 
 ## The Draw's Pool
 
-Tie-breaker 3 draws from a freshly shuffled tile bag:
+Tie-breaker 3 draws from a freshly shuffled single-letter bag (§6), so every drawn tile has
+one printed value.
 
-- One tile per still-tied seat each round. The highest printed value wins the round, and the
-  seats that shared it draw again — until one seat is left.
-- A two-letter tile is worth both of its printed faces together (A/E is 2, T/S is 4, TH would
-  be 7). A choice tile has no chosen face in a draw — nothing is played — so both faces count.
-- Drawn tiles are discarded and never return to the pool, so the only way to run out of tiles
-  is to draw the whole bag, which is refused rather than reusing one.
-- A table configuration may disable two-letter tiles in tie-break draws, leaving the
-  single-letter bag as the pool.
+- Drawn tiles are discarded after the tie-breaker and never return to the pool during it, so
+  the only way to run out of tiles is to draw the whole bag, which is refused rather than
+  reusing one.
 
-<!-- Contract status: the ladder is implemented in `packages/game-rules/src/showdown.ts`
+<!-- Not yet in code: `packages/game-rules/src/showdown.ts` still ranks by the retired
+     highest-letter step and restarts a tied draw instead of adding to it, and its pool holds
+     the two-letter tiles.
+     Contract status: the ladder is implemented in `packages/game-rules/src/showdown.ts`
      (`rankShowdown`, STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values
      behind `showdownDrawPool` / `showdownDrawValue`; the ranking's wire shape is
      `packages/contracts/src/showdown.ts`. The no-valid-word case above was resolved by
@@ -77,7 +74,7 @@ Tie-breaker 3 draws from a freshly shuffled tile bag:
 
 # 22. Betting and Table Stack Rules
 
-All bets use only the player's Table Stack.
+All bets, including blinds, use only the player's Table Stack.
 
 Wallet Coins cannot:
 
@@ -86,6 +83,19 @@ Wallet Coins cannot:
 - Complete an all-in
 - Automatically refill a stack
 - Be transferred into the table during an active hand
+
+## Minimum Bet and Raise
+
+The table's minimum bet is its **big blind** (§5).
+
+- The first bet of a later betting round must be at least the big blind.
+- A raise must add at least the larger of the big blind and the previous raise's increment.
+- Pre-flop the big blind is already the Current Bet, so the first raise is to at least two
+  big blinds.
+- A player going all in may bet or raise less than these minimums (§31).
+
+These floors are for the default **No Limit** structure. Pot Limit and Fixed Limit tables
+are [Formats](formats.md) §40.
 
 ## Betting Controls
 
@@ -108,7 +118,7 @@ The Raise Slider:
 - Cannot exceed the player's available Table Stack
 - Must respect the table's minimum raise
 - Must display the total bet amount clearly
-- Must account for chips already committed during the current betting round
+- Must account for chips already committed during the current betting round, blinds included
 
 ## All In
 
@@ -132,6 +142,9 @@ The All In button should display the amount:
 
 The Current Bet is the highest amount committed by any active player during the current betting round.
 
+On the first betting round, the posted big blind is the opening Current Bet, and each blind
+counts as that seat's committed chips for the round.
+
 To Call, a player contributes enough chips to match the Current Bet.
 
 ### Example
@@ -143,6 +156,13 @@ Call amount:
 
 500 − 200 = **300 Coins**
 
+### Blind Example
+
+Blinds: 50 / 100. No one has raised.
+
+- The small blind has committed 50 and calls 100 − 50 = **50 Coins**.
+- The big blind has committed 100, owes nothing, and may check (§15).
+
 If the player's remaining stack is less than the required call amount, the player may call by going all in.
 
 ---
@@ -153,11 +173,12 @@ The winning player receives the pot.
 
 Winnings are added to the player's Table Stack, not directly to the Wallet.
 
-Stacks are not capped after joining.
+Stacks are not capped by winnings. The Buy-In Cap (§2) limits only the Wallet Coins a player
+brings to the table.
 
 ### Example
 
-Original buy-in: 50,000 Coins
+Buy-In Cap: 50,000 Coins
 Current Table Stack before winning: 50,000 Coins
 Pot won: 40,000 Coins
 
@@ -165,36 +186,41 @@ New Table Stack:
 
 50,000 + 40,000 = **90,000 Coins**
 
-The fixed buy-in limits only the amount initially brought to the table.
-
 ---
 
 # 25. Side Pots
 
 Side pots are required when one or more players go all in with different stack sizes.
 
-A player may win only the portions of the pot they were eligible to contest.
+A player who goes all in can win only the portions of the pot they put chips into:
+
+- Everything bet up to the all-in amount forms the **Main Pot**, which every seat still in the
+  hand may win.
+- Chips bet beyond that amount form a **Side Pot**, which only the seats that put chips into
+  it may win.
+- Every seat still plays out the hand and builds a word. Each pot is then awarded separately,
+  to the best word among the seats that may win it.
 
 ## Example
 
-- Player A commits 500 Coins.
-- Player B commits 1,000 Coins.
-- Player C commits 1,000 Coins.
+Three players: Alex, Bree, and Cam.
+
+- Alex has only 30 Coins left and goes all in for 30.
+- Bree and Cam keep betting and each commit 100 in total.
 
 Main Pot:
 
-500 × 3 = 1,500 Coins
-
-Player A, Player B, and Player C may win the Main Pot.
+30 × 3 = **90 Coins** — Alex, Bree, and Cam may win it.
 
 Side Pot:
 
-500 additional Coins from Player B
-500 additional Coins from Player C
+70 more from Bree + 70 more from Cam = **140 Coins** — only Bree and Cam may win it.
 
-Side Pot total: 1,000 Coins
+Words at showdown: Alex 24 points, Bree 15, Cam 14.
 
-Only Player B and Player C may win the Side Pot.
+- Alex has the best word of all three and wins the Main Pot (90).
+- Only Bree and Cam contest the Side Pot. Bree's 15 beats Cam's 14, so Bree wins it (140),
+  even though Alex's word was higher — Alex never put chips into that pot.
 
 Each pot is evaluated independently using the same word scoring and tie-breaker rules.
 
@@ -211,14 +237,16 @@ The winning player:
 - Receives the entire eligible pot
 - Begins the next hand with the awarded chips in their Table Stack
 
-<!-- Contract status: §22–§26 are implemented in the shared engine. The wire vocabulary —
+<!-- Not yet in code: blinds. The betting-round machine still opens every round on checks
+     with a "minimum bet" of 2% of the buy-in (ADR 0001, superseded by ADR 0004).
+     Contract status: §22–§26 are implemented in the shared engine. The wire vocabulary —
      the action union, the refusal reasons, and the pot/seat shapes — is
      `packages/contracts/src/betting.ts` (STO-336). The stack model is
      `packages/game-rules/src/chips.ts` (`commitChips`/`awardChips`, STO-337), and the
-     betting-round machine — legality, the current bet, the no-blinds minimum bet, the raise
+     betting-round machine — legality, the current bet, the minimum bet, the raise
      floor, and the reopen rule for full vs short all-in raises — is
      `packages/game-rules/src/betting.ts` (`applyBettingAction`/`bettingBounds`/`nextActor`,
-     STO-338/STO-339; the no-blinds opening is ADR 0001). §25's layering and settlement are
+     STO-338/STO-339). §25's layering and settlement are
      `packages/game-rules/src/pots.ts` (`buildPots`/`resolvePayout`, STO-340/STO-341), with
      each pot ranked independently and an unbreakable §21.3 tie split evenly — odd chips
      clockwise from the dealer — rather than refused. §26's fold-out skips the window and the

@@ -6,10 +6,10 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 
 # 13. Hand Structure
 
-A complete hand contains the following phases:
+A complete hand runs the following steps, in order:
 
-1. Deal Private Tiles
-2. First Betting Round
+1. Post Blinds and Deal Private Tiles
+2. First Betting Round (Pre-Flop)
 3. Flop
 4. Second Betting Round
 5. Turn
@@ -21,7 +21,7 @@ A complete hand contains the following phases:
 11. Pot Award
 12. Next Hand
 
-There are no blinds or antes.
+Every hand opens with a small blind and a big blind (§5). There is no ante.
 
 ## Offline Flow (vertical slice)
 
@@ -34,9 +34,9 @@ The offline game plays one hand on the client, with no server in the loop:
   community tiles respectively.
 - Each street runs a **real betting round** (§15, §22–§23): seats fold, check, bet, call,
   raise or shove, and the street rolls only when the round closes. Betting is from the Table
-  Stack alone; the offline table seats every player on a fixed 1,000-chip stack with a
-  20-chip minimum bet, while an online table derives its minimum as 2% of its fixed buy-in
-  (ADR 0001), and hands carry their stacks into the next hand.
+  Stack alone; the offline table seats every player on a fixed 1,000-chip stack and plays
+  10 / 20 blinds, while an online table's blinds are 1% / 2% of its Buy-In Cap (§5,
+  ADR 0004), and hands carry their stacks into the next hand.
 - The river's round closes into **Word Building** (§19) instead of paying out: every seat
   still in the hand shares one 60-second window to draft and confirm a word, and the hand
   pays out once every seat has confirmed or run out of time.
@@ -58,22 +58,23 @@ The offline game plays one hand on the client, with no server in the loop:
   deal until that list has loaded.
 - `payout` is the real showdown over those words: every confirmed word is judged against the
   dictionary (§11) and scored by §7, each pot is settled by ranking its own eligible seats
-  with §21's ladder — word length, then highest printed letter, then the §21.3 draw for seats
+  with §21's ladder — word length, then the §21.3 draw for seats
   with nothing left to compare (§25) — and the chips move into the winners' Table Stacks. A
   seat with no valid word is ranked at 0 points, exactly as §11 says.
 
 ---
 
-# 14. Phase 1: Deal Private Tiles
+# 14. Phase 1: Blinds and Deal
 
-Each active player receives two private tiles.
+The small blind and the big blind post their forced bets (§5).
+
+Each active player then receives two private tiles.
 
 Private tiles:
 
 - Are visible only to their owner
 - May contain single letters
-- May contain two-letter tiles
-- May contain choice tiles
+- May contain 0–2 two-letter choice tiles (§10)
 - May contain tile multipliers
 
 Players see their private tiles before making any bet.
@@ -82,13 +83,37 @@ After all private tiles have been dealt, the first betting round begins.
 
 ---
 
-# 15. Phase 2: First Betting Round
+# 15. Phase 2: First Betting Round (Pre-Flop)
 
-Players bet using only the information from their two private tiles.
+Players bet using only the information from their two private tiles. They do not yet know
+the community tiles.
+
+The big blind is the round's opening Current Bet. Action starts with the first active seat
+clockwise from the big blind (heads-up: the small blind) and ends with the big blind.
+
+## Facing the Big Blind or a Raise
+
+The player may:
+
+- Call
+- Raise
+- Fold
+- Go All In
+
+## The Big Blind's Option
+
+If no one has raised when action returns to the big blind, the big blind's own bet is already
+matched. The big blind may:
+
+- Check, which closes the round
+- Raise
+- Go All In
+
+## Later Betting Rounds (Flop, Turn, River)
 
 Available actions depend on the current bet.
 
-## When No Bet Exists
+### When No Bet Exists
 
 The player may:
 
@@ -97,7 +122,7 @@ The player may:
 - Fold
 - Go All In
 
-## When a Bet Exists
+### When a Bet Exists
 
 The player may:
 
@@ -108,16 +133,26 @@ The player may:
 
 Checking is not available when the player must call an existing bet.
 
-### Betting turn clock
+## Betting Turn Clock
 
-Each betting turn has a configurable 60-second budget by default. The server owns this clock and
-auto-actions an idle connected seat when it expires: it checks when the seat owes nothing and folds
-when it owes a call. A disconnected seat is always folded when action reaches it, regardless of
-what it owes. The timeout action is server-owned and cannot be sent by a client.
+Each betting turn has a configurable 60-second budget by default. The server owns this clock.
+When a seat's turn clock expires, the seat is **folded** — whether it is idle or disconnected,
+and even when it owed nothing and could have checked (ADR 0006). Chips it already committed
+stay in the pot. A disconnected seat gets the same clock as a connected one before it folds
+(§29). The timeout action is server-owned and cannot be sent by a client.
+
+A pre-selected action (§36) acts the moment the turn begins, so a seat that pre-selected
+Check does not time out.
+
+<!-- Not yet in code: the engine auto-checks a seat that owes nothing and folds a disconnected
+     seat as soon as action reaches it (ADR 0003). ADR 0006 changes both. -->
+
+## End of a Betting Round
 
 The betting round ends when:
 
-- All remaining players have contributed the same amount, or
+- All remaining players have contributed the same amount — and, pre-flop, the big blind has
+  had its option — or
 - All remaining players except one are all in, or
 - Only one player remains in the hand
 
@@ -132,8 +167,7 @@ All active players may use these tiles.
 The community tiles may contain:
 
 - Single letters
-- Two-letter tiles
-- Choice tiles
+- 0–2 two-letter choice tiles (§10)
 - Double Letter tiles
 - Triple Letter tiles
 
@@ -154,7 +188,7 @@ Available actions include:
 
 The dealer reveals one additional community tile.
 
-There are now four visible community tiles.
+There are now four visible community tiles. The turn tile may be a choice tile.
 
 A new betting round begins.
 
@@ -171,7 +205,7 @@ Players may:
 
 # 18. Phase 5: The River
 
-The dealer reveals the fifth and final community tile.
+The dealer reveals the fifth and final community tile. The river tile may be a choice tile.
 
 Players now have access to:
 
@@ -207,19 +241,15 @@ Players do not have to use a private tile.
 
 Players do not have to use every community tile.
 
+The word is 2 to 7 letters long (§12).
+
 ## Submission Requirements
 
 The player selects the tiles being used and arranges them into a valid word.
 
-Two-letter sequence tiles:
-
-- Must use both letters
-- Must preserve their printed order
-- Cannot be split
-
 Choice tiles:
 
-- Contribute one selected letter
+- Contribute one selected letter (§10)
 - Must clearly show which option the player selected
 
 The player may edit their submission until:
@@ -236,7 +266,7 @@ out of time — and it moves as soon as every seat has confirmed, without waitin
 A submission is accepted for what it plays, not for what it spells. A word that can be built
 from the seat's tiles is locked once the seat confirms it, even when it is not in the
 dictionary: that word scores 0 (§11) rather than unlocking the seat. A submission that cannot
-be built from those tiles — a tile the seat does not hold, a split two-letter tile, the same
+be built from those tiles — a tile the seat does not hold, a choice tile with no face picked, the same
 tile twice, fewer than two letters — is refused outright, and the seat may fix it until its
 time runs out.
 
@@ -245,10 +275,10 @@ time runs out.
 When time expires:
 
 - A confirmed word is locked.
-- An unconfirmed draft may be automatically submitted only if the game explicitly supports auto-submit.
-- Otherwise, no confirmed word results in 0 points.
+- An unconfirmed draft is never submitted: with no confirmed word, the seat scores 0 (§11).
 
-The preferred default is that the player must confirm their word before time expires.
+A room that runs the auto-submit variation ([Formats](formats.md) §40) submits the draft
+instead; no such room is configured today.
 
 ---
 

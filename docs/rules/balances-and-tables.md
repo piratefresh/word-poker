@@ -15,7 +15,7 @@ The player's permanent account balance.
 Wallet Coins are used to:
 
 - Join tables
-- Re-buy after losing a full Table Stack
+- Re-buy or top up, within the table's Buy-In Cap (§2, §27)
 - Receive remaining chips when leaving a table
 
 Wallet Coins cannot be used directly for bets during a game.
@@ -24,14 +24,14 @@ Wallet Coins cannot be used directly for bets during a game.
 
 The chips currently available to the player at a specific table.
 
-All bets, calls, raises, and all-ins must come from the player's Table Stack.
+All bets, calls, raises, blinds, and all-ins must come from the player's Table Stack.
 
-The Table Stack is created when the player pays the table's fixed buy-in.
+The Table Stack is created when the player pays their buy-in.
 
 ### Example
 
 Wallet before joining: 185,000 Coins
-Table buy-in: 50,000 Coins
+Buy-in chosen: 50,000 Coins
 
 After joining:
 
@@ -44,38 +44,42 @@ Wallet Balance and Table Stack must always be stored separately.
 
 # 2. Table Buy-Ins
 
-Each table has one fixed buy-in amount.
+Every table belongs to a **stake tier**. A tier sets:
 
-Every player joining the same table begins with the same Table Stack.
+- A **buy-in range**: the smallest and largest amount a player may bring when joining
+- The **Buy-In Cap**: the top of that range
+- The table's **blinds** (§5), derived from the Buy-In Cap
 
-There are:
+## The Buy-In Cap
 
-- No custom buy-ins
-- No minimum-to-maximum buy-in ranges
-- No buy-in slider
-- An opening minimum bet derived as 2% of the fixed buy-in (10, 100, or 1,000 Coins)
-- No forced blinds
+The Buy-In Cap is the most Wallet Coins a player may move onto one table in a table session:
+the first buy-in, every re-buy, and every top-up (§27) count toward it together.
 
-## Example Tables
+- A player cannot bring more than the cap, even across re-buys or top-ups.
+- To play with more, the player moves up to a higher stake tier.
+- Leaving and rejoining the same table does not reset the cap. It resets when the table
+  session ends (§29, Table Closing).
+- The cap limits Coins brought in, not chips won. A Table Stack may grow beyond the cap from
+  pots won (§24).
 
-### Beginner Table
+The cap keeps a player with a large Wallet from buying more betting power than the tier
+allows.
 
-Buy-In: 500 Coins
-Maximum Players: 6
+## Stake Tiers
 
-### Intermediate Table
+The default tiers. Every number is a table setting, so balance testing changes the
+configuration and not the code.
 
-Buy-In: 5,000 Coins
-Maximum Players: 6
+| Tier | Buy-in range | Buy-In Cap | Blinds (SB / BB) |
+| ---- | -----------: | ---------: | ---------------: |
+| Beginner | 200 – 500 | 500 | 5 / 10 |
+| Intermediate | 2,000 – 5,000 | 5,000 | 50 / 100 |
+| High Stakes | 20,000 – 50,000 | 50,000 | 500 / 1,000 |
 
-### High Stakes Table
+The range's floor is 20 big blinds, so no one sits down too short to play a hand. The
+tournament and cash-game tiers of the product spec are [Formats](formats.md) §41–§42.
 
-Buy-In: 50,000 Coins
-Maximum Players: 6
-
-The fixed buy-in ensures that players with larger Wallet Balances cannot enter a low-stakes table with more betting power than everyone else.
-
-Stacks may grow beyond the original buy-in after the game begins.
+Maximum players at every tier: 6.
 
 ---
 
@@ -84,7 +88,9 @@ Stacks may grow beyond the original buy-in after the game begins.
 Each table card displays:
 
 - Table Name
-- Fixed Buy-In
+- Stake tier
+- Buy-in range
+- Blinds
 - Current Player Count
 - Maximum Player Count
 - Join button
@@ -93,7 +99,8 @@ Each table card displays:
 
 **High Stakes**
 
-Buy-In: 50,000 Coins
+Buy-In: 20,000 – 50,000 Coins
+Blinds: 500 / 1,000
 Players: 4/6
 
 [ JOIN ]
@@ -103,7 +110,8 @@ Players: 4/6
 The Join button is disabled when:
 
 - The table is full
-- The player's Wallet Balance is below the fixed buy-in
+- The player's Wallet Balance is below the bottom of the buy-in range
+- The player's remaining Buy-In Cap for that table is below the bottom of the range
 - The player is already seated at the table
 - The table is temporarily unavailable
 
@@ -117,17 +125,20 @@ The modal displays:
 
 - Table Name
 - Wallet Balance
-- Fixed Buy-In
+- A buy-in amount control (slider with an exact-value field) over the buy-in range
 - Wallet Balance after joining
 - Confirm and Join button
 - Cancel button
+
+The amount control starts at the most the player may bring: the lowest of the Buy-In Cap
+still available to them and their Wallet Balance.
 
 ## Example
 
 **Join High Stakes?**
 
 Wallet Balance: 185,000 Coins
-Buy-In: 50,000 Coins
+Buy-In: [ 50,000 ] (20,000 – 50,000)
 Remaining Wallet Balance: 135,000 Coins
 
 [ CONFIRM & JOIN ]
@@ -135,12 +146,11 @@ Remaining Wallet Balance: 135,000 Coins
 
 ## Joining Rules
 
-- The player must have a Wallet Balance equal to or greater than the buy-in.
-- The exact fixed buy-in is deducted from the Wallet.
+- The chosen buy-in must lie inside the table's buy-in range.
+- The chosen buy-in cannot exceed the player's Wallet Balance or their remaining Buy-In Cap.
+- The exact chosen amount is deducted from the Wallet.
 - The same amount becomes the player's Table Stack.
-- Partial buy-ins are not allowed.
-- Custom buy-ins are not allowed.
-- The player cannot use additional Wallet Coins after joining.
+- The player cannot move more Wallet Coins onto the table except by §27's re-buy and top-up.
 - A seat becomes occupied only after the transaction succeeds.
 
 The Wallet deduction and Table Stack creation must happen as one transaction. The system must not deduct Coins unless the player successfully joins the table.
@@ -154,16 +164,15 @@ Each table supports:
 - Minimum recommended players: 4
 - Maximum players: 6
 - One house-controlled dealer
-- Equal fixed buy-ins
-- No small blind
-- No big blind
+- Buy-ins inside the tier's range, up to the Buy-In Cap
+- A small blind and a big blind (below)
 - No ante
-- No forced opening bet
 
 The house dealer manages:
 
 - Tile distribution
 - Community tile reveals
+- Blinds
 - Player turn order
 - Pots
 - Showdowns
@@ -172,12 +181,45 @@ The house dealer manages:
 
 The dealer does not participate as a player.
 
+## Starting the Game (Ready Check)
+
+A seated player sees the table itself straight away, not a holding screen: the seats that
+have sat down, around an empty felt. Where the betting controls will be, the player has one
+control: **I'M READY** (tapping again takes it back, **NOT READY**).
+
+- Each seat's nameplate shows **READY** once that player has said so.
+- The first hand is dealt when **every** seated player is ready and at least **2** are seated.
+  The table does not wait to fill its seat cap.
+- One seat that is not ready holds the deal. So does a seat that has disconnected.
+- If the table goes back to waiting (a player leaves between hands, or the session ends),
+  every player says ready again before the next deal.
+
+## Blinds
+
+Every hand opens with two forced bets, posted before any tile is dealt:
+
+- **Small Blind**: 1% of the table's Buy-In Cap
+- **Big Blind**: 2% of the table's Buy-In Cap
+
+The offline table, which has no tiers, plays 10 / 20 on its 1,000-chip stacks (the stack is
+ADR 0002's; the blinds are ADR 0004's).
+
+- The small blind is posted by the first seat clockwise from the dealer button, the big blind
+  by the next.
+- **Heads-up** (two seats dealt in): the dealer button posts the small blind and the other
+  seat the big blind.
+- A seat whose Table Stack is smaller than its blind posts all of it and is all in (§22).
+- Blinds are live bets: they count as the seat's Committed This Round on the first betting
+  round, and the big blind is that round's opening Current Bet (§23).
+- The big blind is also the table's **minimum bet** (§22).
+- A seat that sits down mid-session is dealt in on the next hand wherever the blinds fall;
+  there are no missed-blind or dead-blind rules.
+
 ## Dealer Button and Turn Order
 
-A dealer-position marker rotates clockwise after each completed hand.
+A dealer-position marker rotates clockwise after each completed hand. The blinds move with it.
 
-The first active player clockwise from the dealer position acts first during the first betting round.
-
-The first remaining active player clockwise from the dealer position acts first during later betting rounds.
-
-The dealer marker determines action order only. It does not require any forced bet.
+- First betting round: the first active seat clockwise from the big blind acts first, and the
+  big blind acts last (§15). Heads-up, the dealer button (the small blind) acts first.
+- Later betting rounds: the first remaining active seat clockwise from the dealer button acts
+  first.

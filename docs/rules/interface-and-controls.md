@@ -10,13 +10,14 @@ The seated game view displays:
 
 ## Player Information
 
-- Player name
-- Avatar
+- Anonymous seat label and neutral avatar — never the player's username or chosen avatar (§37)
 - Seat position
 - Connection status
 - Folded status
 - All-in status
 - Remaining Table Stack
+- Small blind and big blind markers
+- Last action this street
 
 ## Local Player Information
 
@@ -32,12 +33,13 @@ The seated game view displays:
 - Pot Size
 - Side Pots
 - Current Bet
+- Blinds
 - Community Tiles
 - Current phase
 - Active player
 - Dealer-position marker
 - Dictionary
-- Table Buy-In
+- Stake tier and buy-in range
 
 Wallet Balance may be shown in a secondary location, but it must not appear as part of the available betting balance.
 
@@ -54,6 +56,7 @@ Wallet Balance may be shown in a secondary location, but it must not appear as p
 ## Check
 
 - Available only when the player does not need to call a bet.
+- Pre-flop, available to the big blind when no one has raised (§15).
 - Passes action without adding chips.
 
 ## Bet
@@ -70,7 +73,7 @@ Wallet Balance may be shown in a secondary location, but it must not appear as p
 
 - Increases the Current Bet.
 - Cannot exceed the player's remaining Table Stack.
-- Must meet the minimum raise unless the player is going all in.
+- Must meet the minimum raise (§22) unless the player is going all in.
 
 ## All In
 
