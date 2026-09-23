@@ -1,6 +1,6 @@
 import { act, fireEvent, render, type RenderResult } from "@testing-library/react-native";
 
-import { WAITING_PHASE, minBetFor, type RoomPhase } from "@wordpoker/contracts";
+import { WAITING_PHASE, blindsFor, type RoomPhase } from "@wordpoker/contracts";
 
 import type { RoomSessionView, TableSnapshot } from "@/lib/room-session";
 
@@ -10,13 +10,13 @@ import { SeatedScreen } from "./seated-screen";
 const mockRoomId = "table-7f3a";
 
 /**
- * The table the snapshot describes: §2's middle buy-in with the minimum bet §2 derives from it,
- * so the copy is checked against numbers the game uses rather than numbers the test invented.
+ * The table the snapshot describes: §2's middle buy-in with the blinds §2 derives from it, so the
+ * copy is checked against numbers the game uses rather than numbers the test invented.
  */
 const TABLE: TableSnapshot = {
   name: "Thursday Felt",
   buyIn: 5_000,
-  minBet: minBetFor(5_000),
+  ...blindsFor(5_000),
   maxSeats: 6,
   seats: 3,
   phase: WAITING_PHASE,
@@ -149,7 +149,7 @@ describe("<SeatedScreen />", () => {
 
     expect(textOf(view, "seated-name")).toBe(TABLE.name);
     expect(textOf(view, "seated-buy-in")).toBe("$5,000");
-    expect(textOf(view, "seated-min-bet")).toBe("$100");
+    expect(textOf(view, "seated-blinds")).toBe("$50 / $100");
     expect(textOf(view, "seated-seats")).toBe("3 / 6");
     expect(textOf(view, "seated-status")).toBe("WAITING");
   });

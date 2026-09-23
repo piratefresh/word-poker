@@ -11,7 +11,11 @@ const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
 const NOW = 1_000_000;
 
-/** The opening bet every seat calls: enough for a real pot without changing the deal. */
+/**
+ * The commitment every seat ends the hand on: the big blind, called around. Enough for a real pot
+ * without changing the deal — pre-flop the blinds are already out, so every other seat owes the
+ * big blind and the big blind itself merely checks (§23).
+ */
 const OPENING_BET = 20;
 
 /**
@@ -73,9 +77,10 @@ function expectedScore(tiles: readonly Tile[]): number {
 }
 
 /**
- * A hand walked to the river's close, where §19's window opens: the first actor opens for the
- * minimum, every seat calls it, and the streets after it are checked around. Every seat ends
- * the hand on the same 20-chip commitment, so the hand has one 80-chip pot to award.
+ * A hand walked to the river's close, where §19's window opens: the blinds are called around
+ * pre-flop — the big blind checking its own blind — and every street after is checked around.
+ * Every seat ends the hand on the same 20-chip commitment, so the hand has one 80-chip pot to
+ * award.
  */
 function atWindow(wordBuilding?: { autoSubmitDrafts?: boolean }): OfflineState {
   let state = startHand({
@@ -95,14 +100,11 @@ function atWindow(wordBuilding?: { autoSubmitDrafts?: boolean }): OfflineState {
     assert.ok(seat, `seat ${index}`);
     assert.ok(round, "a betting round is open");
 
-    const bounds = bettingBounds(state.seats, round, index, state.stakes.minBet);
+    const bounds = bettingBounds(state.seats, round, index, state.stakes.bigBlind);
     assert.ok(bounds, `seat ${index} can act`);
-    const action =
-      step === 0
-        ? ({ type: "bet", playerId: seat.id, amount: OPENING_BET } as const)
-        : bounds.canCheck
-          ? ({ type: "check", playerId: seat.id } as const)
-          : ({ type: "call", playerId: seat.id } as const);
+    const action = bounds.canCheck
+      ? ({ type: "check", playerId: seat.id } as const)
+      : ({ type: "call", playerId: seat.id } as const);
 
     state = reduce(state, action, NOW + step);
     step += 1;
@@ -235,9 +237,15 @@ describe("payout — §11's judging and §21's ladder", () => {
     assert.equal(next.result, null);
     assert.equal(next.wordWindow, null);
     assert.equal(next.dealerSeat, 1);
+    // What the last hand left, and then the new hand's blinds off the seats that post them: the
+    // button moved to seat 1, so the small blind is seat 2's and the big blind seat 3's (§5).
     assert.deepEqual(
       next.seats.map((seat) => seat.stack),
-      [1_060, 980, 980, 980],
+      [1_060, 980, 970, 960],
+    );
+    assert.deepEqual(
+      next.seats.map((seat) => seat.committedHand),
+      [0, 0, 10, 20],
     );
   });
 });

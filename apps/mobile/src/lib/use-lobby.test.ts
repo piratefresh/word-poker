@@ -65,7 +65,8 @@ function listing(roomId: string, overrides: Partial<RoomSummary> = {}) {
     metadata: {
       name: `Table ${roomId}`,
       buyIn: 500,
-      minBet: 10,
+      smallBlind: 5,
+      bigBlind: 10,
       maxSeats: 6,
       status: WAITING_PHASE,
     },

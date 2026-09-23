@@ -1,6 +1,6 @@
 /**
  * The runtime half of the room contract: the checks a create has to survive on both sides of the
- * socket, the stakes a buy-in derives, and the read of a listing entry that decides whether a
+ * socket, the blinds a buy-in derives, and the read of a listing entry that decides whether a
  * lobby row is something the app can draw.
  */
 import assert from "node:assert/strict";
@@ -10,8 +10,8 @@ import {
   BUY_IN_PRESETS,
   MAX_SEATS,
   MIN_SEATS,
+  blindsFor,
   isGameRoomMetadata,
-  minBetFor,
   roomSummaryFromListing,
   tableStatus,
   validateRoomCreateOptions,
@@ -19,6 +19,9 @@ import {
 } from "../src/index";
 
 const TABLE = { name: "Sunset", buyIn: 5_000, maxSeats: 4 } as const;
+
+/** §2's middle preset with the blinds ADR 0004 derives from it. */
+const BLINDS = blindsFor(TABLE.buyIn);
 
 /** A listing entry as the matchmaking listing shapes it. */
 function listing(overrides: Record<string, unknown> = {}) {
@@ -28,14 +31,18 @@ function listing(overrides: Record<string, unknown> = {}) {
     clients: 2,
     maxClients: 4,
     locked: false,
-    metadata: { name: "Sunset", buyIn: 5_000, minBet: 100, maxSeats: 4, status: "waiting" },
+    metadata: { name: "Sunset", buyIn: 5_000, ...BLINDS, maxSeats: 4, status: "waiting" },
     ...overrides,
   };
 }
 
-describe("minBetFor", () => {
-  it("derives ADR 0001's 2% in whole coins for every preset", () => {
-    assert.deepStrictEqual(BUY_IN_PRESETS.map(minBetFor), [10, 100, 1_000]);
+describe("blindsFor", () => {
+  it("derives ADR 0004's 1% and 2% in whole coins for every preset", () => {
+    assert.deepStrictEqual(BUY_IN_PRESETS.map(blindsFor), [
+      { smallBlind: 5, bigBlind: 10 },
+      { smallBlind: 50, bigBlind: 100 },
+      { smallBlind: 500, bigBlind: 1_000 },
+    ]);
   });
 });
 
@@ -94,19 +101,20 @@ describe("validateRoomCreateOptions", () => {
 
 describe("isGameRoomMetadata", () => {
   it("accepts a table's published config", () => {
-    assert.strictEqual(isGameRoomMetadata({ ...TABLE, minBet: 100, status: "flop" }), true);
+    assert.strictEqual(isGameRoomMetadata({ ...TABLE, ...BLINDS, status: "flop" }), true);
   });
 
   it("rejects a listing that is not one of our tables", () => {
-    const published = { ...TABLE, minBet: 100, status: "waiting" };
+    const published = { ...TABLE, ...BLINDS, status: "waiting" };
     for (const value of [
       undefined,
       null,
       "table",
-      { minBet: 100, status: "waiting" },
+      { bigBlind: 100, status: "waiting" },
       { ...published, status: "lobby" },
       { ...published, buyIn: 1_234 },
-      { ...published, minBet: 20 },
+      { ...published, smallBlind: 10 },
+      { ...published, bigBlind: 20 },
       { ...published, status: undefined },
     ]) {
       assert.strictEqual(isGameRoomMetadata(value), false, JSON.stringify(value));
@@ -116,8 +124,8 @@ describe("isGameRoomMetadata", () => {
 
 describe("tableStatus", () => {
   it("reads the synced phase as the two states §3 shows", () => {
-    const waiting: GameRoomMetadata = { ...TABLE, minBet: 100, status: "waiting" };
-    const playing: GameRoomMetadata = { ...TABLE, minBet: 100, status: "river" };
+    const waiting: GameRoomMetadata = { ...TABLE, ...BLINDS, status: "waiting" };
+    const playing: GameRoomMetadata = { ...TABLE, ...BLINDS, status: "river" };
 
     assert.strictEqual(tableStatus(waiting), "waiting");
     assert.strictEqual(tableStatus(playing), "in-hand");
@@ -131,7 +139,7 @@ describe("roomSummaryFromListing", () => {
       clients: 2,
       maxClients: 4,
       locked: false,
-      metadata: { name: "Sunset", buyIn: 5_000, minBet: 100, maxSeats: 4, status: "waiting" },
+      metadata: { name: "Sunset", buyIn: 5_000, ...BLINDS, maxSeats: 4, status: "waiting" },
     });
   });
 

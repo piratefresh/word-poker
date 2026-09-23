@@ -183,7 +183,7 @@ function GameScreenBody({
             layoutConfig={{ seatRadius: { x: 0.98, y: 0.96 }, potY: 0.5 }}
             railWidth={3}
             renderCommunity={() => null}
-            renderPot={() => <Pot amount={game.pot} sidePots={game.sidePots} />}
+            renderPot={() => <Pot amount={game.pot} sidePots={game.sidePots} blinds={game.blinds} />}
             renderSeat={(slot) => <Seat onPress={onSeatPress} slot={slot} />}
             seatCount={game.seatCount}
             seats={game.players}

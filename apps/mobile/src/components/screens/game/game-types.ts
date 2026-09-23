@@ -17,10 +17,10 @@ export type PlayerStatus =
   | "winner";
 
 /**
- * The one role the felt badges. There are no blinds to mark (§13, §5): the dealer button
- * rotates, forces no bet, and is the only marker a seat carries.
+ * The markers a seat can carry (§5): the dealer button, and the two blinds that ride on it. A
+ * seat holds a list because heads-up one seat is both the button and the small blind.
  */
-export type PlayerRole = "dealer";
+export type PlayerRole = "dealer" | "small-blind" | "big-blind";
 
 export type LetterTileData = TileData;
 
@@ -31,7 +31,8 @@ export interface GamePlayer {
   stack: number;
   color: string;
   status: PlayerStatus;
-  role?: PlayerRole;
+  /** The markers this seat holds, in the order the felt prints them; absent when it holds none. */
+  roles?: readonly PlayerRole[];
   bet?: number;
   isHero?: boolean;
 }
@@ -120,5 +121,11 @@ export interface GameScreenState {
   privateTiles: readonly LetterTileData[];
   bestWord?: string;
   bestScore?: number;
+  /**
+   * §30's table information: the blinds this table plays (§5, ADR 0004), drawn with the pot. Both
+   * numbers, because the table fixes both — the big blind is also the minimum bet the row's floor
+   * is built from.
+   */
+  blinds: { smallBlind: number; bigBlind: number };
   betting: BettingState;
 }

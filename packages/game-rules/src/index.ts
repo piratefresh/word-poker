@@ -39,7 +39,7 @@ export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
 export { decideOfflineMove, chooseOfflineWord } from "./bot";
 export {
   BOT_BET_FREQUENCY,
-  BOT_BET_SIZES,
+  BOT_BET_STEPS,
   BOT_CALL_THRESHOLD,
   BOT_RAISE_FREQUENCY,
 } from "./bot";

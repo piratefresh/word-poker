@@ -33,12 +33,15 @@
 # on the spot, and the round's walk waits for the hero's own turn instead of tapping the row
 # while a bot holds it.
 #
-# The pinned seed's line, as the engine plays it (the bots are deterministic too):
-#   preflop mira bets 60 → the hero calls; flop jay bets 40 → the hero calls; turn ellis
-#   bets 20 → the hero calls; river everyone checks to the hero, who opens for the minimum
-#   (the slider seeds at `BET $20`) and is called around, which closes the river's round and
-#   opens §19's window. A different seed means different tiles and different bots, and the
-#   assertions below are the ones that would fail first.
+# The pinned seed's line, as the engine plays it (the bots are deterministic too). Every hand
+# opens with the blinds posted before the deal (§5, §14): ellis holds the small blind's 10, jay
+# the big blind's 20, and the round starts at the first dealt-in seat clockwise from the big
+# blind — mira, at this four-seat table.
+#   preflop mira raises the blind to 40 → the hero calls; flop jay bets 40 → the hero calls;
+#   turn ellis bets 20 → the hero calls; river everyone checks to the hero, who opens for the
+#   minimum (the slider seeds at `BET $20`, the table's big blind) and is called around, which
+#   closes the river's round and opens §19's window. A different seed means different tiles and
+#   different bots, and the assertions below are the ones that would fail first.
 #
 # The felt reaches its row by `id:` rather than by text. Its controls carry test ids
 # (`action-check-call` walks the round and, inside §19's window, is the confirm), because the
@@ -72,11 +75,12 @@ tags:
 - assertVisible:
     text: "COMMUNITY · 0/5"
 
-# The opening bot's bet is on the felt a beat after the deal, and the row states the call the
-# engine says is owed — not a placeholder. This is the seed's line, so a changed seed or table
-# configuration fails here, loudly.
+# The blinds are posted before the deal, and the seat clockwise from the big blind opens the
+# round a beat later: mira raises the blind to 40, and the row states the call that leaves the
+# hero owing — the engine's number, not a placeholder. This is the seed's line, so a changed seed
+# or table configuration fails here, loudly.
 - extendedWaitUntil:
-    visible: "CALL \\$60"
+    visible: "CALL \\$40"
     timeout: 20000
 
 # Play the hero's turns to the river. Each pass waits for the hero to hold the table — the
@@ -106,7 +110,7 @@ tags:
 # on their beats, the pot the felt draws grows, and the round's close opens §19's window.
 #
 # The assertions are the tap being a real bet and not the silent nothing it once was: the chips
-# reach the middle (480 → 560, the hero's 20 and the three calls), and the row stops offering
+# reach the middle (400 → 480, the hero's 20 and the three calls), and the row stops offering
 # the hero a bet — with the action refused, the hero would still be the seat to act and
 # `BET $20` would still be on the felt.
 - extendedWaitUntil:
@@ -115,12 +119,12 @@ tags:
 - assertVisible:
     text: "BET \\$20"
 - assertVisible:
-    text: "\\$480"
+    text: "\\$400"
 - tapOn:
     id: "action-wager"
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: "\\$560"
+    visible: "\\$480"
     timeout: 20000
 - assertNotVisible:
     text: "BET \\$20"
