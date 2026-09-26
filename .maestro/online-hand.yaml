@@ -1,0 +1,112 @@
+# One-command Windows runner from the repo root: pnpm smoke:online
+# A headed online hand through the web build, with a live room and an automated opponent (STO-409).
+#
+# Start the server in one terminal with WORDPOKER_DETERMINISTIC_SEED=1, start Expo web in another
+# with EXPO_PUBLIC_GAME_URL=ws://localhost:2567, and start apps/server/scripts/smoke-opponent.ts in a
+# third. The script creates Smoke Table at seed 409, readies itself when the browser joins, calls when
+# it owes, and holds the results screen open.
+# Run a fresh opponent process for every flow run and pass the room id it prints:
+#
+#   maestro test --platform web .maestro/online-hand.yaml -e ROOM_ID=the-id-printed-by-opponent
+#
+# Probe for seed 409 (browser is seat 1): rack Z, P, O/U, E/I, I, Y, B; board O/U, E/I, I, Y, B. PUB is a dictionary word in rack order: P, U on the O/U choice tile, then B.
+# Choice-tile-only deals changed the old BEE pin; a different seed or a server ignoring the seed
+# fails at the selectors instead of silently building a different word.
+#
+# The room is behind the auth guard. On a fresh headed profile this flow signs in through
+# sign-in.yaml, joins the exact room id supplied by the opponent, and exits after reading results.
+#
+# Web selectors use the accessible id labels. Device selectors are in
+# apps/mobile/.maestro/native/online-hand.yaml; action controls use their test ids.
+url: http://localhost:8081/online
+name: Online hand - join, call the blind, build PUB and read results
+tags:
+  - web
+  - online
+---
+- openLink: http://localhost:8081/online
+
+# Sign in when a fresh profile is bounced to the guard.
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/online
+
+# Join the exact fresh room created by the opponent, avoiding a stale table with the same name.
+- openLink: http://localhost:8081/online/${ROOM_ID}
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- assertVisible:
+    text: "YOU"
+
+# The opponent is ready; the browser is the second seat.
+- tapOn:
+    text: "I'M READY"
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 30000
+
+# The button calls its small blind, then the big blind checks. Later the opponent checks and the
+# browser checks each street. The same control handles CALL and CHECK.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 5 · THE RIVER"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+
+# At the river all five board tiles are available to the strip. Build the dictionary word PUB in rack order;
+# choose U explicitly on the O/U choice tile.
+- extendedWaitUntil:
+    visible: "COMMUNITY · 5/5"
+    timeout: 20000
+- tapOn:
+    id: "P, 4 points, tap to play it"
+- tapOn:
+    id: "O or U, 1 point, double letter, tap to play it"
+- tapOn:
+    id: "Play the O/U tile as U"
+- tapOn:
+    id: "B, 4 points, double letter, tap to play it"
+- assertVisible:
+    text: "PUB"
+
+# CHECK confirms the word once the window opens. The opponent's 60-second payout delay keeps the
+# results overlay visible long enough to assert it before the next hand.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 6 · PAYOUT"
+    commands:
+      - tapOn:
+          id: "action-check-call"
+      - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 30000
+- assertVisible:
+    text: "SCOREBOARD"
+- assertVisible:
+    text: ".*PUB.*"
+- assertNotVisible:
+    text: "The window closed"
+- tapOn:
+    id: "Back to the main menu"
+- waitForAnimationToEnd

@@ -83,6 +83,24 @@ Headed is the default (`--headless` hides the browser; headless also takes `--sc
 whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
 it needs.
 
+Run the online multiplayer smoke (STO-409) from one Windows terminal at the repository root:
+
+```powershell
+pnpm smoke:online
+```
+
+The runner starts Colyseus with deterministic seeds enabled, starts Expo web on port 8081, waits for
+both servers, creates a fresh seed-409 opponent, and passes its room ID to the headed Maestro flow.
+It stops its server and opponent process trees on completion, failure, or Ctrl-C. Logs stay in the
+temporary directory printed at startup. Existing processes listening on ports 2567 and 8081 are terminated before starting.
+The smoke server runs without file watching, and background stdin is redirected to an empty file.
+Maestro must be on PATH or installed at ~/.maestro/bin/maestro.bat; keep Chrome and chromedriver
+on matching versions. The existing mobile/server env files and seeded E2E user are still required
+(see below). This runner is local and Windows-only.
+
+The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
+signs in when needed, builds PUB, checks the results overlay, and leaves the table.
+
 ## E2E test user
 
 Flows behind the auth guard sign in as the shared E2E user `e2e@wordpoker.dev`, seeded straight into
@@ -137,6 +155,15 @@ EAS Workflows can run these flows on its own emulator and simulator — a `maest
 job type and the workers it needs (`linux-*-nested-virtualization` for Android, `macos-*` for iOS)
 require a paid Expo plan on this account (September 2026), so no workflow file is checked in. Add
 one when that changes; trigger it from an `e2e` label on a pull request, or by hand.
+
+## Online device smoke
+
+apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with the e2e-test app build and a ROOM_ID deep link. The auth bypass only skips sign-in. The device still needs a Colyseus server started with WORDPOKER_DETERMINISTIC_SEED=1, reachable through EXPO_PUBLIC_GAME_URL, and a separate smoke-opponent.ts process. Run the flow from apps/mobile and pass the room id printed by the opponent:
+
+    eas build --platform android --profile e2e-test
+    maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
+
+Set EXPO_PUBLIC_GAME_URL at build time to an address the device can reach; localhost on the device is not the development machine. Keep this device flow manual and out of CI until its server and opponent are provisioned.
 
 # Game rules spec
 

@@ -1,0 +1,86 @@
+# The same seed 409 online hand as .maestro/online-hand.yaml, on a device.
+#
+# Build/install with the e2e-test profile. Its auth bypass only skips sign-in; the app still needs a
+# reachable Colyseus server, a seed-enabled server, and the opponent script below. Set
+# EXPO_PUBLIC_GAME_URL in the build to an address the device can reach (not localhost on the device).
+# Start the opponent and pass the room id printed by smoke-opponent.ts:
+#
+#   cd apps/mobile
+#   eas build --platform android --profile e2e-test
+#   maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
+#
+# The device seat is seat 1 at seed 409: rack Z, P, O/U, E/I, I, Y, B; it builds the dictionary
+# word PUB from P, U on the O/U choice tile, and B. A different seed fails at the tile selectors.
+appId: com.wordpoker.wordpoker
+name: Online hand - join, call the blind, build PUB and read results
+tags:
+  - native
+  - online
+---
+- launchApp
+- openLink: wordpoker://online?room=${ROOM_ID}
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- assertVisible:
+    text: "YOU"
+
+# The opponent has readied itself; ready the device seat to deal the hand.
+- tapOn:
+    id: "action-ready"
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 30000
+
+# Walk to the river. The row's check/call action has one stable device test id.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 5 · THE RIVER"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible: "COMMUNITY · 5/5"
+    timeout: 20000
+- tapOn:
+    id: "word-builder-tile-P-1"
+- tapOn:
+    id: "word-builder-face-OU-1-U"
+- tapOn:
+    id: "word-builder-tile-B-1"
+- assertVisible:
+    text: "PUB"
+
+# Confirm from the same check/call control when the word window opens.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 6 · PAYOUT"
+    commands:
+      - tapOn:
+          id: "action-check-call"
+      - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 30000
+- assertVisible:
+    text: "SCOREBOARD"
+- assertVisible:
+    text: ".*PUB.*"
+- assertNotVisible:
+    text: "The window closed"
+- tapOn:
+    id: "results-back"
+- waitForAnimationToEnd
