@@ -47,6 +47,8 @@ import {
 import { resolveSubmission, type Dictionary } from "@wordpoker/game-rules";
 
 import type { GameScreenState } from "@/components/screens/game/game-types";
+import { buildSettledSnapshot } from "@/components/screens/results/results-snapshot";
+import type { ResultsSnapshot } from "@/components/screens/results/results-types";
 import type { WordDraft } from "@/components/word-builder";
 import { colors, palette } from "@/constants/theme";
 import {
@@ -79,10 +81,22 @@ export interface GameRoomLike {
 export interface OnlineGame {
   /** The mapped state the felt renders, or null while the table is still waiting to deal. */
   game: GameScreenState | null;
+  /**
+   * The settled hand as the results screen renders it, or null off the payout (STO-430). The
+   * room holds its payout a few seconds before it deals again; the next deal clears this.
+   */
+  results: ResultsSnapshot | null;
   /** §19's window as the builder reads it, or null outside it. In the builder's own vocabulary. */
   words: WordDraft | null;
   /** The table's phase, including the waiting room the felt has no hand for. */
   phase: RoomPhase;
+  /**
+   * The table before its first deal, or null once a hand is live: how many of its seats have said
+   * ready, and whether the hero is one of them. `game` still draws the felt while it waits.
+   */
+  waiting: { ready: number; seated: number; heroReady: boolean } | null;
+  /** Says (or takes back) that the hero is ready for the deal. */
+  setReady: (ready: boolean) => void;
   /** Surrenders the hand (§22). */
   fold: () => void;
   /** Passes when nothing is owed. */
@@ -117,6 +131,7 @@ interface SeatView {
   folded: boolean;
   sittingOut: boolean;
   actedThisRound: boolean;
+  ready: boolean;
 }
 
 interface WordSlotView {
@@ -126,9 +141,24 @@ interface WordSlotView {
 
 interface ResultStandingView {
   playerId: PlayerId;
+  seat: number;
   score: number;
   place: number;
   word: string;
+  reason: WordRejectionReason | null;
+  /** The reveal, as the room priced it with `playedWord`: tiles in word order and §7's parts. */
+  tiles: readonly Tile[];
+  base: number;
+  mult: number;
+  rack: number;
+}
+
+/** The paid-out hand the broadcast carries: the ladder, the winner, and what the pots held. */
+interface ResultView {
+  winner: PlayerId;
+  standings: readonly ResultStandingView[];
+  /** Every chip the paid pots held (§25). */
+  pot: number;
 }
 
 /** The broadcast schema, decoded into a plain snapshot so a React render sees a fresh value. */
@@ -146,11 +176,13 @@ interface RoomView {
   betting: { currentBet: number; minRaise: number; bigBlind: number } | null;
   pots: readonly number[];
   word: { status: "open" | "settled"; slots: readonly WordSlotView[] } | null;
-  result: { winner: PlayerId; standings: readonly ResultStandingView[] } | null;
+  result: ResultView | null;
 }
 
 /** The hero's private rack and word state, decoded off the targeted `privateState` message. */
 interface PrivateView {
+  /** The hand the rack was dealt for: the broadcast's `handCount` it belongs beside. */
+  hand: number;
   rack: readonly Tile[];
   isYourTurn: boolean;
   word: {
@@ -185,8 +217,14 @@ export function useOnlineGame({
 }): OnlineGame {
   const heroId = room.sessionId;
   const [view, setView] = useState<RoomView | null>(() => decodeRoom(room.state));
-  const [priv, setPriv] = useState<PrivateView | null>(null);
+  const [received, setPriv] = useState<PrivateView | null>(null);
+  // The private message outruns the patch: the room sends the next hand's rack the instant it
+  // deals, and the board that hand deals a patch later. Beside the last hand's board the new rack
+  // can repeat a tile the reshuffled bag just handed back, so a rack counts only beside the board
+  // of the hand it was dealt for — until then the seat holds nothing.
+  const priv = received !== null && received.hand === view?.handCount ? received : null;
   const [heroDraft, setHeroDraft] = useState<readonly TilePlay[]>([]);
+  const lastDraftWindowHand = useRef<number | null>(null);
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
   // The hero's own move, shown the instant it is tapped and kept only until the server's own
   // broadcast catches up — the server always wins on reconcile (AGENTS.md). A move never sticks:
@@ -254,6 +292,22 @@ export function useOnlineGame({
       offRejected();
     };
   }, [room]);
+
+  // A draft can be built while the seats are betting, before the server opens §19's window.
+  // Send that existing draft once when the window opens; edits made after that are sent by setDraft.
+  const wordWindowHand = view?.word?.status === "open" ? view.handCount : null;
+  useEffect(() => {
+    if (wordWindowHand === null) {
+      lastDraftWindowHand.current = null;
+      return;
+    }
+
+    if (lastDraftWindowHand.current === wordWindowHand) return;
+    lastDraftWindowHand.current = wordWindowHand;
+    if (heroDraft.length === 0) return;
+
+    room.send(GAME_MESSAGES.draftWord, { submission: { plays: [...heroDraft] } });
+  }, [heroDraft, room, wordWindowHand]);
 
   // One dispatch path for every betting move: send it, then predict it — the row goes dark and the
   // seat wears the move's pill at once, against the table id it was made on, so a tap reads as done
@@ -327,6 +381,44 @@ export function useOnlineGame({
   );
   const game = hero?.game ?? null;
 
+  // The paid-out hand as the results screen draws it, off the room's own reveal. Live only while
+  // the table sits on its payout: the next deal clears the broadcast's result, and with it this.
+  const results = useMemo<ResultsSnapshot | null>(() => {
+    if (view?.phase !== "payout" || view.result === null || game === null) return null;
+    return buildSettledSnapshot(
+      {
+        hand: view.handCount,
+        // The room's seed derives every hand it deals next, so it never leaves the server.
+        seed: null,
+        pot: view.result.pot,
+        winner: view.result.winner,
+        table: {
+          players: view.seats.filter((seat) => !seat.sittingOut).length,
+          folded: view.seats.filter((seat) => seat.folded).length,
+        },
+        standings: view.result.standings.map((standing) => ({
+          playerId: standing.playerId,
+          seat: standing.seat,
+          place: standing.place,
+          score: standing.score,
+          word: standing.word === "" ? null : standing.word,
+          reason: standing.reason,
+          played:
+            standing.tiles.length === 0
+              ? null
+              : {
+                  tiles: standing.tiles,
+                  base: standing.base,
+                  mult: standing.mult,
+                  rack: standing.rack,
+                  total: standing.score,
+                },
+        })),
+      },
+      game.players,
+    );
+  }, [game, view]);
+
   // The row's two shared controls, bound at the tap to whatever move the row is armed for.
   const betting = game?.betting ?? null;
   const primary = useCallback(
@@ -338,10 +430,27 @@ export function useOnlineGame({
     [bet, betting, call, check, confirmWord, raiseTo],
   );
 
+  const setReady = useCallback(
+    (ready: boolean) => room.send(GAME_MESSAGES.ready, { ready }),
+    [room],
+  );
+  const waiting = useMemo(() => {
+    if (view === null || view.phase !== WAITING_PHASE) return null;
+    return {
+      ready: view.seats.filter((seat) => seat.ready).length,
+      seated: view.seats.length,
+      heroReady: view.seats.some((seat) => seat.playerId === heroId && seat.ready),
+    };
+  }, [heroId, view]);
+
   return {
     game,
-    words: hero?.words ?? null,
+    results,
+    // No hand, no word: the waiting felt draws the table with nothing to build.
+    words: waiting === null ? (hero?.words ?? null) : null,
     phase: view?.phase ?? WAITING_PHASE,
+    waiting,
+    setReady,
     fold,
     check,
     bet,
@@ -367,8 +476,11 @@ function availableFor(priv: PrivateView | null, view: RoomView | null): readonly
 
 /**
  * The room as the Hero View reads it: the broadcast seats in engine order, placed on the felt by
- * their seat number, and the hero's turn and word slot off the seat's own private message. Null
- * while the table is still the waiting room — there is no hand to draw.
+ * their seat number, and the hero's turn and word slot off the seat's own private message.
+ *
+ * The waiting room draws too: the seats that have sat down, around an empty felt, each wearing
+ * READY once it has said so. It is read as a table on preflop with no turn, no board and no rack
+ * — the screen's `waiting` mode is what names it and swaps the betting row out.
  */
 function perspectiveOf(
   view: RoomView,
@@ -376,7 +488,8 @@ function perspectiveOf(
   heroId: PlayerId,
   dictionary: Dictionary,
 ): HeroPerspective | null {
-  const phase = roundPhaseOf(view.phase);
+  const waiting = view.phase === WAITING_PHASE;
+  const phase = waiting ? "preflop" : roundPhaseOf(view.phase);
   if (phase === null) return null;
 
   const seats = engineOrder(view.seats).map((seat) => {
@@ -399,12 +512,19 @@ function perspectiveOf(
     };
   });
   const heroWord = priv?.word.status;
+  const ordered = engineOrder(view.seats);
+  const lastActions = waiting
+    ? new Map(
+        ordered.flatMap((seat, index) => (seat.ready ? [[index, "ready" as const] as const] : [])),
+      )
+    : undefined;
 
   return {
     id: idOf(view),
     handId: `online-hand-${view.handCount}`,
     // The chip layer's flights are the offline adapter's only, so far: the room's felt draws none.
     flights: [],
+    ...(lastActions ? { lastActions } : {}),
     phase,
     seatCount: feltSeatCount(view.maxSeats),
     seats,
@@ -485,6 +605,10 @@ function decodeRoom(state: unknown): RoomView | null {
         ? {
             winner: stringOf(result.winner),
             standings: iterate(result.standings).map(decodeStanding),
+            pot: iterate(result.pots).reduce<number>(
+              (total, pot) => total + numberOf(isRecord(pot) ? pot.amount : 0),
+              0,
+            ),
           }
         : null,
   };
@@ -506,6 +630,7 @@ function decodeSeats(seats: unknown): readonly SeatView[] {
       folded: value.hasFolded === true,
       sittingOut: value.sittingOut === true,
       actedThisRound: value.actedThisRound === true,
+      ready: value.ready === true,
     });
   }
   return out;
@@ -524,9 +649,16 @@ function decodeStanding(value: unknown): ResultStandingView {
   const record = isRecord(value) ? value : {};
   return {
     playerId: stringOf(record.playerId),
+    seat: numberOf(record.seat),
     score: numberOf(record.score),
     place: numberOf(record.place),
     word: stringOf(record.word),
+    // The schema spells "no reason" as an empty string; the reasons themselves are the engine's.
+    reason: stringOf(record.reason) === "" ? null : (stringOf(record.reason) as WordRejectionReason),
+    tiles: iterate(record.tiles).map(decodeTile),
+    base: numberOf(record.base),
+    mult: numberOf(record.mult),
+    rack: numberOf(record.rack),
   };
 }
 
@@ -563,6 +695,7 @@ function decodePrivate(payload: unknown): PrivateView | null {
   const confirmed = isRecord(word.confirmed) ? word.confirmed : null;
 
   return {
+    hand: numberOf(payload.hand),
     rack: iterate(payload.rack).map(decodeTile),
     isYourTurn: payload.isYourTurn === true,
     word: {

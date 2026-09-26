@@ -67,6 +67,8 @@ export {
 export { WORD_WINDOW_MS } from "./word-window";
 export type { WordSlot, WordWindow } from "./word-window";
 export { scoreWord } from "./scoring";
+export { playedWord } from "./played-word";
+export type { PlayedWord } from "./played-word";
 export { awardChips, commitChips } from "./chips";
 export type { ChipSeat, CommitResult } from "./chips";
 export { DEFAULT_STAKES, applyBettingAction, bettingBounds, nextActor } from "./betting";

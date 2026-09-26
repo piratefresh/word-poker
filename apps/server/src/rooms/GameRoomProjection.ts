@@ -5,7 +5,7 @@ import {
   type PrivateWordState,
 } from "@wordpoker/contracts";
 import type { Tile } from "@wordpoker/contracts";
-import { buildPots, type OfflineState } from "@wordpoker/game-rules";
+import { buildPots, playedWord, type OfflineState } from "@wordpoker/game-rules";
 
 import {
   BettingState,
@@ -28,6 +28,7 @@ export interface ProjectionBinding {
   readonly seat: number;
   readonly connected: boolean;
   readonly tableStack: number;
+  readonly ready: boolean;
 }
 
 export interface GameRoomProjectionInput {
@@ -71,6 +72,7 @@ export class GameRoomProjection {
       playerId: input.binding.playerId,
       seat: input.binding.seat,
       tableStack: seat?.stack ?? input.binding.tableStack,
+      hand: input.game?.hand ?? 0,
       rack: seat?.privateTiles.map((tile) => ({ ...tile })) ?? [],
       word: privateWordState(input.game, input.binding.playerId),
       isYourTurn: activeTurn,
@@ -112,6 +114,7 @@ export class GameRoomProjection {
       seat.hasFolded = engineSeat?.folded ?? false;
       seat.sittingOut = engineSeat?.sittingOut ?? false;
       seat.actedThisRound = engineSeat?.actedThisRound ?? false;
+      seat.ready = binding.ready;
       this.state.seats.set(binding.playerId, seat);
     }
   }
@@ -194,6 +197,12 @@ export class GameRoomProjection {
       projected.hasCompared = standing.compared !== null;
       projected.word = standing.word ?? "";
       projected.reason = standing.reason ?? "";
+      // The reveal is §7's own breakdown out of the engine, so the felt never re-prices a word.
+      const played = input.game === null ? null : playedWord(input.game, standing.seat);
+      for (const tile of played?.tiles ?? []) projected.tiles.push(projectTile(tile));
+      projected.base = played?.base ?? 0;
+      projected.mult = played?.mult ?? 0;
+      projected.rack = played?.rack ?? 0;
       projection.standings.push(projected);
     }
 

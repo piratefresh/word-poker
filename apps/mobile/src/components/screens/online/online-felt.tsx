@@ -6,18 +6,26 @@
  * felt never learns it is online — it renders the `GameScreenState` and `WordDraft` the adapter
  * maps off the room, and the check doubles as §19's confirm exactly as it does offline.
  *
+ * Before the first deal the felt is already the table: the seats that have sat down, around an
+ * empty board, with the action row holding the one thing a seat can do yet — say it is ready.
+ * The room deals once every seat has (two at least), and the row turns into the betting controls.
+ *
  * Authority is the server's: every control here dispatches to the room and waits for the
- * broadcast to reflect it. There is no deal, no new-game and no results overlay yet — the room
- * deals the next hand on its own clock, and the settled-hand surface is a later story; the felt
- * shows the payout state the broadcast carries. Leaving goes through the session so the seat is
- * released, then back to the lobby.
+ * broadcast to reflect it. There is no deal and no new-game — the room deals the next hand on its
+ * own clock. At payout the felt presents the same results surface the offline table does, off
+ * the room's own reveal (STO-430): DEAL ANOTHER only closes it, since the deal is the room's,
+ * and the next deal closes it anyway. Leaving goes through the session so the seat is released,
+ * then back to the lobby.
  */
 
+import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import { ActionButton } from "@/components/screens/game/game-primitives";
 import { GameScreen } from "@/components/screens/game/game-screen";
+import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { WordBuilder, WordHand, WordPreview, WordShuffleButton } from "@/components/word-builder";
 import { colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
 import { useOnlineGame, type GameRoomLike } from "@/lib/use-online-game";
@@ -33,10 +41,11 @@ export function OnlineFelt({
   /** Release the seat and leave the table — the felt's own way out (§3). */
   onLeave: () => void;
 }) {
-  const { game, words, fold, primary, allIn, wager, setDraft } = useOnlineGame({
-    room,
-    dictionary,
-  });
+  const { game, results, words, waiting, setReady, fold, primary, allIn, wager, setDraft } =
+    useOnlineGame({ room, dictionary });
+  // The hand whose results the seat has put away: the room keeps the payout on the felt until it
+  // deals again, so a dismissed hand must not reopen on the next patch.
+  const [dismissed, setDismissed] = useState<number | null>(null);
   const connection = useRoomConnection(room);
 
   const reconnecting = connection === "reconnecting";
@@ -45,6 +54,17 @@ export function OnlineFelt({
   const body =
     game === null ? (
       <View style={styles.table} testID="online-felt-waiting" />
+    ) : waiting !== null ? (
+      <View style={styles.table} testID="online-felt-waiting">
+        <GameScreen
+          game={game}
+          onBack={onLeave}
+          waiting={{
+            stamp: "WAITING FOR PLAYERS",
+            controls: <ReadyControls {...waiting} onReady={setReady} />,
+          }}
+        />
+      </View>
     ) : (
       <WordBuilder
         community={game.community}
@@ -82,7 +102,51 @@ export function OnlineFelt({
   return (
     <View style={styles.root}>
       {body}
+      {results !== null && results.hand !== dismissed ? (
+        <ResultsScreen
+          onDeal={() => setDismissed(results.hand)}
+          onExit={onLeave}
+          snapshot={results}
+        />
+      ) : null}
       {reconnecting ? <ReconnectingBanner /> : null}
+    </View>
+  );
+}
+
+/**
+ * The waiting room's action row: how many seats are ready, and the hero's own toggle. A seat that
+ * said ready can take it back until the deal — the button reads as the thing a tap will do.
+ */
+function ReadyControls({
+  ready,
+  seated,
+  heroReady,
+  onReady,
+}: {
+  ready: number;
+  seated: number;
+  heroReady: boolean;
+  onReady: (ready: boolean) => void;
+}) {
+  const status =
+    seated < 2
+      ? "Waiting for another player to sit down"
+      : `${ready} of ${seated} ready — the hand deals when everyone is`;
+  return (
+    <View style={styles.ready}>
+      <Text style={styles.readyStatus} testID="online-ready-status">
+        {status}
+      </Text>
+      <View style={styles.readyRow}>
+        <ActionButton
+          gold={!heroReady}
+          label={heroReady ? "NOT READY" : "I'M READY"}
+          onPress={() => onReady(!heroReady)}
+          testID="action-ready"
+          wide
+        />
+      </View>
     </View>
   );
 }
@@ -115,6 +179,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: spacing.xxxl,
   },
+  ready: { gap: spacing.xs, paddingTop: spacing.xs },
+  readyStatus: {
+    color: colors.textDim,
+    fontFamily: fonts.mono,
+    fontSize: fontSize.caption,
+    letterSpacing: 1,
+    textAlign: "center",
+  },
+  readyRow: { flexDirection: "row" },
   bannerText: {
     color: colors.goldHi,
     fontFamily: fonts.monoBold,

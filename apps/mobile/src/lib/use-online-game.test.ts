@@ -116,6 +116,7 @@ function privateState(over: Record<string, unknown> = {}) {
     playerId: HERO,
     seat: 0,
     tableStack: 5_000,
+    hand: 1,
     rack: RACK.map((tile) => ({ ...tile })),
     word: { status: "none", draft: null, confirmed: null },
     isYourTurn: true,
@@ -146,6 +147,82 @@ describe("useOnlineGame", () => {
     expect(game?.players[0]?.status).toBe("your-turn");
     expect(game?.players[1]?.isHero).toBeFalsy();
     expect(game?.privateTiles).toHaveLength(2);
+  });
+
+  test("never pairs the next hand's rack with the last hand's board", async () => {
+    // The room sends the new rack as a message the moment it deals, and the new board a patch
+    // later: for that tick the old board can hold a tile the reshuffled bag just dealt the hero.
+    const board = [{ id: "t-g", letter: "G", points: 2 }, { id: "t-x", letter: "X", points: 8 }];
+    const room = makeRoom(HERO, liveState({ phase: "payout", community: board }));
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ hand: 2 })));
+
+    const between = handle.current.game;
+    const ids = [...(between?.privateTiles ?? []), ...(between?.community ?? [])].map(
+      (tile) => tile?.id,
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(between?.privateTiles).toHaveLength(0);
+
+    // The patch lands: the board is the new hand's, and the rack is back beside it.
+    await act(async () => room.emitState(liveState({ handCount: 2 })));
+    expect(handle.current.game?.privateTiles.map((tile) => tile.id)).toEqual(["t-g", "t-o"]);
+  });
+
+  test("maps the room's payout into the results screen's snapshot, and no seed (STO-430)", async () => {
+    const standing = (playerId: string, seatIndex: number, place: number, over = {}) => ({
+      playerId,
+      seat: seatIndex,
+      score: 0,
+      place,
+      decidedBy: "score",
+      compared: 0,
+      hasCompared: false,
+      word: "",
+      reason: "",
+      tiles: [],
+      base: 0,
+      mult: 0,
+      rack: 0,
+      ...over,
+    });
+    const room = makeRoom(
+      HERO,
+      liveState({
+        phase: "payout",
+        toActSeat: -1,
+        betting: { active: false },
+        result: {
+          available: true,
+          winner: HERO,
+          standings: [
+            standing(HERO, 0, 1, {
+              score: 3,
+              word: "GO",
+              tiles: RACK.map((tile) => ({ ...tile, kind: "letter" })),
+              base: 3,
+            }),
+            standing(OPPONENT, 1, 2, { reason: "not-a-word" }),
+          ],
+          pots: [{ amount: 200 }, { amount: 50 }],
+        },
+      }),
+    );
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+
+    const results = handle.current.results;
+    expect(results?.hand).toBe(1);
+    expect(results?.seed).toBeNull();
+    expect(results?.pot).toBe(250);
+    expect(results?.seats.map((seat) => seat.playerId)).toEqual([HERO, OPPONENT]);
+    expect(results?.seats[0]).toMatchObject({ word: "GO", total: 3, base: 3, takesPot: true, isYou: true });
+    expect(results?.seats[0]?.tiles.map((tile) => tile.id)).toEqual(["t-g", "t-o"]);
+    expect(results?.seats[1]).toMatchObject({ word: null, reason: "not-a-word", takesPot: false });
+
+    // The next deal clears the broadcast's result, and the results with it.
+    await act(async () => room.emitState(liveState({ handCount: 2 })));
+    expect(handle.current.results).toBeNull();
   });
 
   test("arms the action row from the engine's bounds when it is the hero's turn", async () => {
@@ -203,6 +280,52 @@ describe("useOnlineGame", () => {
     await act(async () => handle.current.wager(300));
 
     expect(room.sends).toEqual([{ type: GAME_MESSAGES.betting, payload: { type: "bet", amount: 300 } }]);
+  });
+
+  test("sends a draft built during betting when the word window opens", async () => {
+    const room = makeRoom(HERO, liveState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+
+    const plays = RACK.map((tile) => ({ tileId: tile.id }));
+    await act(async () => handle.current.setDraft(plays));
+
+    expect(handle.current.words?.word).toBe("GO");
+    expect(room.sends).not.toContainEqual({
+      type: GAME_MESSAGES.draftWord,
+      payload: { submission: { plays } },
+    });
+
+    await act(async () =>
+      room.emitState(
+        liveState({
+          phase: "river",
+          toActSeat: -1,
+          betting: { active: false },
+          wordWindow: {
+            active: true,
+            status: "open",
+            slots: [{ playerId: HERO, status: "drafting" }],
+          },
+        }),
+      ),
+    );
+
+    expect(room.sends).toContainEqual({
+      type: GAME_MESSAGES.draftWord,
+      payload: { submission: { plays } },
+    });
+
+    await act(async () =>
+      room.emit(
+        GAME_EVENTS.privateState,
+        privateState({
+          isYourTurn: false,
+          word: { status: "drafting", draft: { plays }, confirmed: null },
+        }),
+      ),
+    );
+    expect(handle.current.words?.confirmable).toBe(true);
   });
 
   test("builds the word the whole hand and locks it in only on confirm", async () => {
@@ -279,7 +402,7 @@ describe("useOnlineGame", () => {
       betting: { active: true, currentBet: 100, minRaise: 100, bigBlind: 100 },
     });
     await act(async () => room.emitState(next));
-    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ hand: 2 })));
 
     expect(handle.current.game?.betting.canFold).toBe(true);
     expect(handle.current.game?.betting.callAmount).toBe(100);
@@ -317,11 +440,47 @@ describe("useOnlineGame", () => {
     expect(handle.current.words?.reason).toBe("not-in-dictionary");
   });
 
-  test("has no felt while the table is still waiting to deal", async () => {
+  test("draws the waiting table: the seats, who is ready, and no hand", async () => {
+    const room = makeRoom(
+      HERO,
+      liveState({
+        phase: "waiting",
+        handCount: 0,
+        dealerSeat: -1,
+        toActSeat: -1,
+        betting: { active: false, currentBet: 0, minRaise: 0, minBet: 100 },
+        seats: new Map<string, unknown>([
+          [HERO, seat(HERO, 0)],
+          [OPPONENT, seat(OPPONENT, 1, { ready: true })],
+        ]),
+      }),
+    );
+    const handle = await mount(room);
+
+    expect(handle.current.phase).toBe("waiting");
+    expect(handle.current.waiting).toEqual({ ready: 1, seated: 2, heroReady: false });
+    expect(handle.current.words).toBeNull();
+    const [hero, opponent] = handle.current.game?.players ?? [];
+    expect(hero?.status).toBe("waiting");
+    expect(opponent?.status).toBe("ready");
+    expect(handle.current.game?.betting.canFold).toBe(false);
+  });
+
+  test("says the hero is ready, and takes it back", async () => {
     const room = makeRoom(HERO, liveState({ phase: "waiting" }));
     const handle = await mount(room);
 
-    expect(handle.current.game).toBeNull();
-    expect(handle.current.phase).toBe("waiting");
+    await act(async () => handle.current.setReady(true));
+    await act(async () => handle.current.setReady(false));
+
+    expect(room.sends).toEqual([
+      { type: GAME_MESSAGES.ready, payload: { ready: true } },
+      { type: GAME_MESSAGES.ready, payload: { ready: false } },
+    ]);
+  });
+
+  test("has no waiting room once the hand is live", async () => {
+    const handle = await mount(makeRoom(HERO, liveState()));
+    expect(handle.current.waiting).toBeNull();
   });
 });

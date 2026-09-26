@@ -38,6 +38,8 @@ import {
   turnKey,
 } from "./game-screen-hud";
 import type { BettingState, GamePlayer, GameScreenState } from "./game-types";
+import { BackdropUrgencyProvider, toggleBackdropStyle } from "./backdrop-style";
+import { TableBackdrop } from "./table-backdrop";
 
 export interface GameScreenProps {
   game: GameScreenState;
@@ -77,6 +79,12 @@ export interface GameScreenProps {
   onChipFlightEnd?: (id: string) => void;
   /** Seat tap, for a caller that opens a player view. Without it a seat is not a control. */
   onSeatPress?: (player: GamePlayer) => void;
+  /**
+   * The table before its first deal: the HUD names it with `stamp` and runs no clock, and
+   * `controls` stand where the betting row goes — the same place a seat will look once the hand
+   * is live, so the one thing it can do now (say it is ready) is where its moves will be.
+   */
+  waiting?: { stamp: string; controls: ReactNode };
 }
 
 /** No wallet is wired into the hand yet, so the HUD says so instead of painting `$0`. */
@@ -106,9 +114,10 @@ function GameScreenBody({
   onAllIn,
   onChipFlightEnd,
   onSeatPress,
+  waiting,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
-  const { height, width } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const compact = height - insets.top - insets.bottom < 690;
   // The slider's amount belongs to the round, not to the screen: a new street — or a bet the
   // hero has to answer — moves the raise floor, and an amount left over from the last round
@@ -158,11 +167,13 @@ function GameScreenBody({
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
+      <BackdropUrgencyProvider value={waiting || view.paused ? 0 : view.elapsedFraction}>
+        <TableBackdrop />
+      </BackdropUrgencyProvider>
       <View
         style={[
           styles.content,
           {
-            maxWidth: Math.min(520, width),
             paddingBottom: insets.bottom,
             paddingTop: insets.top + HUD_CHROME_HEIGHT,
           },
@@ -202,26 +213,32 @@ function GameScreenBody({
             privateTiles={game.privateTiles}
           />
         )}
-        <BettingControls
-          amount={raiseAmount}
-          leading={bettingLeading}
-          onAllIn={onAllIn}
-          onAmountChange={changeRaise}
-          onCheckOrCall={onCheckOrCall}
-          onFold={onFold}
-          onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
-          state={game.betting}
-        />
+        {waiting ? (
+          <View style={styles.betting}>{waiting.controls}</View>
+        ) : (
+          <BettingControls
+            amount={raiseAmount}
+            leading={bettingLeading}
+            onAllIn={onAllIn}
+            onAmountChange={changeRaise}
+            onCheckOrCall={onCheckOrCall}
+            onFold={onFold}
+            onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
+            state={game.betting}
+          />
+        )}
       </View>
       <Hud
         balance={BALANCE_UNAVAILABLE}
         handId={game.handId}
         onHelp={onHelp}
         onLeave={goBack}
-        onSettings={onSettings}
+        // Until the table has a settings sheet, the gear flips the backdrop between its two looks.
+        onSettings={onSettings ?? toggleBackdropStyle}
         phase={game.phase}
+        stamp={waiting?.stamp}
         style={{ top: insets.top }}
-        turn={view}
+        turn={waiting ? null : view}
         turnPhrase={heroTurnPhrase(game)}
       />
     </LinearGradient>

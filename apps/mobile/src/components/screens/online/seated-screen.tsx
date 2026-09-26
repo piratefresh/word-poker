@@ -1,4 +1,12 @@
-import { Button, Column, Host, Row, Spacer, Text, type UniversalTextStyle } from "@expo/ui";
+import {
+  Button,
+  Column,
+  Host,
+  Row,
+  Spacer,
+  Text,
+  type UniversalTextStyle,
+} from "@expo/ui";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -132,32 +140,41 @@ export function SeatedScreen() {
 
   // A seat held at some other table is not this table's face — the join above is what moves it.
   const table =
-    session.status === "seated" && session.roomId === roomId ? session.table : undefined;
+    session.status === "seated" && session.roomId === roomId
+      ? session.table
+      : undefined;
 
-  // A hand is live once the table leaves the waiting room; only then does the felt have a hand to
-  // draw. The dictionary is loading in parallel (§11 judges the word against it), so a hand that
-  // deals before it lands holds on the table's own card until it arrives, then swaps to the felt.
-  const liveHand = table !== undefined && table.phase !== WAITING_PHASE;
-
-  const body =
-    liveHand && room !== null && dictionary !== null ? (
-      <OnlineFelt dictionary={dictionary} onLeave={leave} room={room} />
-    ) : table !== undefined ? (
-      <TableFace leaving={leaving} onLeave={leave} table={table} />
-    ) : session.status === "error" ? (
-      <Notice
-        message={session.error ?? REFUSAL_FALLBACK}
-        onLobby={toLobby}
-        testID="seated-error"
-      />
-    ) : session.status === "lost" ? (
-      <Notice message={session.error ?? LOST_FALLBACK} onLobby={toLobby} testID="seated-lost" />
-    ) : (
-      <Joining />
-    );
+  // The felt is the table from the moment the seat is taken: it draws the waiting room (the seats,
+  // and the ready toggle where the betting row will be) as well as the hand. The dictionary is
+  // loading in parallel (§11 judges the word against it), so until it lands the table shows its
+  // own card, then swaps to the felt.
+  const felt = table !== undefined && room !== null && dictionary !== null;
+  const body = felt ? (
+    <OnlineFelt dictionary={dictionary} onLeave={leave} room={room} />
+  ) : table !== undefined ? (
+    <TableFace leaving={leaving} onLeave={leave} table={table} />
+  ) : session.status === "error" ? (
+    <Notice
+      message={session.error ?? REFUSAL_FALLBACK}
+      onLobby={toLobby}
+      testID="seated-error"
+    />
+  ) : session.status === "lost" ? (
+    <Notice
+      message={session.error ?? LOST_FALLBACK}
+      onLobby={toLobby}
+      testID="seated-lost"
+    />
+  ) : (
+    <Joining />
+  );
 
   return (
-    <View accessibilityLabel="Online table" style={styles.screen} testID="seated-screen">
+    <View
+      accessibilityLabel="Online table"
+      style={felt ? styles.feltScreen : styles.screen}
+      testID="seated-screen"
+    >
       {body}
     </View>
   );
@@ -220,7 +237,15 @@ function TableFace({
 }
 
 /** One line of the table's stakes: the game's own word for it, and the state's own number. */
-function Stat({ label, value, testID }: { label: string; value: string; testID: string }) {
+function Stat({
+  label,
+  value,
+  testID,
+}: {
+  label: string;
+  value: string;
+  testID: string;
+}) {
   return (
     <Row alignment="center" spacing={spacing.md} style={styles.stat}>
       <Text textStyle={factLabelText}>{label}</Text>
@@ -235,7 +260,11 @@ function Stat({ label, value, testID }: { label: string; value: string; testID: 
 /** The seat is being taken: nothing to show and nothing to press until the table answers. */
 function Joining() {
   return (
-    <View accessibilityLabel="Taking your seat" style={styles.card} testID="seated-joining">
+    <View
+      accessibilityLabel="Taking your seat"
+      style={styles.card}
+      testID="seated-joining"
+    >
       <Host colorScheme="dark" matchContents seedColor={colors.gold}>
         <Column alignment="start" spacing={spacing.sm}>
           <Text textStyle={kickerText}>ONLINE TABLE</Text>
@@ -281,6 +310,9 @@ function Notice({
 }
 
 const styles = StyleSheet.create({
+  // The felt lays out its own column (GameScreen caps and centres it); the centred, padded frame is
+  // for the table card and the notices only.
+  feltScreen: { backgroundColor: colors.bg, flex: 1 },
   screen: {
     alignItems: "center",
     backgroundColor: colors.bg,

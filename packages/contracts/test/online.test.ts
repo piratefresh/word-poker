@@ -19,6 +19,7 @@ describe("online message vocabulary", () => {
       betting: "betting",
       draftWord: "draftWord",
       confirmWord: "confirmWord",
+      ready: "ready",
     });
     assert.deepEqual(GAME_EVENTS, {
       privateState: "privateState",
