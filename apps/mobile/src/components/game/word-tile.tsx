@@ -1,7 +1,15 @@
 import type { LetterMultiplier, Tile as WireTile } from "@wordpoker/contracts";
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -33,6 +41,8 @@ import {
   opacity,
   palette,
 } from "@/constants/theme";
+
+import { useTileTexture } from "./tile-texture/use-tile-texture";
 
 /**
  * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
@@ -176,6 +186,7 @@ export function Tile({
 }: TileProps) {
   const metrics = TILE_METRICS[size];
   const second = secondFace(tile);
+  const texture = useTileTexture(tile.id, metrics.width, metrics.height);
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -471,8 +482,8 @@ export function Tile({
             frontMotion,
           ]}
         >
-          <LinearGradient {...gradients.tile} style={styles.faceFill}>
-            <View style={styles.paperHighlight} />
+          {/* STO-479: the pixel-art face once Skia has painted it; the gradient until then. */}
+          <FaceFill texture={texture}>
             {second === null ? null : (
               // §10: a choice tile has to look special. The pair wears an accent strip no
               // single letter does, over the tile's own ownership border.
@@ -535,7 +546,7 @@ export function Tile({
             >
               {facePoints(tile).join("/")}
             </Text>
-          </LinearGradient>
+          </FaceFill>
         </Animated.View>
         <Animated.View
           importantForAccessibility="no-hide-descendants"
@@ -580,6 +591,24 @@ export function Tile({
   );
 }
 
+/** The front face's ground: the painted texture under the letters, or the gradient fallback. */
+function FaceFill({ texture, children }: { texture: string | null; children: ReactNode }) {
+  if (texture === null) {
+    return (
+      <LinearGradient {...gradients.tile} style={styles.faceFill}>
+        <View style={styles.paperHighlight} />
+        {children}
+      </LinearGradient>
+    );
+  }
+  return (
+    <View style={styles.faceFill}>
+      <Image source={{ uri: texture }} style={styles.texture} />
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   outer: { overflow: "visible" },
   shell: { ...elevation.tile },
@@ -593,6 +622,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   faceFill: { alignItems: "center", flex: 1, justifyContent: "center" },
+  texture: { height: "100%", left: 0, position: "absolute", top: 0, width: "100%" },
   paperHighlight: {
     backgroundColor: "rgba(255,255,255,0.35)",
     height: "38%",
@@ -670,8 +700,8 @@ const styles = StyleSheet.create({
   },
   selectedShell: {
     shadowColor: colors.goldHi,
-    shadowOpacity: 0.75,
-    shadowRadius: 9,
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
   dealGlint: {
     backgroundColor: "#ffffff",

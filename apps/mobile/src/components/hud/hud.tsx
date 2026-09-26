@@ -21,6 +21,8 @@ export interface HudProps {
   phase: RoundPhase;
   /** The live turn, or null between turns. */
   turn: TurnTimerView | null;
+  /** Words for the stamp in place of the phase's, for a table with no hand dealt yet. */
+  stamp?: string;
   /** Spoken turn phrase, e.g. "Magnus to act". */
   turnPhrase?: string;
   balance: BalanceView;
@@ -63,6 +65,7 @@ export function Hud({
   handId,
   phase,
   turn,
+  stamp,
   turnPhrase,
   balance,
   toastQueue,
@@ -95,6 +98,7 @@ export function Hud({
           // screens each deciding what number a phase is would eventually disagree.
           phaseNumber={PHASE_NUMBER[phase]}
           reduceMotion={reduceMotion}
+          stamp={stamp}
           tick={tick}
           turn={turn}
           turnPhrase={turnPhrase}

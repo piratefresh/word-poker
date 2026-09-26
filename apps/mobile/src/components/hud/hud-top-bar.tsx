@@ -56,6 +56,8 @@ export interface HudTopBarProps {
   phaseNumber: number;
   /** The active turn, or null between turns. */
   turn: TurnTimerView | null;
+  /** Words for the stamp in place of the phase's, for a table with no hand dealt yet. */
+  stamp?: string;
   balance: BalanceView;
   /** Back slot: this is the leave-table affordance. */
   onLeave?: () => void;
@@ -123,6 +125,7 @@ const GEAR_TEETH = [0, 45, 90, 135, 180, 225, 270, 315].map((degrees) => {
 export function HudTopBar({
   phase,
   phaseNumber,
+  stamp,
   turn,
   balance,
   onLeave,
@@ -183,7 +186,7 @@ export function HudTopBar({
       </GlassButton>
       <BalanceChip balance={balance} onPress={onBalancePress} />
       <Animated.View style={[styles.centre, entrance]}>
-        <Text style={styles.stamp}>{`PHASE ${phaseNumber} · ${PHASE_LABEL[phase]}`}</Text>
+        <Text style={styles.stamp}>{stamp ?? `PHASE ${phaseNumber} · ${PHASE_LABEL[phase]}`}</Text>
         <TurnClock
           loopsEnabled={loopsOn}
           phrase={turnPhrase}

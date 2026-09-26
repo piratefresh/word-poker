@@ -13,6 +13,7 @@ import Animated, {
 
 import { Tile } from "@/components/game";
 import type { SeatSlot } from "@/components/table";
+import { GradientAvatar } from "@/components/ui/gradiant-avatar";
 import {
   border,
   colors,
@@ -41,6 +42,7 @@ const STATUS_LABEL: Record<PlayerStatus, string> = {
   "all-in": "ALL-IN",
   busted: "BUSTED",
   winner: "WINNER",
+  ready: "READY",
 };
 const ROLE_LABEL: Record<PlayerRole, string> = {
   dealer: "D",
@@ -189,15 +191,18 @@ export function PlayerSeat({ seat, anchor }: SeatSlot<GamePlayer>) {
   return (
     <View style={[styles.seat, out && styles.folded]}>
       <View style={styles.avatarWrap}>
-        <View
+        {/* Seeded by the seat's id, so a player keeps one look all game; it swirls while they act. */}
+        <GradientAvatar
+          animated={active}
+          size={SEAT_AVATAR_SIZE}
           style={[
             styles.avatar,
-            { backgroundColor: seat.color },
             lit && { borderColor: statusColor, borderWidth: 3 },
             winner && glow(colors.goldHi, 16),
-          ]}>
+          ]}
+          token={seat.id}>
           <Text style={styles.initials}>{seat.initials}</Text>
-        </View>
+        </GradientAvatar>
         {seat.roles?.length ? (
           <View style={styles.roleRow}>
             {seat.roles.map((role) => (
@@ -585,6 +590,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansBold,
     fontSize: 11,
     letterSpacing: 1,
+    textAlign: "center",
   },
   goldActionText: { color: colors.onGold },
   disabled: { opacity: opacity.disabled },
