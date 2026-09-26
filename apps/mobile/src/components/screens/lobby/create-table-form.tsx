@@ -14,10 +14,18 @@
  * this screen is driven on the web.
  */
 
-import { BottomSheet, Button, Column, Picker, RNHostView, Text, type UniversalTextStyle } from "@expo/ui";
+import {
+  BottomSheet,
+  Column,
+  Picker,
+  RNHostView,
+  ScrollView,
+  Text,
+  type UniversalTextStyle,
+} from "@expo/ui";
 import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, TextInput } from "react-native";
+import { Pressable, Text as RNText, StyleSheet, TextInput, View } from "react-native";
 
 import {
   BUY_IN_PRESETS,
@@ -28,7 +36,8 @@ import {
   type RoomCreateField,
 } from "@wordpoker/contracts";
 
-import { border, colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
+import { GoldButton } from "@/components/ui/gold-button";
+import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
 import { createTable } from "@/lib/room-session";
 
@@ -97,6 +106,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
+  actions: {
+    alignSelf: "stretch",
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+  },
+  cancel: {
+    alignItems: "center",
+    paddingVertical: spacing.md,
+  },
+  cancelLabel: {
+    color: colors.textDim,
+    fontFamily: fonts.sansBold,
+    fontSize: fontSize.small,
+    letterSpacing: 1,
+  },
 });
 
 /**
@@ -142,85 +166,106 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
   };
 
   return (
-    <BottomSheet isPresented={visible} onDismiss={dismiss} testID="create-table-sheet">
-      <Column alignment="start" spacing={spacing.lg}>
-        <Column alignment="start" spacing={spacing.xxs}>
-          <Text textStyle={titleText}>Create a table</Text>
-          <Text textStyle={kickerText}>STAKES AND SEATS</Text>
-        </Column>
+    <BottomSheet
+      containerColor={palette.felt800}
+      isPresented={visible}
+      onDismiss={dismiss}
+      snapPoints={["full"]}
+      testID="create-table-sheet"
+    >
+      <ScrollView testID="create-table-scroll">
+        <Column alignment="start" spacing={spacing.lg}>
+          <Column alignment="start" spacing={spacing.xxs}>
+            <Text textStyle={titleText}>Create a table</Text>
+            <Text textStyle={kickerText}>STAKES AND SEATS</Text>
+          </Column>
 
-        <Column alignment="start" spacing={spacing.xs}>
-          <Text textStyle={fieldLabelText}>TABLE NAME</Text>
+          <Column alignment="start" spacing={spacing.xs}>
+            <Text textStyle={fieldLabelText}>TABLE NAME</Text>
+            <RNHostView>
+              <TextInput
+                accessibilityLabel="Table name"
+                autoCapitalize="words"
+                autoCorrect={false}
+                onChangeText={setName}
+                placeholder="Sunday felt"
+                placeholderTextColor={colors.textFaint}
+                style={styles.input}
+                testID="create-table-name"
+                value={name}
+              />
+            </RNHostView>
+            {refusal?.field === "name" ? (
+              <Text testID="create-table-name-refusal" textStyle={refusalText}>
+                {refusal.message}
+              </Text>
+            ) : null}
+          </Column>
+
+          <Column alignment="start" spacing={spacing.xs}>
+            <Text textStyle={fieldLabelText}>BUY-IN</Text>
+            <Picker
+              onValueChange={(value) => setBuyIn(value as BuyInPreset)}
+              selectedValue={buyIn}
+              testID="create-table-buy-in"
+            >
+              {BUY_IN_PRESETS.map((preset) => (
+                <Picker.Item key={preset} label={formatAmount(preset)} value={preset} />
+              ))}
+            </Picker>
+            {refusal?.field === "buyIn" ? (
+              <Text testID="create-table-buy-in-refusal" textStyle={refusalText}>
+                {refusal.message}
+              </Text>
+            ) : null}
+          </Column>
+
+          <Column alignment="start" spacing={spacing.xs}>
+            <Text textStyle={fieldLabelText}>SEATS</Text>
+            <Picker
+              onValueChange={setMaxSeats}
+              selectedValue={maxSeats}
+              testID="create-table-seats"
+            >
+              {SEAT_COUNTS.map((count) => (
+                <Picker.Item key={count} label={`${count} seats`} value={count} />
+              ))}
+            </Picker>
+            {refusal?.field === "maxSeats" ? (
+              <Text testID="create-table-seats-refusal" textStyle={refusalText}>
+                {refusal.message}
+              </Text>
+            ) : null}
+          </Column>
+
+          {refusal !== null && refusal.field === null ? (
+            <Text testID="create-table-error" textStyle={refusalText}>
+              {refusal.message}
+            </Text>
+          ) : null}
+
+          {/* The universal Button draws as dark bare text on the web — invisible on the felt
+              (STO-445) — so the actions are the design's gold primary and a text link. */}
           <RNHostView>
-            <TextInput
-              accessibilityLabel="Table name"
-              autoCapitalize="words"
-              autoCorrect={false}
-              onChangeText={setName}
-              placeholder="Sunday felt"
-              placeholderTextColor={colors.textFaint}
-              style={styles.input}
-              testID="create-table-name"
-              value={name}
-            />
+            <View style={styles.actions}>
+              <GoldButton
+                disabled={submitting}
+                label={submitting ? "Creating…" : "Create"}
+                onPress={submit}
+                testID="create-table-submit"
+              />
+              <Pressable
+                accessibilityRole="button"
+                onPress={dismiss}
+                style={styles.cancel}
+                testID="create-table-cancel"
+              >
+                <RNText style={styles.cancelLabel}>Cancel</RNText>
+              </Pressable>
+            </View>
           </RNHostView>
-          {refusal?.field === "name" ? (
-            <Text testID="create-table-name-refusal" textStyle={refusalText}>
-              {refusal.message}
-            </Text>
-          ) : null}
         </Column>
-
-        <Column alignment="start" spacing={spacing.xs}>
-          <Text textStyle={fieldLabelText}>BUY-IN</Text>
-          <Picker
-            onValueChange={(value) => setBuyIn(value as BuyInPreset)}
-            selectedValue={buyIn}
-            testID="create-table-buy-in"
-          >
-            {BUY_IN_PRESETS.map((preset) => (
-              <Picker.Item key={preset} label={formatAmount(preset)} value={preset} />
-            ))}
-          </Picker>
-          {refusal?.field === "buyIn" ? (
-            <Text testID="create-table-buy-in-refusal" textStyle={refusalText}>
-              {refusal.message}
-            </Text>
-          ) : null}
-        </Column>
-
-        <Column alignment="start" spacing={spacing.xs}>
-          <Text textStyle={fieldLabelText}>SEATS</Text>
-          <Picker
-            onValueChange={setMaxSeats}
-            selectedValue={maxSeats}
-            testID="create-table-seats"
-          >
-            {SEAT_COUNTS.map((count) => (
-              <Picker.Item key={count} label={`${count} seats`} value={count} />
-            ))}
-          </Picker>
-          {refusal?.field === "maxSeats" ? (
-            <Text testID="create-table-seats-refusal" textStyle={refusalText}>
-              {refusal.message}
-            </Text>
-          ) : null}
-        </Column>
-
-        {refusal !== null && refusal.field === null ? (
-          <Text testID="create-table-error" textStyle={refusalText}>
-            {refusal.message}
-          </Text>
-        ) : null}
-
-        <Button
-          disabled={submitting}
-          label={submitting ? "Creating…" : "Create"}
-          onPress={submit}
-          testID="create-table-submit"
-        />
-        <Button label="Cancel" onPress={dismiss} testID="create-table-cancel" variant="text" />
-      </Column>
+      </ScrollView>
     </BottomSheet>
   );
 }
