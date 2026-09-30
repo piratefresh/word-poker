@@ -11,8 +11,15 @@ import {
   type PrivateSeatState,
   type Tile,
 } from "@wordpoker/contracts";
-import { chooseOfflineWord, loadDictionary } from "@wordpoker/game-rules";
+import { chooseOfflineWord, loadDictionary, type OfflineState } from "@wordpoker/game-rules";
 
+import {
+  FOUR_SEAT_BUY_IN,
+  FOUR_SEAT_ROOM,
+  FOUR_SEAT_SCRIPT,
+  bestStripWord,
+  toEngineAction,
+} from "../scripts/four-seat-scenario.js";
 import appConfig from "../src/app.config.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
@@ -370,6 +377,97 @@ describe("GameRoom", () => {
       const standings = [...result.standings].map(({ word, score }) => ({ word, score }));
       const winnerSeat = room.state.seats.get(result.winner)?.seat;
       assert.deepStrictEqual({ winnerSeat, standings }, PINNED_408);
+    });
+
+    it("plays the seeded four-seat session (STO-483)", async () => {
+      // The four-browser smoke's script, over sockets: the same seed, actions and words the
+      // Maestro flows tap, so an engine change that breaks the smoke fails here in seconds.
+      const room = await colyseus.createRoom("game", {
+        name: "Four Table",
+        buyIn: FOUR_SEAT_BUY_IN,
+        maxSeats: 6,
+        ...FOUR_SEAT_ROOM,
+        payoutDelay: 50,
+        tickMs: 5,
+      });
+      const clients: ClientRoom[] = [];
+      const racks = new Map<ClientRoom, PrivateSeatState>();
+      const rejections: GameRejectionEvent[] = [];
+      for (let seat = 0; seat < 4; seat += 1) {
+        const client = await colyseus.connectTo(room);
+        client.onMessage(GAME_EVENTS.privateState, (payload) => racks.set(client, payload as PrivateSeatState));
+        client.onMessage(GAME_EVENTS.rejected, (payload) => rejections.push(payload as GameRejectionEvent));
+        clients.push(client);
+      }
+      assert.deepStrictEqual(
+        clients.map((client) => room.state.seats.get(client.sessionId)?.seat),
+        [0, 1, 2, 3],
+        "join order is seat order",
+      );
+      const engine = () => (room as unknown as { game: OfflineState }).game;
+      const stacks = () => clients.map((client) => room.state.seats.get(client.sessionId)?.tableStack);
+      const until = async (done: () => boolean, what: string) => {
+        for (let tick = 0; tick < 200 && !done(); tick += 1) await room.waitForNextTimestep();
+        assert.ok(done(), what);
+      };
+
+      await readyUp(room, clients);
+      const dictionary = await loadDictionary();
+      const words: string[][] = [];
+      const pots: number[][] = [];
+      for (const [handIndex, hand] of FOUR_SEAT_SCRIPT.entries()) {
+        const handNumber = handIndex + 1;
+        await until(() => room.state.handCount === handNumber && room.state.phase === "preflop", `hand ${handNumber} deals`);
+        if (handIndex === 2) {
+          assert.strictEqual(room.state.seats.get(clients[2]!.sessionId)?.sittingOut, true, "the bust sits hand 3 out");
+          // The busted seat sees the deal without it, then leaves the table mid-hand.
+          await clients[2]!.leave();
+        }
+        for (const scripted of hand.steps) {
+          assert.strictEqual(room.state.toActSeat, scripted.seat, `hand ${handNumber}: seat ${scripted.seat} acts`);
+          const { type, ...rest } = toEngineAction(engine(), scripted) as { type: string; playerId: string };
+          const { playerId: _playerId, ...amount } = rest;
+          // Every accepted action replaces the engine's state; a rejection leaves it be.
+          const before = engine();
+          clients[scripted.seat]!.send(GAME_MESSAGES.betting, { type, ...amount });
+          await until(() => engine() !== before, `hand ${handNumber}: seat ${scripted.seat} ${scripted.action} lands`);
+        }
+        assert.strictEqual(room.state.wordWindow.status, "open", `hand ${handNumber}: the river opens the window`);
+
+        await clientsCaughtUp(room, clients);
+        const board = [...room.state.community].map(tileFromRoomState);
+        for (const seat of hand.words) {
+          const rack = racks.get(clients[seat]!);
+          assert.ok(rack?.hand === handNumber, `hand ${handNumber}: seat ${seat} holds this hand's rack`);
+          const word = bestStripWord([...rack.rack, ...board], dictionary);
+          assert.ok(word, `hand ${handNumber}: seat ${seat} spells a word by taps`);
+          clients[seat]!.send(GAME_MESSAGES.confirmWord, { submission: word.submission });
+        }
+        await until(() => room.state.phase === "payout", `hand ${handNumber} settles`);
+        words.push([...room.state.result.standings].map((standing) => standing.word));
+        pots.push(engine().result!.payout.pots.map((pot) => pot.amount));
+
+        if (handIndex === 0) assert.deepStrictEqual(stacks(), [500, 580, 460, 460], "P2 wins hand 1; P3 and P4 lose 40");
+        if (handIndex === 1) {
+          assert.ok(pots[1]!.length >= 2, "the shove leaves a side pot");
+          assert.strictEqual(stacks()[2], 0, "P3's shove loses and busts");
+        }
+      }
+      assert.deepStrictEqual(rejections, [], "every scripted action and word is accepted");
+      assert.deepStrictEqual(words, [
+        ["DX", "YALE", "ILEA"],
+        ["TAX", "RX", "AX"],
+        ["TWEAK", "CALK", "ARAK"],
+      ]);
+      assert.deepStrictEqual(pots, [[120], [40, 1350, 20], [30]]);
+
+      // P3 left: the payout sends the table back to waiting, and the three left say ready again.
+      await until(() => room.state.phase === WAITING_PHASE, "the leave returns the table to waiting");
+      assert.strictEqual(room.state.seats.size, 3);
+      const stayed = [clients[0]!, clients[1]!, clients[3]!];
+      await readyUp(room, stayed);
+      assert.strictEqual(room.state.phase, "preflop", "hand 4 deals 3-handed");
+      assert.strictEqual(engine().seats.length, 3);
     });
 
     it("deals a short table once every seat is ready, and not before", async () => {
@@ -800,6 +898,48 @@ describe("GameRoom", () => {
       // client-chosen seed must not determine the deal.
       assert.strictEqual(racks.length, 2);
       assert.notStrictEqual(racks[0], racks[1], "two gates-off rooms must not replay one seed");
+    });
+
+    it("takes the smoke runner's room knobs from the env only behind the gate (STO-483)", async () => {
+      const previousGate = process.env.WORDPOKER_DETERMINISTIC_SEED;
+      const previousKnobs = process.env.WORDPOKER_SMOKE_ROOM;
+      process.env.WORDPOKER_SMOKE_ROOM = JSON.stringify({ seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 });
+      type Knobs = { seed: number; payoutDelay: number; turnDuration: number };
+      const knobsOf = (room: unknown) => {
+        const { seed, payoutDelay, turnDuration } = room as Knobs;
+        return { seed, payoutDelay, turnDuration };
+      };
+      try {
+        const lobbyForm = await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 6 });
+        assert.deepStrictEqual(
+          knobsOf(lobbyForm),
+          { seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 },
+          "a create that names no knobs takes the env's",
+        );
+
+        const explicit = await colyseus.createRoom("game", {
+          name: "Env knobs",
+          buyIn: 500,
+          maxSeats: 6,
+          seed: 7,
+          payoutDelay: 50,
+        });
+        assert.deepStrictEqual(
+          knobsOf(explicit),
+          { seed: 7, payoutDelay: 50, turnDuration: 120_000 },
+          "knobs the create names win over the env's",
+        );
+
+        delete process.env.WORDPOKER_DETERMINISTIC_SEED;
+        const ungated = knobsOf(await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 6 }));
+        assert.notStrictEqual(ungated.turnDuration, 120_000, "without the gate the env is ignored");
+        assert.notStrictEqual(ungated.payoutDelay, 20_000, "without the gate the env is ignored");
+      } finally {
+        if (previousGate === undefined) delete process.env.WORDPOKER_DETERMINISTIC_SEED;
+        else process.env.WORDPOKER_DETERMINISTIC_SEED = previousGate;
+        if (previousKnobs === undefined) delete process.env.WORDPOKER_SMOKE_ROOM;
+        else process.env.WORDPOKER_SMOKE_ROOM = previousKnobs;
+      }
     });
   });
 

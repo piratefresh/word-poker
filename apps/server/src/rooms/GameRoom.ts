@@ -107,6 +107,19 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       } as OnlineBettingAction & { playerId: string };
       this.apply(client, action, "betting");
     },
+    [GAME_MESSAGES.checkWord]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.checkWord, payload)) return;
+
+      this.apply(
+        client,
+        {
+          type: "checkWord",
+          playerId: client.sessionId,
+          submission: payload.submission,
+        },
+        "checkWord",
+      );
+    },
     [GAME_MESSAGES.draftWord]: (client: Client, payload: unknown) => {
       if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.draftWord, payload)) return;
 
@@ -160,7 +173,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 
-    const knobs = (rawOptions ?? {}) as RoomKnobs;
+    // A browser-driven smoke creates its table through the real lobby form, which cannot send a
+    // seed; behind the deterministic gate the smoke runner supplies the knobs here instead, and
+    // anything the create names still wins (STO-483).
+    const knobs = { ...smokeRoomDefaults(), ...((rawOptions ?? {}) as RoomKnobs) };
     if (
       process.env.WORDPOKER_DETERMINISTIC_SEED === "1" &&
       typeof knobs.seed === "number" &&
@@ -319,9 +335,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private apply(
     client: Client,
     action: OfflineAction,
-    message: "betting" | "draftWord" | "confirmWord",
+    message: "betting" | "checkWord" | "draftWord" | "confirmWord",
   ) {
     if (this.game === null) {
+      if (message === "checkWord") return;
       this.sendRejection(client, rejectionFor(message, "hand-over"));
       return;
     }
@@ -339,12 +356,14 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         }
         this.sendRejection(client, { action: "betting", reason: error.reason });
       } else if (error instanceof WordRejectionError) {
+        if (message === "checkWord") return;
         if (message === "betting") {
           this.sendRejection(client, rejectionFor(message, "hand-over"));
         } else {
           this.sendRejection(client, { action: message, reason: error.reason });
         }
       } else if (error instanceof OfflineActionError) {
+        if (message === "checkWord") return;
         this.sendRejection(client, rejectionFor(message, "hand-over"));
       } else {
         throw error;
@@ -559,6 +578,17 @@ function firstFreeSeat(bindings: ReadonlyMap<string, SeatBinding>, maxSeats: num
     if (!occupied.has(seat)) return seat;
   }
   return null;
+}
+
+/**
+ * The smoke runner's room knobs, as JSON in `WORDPOKER_SMOKE_ROOM`. Read only behind the
+ * deterministic gate: without it a room never takes knobs from the environment.
+ */
+function smokeRoomDefaults(): RoomKnobs {
+  const raw = process.env.WORDPOKER_SMOKE_ROOM;
+  if (process.env.WORDPOKER_DETERMINISTIC_SEED !== "1" || !raw) return {};
+  const parsed: unknown = JSON.parse(raw);
+  return parsed !== null && typeof parsed === "object" ? (parsed as RoomKnobs) : {};
 }
 
 /** A seed nobody can read off the wire: the room id is public, so it must never derive the deal. */

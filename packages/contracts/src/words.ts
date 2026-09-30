@@ -140,6 +140,26 @@ export interface WordScore {
   readonly total: number;
 }
 
+/** The number of explicit dictionary checks a seat gets for one hand. */
+export const WORD_CHECKS_PER_HAND = 5;
+
+/** One private, player-requested lookup against the hand's showdown dictionary. */
+export interface WordCheckResult {
+  /** The exact tile arrangement that was checked, so a changed draft cannot reuse its result. */
+  readonly submission: WordSubmission;
+  /** The letters the checked tiles spelled. */
+  readonly word: string;
+  readonly valid: boolean;
+  /** The §7 score for a valid word; invalid words do not score. */
+  readonly points: number | null;
+}
+
+/** A seat's private per-hand quota and latest result. This never belongs in broadcast state. */
+export interface PrivateWordCheckState {
+  readonly checksRemaining: number;
+  readonly result: WordCheckResult | null;
+}
+
 /** What the engine made of one submission. */
 export type WordEvaluation =
   | {

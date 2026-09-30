@@ -25,6 +25,7 @@ import type { Tile } from "./tiles";
 import {
   WORD_REJECTION_REASONS,
   isWordSubmission,
+  type PrivateWordCheckState,
   type WordRejectionReason,
   type WordSubmission,
 } from "./words";
@@ -54,6 +55,7 @@ export interface OnlineWordAction {
  */
 export interface GameMessageMap {
   readonly betting: OnlineBettingAction;
+  readonly checkWord: OnlineWordAction;
   readonly draftWord: OnlineWordAction;
   readonly confirmWord: OnlineWordAction;
   readonly ready: OnlineReadyAction;
@@ -61,6 +63,7 @@ export interface GameMessageMap {
 
 export const GAME_MESSAGES = {
   betting: "betting",
+  checkWord: "checkWord",
   draftWord: "draftWord",
   confirmWord: "confirmWord",
   ready: "ready",
@@ -193,6 +196,7 @@ export interface PrivateSeatState {
   readonly hand: number;
   readonly rack: readonly Tile[];
   readonly word: PrivateWordState;
+  readonly wordCheck: PrivateWordCheckState;
   readonly isYourTurn: boolean;
   /** Epoch milliseconds on the server; zero when this seat has no betting turn. */
   readonly turnDeadline: number;
@@ -238,6 +242,7 @@ export function isGameMessagePayload<Name extends GameMessageName>(
   switch (name) {
     case "betting":
       return isOnlineBettingAction(value);
+    case "checkWord":
     case "draftWord":
     case "confirmWord":
       return isOnlineWordAction(value);

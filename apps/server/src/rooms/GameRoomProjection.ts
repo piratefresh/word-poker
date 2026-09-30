@@ -1,5 +1,6 @@
 import {
   WAITING_PHASE,
+  WORD_CHECKS_PER_HAND,
   type GameTableConfig,
   type PrivateSeatState,
   type PrivateWordState,
@@ -75,6 +76,11 @@ export class GameRoomProjection {
       hand: input.game?.hand ?? 0,
       rack: seat?.privateTiles.map((tile) => ({ ...tile })) ?? [],
       word: privateWordState(input.game, input.binding.playerId),
+      wordCheck:
+        input.game?.wordChecks[input.binding.playerId] ?? {
+          checksRemaining: WORD_CHECKS_PER_HAND,
+          result: null,
+        },
       isYourTurn: activeTurn,
       turnDeadline: activeTurn ? input.game?.endsAtMs ?? 0 : 0,
     };

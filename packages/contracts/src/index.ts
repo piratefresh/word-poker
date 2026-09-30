@@ -38,7 +38,9 @@ export type {
 } from "./tiles";
 export {
   WORD_REJECTION_REASONS,
+  WORD_CHECKS_PER_HAND,
   isWordSubmission,
+  type PrivateWordCheckState,
   type TileLetter,
   type TilePlay,
   type TilePlayResolution,
@@ -46,6 +48,7 @@ export {
   type WordLetterScore,
   type WordRejectionReason,
   type WordScore,
+  type WordCheckResult,
   type WordSubmission,
 } from "./words";
 export {

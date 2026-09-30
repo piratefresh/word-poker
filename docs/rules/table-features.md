@@ -77,3 +77,21 @@ This prevents players from targeting one another.
 
 When the player has turned animations off (§39), chips and highlights appear in place
 without motion.
+
+---
+
+# 43. Word Checker
+
+- A player may privately check a draft against the showdown dictionary by tapping **Check**.
+  Arranging, selecting, or sorting tiles never runs a check.
+- Each player gets five checks per hand. The server enforces the limit, and a new hand resets
+  the count.
+- A check is available only when the draft has 2–7 letters. Drafts outside that range and
+  players with no checks remaining cannot spend an attempt.
+- A valid result shows a green check, **Valid Word**, and the word's points. An invalid result
+  shows a red X and **Not a word**.
+- After each check, the player sees and hears how many checks remain. The message uses
+  “1 check remaining” for one, and “No checks remaining this hand” after the fifth check.
+  It dismisses after two seconds or when tapped, without blocking the tiles or action buttons.
+- The result and remaining count are private to that player; other seats receive no check
+  result or notice.

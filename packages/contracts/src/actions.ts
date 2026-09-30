@@ -16,6 +16,7 @@ import type { WordSubmission } from "./words";
 export type OfflineAction =
   | { type: "deal" }
   | BettingAction
+  | { type: "checkWord"; playerId: PlayerId; submission: WordSubmission }
   | { type: "draftWord"; playerId: PlayerId; submission: WordSubmission }
   | { type: "confirmWord"; playerId: PlayerId; submission: WordSubmission }
   /** The server's betting clock expired; clients never send this action. */
