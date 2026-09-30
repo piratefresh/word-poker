@@ -73,6 +73,11 @@ export interface GameScreenProps {
   bettingLeading?: ReactNode;
   /** A mode's own control at the end of the bet slider's row: the word builder's word check. */
   bettingSlider?: ReactNode;
+  /**
+   * What a mode draws over the felt itself — §44's Power Draw, the "power used" card. It fills the
+   * table's region and nothing past it, so the community above and the rack below stay in view.
+   */
+  overFelt?: ReactNode;
   onBack?: () => void;
   onHelp?: () => void;
   onSettings?: () => void;
@@ -122,6 +127,7 @@ function GameScreenBody({
   rack,
   bettingLeading,
   bettingSlider,
+  overFelt,
   onBack,
   onHelp,
   onSettings,
@@ -276,6 +282,7 @@ function GameScreenBody({
             style={styles.table}
             testID="poker-table"
           />
+          {overFelt}
         </View>
         <BestWord
           payout={game.phase === "payout"}

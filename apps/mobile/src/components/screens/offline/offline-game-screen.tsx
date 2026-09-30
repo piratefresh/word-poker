@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import { PowerDrawReveal } from "@/components/powers";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
@@ -113,6 +114,8 @@ function OfflineTable({
     wager,
     setDraft,
     checkWord,
+    powers,
+    pickPower,
     endChipFlight,
     sessionOver,
     newGame,
@@ -157,6 +160,13 @@ function OfflineTable({
           onChipFlightEnd={endChipFlight}
           onFold={fold}
           onRaise={wager}
+          overFelt={
+            // §44's Power Draw, at a Wild table: the pack opens over the felt, above the rack
+            // the seat picks with in view. A Classic table has no powers and draws nothing here.
+            powers === null ? null : (
+              <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
+            )
+          }
           rack={
             // The draft reads above the rack it is built from: one line of text over the
             // strip, drawn by the builder and placed by the felt's own rack slot.

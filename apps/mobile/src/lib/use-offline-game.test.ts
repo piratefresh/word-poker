@@ -860,6 +860,9 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     await beat();
     await beat();
     expect(result.current.game.pot).toBe(BLINDS_POSTED);
+    // The HUD runs the draw's clock, and the action row waits with it.
+    expect(result.current.game.secondsRemaining).toBe(POWER_DRAW_MS / 1_000);
+    expect(row(result)).toMatchObject({ canFold: false, canCheck: false, canBet: false, canAllIn: false });
   });
 
   test("keeps the hero's pick and puts pre-flop's first seat on the clock", async () => {
@@ -873,6 +876,8 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     // mira is on the clock, so the power is held but cannot be used yet.
     expect(result.current.powers?.held).toEqual({ id: kept, used: false, usable: false });
     expect(result.current.game.players[3]?.status).toBe("thinking");
+    // Pre-flop's clock starts when the draw closes: a new turn, on the betting budget.
+    expect(result.current.game.secondsRemaining).toBe(OFFLINE_TURN_MS / 1_000);
 
     await passedToTheHero(result);
     expect(result.current.powers?.held).toEqual({ id: kept, used: false, usable: true });

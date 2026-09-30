@@ -907,6 +907,7 @@ function perspectiveOf(
     // The button rides on the seat index, which is why a busted seat can still be the dealer.
     dealerIndex: state.dealerSeat,
     heroToAct: heroIndex >= 0 && state.toActIndex === heroIndex,
+    powerDraw: state.powers?.draw.status === "open",
     turnDurationMs: state.turnDurationMs,
     round: state.betting,
     blinds: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
