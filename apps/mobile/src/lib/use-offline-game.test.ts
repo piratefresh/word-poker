@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react-native";
 import { POWER_DRAW_MS, type PowerUpId, type Tile } from "@wordpoker/contracts";
 import {
   LETTER_VALUES,
+  OFFLINE_TURN_MS,
   WORD_WINDOW_MS,
   dealHand,
   drawOffers,
@@ -924,6 +925,21 @@ describe("useOfflineGame — the Wild table (§44)", () => {
       result.current.endPowerUsed(event);
     });
     expect(result.current.powers?.used).toEqual([]);
+  });
+
+  test("stops offering the power on the deadline, before the clock settles the turn", async () => {
+    const result = await wildTable();
+    await pick(result, "random_wild");
+    await passedToTheHero(result);
+    expect(result.current.powers?.held?.usable).toBe(true);
+
+    // The turn's own timer settles a beat after the deadline; the power goes dark on it.
+    await act(async () => {
+      jest.advanceTimersByTime(OFFLINE_TURN_MS);
+    });
+
+    expect(result.current.game.players[0]?.status).not.toBe("fold");
+    expect(result.current.powers?.held).toEqual({ id: "random_wild", used: false, usable: false });
   });
 
   test("refuses a use off the hero's turn, and changes nothing", async () => {

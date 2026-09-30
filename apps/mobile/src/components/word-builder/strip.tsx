@@ -247,13 +247,42 @@ export function shuffleUnheld(
 }
 
 /**
+ * The tiles the table has dealt, in the order the seat arranged: order kept by id, a tile the
+ * table no longer has replaced in place by one it has just dealt, the rest of the new ones
+ * appended.
+ *
+ * The replacement in place is §44's swap: the new tile takes the place the discarded one sat in,
+ * however the seat had arranged the rack.
+ */
+export function arrangedStrip(
+  order: readonly string[],
+  entries: readonly StripEntry[],
+): readonly StripEntry[] {
+  const byId = new Map(entries.map((entry) => [entry.tile.id, entry]));
+  const ordered = new Set(order);
+  // Tiles the arrangement has never seen, in the table's order; each hole takes the first of them.
+  const fresh = entries.filter((entry) => !ordered.has(entry.tile.id));
+  const placed = new Set<string>();
+  const next: StripEntry[] = [];
+
+  for (const id of order) {
+    if (placed.has(id)) continue;
+    placed.add(id);
+    const entry = byId.get(id) ?? fresh.shift();
+    if (entry !== undefined) next.push(entry);
+  }
+  next.push(...fresh);
+
+  return next;
+}
+
+/**
  * The strip as the seat has arranged it: the order is the ids it holds, the tiles are the ones
  * the table has dealt.
  *
  * The table owns which tiles are there and what they print; the seat owns the order it reads
- * them in, which is local, unsubmitted, and survives every draft — order kept by id, tiles the
- * table no longer has dropped, tiles it has just dealt appended — so an arrangement is not
- * undone by the next tap.
+ * them in, which is local, unsubmitted, and survives every draft (`arrangedStrip`), so an
+ * arrangement is not undone by the next tap.
  */
 export function useStripOrder(entries: readonly StripEntry[]): {
   strip: readonly StripEntry[];
@@ -261,23 +290,7 @@ export function useStripOrder(entries: readonly StripEntry[]): {
 } {
   const [order, setOrder] = useState<readonly string[]>([]);
 
-  const strip = useMemo(() => {
-    const byId = new Map(entries.map((entry) => [entry.tile.id, entry]));
-    const placed = new Set<string>();
-    const next: StripEntry[] = [];
-
-    for (const id of order) {
-      const entry = byId.get(id);
-      if (entry === undefined || placed.has(id)) continue;
-      placed.add(id);
-      next.push(entry);
-    }
-    for (const entry of entries) {
-      if (!placed.has(entry.tile.id)) next.push(entry);
-    }
-
-    return next;
-  }, [order, entries]);
+  const strip = useMemo(() => arrangedStrip(order, entries), [order, entries]);
 
   const arrange = useCallback(
     (arranged: readonly StripEntry[]) => setOrder(idsOf(arranged)),

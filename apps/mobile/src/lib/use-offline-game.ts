@@ -497,6 +497,23 @@ export function useOfflineGame({
     return () => clearTimeout(timer);
   }, [act, drawOpen, state.endsAtMs]);
 
+  // The deadline the felt has seen pass. The settling timers above wait a beat past it, so until
+  // they fire the table still shows the clock that ran out; this one fires on the deadline itself,
+  // so a held power stops reading as usable the moment the engine would start refusing it.
+  const [ranOutAtMs, setRanOutAtMs] = useState<number | null>(null);
+  const tracksPowers = state.powers !== undefined;
+  useEffect(() => {
+    if (!tracksPowers) return;
+
+    const endsAtMs = state.endsAtMs;
+    const timer = setTimeout(
+      () => setRanOutAtMs(endsAtMs),
+      Math.min(Math.max(endsAtMs - Date.now(), 0), MAX_TIMER_MS),
+    );
+
+    return () => clearTimeout(timer);
+  }, [tracksPowers, state.endsAtMs]);
+
   const pickPower = useCallback(
     (powerUpId: PowerUpId) => {
       act({ type: "pickPower", playerId: HERO_ID, powerUpId });
@@ -506,7 +523,13 @@ export function useOfflineGame({
 
   const usePower = useCallback(
     (powerUpId: PowerUpId, tileId: string) => {
-      if (!act({ type: "usePowerUp", playerId: HERO_ID, powerUpId, tileId })) return;
+      if (!act({ type: "usePowerUp", playerId: HERO_ID, powerUpId, tileId })) {
+        // A tap the clock beat — its timer delayed or suspended — still shows the power as spent
+        // rather than leaving it lit for a second tap the engine will refuse too.
+        const endsAtMs = stateRef.current.endsAtMs;
+        if (Date.now() >= endsAtMs) setRanOutAtMs(endsAtMs);
+        return;
+      }
       // The discarded tile leaves the draft the device holds between streets too; inside §19's
       // window the engine has already taken it out of the seat's slot.
       setHeroDraft((draft) => {
@@ -527,8 +550,8 @@ export function useOfflineGame({
   }, []);
 
   const powers = useMemo(
-    () => powerViewOf(state, powerEvents, seatActions),
-    [powerEvents, seatActions, state],
+    () => powerViewOf(state, powerEvents, seatActions, ranOutAtMs === state.endsAtMs),
+    [powerEvents, ranOutAtMs, seatActions, state],
   );
 
   /**
@@ -611,6 +634,7 @@ function powerViewOf(
   state: OfflineState,
   events: readonly PowerUsedEvent[],
   seatActions: readonly SeatAction[],
+  clockRanOut: boolean,
 ): PowerView | null {
   const powers = state.powers;
   if (powers === undefined) return null;
@@ -619,9 +643,11 @@ function powerViewOf(
   const held = powers.held[HERO_ID];
   const street = streetOf(state);
   // The table's own timers settle every deadline — a turn that runs out is folded, a window that
-  // runs out is closed — so between two transitions the clock in play is still running. Reading
-  // "now" as its last millisecond asks the engine exactly that, without a clock read in render.
-  const nowMs = state.endsAtMs - 1;
+  // runs out is closed — but a beat after it, so the clock in play is either still running or
+  // has just run out and is waiting to be settled. Reading "now" as its last millisecond, or as
+  // the deadline itself once it has passed, asks the engine exactly that without a clock read in
+  // render.
+  const nowMs = clockRanOut ? state.endsAtMs : state.endsAtMs - 1;
 
   return {
     draw:

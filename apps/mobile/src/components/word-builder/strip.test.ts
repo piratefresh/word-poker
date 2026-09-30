@@ -1,6 +1,7 @@
 import type { TilePlay } from "@wordpoker/contracts";
 
 import {
+  arrangedStrip,
   inStripOrder,
   move,
   orderFromPositions,
@@ -84,6 +85,23 @@ describe("the strip's order", () => {
     expect(
       sameDraft([{ tileId: "p-a" }], [{ tileId: "p-a", chosenFace: "E" }]),
     ).toBe(false);
+  });
+
+  test("keeps the seat's arrangement as the table deals and takes tiles away", () => {
+    const arranged = ["c-ts", "p-a", "c-z", "p-r"];
+    expect(ids(arrangedStrip(arranged, ENTRIES))).toEqual(arranged);
+
+    // §44's swap: the new tile takes the discarded one's place, not the end of the rack.
+    const swapped: StripEntry = { tile: { id: "power-0", letter: "E", points: 1 }, ownership: "private" };
+    const afterSwap = [swapped, ...ENTRIES.slice(1)];
+    expect(ids(arrangedStrip(arranged, afterSwap))).toEqual(["c-ts", "power-0", "c-z", "p-r"]);
+
+    // A tile dealt with no place left for it goes on the end.
+    const turn: StripEntry = { tile: { id: "c-q", letter: "Q", points: 10 }, ownership: "community" };
+    expect(ids(arrangedStrip(arranged, [...ENTRIES, turn]))).toEqual([...arranged, "c-q"]);
+
+    // Nothing arranged yet: the table's own order.
+    expect(ids(arrangedStrip([], ENTRIES))).toEqual(ids(ENTRIES));
   });
 
   test("shuffles the tiles the word does not hold, and leaves the held ones where they sit", () => {
