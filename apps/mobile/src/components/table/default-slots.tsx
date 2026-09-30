@@ -7,7 +7,7 @@ import {
   type UniversalTextStyle,
 } from "@expo/ui";
 
-import { border, colors, fonts, fontSize, radius } from "@/constants/theme";
+import { border, colors, fonts, fontSize, palette, radius } from "@/constants/theme";
 import type {
   CommunitySlot,
   PokerTableProps,
@@ -87,8 +87,12 @@ function px(base: number, scale: number, min: number) {
 /* ── seat ─────────────────────────────────────────────────────────── */
 
 export function DefaultSeat({ seat, anchor, scale }: SeatSlot<SeatData>) {
-  const puck = px(56, scale, 42);
-  const containerWidth = px(100, scale, 74);
+  // About an eighth of the felt, with the labels growing alongside, so a wide felt reads as a
+  // bigger table rather than the same small seats spread further apart.
+  const puck = px(80, scale, 58);
+  const containerWidth = px(136, scale, 96);
+  const microText = px(fontSize.micro * 1.3, scale, fontSize.micro);
+  const chipText = px(fontSize.small * 1.3, scale, fontSize.small);
 
   if (!seat) {
     const emptyPuck: UniversalStyle = {
@@ -124,31 +128,43 @@ export function DefaultSeat({ seat, anchor, scale }: SeatSlot<SeatData>) {
     opacity: status === "fold" ? 0.45 : 1,
   };
 
-  const pill: UniversalStyle = {
-    backgroundColor: lit ? meta.color : colors.surfaceStrong,
+  // Name and status share one solid plate — near-black with a gold rim, or gold itself when the
+  // seat is lit — so both read cleanly over any part of the felt.
+  const plate: UniversalStyle = {
+    backgroundColor: lit ? meta.color : palette.felt900,
     borderRadius: radius.xs,
-    borderWidth: lit ? 0 : border.hairline,
-    borderColor: meta.color,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    borderWidth: border.hairline,
+    borderColor: lit ? meta.color : colors.gold,
+    paddingHorizontal: px(12, scale, 8),
+    paddingVertical: px(4, scale, 3),
   };
 
   return (
     <Host matchContents>
       <Column alignment="center" spacing={4} style={{ width: containerWidth }}>
         <Row alignment="center" style={puckStyle}>
-          <Text textStyle={{ ...avatarInk, fontSize: px(20, scale, 15) }}>
+          <Text textStyle={{ ...avatarInk, fontSize: px(30, scale, 21) }}>
             {seat.glyph ?? initials(seat.name)}
           </Text>
         </Row>
-        <Text textStyle={nameLabel}>{seat.name.toUpperCase()}</Text>
-        <Row alignment="center" style={pill}>
-          <Text textStyle={{ ...pillText, color: lit ? colors.onGold : meta.color }}>
+        <Column alignment="center" spacing={2} style={plate}>
+          <Text
+            textStyle={{
+              ...nameLabel,
+              fontSize: microText,
+              color: lit ? colors.onGold : colors.textBright,
+            }}
+          >
+            {seat.name.toUpperCase()}
+          </Text>
+          <Text
+            textStyle={{ ...pillText, fontSize: microText, color: lit ? colors.onGold : meta.color }}
+          >
             {meta.label}
           </Text>
-        </Row>
+        </Column>
         {seat.chips != null ? (
-          <Text textStyle={chipLabel}>{`$${seat.chips.toLocaleString()}`}</Text>
+          <Text textStyle={{ ...chipLabel, fontSize: chipText }}>{`$${seat.chips.toLocaleString()}`}</Text>
         ) : null}
       </Column>
     </Host>

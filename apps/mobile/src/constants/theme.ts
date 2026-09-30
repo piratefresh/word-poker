@@ -229,7 +229,7 @@ export const border = {
 export const monoFamily =
   "JetBrains Mono,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace";
 
-/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono}. */
+/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono,lilita-one}. */
 export const fonts = {
   sans: Platform.select({
     ios: "Inter_400Regular",
@@ -248,6 +248,8 @@ export const fonts = {
     default: monoFamily,
   })!,
   monoBold: "JetBrainsMono_600SemiBold",
+  /** The chunky arcade face of the HUD's clock digits. */
+  arcade: "LilitaOne_400Regular",
 } as const;
 
 export const fontSize = {
@@ -444,6 +446,12 @@ export const layout = {
   maxContentWidth: 520,
   tileSize: { sm: 24, md: 32, lg: 44, rack: 48 },
   boardGap: 4,
+  /**
+   * A window whose shorter side reaches this is a tablet or a desktop: the shorter side, not the
+   * width, so a phone turned on its side keeps the phone sizes instead of spending its little
+   * height on larger chrome.
+   */
+  wideShortSide: 600,
 } as const;
 
 export const opacity = { disabled: 0.4, pressed: 0.75, muted: 0.6 } as const;

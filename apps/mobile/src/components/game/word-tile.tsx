@@ -41,7 +41,9 @@ import {
   opacity,
   palette,
 } from "@/constants/theme";
+import { webTestID } from "@/lib/web-id";
 
+import { TileChoiceBeam } from "./tile-choice-beam";
 import { useTileTexture } from "./tile-texture/use-tile-texture";
 
 /**
@@ -57,6 +59,8 @@ export interface TileProps {
   tile: TileData;
   side: TileSide;
   size?: TileSize;
+  /** Grows the size's metrics by a factor, for a window larger than the size was drawn for. */
+  scale?: number;
   ownership?: TileOwnership;
   selected?: boolean;
   dimmed?: boolean;
@@ -122,6 +126,17 @@ export const TILE_METRICS: Record<TileSize, TileMetrics> = {
   },
 };
 
+/** A size's metrics grown by `factor`; a factor of 1 hands back the size's own object. */
+export function scaleTileMetrics(size: TileSize, factor: number): TileMetrics {
+  const base = TILE_METRICS[size];
+  if (factor === 1) return base;
+  const scaled = {} as TileMetrics;
+  for (const key of Object.keys(base) as (keyof TileMetrics)[]) {
+    scaled[key] = base[key] * factor;
+  }
+  return scaled;
+}
+
 const FLIP_EASING = Easing.bezier(...motionEasing.flip);
 const DEAL_EASING = Easing.bezier(...motionEasing.deal);
 const FLIP_PERSPECTIVE = 900;
@@ -171,6 +186,7 @@ export function Tile({
   tile,
   side,
   size = "medium",
+  scale = 1,
   ownership = "neutral",
   selected = false,
   dimmed = false,
@@ -184,7 +200,7 @@ export function Tile({
   style,
   testID,
 }: TileProps) {
-  const metrics = TILE_METRICS[size];
+  const metrics = scaleTileMetrics(size, scale);
   const second = secondFace(tile);
   const texture = useTileTexture(tile.id, metrics.width, metrics.height);
   const reduceMotion = useReducedMotion();
@@ -456,6 +472,9 @@ export function Tile({
         disabled && styles.disabled,
         style,
       ]}
+      // A tile a flow names carries its test id as the page's own id (webTestID): the strip's
+      // tiles are the ones a word is built from, and the felt's copies pass no test id at all.
+      id={webTestID(testID)}
       testID={testID}
     >
       <Animated.View
@@ -490,7 +509,14 @@ export function Tile({
               <View
                 style={[styles.choiceAccent, { height: Math.max(2, metrics.badgeSize / 2) }]}
                 testID="tile-choice-accent"
-              />
+                pointerEvents="none"
+              >
+                <TileChoiceBeam
+                  active={side === "front"}
+                  color={CHOICE_ACCENT}
+                  height={Math.max(2, metrics.badgeSize / 2)}
+                />
+              </View>
             )}
             {multiplierLabel ? (
               <View
@@ -632,8 +658,8 @@ const styles = StyleSheet.create({
     top: 0,
   },
   choiceAccent: {
-    backgroundColor: CHOICE_ACCENT,
     left: 0,
+    overflow: "hidden",
     position: "absolute",
     right: 0,
     top: 0,
