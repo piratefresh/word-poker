@@ -52,7 +52,10 @@ tile dealt — is never fought by a private copy of the list. A tile ignores a p
 `DRAG_SETTLE_MS` after a drop, because the pan does not cancel the tile's own press on the web —
 the pointer never leaves the tile, since the tile travels with it.
 
-The rack is a straight row of `TILE_METRICS`'s `medium` tile, and the places spread into the room
+The rack is a straight row of `TILE_METRICS`'s `medium` tile, grown by the window's `screenScale`
+(`screens/game/screen-scale.ts`; exactly 1 below a 600-point shorter side, then growing with it up to
+a cap, `rackFor` in `strip.tsx`) — the one factor the banner, HUD buttons, community tiles and action
+row grow by too, with the play column bounded by `stageMaxWidth` — and the places spread into the room
 the felt gives them — up to a tile and `MAX_GAP` — closing in on each other (the gap first, then
 some of the tile) when that room is narrower than the row, so a hand of seven stays on screen and
 stays tappable. The strip's places and its drag are measured in that tile, so the two cannot
@@ -82,6 +85,45 @@ maestro test --platform web .maestro/offline-hand.yaml
 Headed is the default (`--headless` hides the browser; headless also takes `--screen-size`). Keep a Chrome
 whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
 it needs.
+
+Run the online multiplayer smoke (STO-409) from one Windows terminal at the repository root:
+
+```powershell
+pnpm smoke:online
+```
+
+The runner starts Colyseus with deterministic seeds enabled, starts Expo web on port 8081, waits for
+both servers, creates a fresh seed-409 opponent, and passes its room ID to the headed Maestro flow.
+It stops its server and opponent process trees on completion, failure, or Ctrl-C. Logs stay in the
+temporary directory printed at startup. Existing processes listening on ports 2567 and 8081 are terminated before starting.
+The smoke server runs without file watching, and background stdin is redirected to an empty file.
+Maestro must be on PATH or installed at ~/.maestro/bin/maestro.bat; keep Chrome and chromedriver
+on matching versions. The existing mobile/server env files and seeded E2E user are still required
+(see below). This runner is local and Windows-only.
+
+The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
+signs in when needed, builds PUB, checks the results overlay, and leaves the table.
+
+The four-browser smoke (STO-483) has every seat played by a real browser, each driven by its own
+Maestro process:
+
+```powershell
+pnpm smoke:online:four            # headed; add -Headless for --headless --screen-size 1280x800
+```
+
+It plays one seeded session. Hand 1 has a raise, a fold, a re-raise, calls, a flop bet and three
+words at showdown. In hand 2 a short stack shoves into a side pot, loses and busts. In hand 3 the
+busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
+up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
+seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
+seed, payout delay, turn clock), which the server merges under a create's own options, and only
+behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
+(`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
+the runner starts the next one only then, so join order is seat order. The script lives in
+`apps/server/scripts/four-seat-scenario.ts`. A mocha case replays it over four sockets, and the
+flows in `.maestro/four-seat/` tap it out. After changing the script or the deal, re-probe with
+`pnpm --filter @wordpoker/server exec tsx scripts/probe-four-seat.ts <firstSeed> <lastSeed>`,
+then update the seed (scenario, runner) and the taps (seat flows, seat-1.yaml's header).
 
 ## E2E test user
 
@@ -137,6 +179,15 @@ EAS Workflows can run these flows on its own emulator and simulator — a `maest
 job type and the workers it needs (`linux-*-nested-virtualization` for Android, `macos-*` for iOS)
 require a paid Expo plan on this account (September 2026), so no workflow file is checked in. Add
 one when that changes; trigger it from an `e2e` label on a pull request, or by hand.
+
+## Online device smoke
+
+apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with the e2e-test app build and a ROOM_ID deep link. The auth bypass only skips sign-in. The device still needs a Colyseus server started with WORDPOKER_DETERMINISTIC_SEED=1, reachable through EXPO_PUBLIC_GAME_URL, and a separate smoke-opponent.ts process. Run the flow from apps/mobile and pass the room id printed by the opponent:
+
+    eas build --platform android --profile e2e-test
+    maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
+
+Set EXPO_PUBLIC_GAME_URL at build time to an address the device can reach; localhost on the device is not the development machine. Keep this device flow manual and out of CI until its server and opponent are provisioned.
 
 # Game rules spec
 

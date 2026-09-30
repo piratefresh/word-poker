@@ -14,6 +14,7 @@
 
 import type {
   PlayerId,
+  PrivateWordCheckState,
   RoundPhase,
   Tile,
   TilePlay,
@@ -111,6 +112,7 @@ export interface HeroPerspective {
     /** The submission the engine locked in, once confirmed. */
     confirmedPlays: readonly TilePlay[] | null;
   };
+  wordCheck: PrivateWordCheckState;
   result: {
     winner: PlayerId;
     standings: readonly { playerId: PlayerId; score: number; place: number; word: string | null }[];
@@ -137,6 +139,8 @@ export interface HeroView {
   game: GameScreenState;
   /** The builder's draft, or null when the hero builds no word (payout, folded, sitting out). */
   words: WordDraft | null;
+  /** The hero's private check quota and most recent explicit lookup. */
+  wordCheck: PrivateWordCheckState;
 }
 
 /**
@@ -160,7 +164,11 @@ const INERT_BETS: BettingState = {
 };
 
 export function heroView(perspective: HeroPerspective, local: HeroLocal): HeroView {
-  return { game: screenState(perspective, local), words: wordsOf(perspective, local) };
+  return {
+    game: screenState(perspective, local),
+    words: wordsOf(perspective, local),
+    wordCheck: perspective.wordCheck,
+  };
 }
 
 /** The seat's moves, as the adapter dispatches them. */
@@ -401,7 +409,7 @@ function wordsOf(p: HeroPerspective, local: HeroLocal): WordDraft | null {
     word: spellSubmission({ available: p.available, submission }),
     // §7 on the same resolution, so the seat watches the number move as it builds.
     score: resolution.ok ? scoreWord(resolution.tiles) : null,
-    reason: local.refusal ?? previewReason(plays.length, resolution, p.dictionary),
+    reason: local.refusal ?? previewReason(plays.length, resolution),
     confirmed,
     // The seat may build until it confirms; only §19's window lets it lock the word in.
     open: !confirmed,
@@ -409,15 +417,13 @@ function wordsOf(p: HeroPerspective, local: HeroLocal): WordDraft | null {
   };
 }
 
-/** §11's answer for a draft that has not been confirmed yet; an empty or partial draft is not a refusal. */
+/** Structural feedback only: dictionary validity stays hidden until the player taps Check. */
 function previewReason(
   played: number,
   resolution: SubmissionResolution,
-  dictionary: Dictionary,
 ): WordRejectionReason | null {
   if (played === 0) return null;
-  // A one-letter draft is a word in progress, exactly as the window treats it: the floor belongs
-  // to the confirm, not to the typing.
+  // A one-letter draft is a word in progress; the minimum length belongs to Check or confirm.
   if (!resolution.ok) return resolution.reason === "too-short" ? null : resolution.reason;
-  return dictionary.isWord(resolution.word) ? null : "not-in-dictionary";
+  return null;
 }

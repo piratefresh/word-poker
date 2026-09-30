@@ -1,0 +1,15 @@
+# Subflow: read hand HAND's results, check the winning WORD is on the scoreboard, and put the
+# overlay away. The room deals the next hand on its own after the smoke's 20-second payout.
+url: http://localhost:8081/online
+name: Four-seat - results
+---
+- extendedWaitUntil:
+    visible: "HAND #${HAND} · RESULTS"
+    timeout: 180000
+- assertVisible:
+    text: "SCOREBOARD"
+- assertVisible:
+    text: ".*${WORD}.*"
+- tapOn:
+    id: "Deal another hand"
+- waitForAnimationToEnd

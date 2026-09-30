@@ -1,12 +1,18 @@
 import type { RoundPhase } from "@wordpoker/contracts";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import { spacing } from "@/constants/theme";
 import { useLoopsEnabled, usePhaseClock } from "@/motion";
 
 import type { ToastQueue } from "./hud-toasts";
 import { HudToasts } from "./hud-toasts";
-import { HUD_BAR_HEIGHT, HudTopBar } from "./hud-top-bar";
+import { hudBarHeight, HudTopBar } from "./hud-top-bar";
 import { BalanceView, PHASE_NUMBER } from "./hud-types";
 import type { TurnTimerView } from "./turn-clock";
 
@@ -21,6 +27,8 @@ export interface HudProps {
   phase: RoundPhase;
   /** The live turn, or null between turns. */
   turn: TurnTimerView | null;
+  /** Words for the stamp in place of the phase's, for a table with no hand dealt yet. */
+  stamp?: string;
   /** Spoken turn phrase, e.g. "Magnus to act". */
   turnPhrase?: string;
   balance: BalanceView;
@@ -41,13 +49,16 @@ export interface HudProps {
 }
 
 /**
- * Vertical room the HUD's chrome occupies: the top bar, and nothing under it.
+ * Vertical room the HUD's chrome occupies in this window: the top bar, and nothing under it.
  *
  * Exported because a screen showing the HUD has to reserve it. The HUD floats over the
  * felt, so a screen that measured it instead would reserve nothing on the first frame
- * and then shove all of its content down once the measurement landed.
+ * and then shove all of its content down once the measurement landed. It is derived from
+ * the window the bar reads too, so the two agree on every frame of a resize.
  */
-export const HUD_CHROME_HEIGHT = HUD_BAR_HEIGHT;
+export function useHudChromeHeight(): number {
+  return hudBarHeight(useWindowDimensions());
+}
 
 /**
  * The in-hand HUD: one overlay that composes above the table without owning any
@@ -63,6 +74,7 @@ export function Hud({
   handId,
   phase,
   turn,
+  stamp,
   turnPhrase,
   balance,
   toastQueue,
@@ -95,6 +107,7 @@ export function Hud({
           // screens each deciding what number a phase is would eventually disagree.
           phaseNumber={PHASE_NUMBER[phase]}
           reduceMotion={reduceMotion}
+          stamp={stamp}
           tick={tick}
           turn={turn}
           turnPhrase={turnPhrase}

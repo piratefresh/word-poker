@@ -46,6 +46,66 @@ export const palette = {
   onGold: "#1a1208",
 } as const;
 
+/* ── poker chips ─────────────────────────────────────────────────── */
+
+/**
+ * The painted chip's tones (STO-481): the body lit from the top left (`light` → `base` →
+ * `dark`), the cream edge inserts, the inner ring and the emblem. Gold carries a dark emblem,
+ * the way the reference sheet does. Purple is the hero chip's, not a denomination.
+ */
+export const chipTones = {
+  red: {
+    base: "#b3241f",
+    light: "#dc4a3c",
+    dark: "#5e1210",
+    inset: "#ecd9b4",
+    emblem: "#d9a441",
+    ring: "#d9a441",
+  },
+  blue: {
+    base: "#1d4f9c",
+    light: "#3b7acb",
+    dark: "#0b2a57",
+    inset: "#ecd9b4",
+    emblem: "#d9a441",
+    ring: "#d9a441",
+  },
+  green: {
+    base: "#11704a",
+    light: "#2c9a68",
+    dark: "#06402a",
+    inset: "#ecd9b4",
+    emblem: "#d9a441",
+    ring: "#d9a441",
+  },
+  black: {
+    base: "#2a2824",
+    light: "#4f4a41",
+    dark: "#11100e",
+    inset: "#e6d3ae",
+    emblem: "#d9a441",
+    ring: "#d9a441",
+  },
+  gold: {
+    base: "#c9983f",
+    light: "#efc86e",
+    dark: "#7a561c",
+    inset: "#f3e2bb",
+    emblem: "#3a2a12",
+    ring: "#8a6420",
+  },
+  purple: {
+    base: "#5b3690",
+    light: "#8460bd",
+    dark: "#2c1848",
+    inset: "#ecd9b4",
+    emblem: "#d9a441",
+    ring: "#d9a441",
+  },
+} as const;
+
+export type ChipTone = keyof typeof chipTones;
+
 /* ── semantic colors ─────────────────────────────────────────────── */
 
 export const colors = {
@@ -169,7 +229,7 @@ export const border = {
 export const monoFamily =
   "JetBrains Mono,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace";
 
-/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono}. */
+/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono,lilita-one}. */
 export const fonts = {
   sans: Platform.select({
     ios: "Inter_400Regular",
@@ -188,6 +248,8 @@ export const fonts = {
     default: monoFamily,
   })!,
   monoBold: "JetBrainsMono_600SemiBold",
+  /** The chunky arcade face of the HUD's clock digits. */
+  arcade: "LilitaOne_400Regular",
 } as const;
 
 export const fontSize = {
@@ -354,14 +416,12 @@ export const easing = {
 export const resultsEntrance = {
   /** Where the clock stops: the last beat's end, and the moment the primary goes live. */
   total: 1_140,
-  /** The pot's count-up, its bloom, and the CTA row's fade — the three slow beats. */
+  /** The pot's count-up and the CTA row's fade — the two slow beats. */
   count: 700,
-  bloomFade: 900,
   ctaIn: 220,
   /** Beat starts, in ms from the sequence's start. */
   headline: 0,
   pot: 180,
-  bloom: 180,
   winner: 420,
   cards: 520,
   cardStagger: 70,
@@ -386,6 +446,12 @@ export const layout = {
   maxContentWidth: 520,
   tileSize: { sm: 24, md: 32, lg: 44, rack: 48 },
   boardGap: 4,
+  /**
+   * A window whose shorter side reaches this is a tablet or a desktop: the shorter side, not the
+   * width, so a phone turned on its side keeps the phone sizes instead of spending its little
+   * height on larger chrome.
+   */
+  wideShortSide: 600,
 } as const;
 
 export const opacity = { disabled: 0.4, pressed: 0.75, muted: 0.6 } as const;

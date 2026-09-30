@@ -14,17 +14,24 @@
 
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Animated, { interpolate, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue,
+} from "react-native-reanimated";
 
-import { colors, fonts, fontSize, resultsEntrance, spacing } from "@/constants/theme";
+import {
+  colors,
+  fonts,
+  fontSize,
+  resultsEntrance,
+  spacing,
+} from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
 import { beatProgress } from "@/lib/use-results-entrance";
 
 import { ResultsPot } from "./results-pot";
 import type { ResultsSnapshot } from "./results-types";
-
-/** The block's own label; the sentence below it is the hand's. */
-const EYEBROW = "HEADLINE · RESULTS";
 
 export interface ResultsHeadlineProps {
   /** The settled hand: its headline pieces, and the pot the count settles on. */
@@ -33,14 +40,21 @@ export interface ResultsHeadlineProps {
   readonly clock: SharedValue<number>;
 }
 
-export function ResultsHeadlineView({ snapshot, clock }: ResultsHeadlineProps): ReactElement {
+export function ResultsHeadlineView({
+  snapshot,
+  clock,
+}: ResultsHeadlineProps): ReactElement {
   const { emphasis, lead, subline } = snapshot.headline;
   const label = `${lead} ${emphasis}, ${formatAmount(snapshot.pot)} pot, ${subline}`;
 
   // The eyebrow and the sentence enter as one block: they are one thought, and two rises would
   // read as two lines arriving at different times.
   const enter = useAnimatedStyle(() => {
-    const progress = beatProgress(clock, resultsEntrance.headline, resultsEntrance.rise);
+    const progress = beatProgress(
+      clock,
+      resultsEntrance.headline,
+      resultsEntrance.rise,
+    );
 
     return {
       opacity: progress,
@@ -49,17 +63,18 @@ export function ResultsHeadlineView({ snapshot, clock }: ResultsHeadlineProps): 
   });
 
   return (
-    <View accessibilityLabel={label} accessibilityRole="header" accessible style={styles.block}>
+    <View
+      accessibilityLabel={label}
+      accessibilityRole="header"
+      accessible
+      style={styles.block}
+    >
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         style={styles.content}
       >
         <Animated.View style={enter}>
-          <Text allowFontScaling style={styles.eyebrow}>
-            {EYEBROW}
-          </Text>
-
           <Text allowFontScaling style={styles.sentence}>
             {`${lead} `}
             <Text allowFontScaling style={styles.emphasis}>

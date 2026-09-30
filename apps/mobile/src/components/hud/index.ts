@@ -1,4 +1,4 @@
-export { Hud, HUD_CHROME_HEIGHT } from "./hud";
+export { Hud, useHudChromeHeight } from "./hud";
 export type { HudProps } from "./hud";
 
 export { CountdownRing } from "./countdown-ring";

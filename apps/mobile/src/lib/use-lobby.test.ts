@@ -33,12 +33,14 @@ interface Subscription {
  * A lobby room the test owns. Colyseus pushes `+` as a `[roomId, listing]` pair — a table added,
  * or one whose listing changed — and `-` as the room id alone.
  */
-function subscription(): Subscription {
+function subscription(respondToFilter = false): Subscription {
   const handlers: Record<string, (payload?: unknown) => void> = {};
 
   return {
     leave: jest.fn(async () => 0),
-    send: jest.fn(),
+    send: jest.fn((type: string) => {
+      if (respondToFilter && type === "filter") handlers[ROOMS]?.([listing("filtered")]);
+    }),
     onMessage: jest.fn((type: string, handler: (payload?: unknown) => void) => {
       handlers[type] = handler;
       return () => delete handlers[type];
@@ -109,6 +111,21 @@ test("opens on the lobby room and holds the screen until its first list arrives"
   expect(view.result.current.error).toBeUndefined();
 });
 
+test("refreshes after joining so a listing that raced the join is not lost", async () => {
+  const lobby = subscription(true);
+  // A LobbyRoom can send its initial listing while the join handshake is still settling. The
+  // handler is not installed until the join promise resolves, so this message is intentionally
+  // lost unless the client asks for the list once more after registering its handlers.
+  lobby.push(ROOMS, [listing("raced")]);
+  joinOrCreate.mockResolvedValue(lobby);
+
+  const view = await renderHook(() => useLobby());
+
+  await waitFor(() => expect(lobby.send).toHaveBeenCalledWith("filter"));
+  expect(view.result.current.status).toBe("ready");
+  expect(view.result.current.rooms.map((room) => room.roomId)).toEqual(["filtered"]);
+});
+
 test("lists only the entries it can describe as a table", async () => {
   const { lobby, view } = await opened();
 
@@ -169,6 +186,40 @@ test("asks the server for the whole list again when refresh is called on a live 
   // A bare `filter` is the server's "no filter" path — the missing payload is the whole point:
   // `{}` would be read as a filter naming a room type we do not have, and would list nothing.
   expect(lobby.send).toHaveBeenCalledWith("filter");
+});
+
+test("arms the refresh until the list it asked for lands", async () => {
+  const { lobby, view } = await opened();
+  await push(lobby, ROOMS, [listing("alpha")]);
+
+  expect(view.result.current.refreshing).toBe(false);
+
+  await act(async () => {
+    view.result.current.refresh();
+  });
+
+  // The subscription is live, so the gesture has nothing to wait on but the server's own answer —
+  // and a list that never comes must not leave a spinner turning over it.
+  expect(view.result.current.refreshing).toBe(true);
+
+  await push(lobby, ROOMS, [listing("alpha"), listing("beta")]);
+
+  expect(view.result.current.refreshing).toBe(false);
+  expect(view.result.current.rooms.map((room) => room.roomId)).toEqual(["alpha", "beta"]);
+});
+
+test("disarms the refresh when the subscription drops under it", async () => {
+  const { lobby, view } = await opened();
+  await push(lobby, ROOMS, [listing("alpha")]);
+
+  await act(async () => {
+    view.result.current.refresh();
+  });
+  await push(lobby, LEFT);
+
+  // The list is never coming. The message says so and the gesture ends with it.
+  expect(view.result.current.refreshing).toBe(false);
+  expect(view.result.current.status).toBe("error");
 });
 
 test("re-subscribes on refresh after a drop, and takes the fresh list", async () => {

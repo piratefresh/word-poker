@@ -1,0 +1,71 @@
+# The four-browser online smoke, seat P3 (STO-483): the bust. Seed, racks and taps: seat-1.yaml.
+url: http://localhost:8081/online
+name: Four-seat P3 - loses hand 1, shoves and busts, sits out hand 3 and leaves
+tags:
+  - web
+  - online
+  - four-seat
+---
+- runFlow: _sign-in-and-open.yaml
+- runFlow: _join.yaml
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
+
+# Hand 1: the big blind calls the re-raise and the flop bet, checks it down, spells YALE, loses.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-tile-Y-1"
+- tapOn:
+    id: "word-builder-face-AI-1-A"
+- tapOn:
+    id: "word-builder-tile-L-4"
+- tapOn:
+    id: "word-builder-tile-E-5"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "1", WORD: YALE }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "1", WORD: DX }
+
+# Hand 2: the small blind shoves its 460. P1 and P2 bet on past it, into a side pot it cannot win.
+- runFlow: _all-in.yaml
+- extendedWaitUntil:
+    visible: "SIDE POT .*"
+    timeout: 150000
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-face-AI-1-A"
+- tapOn:
+    id: "word-builder-tile-X-1"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "2", WORD: AX }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "2", WORD: TAX }
+
+# Hand 3 is dealt without it: the seat reads BUSTED, sees the hand start, and leaves the table.
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 60000
+- assertVisible:
+    text: "BUSTED"
+- tapOn:
+    id: "Leave the table"
+- extendedWaitUntil:
+    visible: "Deal a new table"
+    timeout: 30000

@@ -75,8 +75,11 @@ export interface ResultsSnapshot {
   /**
    * The seed this hand was dealt from, so a rating can be replayed: the engine derives every
    * later hand from the seed before it, and this is the one this hand replayed from.
+   *
+   * `null` online: the room's seed derives every hand it will deal next, so it never leaves the
+   * server, and the screen carries no rating card for a hand it cannot replay.
    */
-  readonly seed: number;
+  readonly seed: number | null;
   /** Every chip the hand's pots hold: what the pot counts 0 up to, and settles on exactly. */
   readonly pot: number;
   /**

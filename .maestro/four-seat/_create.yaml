@@ -1,0 +1,18 @@
+# Subflow (P1 only): create Four Table through the real lobby form. The form sends no seed; the
+# smoke server's WORDPOKER_SMOKE_ROOM supplies it (and the long payout and turn clocks).
+url: http://localhost:8081/online
+name: Four-seat - create Four Table
+---
+- tapOn:
+    text: "Deal a new table"
+- tapOn:
+    id: "Table name"
+- inputText: "Four Table"
+- tapOn:
+    text: "Create"
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- assertVisible:
+    text: "YOU"

@@ -38,12 +38,9 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
-import { colors, fonts, glow, radius, resultsEntrance, spacing } from "@/constants/theme";
+import { colors, fonts, resultsEntrance, spacing } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
 import { beatProgress } from "@/lib/use-results-entrance";
-
-/** The bloom's diameter: a wide glow behind a 40pt number, wider than the pot's own box. */
-const BLOOM = 150;
 
 /**
  * What the count-up layer receives. reanimated writes the counted string onto the input, and
@@ -62,7 +59,7 @@ const PotValue = Animated.createAnimatedComponent(TextInput) as unknown as Compo
 export interface ResultsPotProps {
   /** Every chip the hand's pots hold: what the count runs to, and what it settles on. */
   readonly amount: number;
-  /** The entrance's shared clock: the count, the lift and the bloom are three of its beats. */
+  /** The entrance's shared clock: the count and its lift read two beats of it. */
   readonly clock: SharedValue<number>;
 }
 
@@ -99,26 +96,12 @@ export function ResultsPot({ amount, clock }: ResultsPotProps): ReactElement {
     ],
   }));
 
-  // The slowest beat: the bloom flares with the count and keeps a low ember after it.
-  const bloom = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      beatProgress(clock, resultsEntrance.bloom, resultsEntrance.bloomFade),
-      [0, 0.5, 1],
-      [0, 0.35, 0.12],
-    ),
-  }));
-
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={styles.box}
     >
-      {/* Behind the number, and only ever lit by its own beat. */}
-      <Animated.View pointerEvents="none" style={[styles.bloomLayer, bloom]}>
-        <View style={styles.bloom} />
-      </Animated.View>
-
       {/* The box: invisible, in the flow, and the exact final amount. */}
       <Text allowFontScaling style={[styles.pot, styles.reserve]} testID="results-pot-reserve">
         {settled}
@@ -153,22 +136,6 @@ const potType: TextStyle = {
 };
 
 const styles = StyleSheet.create({
-  bloom: {
-    ...glow(colors.gold, 26),
-    backgroundColor: colors.gold,
-    borderRadius: radius.pill,
-    height: BLOOM,
-    width: BLOOM,
-  },
-  bloomLayer: {
-    alignItems: "center",
-    bottom: 0,
-    justifyContent: "center",
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
   box: {
     alignItems: "center",
     justifyContent: "center",

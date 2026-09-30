@@ -8,7 +8,7 @@ import { ROUND_PHASES, type RoundPhase } from "@wordpoker/contracts";
 
 import { Tile, type TileData, type TileSide } from "@/components/game";
 import {
-  HUD_CHROME_HEIGHT,
+  useHudChromeHeight,
   Hud,
   TurnClockProvider,
   useToastQueue,
@@ -22,6 +22,7 @@ import {
   Pot,
 } from "@/components/screens/game/game-primitives";
 import { DEVICE_CLOCK_SAMPLE, openTurn, type OpenTurn } from "@/components/screens/game/game-screen-hud";
+import { playerSeatBounds, tableSeating } from "@/components/screens/game/seat-metrics";
 import { PokerTable } from "@/components/table";
 import {
   border,
@@ -42,6 +43,7 @@ const COMMUNITY_TILES: readonly TileData[] = [
 ];
 
 const COMMUNITY_TILE_SIZE = 34;
+const SEATING = tableSeating(FOUR_PLAYER_FLOP_FIXTURE.seatCount);
 const DEAL_STAGGER_MS = 130;
 const SETTLE_AFTER_LAST_FLIP_MS = duration.deal + 80;
 
@@ -143,6 +145,7 @@ export function TutorialScreen() {
 /** The body reads the clock, so it has to sit inside the provider rather than beside it. */
 function TutorialScreenBody() {
   const insets = useSafeAreaInsets();
+  const hudHeight = useHudChromeHeight();
   const [handSide, setHandSide] = useState<TileSide>("back");
   const [dealtCount, setDealtCount] = useState(0);
   const [isDealing, setIsDealing] = useState(false);
@@ -225,7 +228,7 @@ function TutorialScreenBody() {
       style={[
         styles.screen,
         {
-          paddingTop: insets.top + HUD_CHROME_HEIGHT,
+          paddingTop: insets.top + hudHeight,
           paddingBottom: insets.bottom + spacing.xl,
         },
       ]}>
@@ -280,15 +283,20 @@ function TutorialScreenBody() {
 
       <View style={styles.tableRegion}>
         <PokerTable
-          chromeInset={42}
           community={[]}
-          layoutConfig={{ seatRadius: { x: 0.98, y: 0.96 }, potY: 0.5 }}
-          railWidth={3}
+          chromeInset={0}
+          layoutConfig={SEATING.layoutConfig}
           renderCommunity={() => null}
-          renderPot={() => (
-            <Pot amount={FOUR_PLAYER_FLOP_FIXTURE.pot} blinds={FOUR_PLAYER_FLOP_FIXTURE.blinds} />
+          renderPot={({ size }) => (
+            <Pot
+              amount={FOUR_PLAYER_FLOP_FIXTURE.pot}
+              blinds={FOUR_PLAYER_FLOP_FIXTURE.blinds}
+              tableWidth={size.width}
+            />
           )}
           renderSeat={PlayerSeat}
+          seatBounds={playerSeatBounds}
+          seatPlacement={SEATING.seatPlacement}
           seatCount={FOUR_PLAYER_FLOP_FIXTURE.seatCount}
           seats={FOUR_PLAYER_FLOP_FIXTURE.players}
           style={styles.table}
@@ -419,13 +427,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   /* PokerTable measures itself, so the region must bound a real height. It
-     spans the full width like the game screen does, so the seats sitting on
-     the felt edge are never clipped by the screen gutter. */
+     spans the full width like the game screen does: the seats sit inside the
+     table, so the table itself can run to the screen's edges. */
   tableRegion: {
     flex: 1,
     minHeight: 260,
     marginBottom: -spacing.lg,
-    paddingHorizontal: spacing.sm,
     width: "100%",
   },
   table: {

@@ -1,0 +1,18 @@
+# Subflow: shove on this seat's turn, through the all-in sheet's confirm.
+url: http://localhost:8081/online
+name: Four-seat - all in
+---
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 150000
+- tapOn:
+    id: "all-in-button"
+- extendedWaitUntil:
+    visible:
+      id: "all-in-sheet"
+    timeout: 10000
+- tapOn:
+    id: "all-in-confirm"
+- extendedWaitUntil:
+    notVisible: "YOUR TURN"
+    timeout: 30000

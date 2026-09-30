@@ -29,6 +29,12 @@ export type LobbyStatus =
 export interface LobbyView {
   readonly status: LobbyStatus;
   readonly rooms: RoomSummary[];
+  /**
+   * A refresh is in the air: the list has been asked for and the server has not answered yet. The
+   * subscription is live, so this is the only thing that can tell a pull-to-refresh that its
+   * gesture landed.
+   */
+  readonly refreshing: boolean;
   /** A sentence for the player, not a stack trace. */
   readonly error?: string;
   readonly refresh: () => void;
@@ -46,6 +52,7 @@ export function useLobby(): LobbyView {
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
   const [attempt, setAttempt] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const subscription = useRef<Room | null>(null);
 
   useEffect(() => {
@@ -55,6 +62,7 @@ export function useLobby(): LobbyView {
     const fail = (message: string) => {
       if (cancelled) return;
       subscription.current = null;
+      setRefreshing(false);
       setStatus("error");
       setError(message);
     };
@@ -69,6 +77,7 @@ export function useLobby(): LobbyView {
       }
 
       setRooms(rows);
+      setRefreshing(false);
       setStatus("ready");
       setError(undefined);
     };
@@ -108,6 +117,10 @@ export function useLobby(): LobbyView {
         joined.onMessage("-", drop);
         joined.onLeave(() => fail(DROPPED));
         joined.onError(() => fail(DROPPED));
+        // The initial `rooms` message can race the join promise, before the handlers above are
+        // registered. Ask the LobbyRoom for the unfiltered list once more so the screen cannot
+        // stay in its loading state with a table already open.
+        joined.send("filter");
       })
       .catch(() => fail(UNREACHABLE));
 
@@ -123,14 +136,16 @@ export function useLobby(): LobbyView {
     if (room !== null) {
       // A bare `filter` is the server's own "no filter" path: it pushes the whole list back.
       // (A filter of `{}` would be read as "no room is named `game`" and list nothing.)
+      setRefreshing(true);
       room.send("filter");
       return;
     }
     // The subscription is gone, so the retry is a fresh one.
+    setRefreshing(false);
     setStatus("loading");
     setError(undefined);
     setAttempt((current) => current + 1);
   }, []);
 
-  return { status, rooms, error, refresh };
+  return { status, rooms, refreshing, error, refresh };
 }

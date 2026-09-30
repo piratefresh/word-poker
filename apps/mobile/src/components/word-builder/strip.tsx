@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   Text,
+  useWindowDimensions,
   View,
   type LayoutChangeEvent,
 } from "react-native";
@@ -19,39 +20,23 @@ import Animated, {
 
 import {
   Tile,
-  TILE_METRICS,
+  scaleTileMetrics,
   getTileAccessibilityLabel,
   type TileOwnership,
   type TileSize,
 } from "@/components/game";
+import {
+  isCompactWindow,
+  screenScale,
+} from "@/components/screens/game/screen-scale";
 import { spacing } from "@/constants/theme";
+import { webTestID } from "@/lib/web-id";
 
 import { haptic } from "./haptics";
 import { styles } from "./styles";
 
-/**
- * A tile in the strip stays where the seat left it: the word is the tiles it has selected, read
- * left to right, so a tap toggles a tile in or out of the word without moving it and a drag is
- * only ever an order. The strip's grid is taken from the tile it draws — a place is one tile
- * plus the gap that separates it from the next, laid out from the strip's start — so the tile's
- * own metrics are what the places and the drag are measured in.
- */
-const RACK_TILE_SIZE: TileSize = "medium";
-const TILE = TILE_METRICS[RACK_TILE_SIZE];
-const ITEM_WIDTH = TILE.width;
-
 /** The widest gap the places take between them: a short hand sits at this and stays tight. */
 const MAX_GAP = 10;
-
-/** How far apart two places sit on a rack with room to spare: the tile and that daylight. */
-const MAX_STEP = ITEM_WIDTH + MAX_GAP;
-
-/**
- * The closest two places may come. A narrow phone gives up the gap first and then some of the
- * tile itself, so the end tiles overlap the way a hand held in one does — the hand stays on
- * screen and stays tappable rather than running off the edge of the table.
- */
-const MIN_STEP = Math.round(ITEM_WIDTH * 0.72);
 
 /** The bite taken at either end of the rack, so the hand does not run into the edge of the table. */
 const RACK_INSET = 8;
@@ -60,10 +45,65 @@ const RACK_INSET = 8;
 const FACE_HEIGHT = 24;
 
 /**
- * The strip's row height: a tile and, under a choice tile, its two faces. Every tile is laid out
- * absolutely inside the row, so the row is the one place the height is set.
+ * A tile in the strip stays where the seat left it: the word is the tiles it has selected, read
+ * left to right, so a tap toggles a tile in or out of the word without moving it and a drag is
+ * only ever an order. The strip's grid is taken from the tile it draws — a place is one tile
+ * plus the gap that separates it from the next, laid out from the strip's start — so the tile's
+ * own metrics are what the places and the drag are measured in.
  */
-const RACK_HEIGHT = TILE.height + spacing.xs + FACE_HEIGHT;
+export interface RackGeometry {
+  /** The tile the rack draws: `medium`, grown by `scale` on a tablet or desktop window. */
+  readonly size: TileSize;
+  /** The screen scale the tile is grown by; 1 on a phone. */
+  readonly scale: number;
+  readonly itemWidth: number;
+  /** How far apart two places sit on a rack with room to spare: the tile and `MAX_GAP`. */
+  readonly maxStep: number;
+  /**
+   * The closest two places may come. A narrow phone gives up the gap first and then some of the
+   * tile itself, so the end tiles overlap the way a hand held in one does — the hand stays on
+   * screen and stays tappable rather than running off the edge of the table.
+   */
+  readonly minStep: number;
+  /**
+   * The strip's row height: a tile and, under a choice tile, its two faces. Every tile is laid
+   * out absolutely inside the row, so the row is the one place the height is set.
+   */
+  readonly height: number;
+}
+
+function rackGeometry(size: TileSize, scale = 1): RackGeometry {
+  const tile = scaleTileMetrics(size, scale);
+  return {
+    size,
+    scale,
+    itemWidth: tile.width,
+    maxStep: tile.width + MAX_GAP,
+    minStep: Math.round(tile.width * 0.72),
+    height: tile.height + spacing.xs + FACE_HEIGHT * scale,
+  };
+}
+
+/** The rack for a phone: the medium tile, drawn as it always was. */
+export const RACK = {
+  phone: rackGeometry("medium"),
+  /** An iPhone SE-class window: the small tile, which frees height for the table. */
+  compact: rackGeometry("small"),
+} as const;
+
+/**
+ * The rack for a window: the medium tile grown by the window's screen scale, so the tiles keep
+ * pace with the banner, the seats and the action row. Its shorter side decides, so a phone —
+ * upright or on its side — gets the phone rack itself.
+ */
+export function rackFor(window: {
+  width: number;
+  height: number;
+}): RackGeometry {
+  const scale = screenScale(window);
+  if (scale !== 1) return rackGeometry("medium", scale);
+  return isCompactWindow(window) ? RACK.compact : RACK.phone;
+}
 
 /**
  * How far apart two places sit, given the room the rack was drawn in: the hand spreads into the
@@ -71,15 +111,19 @@ const RACK_HEIGHT = TILE.height + spacing.xs + FACE_HEIGHT;
  * giving up the gap first and then some of the tile itself. Nothing measured yet, or a lone
  * tile, lays out at the full step.
  */
-function stepFor(count: number, room: number): number {
-  if (count < 2 || room <= 0) return MAX_STEP;
-  const spread = (room - RACK_INSET * 2 - ITEM_WIDTH) / (count - 1);
-  return Math.max(MIN_STEP, Math.min(MAX_STEP, spread));
+export function stepFor(
+  count: number,
+  room: number,
+  rack: RackGeometry,
+): number {
+  if (count < 2 || room <= 0) return rack.maxStep;
+  const spread = (room - RACK_INSET * 2 - rack.itemWidth) / (count - 1);
+  return Math.max(rack.minStep, Math.min(rack.maxStep, spread));
 }
 
 /** The width the places span: one tile, and a step for each of the rest. */
-const rowWidth = (count: number, step: number): number =>
-  count === 0 ? 0 : ITEM_WIDTH + (count - 1) * step;
+const rowWidth = (count: number, step: number, rack: RackGeometry): number =>
+  count === 0 ? 0 : rack.itemWidth + (count - 1) * step;
 
 /**
  * How far the pointer travels before a press becomes a drag: a few pixels, the way dnd-kit's
@@ -123,7 +167,13 @@ export function move(
   from: number,
   to: number,
 ): readonly StripEntry[] {
-  if (from === to || from < 0 || to < 0 || from >= entries.length || to >= entries.length) {
+  if (
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= entries.length ||
+    to >= entries.length
+  ) {
     return entries;
   }
 
@@ -139,7 +189,9 @@ export function move(
  * A drop hands the strip its whole arrangement this way, so the seat's order is rebuilt from the
  * places rather than tracked move by move.
  */
-export function orderFromPositions(positions: Readonly<Record<string, number>>): readonly string[] {
+export function orderFromPositions(
+  positions: Readonly<Record<string, number>>,
+): readonly string[] {
   return Object.entries(positions)
     .sort(([, a], [, b]) => a - b)
     .map(([id]) => id);
@@ -159,7 +211,10 @@ export function inStripOrder(
 }
 
 /** Whether two drafts are the same submission: the same tiles, in the order, playing the faces. */
-export function sameDraft(draft: readonly TilePlay[], other: readonly TilePlay[]): boolean {
+export function sameDraft(
+  draft: readonly TilePlay[],
+  other: readonly TilePlay[],
+): boolean {
   return (
     draft.length === other.length &&
     draft.every((play, index) => {
@@ -182,7 +237,9 @@ export function shuffleUnheld(
   strip: readonly StripEntry[],
   held: ReadonlySet<string>,
 ): readonly StripEntry[] {
-  const queue = [...shuffled(strip.filter((entry) => !held.has(entry.tile.id)))];
+  const queue = [
+    ...shuffled(strip.filter((entry) => !held.has(entry.tile.id))),
+  ];
 
   return strip.map((entry) =>
     held.has(entry.tile.id) ? entry : (queue.shift() ?? entry),
@@ -311,13 +368,14 @@ export function TileStrip({
     [strip, held],
   );
 
-  const step = stepFor(data.length, room);
+  const rack = rackFor(useWindowDimensions());
+  const step = stepFor(data.length, room, rack);
 
   return (
     <View
       accessibilityLabel="Your letter rack"
       onLayout={measure}
-      style={styles.strip}
+      style={[styles.strip, rack === RACK.compact && styles.stripTight]}
       testID="word-builder-strip"
     >
       {/*
@@ -328,7 +386,7 @@ export function TileStrip({
       <View
         style={[
           styles.stripContent,
-          { height: RACK_HEIGHT, width: rowWidth(data.length, step) },
+          { height: rack.height, width: rowWidth(data.length, step, rack) },
         ]}
       >
         {sortable ? (
@@ -341,7 +399,7 @@ export function TileStrip({
           */
           <SortableStrip
             data={data}
-            key={`${step}:${data.map((datum) => datum.id).join("-")}`}
+            key={`${rack.scale}:${step}:${data.map((datum) => datum.id).join("-")}`}
             live={live}
             onDragStart={() => {
               dragging.current = true;
@@ -353,6 +411,7 @@ export function TileStrip({
               onReorder(order);
             }}
             onToggle={toggle}
+            rack={rack}
             step={step}
           />
         ) : (
@@ -361,9 +420,18 @@ export function TileStrip({
           data.map((datum, index) => (
             <View
               key={datum.id}
-              style={[styles.place, { left: index * step, width: ITEM_WIDTH }]}
+              style={[
+                styles.place,
+                { left: index * step, width: rack.itemWidth },
+              ]}
             >
-              <TileContent datum={datum} live={live} onToggle={toggle} />
+              <TileContent
+                datum={datum}
+                live={live}
+                onToggle={toggle}
+                size={rack.size}
+                scale={rack.scale}
+              />
             </View>
           ))
         )}
@@ -392,6 +460,7 @@ export function TileStrip({
 function SortableStrip({
   data,
   live,
+  rack,
   step,
   onToggle,
   onDragStart,
@@ -399,6 +468,7 @@ function SortableStrip({
 }: {
   data: readonly StripDatum[];
   live: boolean;
+  rack: RackGeometry;
   /** How far apart the places sit, as the room the rack was given allows. */
   step: number;
   onToggle: (entry: StripEntry, face?: string) => void;
@@ -429,6 +499,7 @@ function SortableStrip({
           onDrop={settle}
           onToggle={onToggle}
           positions={positions}
+          rack={rack}
           step={step}
         />
       ))}
@@ -443,6 +514,7 @@ function SortableStrip({
 function DragTile({
   datum,
   count,
+  rack,
   step,
   positions,
   activeId,
@@ -453,6 +525,7 @@ function DragTile({
 }: {
   datum: StripDatum;
   count: number;
+  rack: RackGeometry;
   /** How far apart the places sit, as the room the rack was given allows. */
   step: number;
   positions: SharedValue<Record<string, number>>;
@@ -488,7 +561,10 @@ function DragTile({
 
       // The place the tile's middle is over now, and, if it moved, the strip shifted so the
       // tiles between here and there slide by one to make room — an insert, never a swap.
-      const target = Math.max(0, Math.min(count - 1, Math.round(left.get() / step)));
+      const target = Math.max(
+        0,
+        Math.min(count - 1, Math.round(left.get() / step)),
+      );
       const places = positions.get();
       const current = places[id];
       if (current === undefined || current === target) return;
@@ -497,13 +573,19 @@ function DragTile({
       for (const key in places) {
         const place = places[key];
         if (key === id) next[key] = target;
-        else if (current < target) next[key] = place > current && place <= target ? place - 1 : place;
+        else if (current < target)
+          next[key] = place > current && place <= target ? place - 1 : place;
         else next[key] = place >= target && place < current ? place + 1 : place;
       }
       positions.set(next);
     })
     .onEnd(() => {
-      left.set(withSpring((positions.get()[id] ?? 0) * step, { damping: 22, stiffness: 240 }));
+      left.set(
+        withSpring((positions.get()[id] ?? 0) * step, {
+          damping: 22,
+          stiffness: 240,
+        }),
+      );
     })
     .onFinalize(() => {
       if (activeId.get() !== id) return;
@@ -516,7 +598,9 @@ function DragTile({
     return {
       left: left.get(),
       transform: [
-        { scale: withSpring(active ? 1.08 : 1, { damping: 18, stiffness: 260 }) },
+        {
+          scale: withSpring(active ? 1.08 : 1, { damping: 18, stiffness: 260 }),
+        },
       ],
       zIndex: active ? 10 : 0,
     };
@@ -524,8 +608,16 @@ function DragTile({
 
   return (
     <GestureDetector gesture={pan}>
-      <Animated.View style={[styles.place, { width: ITEM_WIDTH }, animatedStyle]}>
-        <TileContent datum={datum} live={live} onToggle={onToggle} />
+      <Animated.View
+        style={[styles.place, { width: rack.itemWidth }, animatedStyle]}
+      >
+        <TileContent
+          datum={datum}
+          live={live}
+          onToggle={onToggle}
+          size={rack.size}
+          scale={rack.scale}
+        />
       </Animated.View>
     </GestureDetector>
   );
@@ -539,10 +631,14 @@ function DragTile({
 function TileContent({
   datum,
   live,
+  size,
+  scale,
   onToggle,
 }: {
   datum: StripDatum;
   live: boolean;
+  size: TileSize;
+  scale: number;
   onToggle: (entry: StripEntry, face?: string) => void;
 }): JSX.Element {
   const { entry, held, chosenFace } = datum;
@@ -550,7 +646,10 @@ function TileContent({
   const choice = "alternativeLetter" in tile ? tile : null;
   // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
   // held choice tile says the face the word is playing and not only the pair it prints.
-  const playing = choice !== null && held && chosenFace !== undefined ? `, playing ${chosenFace}` : "";
+  const playing =
+    choice !== null && held && chosenFace !== undefined
+      ? `, playing ${chosenFace}`
+      : "";
   const label = held
     ? `${getTileAccessibilityLabel(tile)}${playing}, in your word, tap to take it back`
     : `${getTileAccessibilityLabel(tile)}, tap to play it`;
@@ -568,7 +667,8 @@ function TileContent({
         ownership={ownership}
         selected={held}
         side="front"
-        size={RACK_TILE_SIZE}
+        scale={scale}
+        size={size}
         testID={`word-builder-tile-${tile.id}`}
         tile={tile}
       />
@@ -608,15 +708,23 @@ function FaceChip({
   playable: boolean;
   onPress: () => void;
 }): JSX.Element {
+  const testID = `word-builder-face-${tile.id}-${face}`;
   return (
     <Pressable
       accessibilityLabel={`Play the ${tile.letter}/${tile.alternativeLetter} tile as ${face}`}
       accessibilityRole="button"
       accessibilityState={{ disabled: !playable, selected: chosen }}
       disabled={!playable}
+      // The chip's label names the letters, not this face of them: a flow names the face by
+      // its test id, which is the page's own id on the web (webTestID).
+      id={webTestID(testID)}
       onPress={onPress}
-      style={[styles.chip, chosen && styles.chipChosen, !playable && styles.chipSpent]}
-      testID={`word-builder-face-${tile.id}-${face}`}
+      style={[
+        styles.chip,
+        chosen && styles.chipChosen,
+        !playable && styles.chipSpent,
+      ]}
+      testID={testID}
     >
       <Text style={styles.chipFace}>{face}</Text>
     </Pressable>

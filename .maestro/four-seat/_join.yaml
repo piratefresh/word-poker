@@ -1,0 +1,11 @@
+# Subflow (P2-P4): join the exact room the runner read off the lobby watcher.
+url: http://localhost:8081/online
+name: Four-seat - join by room id
+---
+- openLink: http://localhost:8081/online/${ROOM_ID}
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- assertVisible:
+    text: "YOU"

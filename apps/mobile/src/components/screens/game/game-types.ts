@@ -14,7 +14,9 @@ export type PlayerStatus =
   | "fold"
   | "all-in"
   | "busted"
-  | "winner";
+  | "winner"
+  /** Said ready at a table that has not dealt yet. */
+  | "ready";
 
 /**
  * The markers a seat can carry (§5): the dealer button, and the two blinds that ride on it. A

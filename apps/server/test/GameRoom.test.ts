@@ -9,13 +9,98 @@ import {
   type GameRejectionEvent,
   type OnlineBettingAction,
   type PrivateSeatState,
+  type Tile,
 } from "@wordpoker/contracts";
+import { chooseOfflineWord, loadDictionary, type OfflineState } from "@wordpoker/game-rules";
 
+import {
+  FOUR_SEAT_BUY_IN,
+  FOUR_SEAT_ROOM,
+  FOUR_SEAT_SCRIPT,
+  bestStripWord,
+  toEngineAction,
+} from "../scripts/four-seat-scenario.js";
 import appConfig from "../src/app.config.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
 // this gate. The suite boots unseeded rooms too, so only tests that pin a seed need it on.
 process.env.WORDPOKER_DETERMINISTIC_SEED = "1";
+
+/** Seed 408's deal and standings after STO-467 changed the bag to choice tiles only. */
+const PINNED_408 = {
+  winnerSeat: 0,
+  standings: [
+    { word: "DOLOR", score: 11 },
+    { word: "LOUR", score: 10 },
+  ],
+};
+
+/** The server-side room as `connectTo` hands it: its state, and a way to wait for a patch. */
+type ServerRoom = { state: { phase: string }; waitForNextPatch(): Promise<unknown> };
+
+/**
+ * Every seat says ready, and the test waits for the deal that follows: a table deals only once
+ * each of its seats — two at least — has said so.
+ */
+async function readyUp(room: ServerRoom, clients: readonly ClientRoom[]) {
+  for (const client of clients) client.send(GAME_MESSAGES.ready, { ready: true });
+  for (let patch = 0; patch < 20 && room.state.phase === WAITING_PHASE; patch += 1) {
+    await room.waitForNextPatch();
+  }
+}
+
+/** The board ids a room holds, in order. */
+function boardIds(state: unknown): string[] {
+  const community = (state as { community?: Iterable<{ id: string }> }).community ?? [];
+  return [...community].map((tile) => tile.id);
+}
+
+/** Strips schema-only blank alternative faces so plain letters stay plain engine tiles. */
+function tileFromRoomState(tile: { toJSON(): unknown }): Tile {
+  const state = tile.toJSON() as {
+    kind: "choice" | "letter";
+    id: string;
+    letter: string;
+    points: number;
+    alternativeLetter: string;
+    alternativePoints: number;
+    multiplier: string;
+  };
+  const multiplier = state.multiplier as NonNullable<Tile["multiplier"]> | undefined;
+  const shared = {
+    id: state.id,
+    letter: state.letter,
+    points: state.points,
+    ...(multiplier ? { multiplier } : {}),
+  };
+  return state.kind === "choice"
+    ? { ...shared, alternativeLetter: state.alternativeLetter, alternativePoints: state.alternativePoints }
+    : shared;
+}
+
+/** Waits until every client has decoded the server's board: a patch reaches clients async. */
+async function clientsCaughtUp(room: { state: unknown }, clients: readonly ClientRoom[]) {
+  for (let tick = 0; tick < 50; tick += 1) {
+    const expected = boardIds(room.state).join();
+    if (clients.every((client) => boardIds(client.state).join() === expected)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/**
+ * Each client decodes the board the server holds, each tile once: re-projecting a street must
+ * not leave the previous street's tiles behind in a client's copy (a duplicate React key at the
+ * payout).
+ */
+function assertBoardDecodesOnce(room: { state: unknown }, clients: readonly ClientRoom[]) {
+  for (const client of clients) {
+    assert.deepStrictEqual(
+      boardIds(client.state),
+      boardIds(room.state),
+      "the client's board is the server's, each tile once",
+    );
+  }
+}
 
 /**
  * The server, booted once: what a creator may configure, how a full table runs an authoritative
@@ -51,7 +136,9 @@ describe("GameRoom", () => {
       assert.strictEqual(room.state.phase, "waiting", "one player is not a table");
 
       const second = await colyseus.connectTo(room);
-      assert.strictEqual(room.state.phase, "preflop", "a full table deals the first round");
+      assert.strictEqual(room.state.phase, "waiting", "a seated table waits for its players");
+      await readyUp(room, [first, second]);
+      assert.strictEqual(room.state.phase, "preflop", "a ready table deals the first round");
       assert.strictEqual(room.state.handCount, 1);
       assert.strictEqual(room.state.community.length, 0, "the unrevealed board stays private");
       assert.strictEqual(room.state.seats.size, 2);
@@ -105,6 +192,7 @@ describe("GameRoom", () => {
         assert.strictEqual(received.playerId, client.sessionId, "the state is the receiving seat's");
         assert.strictEqual(received.seat, room.state.seats.get(client.sessionId)?.seat);
         assert.strictEqual(received.rack.length, 2);
+        assert.strictEqual(received.hand, room.state.handCount, "the rack names its own hand");
       }
       assert.notDeepStrictEqual(
         privateStates.get(first.sessionId)?.rack,
@@ -125,6 +213,8 @@ describe("GameRoom", () => {
         assert.ok(currentActor);
         currentActor.send(GAME_MESSAGES.betting, moveFor(currentActorId));
         await room.waitForNextPatch();
+        await clientsCaughtUp(room, clients);
+        assertBoardDecodesOnce(room, clients);
         if (room.state.phase in revealedFor) {
           assert.strictEqual(
             room.state.community.length,
@@ -148,8 +238,287 @@ describe("GameRoom", () => {
       }
 
       assert.strictEqual(room.state.phase, "payout");
+      await clientsCaughtUp(room, clients);
+      assertBoardDecodesOnce(room, clients);
       assert.strictEqual(room.state.result.available, true);
       assert.ok(room.state.result.standings.length > 0);
+      for (const standing of room.state.result.standings) {
+        if (standing.word === "") {
+          assert.strictEqual(standing.tiles.length, 0, "a seat with no word reveals no tiles");
+          continue;
+        }
+        assert.ok(standing.tiles.length > 0, "a word that stood reveals its tiles");
+        assert.strictEqual(
+          standing.base + standing.mult + standing.rack,
+          standing.score,
+          "§7's parts add up to the score the ladder ranked",
+        );
+      }
+    });
+
+    it("plays a seeded two-seat hand to a pinned payout (STO-408)", async () => {
+      // The multiplayer smoke: two clients, one seeded room, a bet and a call, real words, and
+      // the settled stacks pinned. Paced by patches alone — no wall-clock sleeps — and a long
+      // payout delay keeps the result on the state while it is read.
+      const room = await colyseus.createRoom("game", {
+        name: "Smoke test",
+        buyIn: 500,
+        maxSeats: 2,
+        seed: 408,
+        payoutDelay: 60_000,
+      });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      const clients = [first, second];
+      const racks = new Map<string, PrivateSeatState>();
+      const rejections: GameRejectionEvent[] = [];
+      for (const client of clients) {
+        client.onMessage(GAME_EVENTS.privateState, (payload) => {
+          racks.set(client.sessionId, payload as PrivateSeatState);
+        });
+        client.onMessage(GAME_EVENTS.rejected, (payload) => {
+          rejections.push(payload as GameRejectionEvent);
+        });
+      }
+      await readyUp(room, clients);
+      assert.strictEqual(room.state.phase, "preflop");
+      const buttonSeat = room.state.dealerSeat;
+      const smallBlind = room.state.table.smallBlind;
+      const bigBlind = room.state.table.bigBlind;
+      const smallBlindId = [...room.state.seats.values()].find((seat) => seat.seat === buttonSeat)?.playerId;
+      assert.ok(smallBlindId, "the button posts the small blind heads-up");
+      const bigBlindId = [...room.state.seats.values()].find((seat) => seat.seat !== buttonSeat)?.playerId;
+      assert.ok(bigBlindId, "the other seat posts the big blind heads-up");
+      assert.strictEqual(
+        room.state.seats.get(smallBlindId)?.committedThisRound,
+        smallBlind,
+        "the button posts the small blind",
+      );
+      assert.strictEqual(
+        room.state.seats.get(bigBlindId)?.committedThisRound,
+        bigBlind,
+        "the other seat posts the big blind",
+      );
+
+      const actor = () => {
+        const id = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
+        const client = clients.find((candidate) => candidate.sessionId === id);
+        assert.ok(client, "the server names a connected actor");
+        return client;
+      };
+      /** The actor sends one action; the test waits for the turn or the street to move on. */
+      const act = async (action: object) => {
+        const { phase, toActSeat } = room.state;
+        actor().send(GAME_MESSAGES.betting, action);
+        for (
+          let patch = 0;
+          patch < 20 && room.state.phase === phase && room.state.toActSeat === toActSeat;
+          patch += 1
+        ) {
+          await room.waitForNextPatch();
+        }
+      };
+
+      assert.strictEqual(room.state.toActSeat, buttonSeat, "the button and small blind acts first heads-up");
+      assert.strictEqual(actor().sessionId, smallBlindId);
+      await act({ type: "call" });
+      assert.strictEqual(room.state.phase, "preflop", "the small blind calls the big blind");
+      assert.notStrictEqual(room.state.toActSeat, buttonSeat, "the big blind gets its option");
+      assert.strictEqual(actor().sessionId, bigBlindId);
+      await act({ type: "check" });
+      assert.strictEqual(room.state.phase, "flop", "the big blind checks its option");
+      assert.strictEqual(room.state.community.length, 3);
+
+      const bet = bigBlind;
+      assert.ok(bet > 0, "the flop opens with a minimum bet");
+      await act({ type: "bet", amount: bet });
+      assert.strictEqual(room.state.betting.currentBet, bet, "the bet is the round's to match");
+      await act({ type: "call" });
+      assert.strictEqual(room.state.phase, "turn", "a called bet closes the flop");
+      const pot = [...room.state.pots].reduce((sum, layer) => sum + layer.amount, 0);
+      assert.strictEqual(pot, 2 * (bigBlind + bet), "both seats match the big blind and flop bet");
+
+      for (let action = 0; action < 4 && room.state.wordWindow.status !== "open"; action += 1) {
+        await act({ type: "check" });
+      }
+      assert.strictEqual(room.state.wordWindow.status, "open", "the river's checks open the word window");
+      assert.strictEqual(room.state.community.length, 5);
+
+      const dictionary = await loadDictionary();
+      const board = [...room.state.community].map(tileFromRoomState);
+      for (const client of clients) {
+        const privateState = racks.get(client.sessionId);
+        assert.ok(privateState?.hand === room.state.handCount, "the seat holds this hand's rack");
+        const submission = chooseOfflineWord({ available: [...privateState.rack, ...board], dictionary });
+        assert.ok(submission, "the seeded deal gives every seat a word");
+        client.send(GAME_MESSAGES.confirmWord, { submission });
+      }
+      for (let patch = 0; patch < 20 && room.state.phase !== "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+
+      assert.deepStrictEqual(rejections, [], "all smoke actions, including word confirmations, are accepted");
+      assert.strictEqual(room.state.phase, "payout", "both words confirmed settle the hand");
+      const { result } = room.state;
+      assert.strictEqual(result.available, true);
+      const stacks = new Map([...room.state.seats.values()].map((seat) => [seat.playerId, seat.tableStack]));
+      assert.strictEqual([...stacks.values()].reduce((sum, stack) => sum + stack, 0), 1_000, "no chip is made or lost");
+      assert.ok(stacks.has(result.winner), "the result names a seated winner");
+      const loserId = result.winner === smallBlindId ? bigBlindId : smallBlindId;
+      const transfer = bigBlind + bet;
+      for (const [playerId, stack] of stacks) {
+        assert.strictEqual(
+          stack,
+          playerId === result.winner ? 500 + transfer : 500 - transfer,
+          "the winner takes the loser's blind and flop bet",
+        );
+      }
+      // Pinned to seed 408: the same deal, the same words, the same winner, every run.
+      const standings = [...result.standings].map(({ word, score }) => ({ word, score }));
+      const winnerSeat = room.state.seats.get(result.winner)?.seat;
+      assert.deepStrictEqual({ winnerSeat, standings }, PINNED_408);
+    });
+
+    it("plays the seeded four-seat session (STO-483)", async () => {
+      // The four-browser smoke's script, over sockets: the same seed, actions and words the
+      // Maestro flows tap, so an engine change that breaks the smoke fails here in seconds.
+      const room = await colyseus.createRoom("game", {
+        name: "Four Table",
+        buyIn: FOUR_SEAT_BUY_IN,
+        maxSeats: 6,
+        ...FOUR_SEAT_ROOM,
+        payoutDelay: 50,
+        tickMs: 5,
+      });
+      const clients: ClientRoom[] = [];
+      const racks = new Map<ClientRoom, PrivateSeatState>();
+      const rejections: GameRejectionEvent[] = [];
+      for (let seat = 0; seat < 4; seat += 1) {
+        const client = await colyseus.connectTo(room);
+        client.onMessage(GAME_EVENTS.privateState, (payload) => racks.set(client, payload as PrivateSeatState));
+        client.onMessage(GAME_EVENTS.rejected, (payload) => rejections.push(payload as GameRejectionEvent));
+        clients.push(client);
+      }
+      assert.deepStrictEqual(
+        clients.map((client) => room.state.seats.get(client.sessionId)?.seat),
+        [0, 1, 2, 3],
+        "join order is seat order",
+      );
+      const engine = () => (room as unknown as { game: OfflineState }).game;
+      const stacks = () => clients.map((client) => room.state.seats.get(client.sessionId)?.tableStack);
+      const until = async (done: () => boolean, what: string) => {
+        for (let tick = 0; tick < 200 && !done(); tick += 1) await room.waitForNextTimestep();
+        assert.ok(done(), what);
+      };
+
+      await readyUp(room, clients);
+      const dictionary = await loadDictionary();
+      const words: string[][] = [];
+      const pots: number[][] = [];
+      for (const [handIndex, hand] of FOUR_SEAT_SCRIPT.entries()) {
+        const handNumber = handIndex + 1;
+        await until(() => room.state.handCount === handNumber && room.state.phase === "preflop", `hand ${handNumber} deals`);
+        if (handIndex === 2) {
+          assert.strictEqual(room.state.seats.get(clients[2]!.sessionId)?.sittingOut, true, "the bust sits hand 3 out");
+          // The busted seat sees the deal without it, then leaves the table mid-hand.
+          await clients[2]!.leave();
+        }
+        for (const scripted of hand.steps) {
+          assert.strictEqual(room.state.toActSeat, scripted.seat, `hand ${handNumber}: seat ${scripted.seat} acts`);
+          const { type, ...rest } = toEngineAction(engine(), scripted) as { type: string; playerId: string };
+          const { playerId: _playerId, ...amount } = rest;
+          // Every accepted action replaces the engine's state; a rejection leaves it be.
+          const before = engine();
+          clients[scripted.seat]!.send(GAME_MESSAGES.betting, { type, ...amount });
+          await until(() => engine() !== before, `hand ${handNumber}: seat ${scripted.seat} ${scripted.action} lands`);
+        }
+        assert.strictEqual(room.state.wordWindow.status, "open", `hand ${handNumber}: the river opens the window`);
+
+        await clientsCaughtUp(room, clients);
+        const board = [...room.state.community].map(tileFromRoomState);
+        for (const seat of hand.words) {
+          const rack = racks.get(clients[seat]!);
+          assert.ok(rack?.hand === handNumber, `hand ${handNumber}: seat ${seat} holds this hand's rack`);
+          const word = bestStripWord([...rack.rack, ...board], dictionary);
+          assert.ok(word, `hand ${handNumber}: seat ${seat} spells a word by taps`);
+          clients[seat]!.send(GAME_MESSAGES.confirmWord, { submission: word.submission });
+        }
+        await until(() => room.state.phase === "payout", `hand ${handNumber} settles`);
+        words.push([...room.state.result.standings].map((standing) => standing.word));
+        pots.push(engine().result!.payout.pots.map((pot) => pot.amount));
+
+        if (handIndex === 0) assert.deepStrictEqual(stacks(), [500, 580, 460, 460], "P2 wins hand 1; P3 and P4 lose 40");
+        if (handIndex === 1) {
+          assert.ok(pots[1]!.length >= 2, "the shove leaves a side pot");
+          assert.strictEqual(stacks()[2], 0, "P3's shove loses and busts");
+        }
+      }
+      assert.deepStrictEqual(rejections, [], "every scripted action and word is accepted");
+      assert.deepStrictEqual(words, [
+        ["DX", "YALE", "ILEA"],
+        ["TAX", "RX", "AX"],
+        ["TWEAK", "CALK", "ARAK"],
+      ]);
+      assert.deepStrictEqual(pots, [[120], [40, 1350, 20], [30]]);
+
+      // P3 left: the payout sends the table back to waiting, and the three left say ready again.
+      await until(() => room.state.phase === WAITING_PHASE, "the leave returns the table to waiting");
+      assert.strictEqual(room.state.seats.size, 3);
+      const stayed = [clients[0]!, clients[1]!, clients[3]!];
+      await readyUp(room, stayed);
+      assert.strictEqual(room.state.phase, "preflop", "hand 4 deals 3-handed");
+      assert.strictEqual(engine().seats.length, 3);
+    });
+
+    it("deals a short table once every seat is ready, and not before", async () => {
+      const room = await colyseus.createRoom("game", { name: "Ready test", buyIn: 500, maxSeats: 6 });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      const third = await colyseus.connectTo(room);
+
+      first.send(GAME_MESSAGES.ready, { ready: true });
+      second.send(GAME_MESSAGES.ready, { ready: true });
+      await room.waitForNextPatch();
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE, "one seat not ready holds the deal");
+      assert.deepStrictEqual(
+        [...room.state.seats.values()].map((seat) => seat.ready).sort(),
+        [false, true, true],
+        "each seat's ready is public",
+      );
+
+      first.send(GAME_MESSAGES.ready, { ready: false });
+      third.send(GAME_MESSAGES.ready, { ready: true });
+      await room.waitForNextPatch();
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE, "a seat can take its ready back");
+
+      await readyUp(room, [first]);
+      assert.strictEqual(room.state.phase, "preflop", "three of six seats, all ready, is a table");
+      assert.strictEqual(room.state.seats.size, 3);
+    });
+
+    it("never deals a table of one, however ready", async () => {
+      const room = await colyseus.createRoom("game", { name: "Solo", buyIn: 500, maxSeats: 4 });
+      const only = await colyseus.connectTo(room);
+      only.send(GAME_MESSAGES.ready, { ready: true });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+    });
+
+    it("deals when the one seat the table waited on leaves", async () => {
+      const room = await colyseus.createRoom("game", { name: "Leaver", buyIn: 500, maxSeats: 4 });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      const third = await colyseus.connectTo(room);
+      first.send(GAME_MESSAGES.ready, { ready: true });
+      second.send(GAME_MESSAGES.ready, { ready: true });
+      await room.waitForNextPatch();
+      await third.leave();
+      for (let patch = 0; patch < 20 && room.state.phase === WAITING_PHASE; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, "preflop");
     });
 
     it("runs a dropped seat's own turn clock and folds it at the deadline (§29)", async () => {
@@ -164,7 +533,8 @@ describe("GameRoom", () => {
       });
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
-      assert.strictEqual(room.state.phase, "preflop", "full table starts");
+      await readyUp(room, [first, second]);
+      assert.strictEqual(room.state.phase, "preflop", "a ready table starts");
 
       const actorSeat = room.state.toActSeat;
       const actorId = [...room.state.seats.values()].find((seat) => seat.seat === actorSeat)?.playerId;
@@ -208,7 +578,8 @@ describe("GameRoom", () => {
       });
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
-      assert.strictEqual(room.state.phase, "preflop", "full table starts");
+      await readyUp(room, [first, second]);
+      assert.strictEqual(room.state.phase, "preflop", "a ready table starts");
 
       const actorId = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
       assert.ok(actorId, "the leaving seat has an id");
@@ -235,13 +606,15 @@ describe("GameRoom", () => {
         buyIn: 500,
         maxSeats: 2,
         seed: 654,
-        turnDuration: 30,
+        // Longer than a patch interval, so the clock is still running when `readyUp` sees the deal.
+        turnDuration: 150,
         tickMs: 5,
         payoutDelay: 10,
       });
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
-      assert.strictEqual(room.state.phase, "preflop", "full table starts");
+      await readyUp(room, [first, second]);
+      assert.strictEqual(room.state.phase, "preflop", "a ready table starts");
 
       const actorId = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
       assert.ok(actorId, "the server chooses the first actor");
@@ -253,7 +626,7 @@ describe("GameRoom", () => {
       actor.reconnection.enabled = false;
       actor.connection.close();
 
-      for (let tick = 0; tick < 40 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
+      for (let tick = 0; tick < 80 && room.state.seats.get(actorId)?.hasFolded !== true; tick += 1) {
         await room.waitForNextTimestep();
       }
 
@@ -284,6 +657,7 @@ describe("GameRoom", () => {
       second.onMessage(GAME_EVENTS.privateState, (payload) => {
         privateStates.set(second.sessionId, payload as PrivateSeatState);
       });
+      await readyUp(room, [first, second]);
 
       const playerForSeat = (seatNumber: number) =>
         [...room.state.seats.values()].find((seat) => seat.seat === seatNumber)?.playerId;
@@ -385,6 +759,7 @@ describe("GameRoom", () => {
       });
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
+      await readyUp(room, [first, second]);
 
       // Heads-up the button posts the small blind, so the small blind is the first actor and the
       // turn its call hands on is the big blind's option — the seat that owes nothing (§15).
@@ -440,6 +815,7 @@ describe("GameRoom", () => {
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
       const clients = [first, second];
+      await readyUp(room, clients);
 
       const privateStates = new Map<string, PrivateSeatState>();
       for (const client of clients) {
@@ -508,7 +884,8 @@ describe("GameRoom", () => {
               if (state.rack.length > 0) resolve(state);
             });
           });
-          await colyseus.connectTo(room);
+          const second = await colyseus.connectTo(room);
+          await readyUp(room, [first, second]);
           const { rack } = await seated;
           racks.push(rack.map((tile) => tile.id).sort().join(","));
         }
@@ -521,6 +898,48 @@ describe("GameRoom", () => {
       // client-chosen seed must not determine the deal.
       assert.strictEqual(racks.length, 2);
       assert.notStrictEqual(racks[0], racks[1], "two gates-off rooms must not replay one seed");
+    });
+
+    it("takes the smoke runner's room knobs from the env only behind the gate (STO-483)", async () => {
+      const previousGate = process.env.WORDPOKER_DETERMINISTIC_SEED;
+      const previousKnobs = process.env.WORDPOKER_SMOKE_ROOM;
+      process.env.WORDPOKER_SMOKE_ROOM = JSON.stringify({ seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 });
+      type Knobs = { seed: number; payoutDelay: number; turnDuration: number };
+      const knobsOf = (room: unknown) => {
+        const { seed, payoutDelay, turnDuration } = room as Knobs;
+        return { seed, payoutDelay, turnDuration };
+      };
+      try {
+        const lobbyForm = await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 6 });
+        assert.deepStrictEqual(
+          knobsOf(lobbyForm),
+          { seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 },
+          "a create that names no knobs takes the env's",
+        );
+
+        const explicit = await colyseus.createRoom("game", {
+          name: "Env knobs",
+          buyIn: 500,
+          maxSeats: 6,
+          seed: 7,
+          payoutDelay: 50,
+        });
+        assert.deepStrictEqual(
+          knobsOf(explicit),
+          { seed: 7, payoutDelay: 50, turnDuration: 120_000 },
+          "knobs the create names win over the env's",
+        );
+
+        delete process.env.WORDPOKER_DETERMINISTIC_SEED;
+        const ungated = knobsOf(await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 6 }));
+        assert.notStrictEqual(ungated.turnDuration, 120_000, "without the gate the env is ignored");
+        assert.notStrictEqual(ungated.payoutDelay, 20_000, "without the gate the env is ignored");
+      } finally {
+        if (previousGate === undefined) delete process.env.WORDPOKER_DETERMINISTIC_SEED;
+        else process.env.WORDPOKER_DETERMINISTIC_SEED = previousGate;
+        if (previousKnobs === undefined) delete process.env.WORDPOKER_SMOKE_ROOM;
+        else process.env.WORDPOKER_SMOKE_ROOM = previousKnobs;
+      }
     });
   });
 
@@ -679,8 +1098,8 @@ describe("GameRoom", () => {
       const { followed } = await subscribe();
       await followed.until((rows) => rows.has(table.roomId), "the new table");
 
-      await colyseus.connectTo(table);
-      await colyseus.connectTo(table);
+      const players = [await colyseus.connectTo(table), await colyseus.connectTo(table)];
+      await readyUp(table, players);
 
       const full = (await followed.until((rows) => rows.get(table.roomId)!.locked === true, "the table to lock"))!
         .get(table.roomId)!;
@@ -695,6 +1114,7 @@ describe("GameRoom", () => {
 
       const first = await colyseus.connectTo(table);
       const second = await colyseus.connectTo(table);
+      await readyUp(table, [first, second]);
       await followed.until((rows) => rows.get(table.roomId)!.locked === true, "the table to lock");
 
       // Heads-up the button posts the small blind and is the seat the hand opens on, so the seat

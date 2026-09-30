@@ -35,7 +35,10 @@ export interface ResultsHeaderProps {
   readonly onBack: () => void;
 }
 
-export function ResultsHeader({ hand, onBack }: ResultsHeaderProps): ReactElement {
+export function ResultsHeader({
+  hand,
+  onBack,
+}: ResultsHeaderProps): ReactElement {
   const insets = useSafeAreaInsets();
 
   return (
@@ -51,7 +54,10 @@ export function ResultsHeader({ hand, onBack }: ResultsHeaderProps): ReactElemen
         <BackChevron />
       </Pressable>
 
-      <Text allowFontScaling style={styles.stamp}>{`HAND #${hand} · RESULTS`}</Text>
+      <Text
+        allowFontScaling
+        style={styles.stamp}
+      >{`HAND #${hand} · RESULTS`}</Text>
 
       {/* The circle's own width: with equal gaps either side, the stamp lands on centre. */}
       <View style={styles.spacer} />
@@ -81,6 +87,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.gutter,
+    gap: spacing.sm,
   },
   back: {
     alignItems: "center",

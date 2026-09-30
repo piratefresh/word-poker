@@ -232,11 +232,11 @@ describe("<OfflineGameScreen />", () => {
     // The badge only lands on the felt if the mapped state flags the hero's seat.
     expect(view.getByText(/· YOU/)).toBeOnTheScreen();
 
-    // The pinned hand posts 10 / 20 and then raises to 40, so the felt states a real call and a
+    // The pinned hand posts 10 / 20 and then raises to 60, so the felt states a real call and a
     // real pot — the numbers the engine counted, not a placeholder row.
-    expect(control(view, "action-check-call").getByText("CALL $40")).toBeOnTheScreen();
-    expect(view.getByTestId("pot")).toHaveTextContent(/\$70/);
-    expect(view.getByText("ALL IN · $1,000")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
+    expect(view.getByTestId("pot")).toHaveTextContent(/\$90/);
+    expect(control(view, "all-in-button").getByText("ALL IN")).toBeOnTheScreen();
   });
 
   test("deals its own drawn hand for a table the URL does not pin", async () => {
@@ -279,8 +279,8 @@ describe("<OfflineGameScreen />", () => {
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
     expect(control(view, "action-fold").getByText("FOLD")).toBeOnTheScreen();
-    expect(control(view, "action-check-call").getByText("CALL $40")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("RAISE $60")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("$100")).toBeOnTheScreen();
     expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
@@ -356,24 +356,20 @@ describe("<OfflineGameScreen />", () => {
     // opening bet rather than a raise: the same slider, and the other engine action.
     for (let street = 0; street < 3; street += 1) await takeTurn(view);
     expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("BET $20")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("$20")).toBeOnTheScreen();
 
     const before = potAmount(view);
     await fireEvent.press(view.getByTestId("action-wager"));
+
+    // A real opening bet commits 20 immediately, before any bot answers on its beat.
+    expect(potAmount(view)).toBe(before + 20);
     await passedToTheHero(view);
 
-    // The chips moved: the amount the button named left the seat's stack for the middle — the
-    // hero's 20 and the three calls it drew, each on its own beat — which is the engine's own
-    // `bet`. A raise with nothing to raise is refused, and a refused action is dropped where
-    // nothing moved, which is exactly how this tap used to do nothing: the pot stood still at
-    // 400, and a refused bet would have left the hero holding the turn with `BET $20` on the row.
-    expect(before).toBe(400);
-    expect(potAmount(view)).toBe(480);
-    // The row has stopped offering the hero a bet: with the round closed there is no amount to
-    // name, so the wager falls back to its inert label and the call has gone quiet.
-    expect(control(view, "action-wager").getByText("RAISE $0")).toBeOnTheScreen();
-    expect(windowIsOpen(view)).toBe(true);
-    expect(control(view, "action-check-call").getByText("CALL $0")).toBeOnTheScreen();
+    // These opponents have no word in the one-word fixture dictionary: all three fold.
+    expect(before).toBe(240);
+    expect(potAmount(view)).toBe(260);
+    expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
+
   });
 
   test("leaves the table where it was when a disabled control is pressed in the window", async () => {

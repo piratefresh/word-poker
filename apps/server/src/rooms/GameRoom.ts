@@ -35,8 +35,15 @@ import {
 import { GameRoomState } from "./schema/GameRoomState.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
-const DEFAULT_PAYOUT_DELAY_MS = 250;
+/**
+ * How long a paid-out hand stays on the felt before the room deals again: the clients present the
+ * results over it (STO-430), and a hold shorter than a read would deal the next hand, and start
+ * its turn clock, behind a scoreboard nobody has finished.
+ */
+const DEFAULT_PAYOUT_DELAY_MS = 8_000;
 const HOLD_RECHECK_MS = 1_000;
+/** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
+const MIN_PLAYERS = 2;
 
 type TableConfig = GameTableConfig;
 
@@ -47,6 +54,8 @@ interface SeatBinding {
   connected: boolean;
   present: boolean;
   tableStack: number;
+  /** Said ready in the waiting room. Cleared every time the table goes back to waiting. */
+  ready: boolean;
 }
 
 interface RoomKnobs {
@@ -98,6 +107,19 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       } as OnlineBettingAction & { playerId: string };
       this.apply(client, action, "betting");
     },
+    [GAME_MESSAGES.checkWord]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.checkWord, payload)) return;
+
+      this.apply(
+        client,
+        {
+          type: "checkWord",
+          playerId: client.sessionId,
+          submission: payload.submission,
+        },
+        "checkWord",
+      );
+    },
     [GAME_MESSAGES.draftWord]: (client: Client, payload: unknown) => {
       if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.draftWord, payload)) return;
 
@@ -124,7 +146,21 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         "confirmWord",
       );
     },
+    [GAME_MESSAGES.ready]: (client: Client, payload: unknown) => this.onReady(client, payload),
   };
+
+  /** The one message the waiting room answers: a seat saying it is (or is no longer) ready. */
+  private onReady(client: Client, payload: unknown) {
+    const binding = this.bindings.get(client.sessionId);
+    if (binding === undefined || !binding.present || !binding.connected) return;
+    if (!this.isPayload(GAME_MESSAGES.ready, payload)) return;
+    // Once a hand is dealt the question is settled; a late toggle changes nothing.
+    if (this.game !== null) return;
+
+    binding.ready = payload.ready;
+    this.project();
+    this.startWhenReady();
+  }
 
   async onCreate(rawOptions: unknown) {
     const validation = validateRoomCreateOptions(rawOptions);
@@ -137,7 +173,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 
-    const knobs = (rawOptions ?? {}) as RoomKnobs;
+    // A browser-driven smoke creates its table through the real lobby form, which cannot send a
+    // seed; behind the deterministic gate the smoke runner supplies the knobs here instead, and
+    // anything the create names still wins (STO-483).
+    const knobs = { ...smokeRoomDefaults(), ...((rawOptions ?? {}) as RoomKnobs) };
     if (
       process.env.WORDPOKER_DETERMINISTIC_SEED === "1" &&
       typeof knobs.seed === "number" &&
@@ -202,16 +241,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       connected: true,
       present: true,
       tableStack: this.table.buyIn,
+      ready: false,
     });
     this.project();
-
-    if (this.presentBindings().length === this.maxClients && this.game === null) {
-      this.startFirstHand();
-    }
-
-    if (this.game === null) {
-      this.sendPrivateStateLater(client);
-    }
+    this.sendPrivateStateLater(client);
   }
 
   onDrop(client: Client, _code: CloseCode) {
@@ -250,6 +283,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       this.bindings.delete(client.sessionId);
       this.project();
       this.publishPhase();
+      // The seat that left may have been the last one the rest were waiting on.
+      this.startWhenReady();
       return;
     }
 
@@ -259,6 +294,30 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     // deadline folds it if it is still to act when its clock runs out (§29, ADR 0006).
     this.authoritative.foldDepartedSeat(client.sessionId, this.now());
     this.project();
+  }
+
+  /**
+   * The waiting room deals once every seat at the table has said ready, and there are at least
+   * two of them. A dropped seat holds the deal: it is still at the table, and it has not seen it.
+   */
+  private startWhenReady() {
+    if (this.game !== null) return;
+    const present = this.presentBindings();
+    if (present.length < MIN_PLAYERS) return;
+    if (!present.every((binding) => binding.ready && binding.connected)) return;
+    this.startFirstHand();
+  }
+
+  /** Back to the waiting room: everyone says ready again before the next deal. */
+  private returnToWaiting() {
+    this.authoritative.clear();
+    for (const [playerId, binding] of this.bindings) {
+      if (!binding.present) this.bindings.delete(playerId);
+      else binding.ready = false;
+    }
+    this.project();
+    this.publishPhase();
+    this.sendPrivateStates();
   }
 
   private startFirstHand() {
@@ -276,9 +335,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private apply(
     client: Client,
     action: OfflineAction,
-    message: "betting" | "draftWord" | "confirmWord",
+    message: "betting" | "checkWord" | "draftWord" | "confirmWord",
   ) {
     if (this.game === null) {
+      if (message === "checkWord") return;
       this.sendRejection(client, rejectionFor(message, "hand-over"));
       return;
     }
@@ -296,12 +356,14 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         }
         this.sendRejection(client, { action: "betting", reason: error.reason });
       } else if (error instanceof WordRejectionError) {
+        if (message === "checkWord") return;
         if (message === "betting") {
           this.sendRejection(client, rejectionFor(message, "hand-over"));
         } else {
           this.sendRejection(client, { action: message, reason: error.reason });
         }
       } else if (error instanceof OfflineActionError) {
+        if (message === "checkWord") return;
         this.sendRejection(client, rejectionFor(message, "hand-over"));
       } else {
         throw error;
@@ -384,14 +446,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     if (game === null || game.phase !== "payout") return;
     this.syncStacks();
     const present = this.presentBindings();
-    if (present.length !== this.maxClients) {
-      this.authoritative.clear();
-      for (const [playerId, binding] of this.bindings) {
-        if (!binding.present) this.bindings.delete(playerId);
-      }
-      this.project();
-      this.publishPhase();
-      this.sendPrivateStates();
+    // A seat that left takes the table back to the waiting room; the rest play on only once they
+    // all say ready again, so nobody is dealt into a smaller game they did not agree to.
+    if (present.length !== game.seats.length) {
+      this.returnToWaiting();
       return;
     }
     if (!present.every((binding) => binding.connected)) {
@@ -405,10 +463,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     if (this.game?.sessionOver === true) {
       // §27/§28: a busted seat re-buys or leaves between hands, and the wallet is Epic B's — so
       // the room holds each seat's ended stack and waits rather than dealing a hand nobody can pay.
-      this.authoritative.clear();
-      this.project();
-      this.publishPhase();
-      this.sendPrivateStates();
+      this.returnToWaiting();
       return;
     }
     this.syncStacks();
@@ -500,6 +555,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       seat: binding.seat,
       connected: binding.connected,
       tableStack: binding.tableStack,
+      ready: binding.ready,
     }));
   }
 
@@ -522,6 +578,17 @@ function firstFreeSeat(bindings: ReadonlyMap<string, SeatBinding>, maxSeats: num
     if (!occupied.has(seat)) return seat;
   }
   return null;
+}
+
+/**
+ * The smoke runner's room knobs, as JSON in `WORDPOKER_SMOKE_ROOM`. Read only behind the
+ * deterministic gate: without it a room never takes knobs from the environment.
+ */
+function smokeRoomDefaults(): RoomKnobs {
+  const raw = process.env.WORDPOKER_SMOKE_ROOM;
+  if (process.env.WORDPOKER_DETERMINISTIC_SEED !== "1" || !raw) return {};
+  const parsed: unknown = JSON.parse(raw);
+  return parsed !== null && typeof parsed === "object" ? (parsed as RoomKnobs) : {};
 }
 
 /** A seed nobody can read off the wire: the room id is public, so it must never derive the deal. */

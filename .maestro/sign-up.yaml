@@ -1,0 +1,121 @@
+# Register a brand-new user through the real sign-up screen.
+#
+#   maestro test --platform web .maestro/sign-up.yaml
+#
+# The email is minted per run by evalScript — e2e-signup-<timestamp>@wordpoker.dev —
+# so a rerun never collides with the user the last run created; every run leaves a
+# throwaway row in Postgres, which is fine for the dev database. No seeded user is
+# needed — this flow makes its own — and no server beyond the web build.
+#
+# The flow ends signed out: it leaves Maestro's Chrome profile the way it found it,
+# so a headed rerun (or a later flow in the same profile) starts from a clean slate.
+#
+# Headless runs need a window tall enough for the home screen's account row:
+# Maestro's default is 1008x617, where that row lands under the tab bar's hit area
+# (app-tabs.web.tsx pins the bar to the bottom, the content is top-anchored) and the
+# click at its centre is swallowed — the tap is dispatched, nothing happens, and the
+# sign-out step reads as a dead button. Maestro's web scroll is a drag, and a
+# react-native-web ScrollView scrolls on the wheel, not on a drag, so no amount of
+# scrolling moves the row out. A taller window simply clears it:
+#
+#   maestro test --platform web --headless --screen-size 1280x1024 .maestro/sign-up.yaml
+#
+# Selector notes are sign-in.yaml's: commands take the mapping form, elements match
+# by `text:` / `id:` — and web text matching folds case, so a caption and its
+# placeholder fold to the same string (NAME/Name, PASSWORD/Password) and neither field
+# can be tapped by name alone. `below:` is what separates them: the node named "Name"
+# *under* the NAME caption is the input, and the caption is not below itself. The
+# placeholder is the input's own text, so the tap lands on the field and the typing
+# goes in. The flow therefore carries no `css:` selector at all — offline-hand.yaml
+# reports css never settling on the felt page, and here it settles headed but hangs
+# headless (`input[autocomplete="name"]`), which is exactly the difference between a
+# green local run and a suite that times out on CI.
+#
+# Non-UI agents don't need this flow; the same registration works over HTTP:
+#   POST /api/auth/sign-up/email {"name": ..., "email": ..., "password": ...}
+url: http://localhost:8081/sign-up
+name: Register a new user through the real sign-up screen
+tags:
+  - web
+  - auth
+env:
+  SIGNUP_NAME: E2E Signup
+  SIGNUP_PASSWORD: wordpoker-signup-e2e
+---
+# A fresh email per run: the timestamp keeps "user already exists" impossible.
+- evalScript: ${output.email = 'e2e-signup-' + Date.now() + '@wordpoker.dev'}
+
+- openLink: http://localhost:8081/sign-up
+
+# The app hides everything until the first session check resolves, so give it a
+# beat before deciding which screen we're on.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# A session left by a previous run bounces /sign-up to the home screen, so it is
+# dropped first. `optional` — a signed-out profile shows the form straight away.
+- extendedWaitUntil:
+    visible:
+      text: "Sign out"
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      visible: "Sign out"
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Sign out"
+          direction: DOWN
+          timeout: 20000
+      - tapOn:
+          text: "Sign out"
+      - extendedWaitUntil:
+          visible: "TAKE YOUR SEAT"
+          timeout: 30000
+      # Signing out lands on the sign-in screen; the form is one link away.
+      - openLink: http://localhost:8081/sign-up
+
+# The sign-up form.
+- extendedWaitUntil:
+    visible: "SIT DOWN"
+    timeout: 30000
+- assertVisible:
+    text: "Create an account"
+- tapOn:
+    text: "Name"
+    below:
+      text: "NAME"
+- inputText: ${SIGNUP_NAME}
+- tapOn:
+    text: "Email"
+- inputText: ${output.email}
+- tapOn:
+    text: "Password"
+    below:
+      text: "PASSWORD"
+- inputText: ${SIGNUP_PASSWORD}
+- tapOn:
+    text: "Create an account"
+
+# Registered: Better Auth creates the account and the session together, so the
+# guard lets the fresh user through to the home screen.
+- extendedWaitUntil:
+    visible: "Choose how to play"
+    timeout: 60000
+- assertVisible:
+    text: "Signed in as"
+- assertVisible:
+    text: ${output.email}
+
+# Leave the profile the way the flow found it: signed out.
+- scrollUntilVisible:
+    element:
+      text: "Sign out"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    text: "Sign out"
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 30000

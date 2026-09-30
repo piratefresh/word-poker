@@ -116,9 +116,12 @@ export function ResultsScreen({ snapshot, onDeal, onExit }: ResultsScreenProps):
               ))}
             </View>
 
-            <View style={styles.rating}>
-              <RatingCard handNo={hand.hand} seed={hand.seed} />
-            </View>
+            {/* A rating is only worth its replay: a table that keeps its seed has no card. */}
+            {hand.seed !== null ? (
+              <View style={styles.rating}>
+                <RatingCard handNo={hand.hand} seed={hand.seed} />
+              </View>
+            ) : null}
           </ScrollView>
         </Animated.View>
       </LinearGradient>

@@ -276,9 +276,9 @@ describe("useOfflineGame — the dealt table", () => {
     await passedToTheHero(result);
     const heroTurn = result.current.game.id;
 
-    await takeTurn(result);
+    await act(async () => { result.current.call(); });
 
-    // The turn moved — the HUD re-anchors on that — and it moved on the hero's own action.
+    // Check the next actor before the CPU can raise back to the hero. The turn moved — the HUD re-anchors on that — and it moved on the hero's own action.
     expect(result.current.game.id).not.toBe(heroTurn);
   });
 
@@ -308,22 +308,20 @@ describe("useOfflineGame — the dealt table", () => {
     const betting = await table(BETTING_SEED);
     await passedToTheHero(betting);
 
-    // mira raised the blind to 40 on its beat, so the hero owes the difference the row states.
+    // mira raised the blind to 60 on its beat, so the hero owes the difference the row states.
     expect(row(betting).canCheck).toBe(false);
-    expect(row(betting).callAmount).toBe(40);
+    expect(row(betting).callAmount).toBe(60);
     expect(row(betting).canBet).toBe(false);
     expect(row(betting).canRaise).toBe(true);
     // The raise floor is the current bet plus the last raise's increment.
-    expect(row(betting).minRaise).toBe(60);
+    expect(row(betting).minRaise).toBe(100);
     // The blinds and mira's raise are in the middle; the hero has not paid the call it owes.
-    expect(betting.current.game.pot).toBe(70);
-    expect(betting.current.game.players.map((player) => player?.bet ?? 0)).toEqual([0, 10, 20, 40]);
+    expect(betting.current.game.pot).toBe(90);
+    expect(betting.current.game.players.map((player) => player?.bet ?? 0)).toEqual([0, 10, 20, 60]);
 
     await takeTurn(betting);
 
-    // The hero matched and the seats behind it called the raise, and the flop's own betting is
-    // under way by the time the table is back on the hero: pre-flop's 160, plus jay's 40 and
-    // mira's call of it.
+    // Every seat matched 60; the flop checks around in this one-word dictionary.
     expect(betting.current.game.pot).toBe(240);
   });
 
@@ -359,13 +357,8 @@ describe("useOfflineGame — the hero's clocks", () => {
 
   test("folds on the deadline when nothing is owed", async () => {
     const result = await table();
-    // Pre-flop the hero owes the big blind. Call it, and the table reaches the flop, where a
-    // checked round leaves the hero owing nothing.
-    await passedToTheHero(result);
-    await act(async () => {
-      result.current.call();
-    });
-    await passedToTheHero(result);
+    // A raise can send the action back to the hero before the first free check.
+    for (let turn = 0; turn < 20 && !row(result).canCheck; turn += 1) await takeTurn(result);
     expect(row(result).canCheck).toBe(true);
     const atRest = result.current.game.pot;
 
@@ -413,7 +406,7 @@ describe("useOfflineGame — the CPU's beat", () => {
     // holds the table.
     expect(statuses(result)[3]).toBe("raise");
     expect(thinkingSeats(result)).toEqual([]);
-    expect(result.current.game.pot).toBe(70);
+    expect(result.current.game.pot).toBe(90);
 
     const owed = row(result).callAmount ?? 0;
     const potBefore = result.current.game.pot;
@@ -436,19 +429,13 @@ describe("useOfflineGame — the CPU's beat", () => {
 
   test("prints a seat's action for the street it was taken on, and only for that street", async () => {
     const result = await table();
-    // Pre-flop the hero pays the blind it owes, and the round closes on the big blind's check.
-    // The flop is the street that then opens on a check, and the three seats in front of the hero
-    // each check it on their own beat.
-    await passedToTheHero(result);
-    await act(async () => {
-      result.current.call();
-    });
-    await passedToTheHero(result);
+    // Answer the blind and any re-raise until the flop is on the hero.
+    for (let turn = 0; turn < 20 && result.current.game.phase === "preflop"; turn += 1) await takeTurn(result);
     expect(result.current.game.phase).toBe("flop");
 
     // A check moves no chips and leaves no flag on the seat: the nameplate is the only place it
     // can be read.
-    expect(statuses(result).slice(1)).toEqual(["check", "check", "check"]);
+    expect(statuses(result).slice(1)).toEqual(["fold", "check", "fold"]);
 
     // The hero's check closes the street. A street nobody has acted on yet is what the pills
     // show, so the words from the last one do not survive into it — not the bots' and not the
@@ -472,7 +459,7 @@ describe("useOfflineGame — the CPU's beat", () => {
     // left it — the blinds and mira's raise — and the seat behind the hero is the one the table
     // sits on.
     expect(result.current.game.phase).toBe("preflop");
-    expect(result.current.game.pot).toBe(70);
+    expect(result.current.game.pot).toBe(90);
     expect(statuses(result)[0]).toBe("fold");
     expect(thinkingSeats(result)).toEqual([1]);
 
@@ -492,6 +479,8 @@ describe("useOfflineGame — the CPU's beat", () => {
     const felt = result as Table;
 
     await playToWindow(felt);
+    const liveBots = felt.current.game.players.slice(1).filter((seat) => seat && seat.status !== "fold").length;
+    expect(liveBots).toBeGreaterThan(0);
     await buildHeroWord(felt);
 
     // The hero's confirm is the hero's own transition: the window is still open on the bots'
@@ -504,9 +493,9 @@ describe("useOfflineGame — the CPU's beat", () => {
       beats += 1;
     }
 
-    // One seat per beat: the three bots still in the hand, and then the window is settled.
+    // One seat per beat: only the bots still in the hand confirm.
     expect(felt.current.game.phase).toBe("payout");
-    expect(beats).toBe(3);
+    expect(beats).toBe(liveBots);
   });
 });
 
@@ -712,7 +701,7 @@ describe("useOfflineGame — the chips in flight", () => {
 
     // mira's raise came through the beat, and it is on the felt as a flight rather than as a pot
     // that moved on its own.
-    expect(result.current.game.pot).toBe(70);
+    expect(result.current.game.pot).toBe(90);
     expect(result.current.game.flights.map((flight) => flight.seatIndex)).toContain(3);
   });
 

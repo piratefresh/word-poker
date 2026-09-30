@@ -1,0 +1,108 @@
+# The four-browser online smoke, seat P2 (STO-483). Seed, racks and taps: the header of seat-1.yaml.
+url: http://localhost:8081/online
+name: Four-seat P2 - re-raises and wins, wins the side pot, plays 3-handed
+tags:
+  - web
+  - online
+  - four-seat
+---
+- runFlow: _sign-in-and-open.yaml
+- runFlow: _join.yaml
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
+
+# Hand 1: the small blind re-raises P4, bets the flop, checks it down, spells DX and wins.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: wager }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: wager }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-face-DT-1-D"
+- tapOn:
+    id: "word-builder-tile-X-1"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "1", WORD: DX }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "1", WORD: DX }
+
+# Hand 2: the button limps, calls the shove and P1's flop bet, checks it down, spells TAX.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-tile-T-1"
+- tapOn:
+    id: "word-builder-tile-A-9"
+- tapOn:
+    id: "word-builder-tile-X-1"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "2", WORD: TAX }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "2", WORD: TAX }
+
+# Hand 3: the big blind checks its option and every street, spells TWEAK.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-face-TS-1-T"
+- tapOn:
+    id: "word-builder-tile-W-2"
+- tapOn:
+    id: "word-builder-face-EI-1-E"
+- tapOn:
+    id: "word-builder-tile-A-9"
+- tapOn:
+    id: "word-builder-tile-K-1"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "3", WORD: TWEAK }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "3", WORD: TWEAK }
+
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "3" }
+- tapOn:
+    id: "Leave the table"
+- extendedWaitUntil:
+    visible: "Deal a new table"
+    timeout: 30000

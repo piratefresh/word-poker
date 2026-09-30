@@ -38,12 +38,15 @@ import {
   type BettingAction,
   type OfflineAction,
   type PayoutResult,
+  WORD_CHECKS_PER_HAND,
+  type PrivateWordCheckState,
   type PlayerId,
   type RoundPhase,
   type ShowdownComparison,
   type ShowdownStanding,
   type Tile,
   type WordRejectionReason,
+  type WordCheckResult,
 } from "@wordpoker/contracts";
 
 import {
@@ -54,7 +57,7 @@ import {
   type BettingSeatState,
   type Stakes,
 } from "./betting";
-import { evaluateWord } from "./building";
+import { evaluateWord, spellSubmission } from "./building";
 import { commitChips } from "./chips";
 import { dealHand } from "./deal";
 import type { Dictionary } from "./dictionary";
@@ -179,6 +182,8 @@ export interface OfflineState {
   autoSubmitDrafts: boolean;
   /** §19's window: `null` until the river closes, then open, then settled. */
   wordWindow: WordWindow | null;
+  /** Per-seat private dictionary-check quota and latest result, reset by every fresh deal. */
+  wordChecks: Readonly<Record<PlayerId, PrivateWordCheckState>>;
   /**
    * The word list this hand is judged against, held for the whole hand so the payout and a
    * replayed action sequence cannot disagree about which words count (§11). A table displays
@@ -225,6 +230,16 @@ export interface StartHandOptions {
   /** The seat holding the dealer button. Absent means seat 0, the first hand's button. */
   dealerSeat?: number;
   turnDurationMs?: number;
+}
+
+function freshWordChecks(
+  seats: readonly OfflineSeat[],
+): Readonly<Record<PlayerId, PrivateWordCheckState>> {
+  const checks: Record<PlayerId, PrivateWordCheckState> = {};
+  for (const seat of seats) {
+    checks[seat.id] = { checksRemaining: WORD_CHECKS_PER_HAND, result: null };
+  }
+  return checks;
 }
 
 /** How many community tiles the phase has face up. */
@@ -320,6 +335,7 @@ export function startHand({
     stakes: tableStakes,
     autoSubmitDrafts: wordBuilding?.autoSubmitDrafts ?? false,
     wordWindow: null,
+    wordChecks: freshWordChecks(seats),
     dictionary,
     result: null,
   };
@@ -401,6 +417,9 @@ export function reduce(state: OfflineState, action: OfflineAction, nowMs: number
       }
       return nextHand(state, nowMs);
     }
+
+    case "checkWord":
+      return applyWordCheck(state, action);
 
     case "draftWord":
     case "confirmWord":
@@ -630,6 +649,52 @@ function applyWord(
   const window = wordWindow.applyWord(table(state, open.slots), action, nowMs);
 
   return window.status === "settled" ? settleWindow(state, window) : { ...state, wordWindow: window };
+}
+
+/** Runs one explicit dictionary lookup, privately, without changing the seat's turn. */
+function applyWordCheck(
+  state: OfflineState,
+  action: Extract<OfflineAction, { type: "checkWord" }>,
+): OfflineState {
+  if (state.phase === "payout") return state;
+
+  const seatIndex = state.seats.findIndex((seat) => seat.id === action.playerId);
+  const seat = seatIndex < 0 ? undefined : state.seats[seatIndex];
+  if (seat === undefined || seat.folded || seat.sittingOut) return state;
+
+  const slot = state.wordWindow?.slots.find((candidate) => candidate.playerId === action.playerId);
+  if (slot?.status === "confirmed" || slot?.status === "timed-out") return state;
+
+  // Each physical tile contributes one letter. The client disables out-of-range drafts, and
+  // this guard makes sure a forged message cannot spend a check either.
+  if (action.submission.plays.length < 2 || action.submission.plays.length > 7) return state;
+
+  const current = state.wordChecks[action.playerId] ?? {
+    checksRemaining: WORD_CHECKS_PER_HAND,
+    result: null,
+  };
+  if (current.checksRemaining <= 0) return state;
+
+  const available = availableTiles(state, seatIndex);
+  const submission = { plays: action.submission.plays.map((play) => ({ ...play })) };
+  const evaluation = evaluateWord({ available, submission, dictionary: state.dictionary });
+  const result: WordCheckResult = {
+    submission,
+    word: evaluation.valid ? evaluation.word : spellSubmission({ available, submission }),
+    valid: evaluation.valid,
+    points: evaluation.valid ? scoreWord(evaluation.tiles).total : null,
+  };
+
+  return {
+    ...state,
+    wordChecks: {
+      ...state.wordChecks,
+      [action.playerId]: {
+        checksRemaining: current.checksRemaining - 1,
+        result,
+      },
+    },
+  };
 }
 
 /**

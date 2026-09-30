@@ -13,6 +13,11 @@
  * window is open — so the builder itself carries no button row.
  */
 
-export { WordBuilder, WordHand, WordPreview } from "./word-builder";
+export {
+  WordBuilder,
+  WordCheckButton,
+  WordHand,
+  WordPreview,
+} from "./word-builder";
 export type { WordBuilderProps, WordDraft } from "./word-builder";
 export { WordShuffleButton } from "./shuffle-button";

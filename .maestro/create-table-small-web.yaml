@@ -1,0 +1,43 @@
+# Regression flow for STO-445: the create-table action row must be visible on a short web viewport.
+#
+#   pnpm --filter @wordpoker/mobile web
+#   maestro test --platform web --screen-size 432x662 .maestro/create-table-small-web.yaml
+#
+# The flow composes the real sign-in flow when the browser profile is signed out. It only opens and
+# dismisses the sheet, so it does not create a table or require a live table holder.
+url: http://localhost:8081/online
+name: Create-table actions stay reachable on a small web viewport
+tags:
+  - web
+  - regression
+  - STO-445
+---
+- openLink: http://localhost:8081/online
+
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/online
+
+- extendedWaitUntil:
+    visible: "Tonight at the parlor.*"
+    timeout: 30000
+- tapOn:
+    id: "lobby-create"
+
+# At 432 × 662 these assertions fail against the old unsnapped 85vh sheet because the action row is
+# below the visible sheet. They also verify the controls by their stable test IDs, not ambiguous
+# text shared with other lobby content.
+- assertVisible:
+    id: "create-table-submit"
+- assertVisible:
+    id: "create-table-cancel"
+- tapOn:
+    id: "create-table-cancel"
+- assertNotVisible:
+    id: "create-table-submit"

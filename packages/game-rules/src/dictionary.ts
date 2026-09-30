@@ -76,6 +76,8 @@ export interface Dictionary extends DictionaryInfo {
    * two letters is `false` rather than normalised into a word it never was.
    */
   isWord(word: string): boolean;
+  /** Optional search accelerator. False rules out every continuation. */
+  hasPrefix?(prefix: string): boolean;
 }
 
 /**
@@ -144,6 +146,22 @@ function isWord(words: readonly string[], word: string): boolean {
   return false;
 }
 
+/** Lower-bound lookup over the existing list; no second dictionary or startup index. */
+function hasPrefix(words: readonly string[], prefix: string): boolean {
+  const trimmed = prefix.trim();
+  if (!/^[A-Za-z]*$/.test(trimmed)) return false;
+  const wanted = trimmed.toUpperCase();
+  let low = 0;
+  let high = words.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    const candidate = words[middle];
+    if (candidate !== undefined && candidate < wanted) low = middle + 1;
+    else high = middle;
+  }
+  return words[low]?.startsWith(wanted) ?? false;
+}
+
 /**
  * Turns a prepared artifact into the lookup a hand validates against.
  *
@@ -193,6 +211,7 @@ export function createDictionary(artifact: DictionaryArtifact): Dictionary {
     source: artifact.source,
     size: words.length,
     isWord: (word: string) => isWord(words, word),
+    hasPrefix: (prefix: string) => hasPrefix(words, prefix),
   };
 }
 

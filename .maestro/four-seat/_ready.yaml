@@ -1,0 +1,13 @@
+# Subflow: the barrier. Wait until SEATS seats are at the table, then say ready. Nothing deals
+# until every seated browser has done the same.
+url: http://localhost:8081/online
+name: Four-seat - ready up
+---
+- extendedWaitUntil:
+    visible: "[0-9] of ${SEATS} ready.*"
+    timeout: 600000
+- tapOn:
+    id: "action-ready"
+- extendedWaitUntil:
+    visible: "PHASE 2 · PRE-FLOP"
+    timeout: 180000

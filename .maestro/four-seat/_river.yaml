@@ -1,0 +1,7 @@
+# Subflow: wait for the full board, before a seat taps its word's tiles.
+url: http://localhost:8081/online
+name: Four-seat - river
+---
+- extendedWaitUntil:
+    visible: "COMMUNITY · 5/5"
+    timeout: 150000

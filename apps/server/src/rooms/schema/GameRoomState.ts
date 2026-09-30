@@ -35,6 +35,7 @@ export const SeatState = schema({
   hasFolded: t.boolean().default(false),
   sittingOut: t.boolean().default(false),
   actedThisRound: t.boolean().default(false),
+  ready: t.boolean().default(false),
 }, "SeatState");
 export type SeatState = SchemaType<typeof SeatState>;
 
@@ -84,6 +85,11 @@ export const StandingState = schema({
   hasCompared: t.boolean().default(false),
   word: t.string().default(""),
   reason: t.string().default(""),
+  /** The reveal: the tiles the seat's word played, in word order (§20). */
+  tiles: t.array(TileState),
+  base: t.uint32().default(0),
+  mult: t.uint32().default(0),
+  rack: t.uint32().default(0),
 }, "StandingState");
 export type StandingState = SchemaType<typeof StandingState>;
 

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, waitFor, within, type RenderResult } from "@testing-library/react-native";
 
-import { LOBBY_ROOM_NAME, WAITING_PHASE } from "@wordpoker/contracts";
+import { LOBBY_ROOM_NAME, ROUND_PHASES, WAITING_PHASE } from "@wordpoker/contracts";
 
 import { LobbyScreen } from "./lobby-screen";
 
@@ -15,7 +15,14 @@ jest.mock("@/lib/room-session", () => ({
 
 // expo-router reaches a navigation package Jest cannot parse, and the router is the one thing
 // this screen's taps are allowed to reach.
-jest.mock("expo-router", () => ({ router: { push: jest.fn(), replace: jest.fn() } }));
+jest.mock("expo-router", () => ({
+  router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn() },
+}));
+
+// The session is what the masthead's avatar is drawn from; the lobby reads nothing else of it.
+jest.mock("@/lib/auth-client", () => ({
+  authClient: { useSession: jest.fn(() => ({ data: { user: { name: "Dylan", email: "d@x.dev" } } })) },
+}));
 
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
@@ -33,7 +40,6 @@ const activeRoomId = useActiveRoomId as unknown as jest.Mock;
 const push = router.push as unknown as jest.Mock;
 
 const ROOMS = "rooms";
-const ADDED = "+";
 const LEFT = "left";
 
 /** One subscription: the handlers the screen registers, and the pushes the LobbyRoom would make. */
@@ -83,7 +89,7 @@ type Listing = {
   };
 };
 
-/** One table as the lobby lists it — a listing entry and the metadata a row draws from it. */
+/** One table as the lobby lists it — a listing entry and the metadata a card draws from it. */
 function table(roomId: string, overrides: Partial<Listing> = {}): Listing {
   return {
     roomId,
@@ -101,6 +107,20 @@ function table(roomId: string, overrides: Partial<Listing> = {}): Listing {
     ...overrides,
   };
 }
+
+/** A table whose hand is under way: the hero card's own reason to be featured. */
+function live(roomId: string, overrides: Partial<Listing> = {}): Listing {
+  return table(roomId, {
+    ...overrides,
+    metadata: { ...table(roomId).metadata, status: ROUND_PHASES[0], ...overrides.metadata },
+  });
+}
+
+/**
+ * Two tables where the first is the hero and the second is a row: the featured pick is the fullest
+ * table with a hand under way, so `hero` has to be one seat short of its cap to win it.
+ */
+const HERO_AND_ROW = [live("hero", { clients: 5 }), table("row")];
 
 /** The lobby room pushing one of its own messages into the screen's subscription. */
 async function deliver(lobby: Subscription, type: string, payload?: unknown) {
@@ -120,19 +140,34 @@ async function openLobby() {
   return { lobby, view };
 }
 
-/** The sentence an `@expo/ui` text draws: the adapter view carries it as its `text` prop. */
+/**
+ * The sentence a text draws, whichever kind of text it is: `@expo/ui`'s adapter carries it in a
+ * `text` prop, and React Native's splits it across children.
+ */
 function sentence(view: RenderResult, testID: string): string {
-  return String(view.getByTestId(testID).props.text);
+  const node = view.getByTestId(testID);
+  if (typeof node.props.text === "string") return node.props.text;
+
+  const parts: string[] = [];
+  const walk = (children: unknown): void => {
+    if (Array.isArray(children)) {
+      for (const child of children) walk(child);
+      return;
+    }
+    if (typeof children === "string" || typeof children === "number") parts.push(String(children));
+  };
+  walk(node.props.children);
+  return parts.join("");
 }
 
 /**
  * Press a button that lives inside the sheet. The sheet's content is hosted behind its own
  * gesture layer (`pointerEvents="none"` — the native sheet takes the touches), which a synthetic
- * press on the tree cannot reach through, so the button's own event is fired by name instead.
+ * press on the tree cannot reach through, so the button's own handler is called instead.
  */
 async function pressInSheet(view: RenderResult, testID: string) {
   await act(async () => {
-    fireEvent(view.getByTestId(testID), "buttonPress");
+    view.getByTestId(testID).props.onClick?.() ?? view.getByTestId(testID).props.onPress?.();
   });
 }
 
@@ -152,6 +187,42 @@ async function chooseOption(view: RenderResult, testID: string, value: number) {
   });
 }
 
+/**
+ * The felt measures its own box before it draws anything (`PokerTable`), and a test tree never
+ * lays out — the same `fireEvent(..., "layout")` the felt's other suites drive it with.
+ */
+const FELT_BOX = { nativeEvent: { layout: { width: 320, height: 236 } } };
+
+async function measureFelt(view: RenderResult) {
+  await fireEvent(view.getByTestId("parlor-featured-felt"), "layout", FELT_BOX);
+}
+
+/**
+ * Every sentence in the tree that an `@expo/ui` text carries. The library's `Text` keeps its string
+ * in a `text` prop rather than in children, so a rendered-text query cannot see the felt's seats —
+ * and the felt's seats are the library's own. The walk is over the host tree, which is what the
+ * screen renders through.
+ */
+function libraryTexts(view: RenderResult): string[] {
+  const found: string[] = [];
+
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child);
+      return;
+    }
+    if (typeof node !== "object" || node === null) return;
+
+    const element = node as { props?: Record<string, unknown>; children?: unknown };
+    const text = element.props?.text;
+    if (typeof text === "string") found.push(text);
+    walk(element.children);
+  };
+
+  walk(view.toJSON());
+  return found;
+}
+
 /** Open the create sheet from the lobby, the way a player does. */
 async function openForm(view: RenderResult) {
   await fireEvent.press(view.getByTestId("lobby-create"));
@@ -165,27 +236,51 @@ beforeEach(() => {
   create.mockResolvedValue("new-table");
 });
 
-test("waits for the first list instead of claiming the lobby is empty", async () => {
+test("waits for the first list instead of claiming the room is empty", async () => {
   const { view } = await openLobby();
 
   expect(sentence(view, "lobby-loading")).toBe("Looking for tables…");
   expect(view.queryByTestId("lobby-empty")).toBeNull();
 });
 
-test("says the lobby is empty only once the server says so", async () => {
+test("says the room is empty only once the server says so", async () => {
   const { lobby, view } = await openLobby();
 
   await deliver(lobby, ROOMS, []);
 
-  expect(sentence(view, "lobby-empty")).toBe("No tables open — create one.");
+  expect(sentence(view, "lobby-empty")).toBe("The room is empty — deal the first table.");
   expect(view.queryByTestId("lobby-loading")).toBeNull();
+  expect(view.queryByTestId("parlor-featured")).toBeNull();
 });
 
-test("lists a table with the stakes, the seats and the state a player picks it by", async () => {
+test("features the liveliest table with its terms, its seats on the felt, and the one way in", async () => {
+  const { lobby, view } = await openLobby();
+
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
+
+  const card = within(view.getByTestId("parlor-featured"));
+  expect(card.getByText("Table hero")).toBeOnTheScreen();
+  expect(card.getByText("IN HAND")).toBeOnTheScreen();
+  expect(card.getByText("$500")).toBeOnTheScreen();
+  expect(card.getByText("$5 / $10 BLINDS")).toBeOnTheScreen();
+  expect(card.getByText("TAKE THE LAST SEAT")).toBeOnTheScreen();
+
+  // The felt is the game rooms' own and draws itself into the box the card gives it. A seat the
+  // listing counts is a numbered place with no face invented for it; a seat that is free is the
+  // OPEN one the rooms draw, and the figure in the middle is the table's own count.
+  await measureFelt(view);
+  expect(card.getByText("5 / 6")).toBeOnTheScreen();
+
+  const texts = libraryTexts(view);
+  expect(texts).toContain("SEAT 5");
+  expect(texts.filter((text) => text === "OPEN")).toHaveLength(1);
+});
+
+test("lists the other tables with the stakes, the seats and the state a player picks them by", async () => {
   const { lobby, view } = await openLobby();
 
   await deliver(lobby, ROOMS, [
-    table("alpha"),
+    ...HERO_AND_ROW,
     table("beta", {
       clients: 6,
       maxClients: 6,
@@ -199,53 +294,70 @@ test("lists a table with the stakes, the seats and the state a player picks it b
     }),
   ]);
 
-  const alpha = within(view.getByTestId("lobby-room-alpha"));
-  expect(alpha.getByText("Table alpha")).toBeOnTheScreen();
-  expect(alpha.getByText("$500")).toBeOnTheScreen();
-  expect(alpha.getByText("$5 / $10 BLINDS")).toBeOnTheScreen();
-  expect(alpha.getByText("1 / 6")).toBeOnTheScreen();
-  expect(alpha.getByText("WAITING")).toBeOnTheScreen();
+  const row = within(view.getByTestId("lobby-room-row"));
+  expect(row.getByText("Table row")).toBeOnTheScreen();
+  expect(row.getByText("$500")).toBeOnTheScreen();
+  expect(row.getByText("$5 / $10 BLINDS")).toBeOnTheScreen();
+  expect(row.getByText("1 / 6 SEATS")).toBeOnTheScreen();
+  expect(row.getByText("WAITING")).toBeOnTheScreen();
+  expect(row.getByText("JOIN")).toBeOnTheScreen();
 
   const beta = within(view.getByTestId("lobby-room-beta"));
   expect(beta.getByText("High rollers")).toBeOnTheScreen();
   expect(beta.getByText("$50,000")).toBeOnTheScreen();
   expect(beta.getByText("$500 / $1,000 BLINDS")).toBeOnTheScreen();
-  expect(beta.getByText("6 / 6")).toBeOnTheScreen();
+  expect(beta.getByText("6 / 6 SEATS")).toBeOnTheScreen();
+  expect(beta.getByText("FULL")).toBeOnTheScreen();
+});
 
-  expect(view.queryByTestId("lobby-empty")).toBeNull();
+test("takes a seat at the table the hero card offers, then shows it", async () => {
+  const { lobby, view } = await openLobby();
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
+
+  // The one offer, heard the same way wherever it is met: the hero's button says what a row says.
+  expect(view.getByTestId("parlor-featured-join").props.accessibilityLabel).toBe(
+    "Join Table hero, $500 buy-in, blinds $5 and $10, 5 of 6 seats taken, a hand in play",
+  );
+
+  await fireEvent.press(view.getByTestId("parlor-featured-join"));
+
+  await waitFor(() => expect(join).toHaveBeenCalledWith("hero"));
+  await waitFor(() =>
+    expect(push).toHaveBeenCalledWith({ pathname: "/online/[roomId]", params: { roomId: "hero" } }),
+  );
 });
 
 test("takes a seat at the table a row names, then shows it", async () => {
   const { lobby, view } = await openLobby();
-  await deliver(lobby, ROOMS, [table("alpha")]);
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
 
-  await fireEvent.press(view.getByTestId("lobby-room-alpha"));
+  await fireEvent.press(view.getByTestId("lobby-room-row"));
 
-  await waitFor(() => expect(join).toHaveBeenCalledWith("alpha"));
+  await waitFor(() => expect(join).toHaveBeenCalledWith("row"));
   await waitFor(() =>
-    expect(push).toHaveBeenCalledWith({ pathname: "/online/[roomId]", params: { roomId: "alpha" } }),
+    expect(push).toHaveBeenCalledWith({ pathname: "/online/[roomId]", params: { roomId: "row" } }),
   );
 });
 
 test("routes back to the seat already held instead of joining it a second time", async () => {
   const { lobby, view } = await openLobby();
-  activeRoomId.mockReturnValue("alpha");
-  await deliver(lobby, ROOMS, [table("alpha"), table("beta")]);
+  activeRoomId.mockReturnValue("hero");
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
 
-  await fireEvent.press(view.getByTestId("lobby-room-alpha"));
+  await fireEvent.press(view.getByTestId("parlor-featured-join"));
 
   // A room counts connections, not identities: a second `joinById` would take a second seat.
   expect(join).not.toHaveBeenCalled();
   expect(push).toHaveBeenCalledWith({
     pathname: "/online/[roomId]",
-    params: { roomId: "alpha" },
+    params: { roomId: "hero" },
   });
 });
 
 test("offers the table already held as a way back, not as a join", async () => {
   const { lobby, view } = await openLobby();
   activeRoomId.mockReturnValue("mine");
-  await deliver(lobby, ROOMS, [table("mine"), table("theirs")]);
+  await deliver(lobby, ROOMS, [...HERO_AND_ROW, table("mine")]);
 
   const mine = view.getByTestId("lobby-room-mine");
   expect(within(mine).getByText("YOUR TABLE")).toBeOnTheScreen();
@@ -253,15 +365,15 @@ test("offers the table already held as a way back, not as a join", async () => {
     "Your table, Table mine, $500 buy-in, blinds $5 and $10, 1 of 6 seats taken, waiting for players",
   );
 
-  const theirs = view.getByTestId("lobby-room-theirs");
-  expect(within(theirs).getByText("JOIN")).toBeOnTheScreen();
-  expect(theirs.props.accessibilityLabel).toContain("Join Table theirs");
+  const row = view.getByTestId("lobby-room-row");
+  expect(within(row).getByText("JOIN")).toBeOnTheScreen();
+  expect(row.props.accessibilityLabel).toContain("Join Table row");
 });
 
 test("a full table you are seated at is still the way back to your seat", async () => {
   const { lobby, view } = await openLobby();
   activeRoomId.mockReturnValue("mine");
-  await deliver(lobby, ROOMS, [table("mine", { clients: 6, maxClients: 6 })]);
+  await deliver(lobby, ROOMS, [...HERO_AND_ROW, table("mine", { clients: 6, maxClients: 6 })]);
 
   const mine = view.getByTestId("lobby-room-mine");
 
@@ -280,6 +392,7 @@ test("a full table you are seated at is still the way back to your seat", async 
 test("keeps a full table listed, and cannot be pressed", async () => {
   const { lobby, view } = await openLobby();
   await deliver(lobby, ROOMS, [
+    ...HERO_AND_ROW,
     table("full", { clients: 6, maxClients: 6 }),
     table("locked", { locked: true }),
   ]);
@@ -297,33 +410,45 @@ test("keeps a full table listed, and cannot be pressed", async () => {
   expect(within(locked).getByText("LOCKED")).toBeOnTheScreen();
 });
 
+test("still features a table when every table is full, and offers nothing to press", async () => {
+  const { lobby, view } = await openLobby();
+
+  // A room with no seat in it is still a room: the card says why it cannot be taken rather than
+  // showing an empty parlour beside a list of full tables.
+  await deliver(lobby, ROOMS, [table("full", { clients: 6, maxClients: 6 })]);
+
+  const card = within(view.getByTestId("parlor-featured"));
+  expect(card.getByText("TABLE FULL")).toBeOnTheScreen();
+  expect(view.getByTestId("parlor-featured-join")).toBeDisabled();
+});
+
 test("says why a join was refused and asks for the list again", async () => {
   const { lobby, view } = await openLobby();
-  await deliver(lobby, ROOMS, [table("alpha")]);
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
   join.mockRejectedValue(new Error("That table is full or has just closed."));
 
-  await fireEvent.press(view.getByTestId("lobby-room-alpha"));
+  await fireEvent.press(view.getByTestId("lobby-room-row"));
 
   await waitFor(() =>
     expect(sentence(view, "lobby-refusal")).toBe("That table is full or has just closed."),
   );
-  // The refusal is never a screen stuck on "connecting", and a seat taken under us is what the
-  // list has to be asked about again.
+  // The refusal is never a card stuck on "taking your seat", and a seat taken under us is what
+  // the list has to be asked about again.
   expect(push).not.toHaveBeenCalled();
   expect(lobby.send).toHaveBeenCalledWith("filter");
 });
 
-test("surfaces a dropped subscription beside the rows it already had, and re-subscribes on retry", async () => {
+test("surfaces a dropped subscription beside the cards it already had, and re-subscribes on retry", async () => {
   const { lobby, view } = await openLobby();
-  await deliver(lobby, ROOMS, [table("alpha")]);
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
 
   await deliver(lobby, LEFT);
 
   expect(sentence(view, "lobby-error")).toBe(
     "Lost the table list. Check your connection and try again.",
   );
-  // The last list the server sent stays up: a stale row beats an empty lobby.
-  expect(view.getByTestId("lobby-room-alpha")).toBeOnTheScreen();
+  // The last list the server sent stays up: a stale card beats an empty parlour.
+  expect(view.getByTestId("lobby-room-row")).toBeOnTheScreen();
 
   const rejoined = subscription();
   joinOrCreate.mockResolvedValue(rejoined);
@@ -332,11 +457,43 @@ test("surfaces a dropped subscription beside the rows it already had, and re-sub
   await waitFor(() => expect(joinOrCreate).toHaveBeenCalledTimes(2));
   // The retry is a fresh subscription, so the list the server pushes is the one it sends it.
   await waitFor(() => expect(rejoined.onMessage).toHaveBeenCalled());
-  await deliver(rejoined, ROOMS, [table("beta")]);
+  await deliver(rejoined, ROOMS, [table("beta"), table("gamma")]);
 
   expect(view.queryByTestId("lobby-error")).toBeNull();
-  expect(view.getByTestId("lobby-room-beta")).toBeOnTheScreen();
-  expect(view.queryByTestId("lobby-room-alpha")).toBeNull();
+  // The list the new subscription pushes is the one on screen: beta takes the hero card, gamma
+  // the row, and the table the dead subscription was holding is gone.
+  expect(within(view.getByTestId("parlor-featured")).getByText("Table beta")).toBeOnTheScreen();
+  expect(view.getByTestId("lobby-room-gamma")).toBeOnTheScreen();
+  expect(view.queryByTestId("lobby-room-row")).toBeNull();
+});
+
+test("pulls the list again when the room is dragged down", async () => {
+  const { lobby, view } = await openLobby();
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
+
+  const scroll = view.getByTestId("lobby-scroll");
+  await act(async () => {
+    scroll.props.refreshControl.props.onRefresh();
+  });
+
+  // The subscription is live, so a refresh is the server's own "send me the list" rather than a
+  // second connection — and the gesture stays armed until that list lands.
+  expect(lobby.send).toHaveBeenCalledWith("filter");
+  expect(scroll.props.refreshControl.props.refreshing).toBe(true);
+
+  await deliver(lobby, ROOMS, HERO_AND_ROW);
+  expect(view.getByTestId("lobby-scroll").props.refreshControl.props.refreshing).toBe(false);
+});
+
+test("leaves the room the way it arrived, and falls back to the menu when it arrived cold", async () => {
+  const { view } = await openLobby();
+
+  await fireEvent.press(view.getByTestId("parlor-back"));
+  expect(router.back).toHaveBeenCalled();
+
+  (router.canGoBack as unknown as jest.Mock).mockReturnValue(false);
+  await fireEvent.press(view.getByTestId("parlor-back"));
+  expect(router.replace).toHaveBeenCalledWith("/");
 });
 
 test("refuses an over-long table name before it spends a round trip", async () => {
@@ -350,6 +507,15 @@ test("refuses an over-long table name before it spends a round trip", async () =
   expect(sentence(view, "create-table-name-refusal")).toBe(
     "Table names run to 32 characters.",
   );
+});
+
+test("keeps the create actions reachable inside a full-height scrollable sheet", async () => {
+  const { view } = await openLobby();
+  await openForm(view);
+
+  const sheetScroll = view.getByTestId("create-table-scroll");
+  expect(within(sheetScroll).getByTestId("create-table-submit")).toBeOnTheScreen();
+  expect(within(sheetScroll).getByTestId("create-table-cancel")).toBeOnTheScreen();
 });
 
 test("refuses a seat count outside §5 before it spends a round trip", async () => {

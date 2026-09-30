@@ -1,0 +1,20 @@
+# Subflow: lock the drafted word in with the row's check once §19's window opens. The builder
+# locks on confirm, so a repeat tap before the window opens, or after, does nothing twice.
+url: http://localhost:8081/online
+name: Four-seat - confirm the word
+---
+- assertVisible:
+    text: "${WORD}"
+- repeat:
+    times: 60
+    while:
+      notVisible:
+        text: "HAND #${HAND} · RESULTS"
+    commands:
+      - tapOn:
+          id: "action-check-call"
+          optional: true
+      - extendedWaitUntil:
+          visible: "HAND #${HAND} · RESULTS"
+          timeout: 5000
+          optional: true

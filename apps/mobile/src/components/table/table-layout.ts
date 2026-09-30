@@ -69,6 +69,7 @@ export interface TableLayoutConfig {
    * 1 puts seat centers on the felt edge; <1 pulls them inward.
    */
   seatRadius?: { x: number; y: number };
+  seatCenterY?: number;
   /** Number of community slots. Poker uses 5 (flop 3 + turn + river). */
   communitySlots?: number;
   /** Horizontal span the community row occupies, as a fraction of felt width. */
@@ -90,6 +91,7 @@ export type ResolvedTableLayoutConfig = Required<
 
 const DEFAULTS: Omit<ResolvedTableLayoutConfig, "seatCount"> = {
   seatRadius: { x: 0.9, y: 0.86 },
+  seatCenterY: 0.5,
   communitySlots: 5,
   communitySpan: 0.62,
   communityY: 0.44,
@@ -113,6 +115,7 @@ function resolveConfig(config: TableLayoutConfig): ResolvedTableLayoutConfig {
   return {
     seatCount: config.seatCount,
     seatRadius: config.seatRadius ?? DEFAULTS.seatRadius,
+    seatCenterY: config.seatCenterY ?? DEFAULTS.seatCenterY,
     communitySlots: config.communitySlots ?? DEFAULTS.communitySlots,
     communitySpan: config.communitySpan ?? DEFAULTS.communitySpan,
     communityY: config.communityY ?? DEFAULTS.communityY,
@@ -131,7 +134,7 @@ export function computeTableLayout(config: TableLayoutConfig): TableLayout {
   const { seatCount, seatRadius } = resolved;
 
   const cx = 0.5;
-  const cy = 0.5;
+  const cy = resolved.seatCenterY;
   const rx = seatRadius.x / 2;
   const ry = seatRadius.y / 2;
 

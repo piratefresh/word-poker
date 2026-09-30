@@ -25,6 +25,7 @@ import type { Tile } from "./tiles";
 import {
   WORD_REJECTION_REASONS,
   isWordSubmission,
+  type PrivateWordCheckState,
   type WordRejectionReason,
   type WordSubmission,
 } from "./words";
@@ -33,6 +34,14 @@ import {
 type WithoutPlayerId<Action> = Action extends { playerId: PlayerId } ? Omit<Action, "playerId"> : never;
 
 export type OnlineBettingAction = WithoutPlayerId<BettingAction>;
+
+/**
+ * A seat saying whether it is ready for the first hand. The waiting room deals once every seat
+ * at the table (two at least) has said yes; a seat may take it back until then.
+ */
+export interface OnlineReadyAction {
+  readonly ready: boolean;
+}
 
 /** The payload for either online word message. */
 export interface OnlineWordAction {
@@ -46,14 +55,18 @@ export interface OnlineWordAction {
  */
 export interface GameMessageMap {
   readonly betting: OnlineBettingAction;
+  readonly checkWord: OnlineWordAction;
   readonly draftWord: OnlineWordAction;
   readonly confirmWord: OnlineWordAction;
+  readonly ready: OnlineReadyAction;
 }
 
 export const GAME_MESSAGES = {
   betting: "betting",
+  checkWord: "checkWord",
   draftWord: "draftWord",
   confirmWord: "confirmWord",
+  ready: "ready",
 } as const satisfies { [Name in keyof GameMessageMap]: Name };
 
 export type GameMessageName = keyof GameMessageMap;
@@ -93,6 +106,8 @@ export interface OnlineSeatState extends SeatChips {
   readonly sittingOut: boolean;
   /** Whether this seat has acted since the last full raise. */
   readonly actedThisRound: boolean;
+  /** Said ready in the waiting room; cleared whenever the table goes back to waiting. */
+  readonly ready: boolean;
 }
 
 /** One live pot layer, with player ids rather than the engine's private seat indexes. */
@@ -125,6 +140,15 @@ export type GameTableConfig = Omit<GameRoomMetadata, "status">;
 export interface OnlineStanding extends ShowdownStanding {
   readonly word: string | null;
   readonly reason: WordRejectionReason | null;
+  /**
+   * The reveal (§20): the physical tiles the seat played, in word order — public once the hand
+   * pays out, and empty when no word stood. Private tiles never enter the broadcast before this.
+   */
+  readonly tiles: readonly Tile[];
+  /** §7's parts of `score`: printed values, what the multipliers added, the Full Rack Bonus. */
+  readonly base: number;
+  readonly mult: number;
+  readonly rack: number;
 }
 
 /** The public result retained after the hand reaches payout. */
@@ -164,8 +188,15 @@ export interface PrivateSeatState {
   readonly playerId: PlayerId;
   readonly seat: number;
   readonly tableStack: number;
+  /**
+   * The hand this rack was dealt for — the broadcast's `handCount`, zero before the first deal.
+   * The message outruns the patch that deals the board, so a client pairs a rack only with the
+   * board of the same hand.
+   */
+  readonly hand: number;
   readonly rack: readonly Tile[];
   readonly word: PrivateWordState;
+  readonly wordCheck: PrivateWordCheckState;
   readonly isYourTurn: boolean;
   /** Epoch milliseconds on the server; zero when this seat has no betting turn. */
   readonly turnDeadline: number;
@@ -198,6 +229,11 @@ export function isOnlineWordAction(value: unknown): value is OnlineWordAction {
   return isRecord(value) && !("playerId" in value) && isWordSubmission(value.submission);
 }
 
+/** Structural validation for a client ready payload. */
+export function isOnlineReadyAction(value: unknown): value is OnlineReadyAction {
+  return isRecord(value) && typeof value.ready === "boolean";
+}
+
 /** Runtime dispatch validation for the typed Colyseus message map. */
 export function isGameMessagePayload<Name extends GameMessageName>(
   name: Name,
@@ -206,9 +242,12 @@ export function isGameMessagePayload<Name extends GameMessageName>(
   switch (name) {
     case "betting":
       return isOnlineBettingAction(value);
+    case "checkWord":
     case "draftWord":
     case "confirmWord":
       return isOnlineWordAction(value);
+    case "ready":
+      return isOnlineReadyAction(value);
     default:
       return false;
   }

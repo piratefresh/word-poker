@@ -3,7 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import type { RoundPhase } from "@wordpoker/contracts";
 
 import { type BalanceView } from "./hud-types";
-import { HudTopBar, type HudTopBarProps } from "./hud-top-bar";
+import { HudTopBar, hudBarHeight, type HudTopBarProps } from "./hud-top-bar";
+import { bannerLayout } from "./top-bar/banner";
 import { deriveTurnTimer, type TurnTimerView } from "./turn-clock";
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
@@ -181,4 +182,58 @@ test("an expired turn says time is up", async () => {
   expect(screen.getByText("00:00")).toBeOnTheScreen();
   expect(screen.getByLabelText("Time is up")).toBeOnTheScreen();
   expect(screen.getByText(`${PHRASE}: time is up`)).toBeOnTheScreen();
+});
+
+describe("the banner's size", () => {
+  test("keeps the phone's banner on a phone, upright or on its side", () => {
+    const phone = hudBarHeight({ width: 390, height: 844 });
+
+    expect(hudBarHeight({ width: 844, height: 390 })).toBe(phone);
+    expect(hudBarHeight({ width: 1280, height: 720 })).toBe(phone);
+  });
+
+  test("hangs a larger banner in a larger window, and stops growing", () => {
+    const small = hudBarHeight({ width: 1280, height: 720 });
+    const medium = hudBarHeight({ width: 1440, height: 900 });
+    const large = hudBarHeight({ width: 1920, height: 1080 });
+
+    expect(medium).toBeGreaterThan(small);
+    expect(large).toBeGreaterThan(medium);
+    expect(hudBarHeight({ width: 2560, height: 1440 })).toBeGreaterThan(large);
+    expect(hudBarHeight({ width: 3840, height: 2160 })).toBe(hudBarHeight({ width: 2560, height: 1440 }));
+  });
+});
+
+describe("the clock's glass", () => {
+  test("sits inside the banner's frame, with its outline inside its own box", () => {
+    for (const window of [
+      { width: 360, height: 780 },
+      { width: 390, height: 844 },
+      { width: 1920, height: 1080 },
+    ]) {
+      const { frame, glass } = bannerLayout(window);
+      const { box } = glass;
+
+      expect(box.left).toBeGreaterThan(0);
+      expect(box.top).toBeGreaterThan(0);
+      expect(Number(box.left) + box.width).toBeLessThan(frame.width);
+      expect(Number(box.top) + box.height).toBeLessThan(frame.height);
+      for (const { x, y } of glass.outline) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(box.width + 1e-9);
+        expect(y).toBeLessThanOrEqual(box.height + 1e-9);
+      }
+    }
+  });
+
+  test("grows with the banner, so the light and the frame cannot drift apart", () => {
+    const phone = bannerLayout({ width: 390, height: 844 });
+    const desk = bannerLayout({ width: 1920, height: 1080 });
+    const growth = desk.glass.scale / phone.glass.scale;
+
+    expect(growth).toBeGreaterThan(1);
+    expect(desk.glass.box.width).toBeCloseTo(phone.glass.box.width * growth);
+    expect(desk.frame.width).toBeCloseTo(phone.frame.width * growth);
+  });
 });

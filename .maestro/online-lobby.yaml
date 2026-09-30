@@ -43,8 +43,14 @@ tags:
 
 # The list is the server's own listing, subscribed live. The actor's table is in it with the one
 # seat it holds.
+#
+# The anchor is the masthead rather than the list's own heading: the parlour is a page, and at a
+# phone's height the heading — and every row under it — sits below the fold, which a `visible`
+# assertion does not count. The masthead is the top of the page at every window size, and it is
+# matched by its own words alone: the italic of "the parlor" is a nested text, so the element the
+# screen reader sees reads "Tonight at" and the em-phrase is its child.
 - extendedWaitUntil:
-    visible: "Open tables"
+    visible: "Tonight at.*"
     timeout: 30000
 - extendedWaitUntil:
     visible:
@@ -52,61 +58,71 @@ tags:
     timeout: 30000
 - extendedWaitUntil:
     visible:
-      text: "1 / 2"
+      text: "1 / 2.*"
     timeout: 30000
 
 # Create a table through the form. The defaults are §2's first buy-in (500 coins) and §5's cap
-# (6 seats), so the flow only names it.
+# (6 seats), so the flow only names it. The button that opens it is the parlour's floating deal.
 - tapOn:
-    text: "Create a table"
+    text: "Deal a new table"
 - tapOn:
     id: "Table name"
 - inputText: "Maestro Table"
 - tapOn:
     text: "Create"
 
-# The creator lands seated at the table they made: its name, its fixed buy-in, its live seat
-# count, and the waiting state §3's card promised.
+# The creator lands seated at the table they made, and the felt is the table from the moment the
+# seat is taken: this player's place on it with the fixed buy-in as its stack, the waiting state,
+# and §5's ready check where the betting row will be — nobody else is seated, so nothing deals.
+# The felt does not print the table's name; the lobby checks below are what tie it to this table.
 - extendedWaitUntil:
     visible:
-      text: "Maestro Table"
+      id: "poker-table"
     timeout: 30000
+- assertVisible:
+    text: "YOU"
 - assertVisible:
     text: "WAITING"
 - assertVisible:
     text: "$500"
 - assertVisible:
-    text: "1 / 6"
+    text: "I'M READY"
 
-# Leave: the seat goes, and with the last of them the table disposes — the lobby's live
-# subscription drops the row rather than leaving a table nobody can sit at.
+# Leave through the felt's HUD control: the seat goes, and with the last of them the table
+# disposes — the lobby's live subscription drops the row rather than leaving a table nobody can
+# sit at.
 - tapOn:
-    text: "Leave table"
+    id: "Leave the table"
 - extendedWaitUntil:
-    visible: "Open tables"
+    visible: "Tonight at.*"
     timeout: 30000
 - assertNotVisible:
     text: "Maestro Table"
 
-# Join from the list: the row states the table's own terms (name, buy-in, seats taken of seats
-# it has, the state §3's browser reads), and tapping it takes the free seat.
+# Join from the list: the row — or the hero card, when the table is the only one listed, since the
+# card's button carries the same spoken sentence — states the table's own terms (name, buy-in,
+# seats taken of seats it has, the state §3's browser reads), and tapping it takes the free seat.
+#
+# The join lands on the felt. Nothing deals until every seated player says ready (§5), so the
+# table sits in its waiting room. A felt does not print the table's name, so what proves the seat
+# was taken is the felt's own: this player's place on it.
 - tapOn:
     id: "Join Node Table.*"
 - extendedWaitUntil:
     visible:
-      text: "Node Table"
+      id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "2 / 2"
-- assertVisible:
-    text: "IN HAND"
+    text: "YOU"
 
-# And back out: the table has the actor's seat left, so the lobby shows it open again. The count
-# is the server's own, pushed when the seat went — so this waits rather than samples.
+# And back out through the felt's own leave control — the one in the HUD, which has no label to
+# read on the felt. The seat goes, the table is down to the holder's, and the lobby shows it open
+# again. The count is the server's own, pushed when the seat went — so this waits rather than
+# samples.
 - tapOn:
-    text: "Leave table"
+    id: "Leave the table"
 - extendedWaitUntil:
-    visible: "Open tables"
+    visible: "Tonight at.*"
     timeout: 30000
 - extendedWaitUntil:
     visible:
@@ -114,7 +130,7 @@ tags:
     timeout: 30000
 - extendedWaitUntil:
     visible:
-      text: "1 / 2"
+      text: "1 / 2.*"
     timeout: 30000
 
 # A link that names a table lands on that table's own screen rather than on the lobby — in both
@@ -134,7 +150,7 @@ tags:
 - tapOn:
     text: "Back to lobby"
 - extendedWaitUntil:
-    visible: "Open tables"
+    visible: "Tonight at.*"
     timeout: 30000
 
 # The form the app writes itself: routing to a table leaves `/online/<roomId>` in the address bar,
@@ -147,5 +163,5 @@ tags:
 - tapOn:
     text: "Back to lobby"
 - extendedWaitUntil:
-    visible: "Open tables"
+    visible: "Tonight at.*"
     timeout: 30000

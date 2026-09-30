@@ -1,0 +1,252 @@
+{
+  "image": "arena-atlas.png",
+  "size": {
+    "width": 1024,
+    "height": 1024
+  },
+  "notes": [
+    "Coordinates were detected from the current 1024x1024 atlas.",
+    "The current atlas has an opaque checkerboard baked into the image (alpha is 255 everywhere). Remove/regenerate that background before using it as a runtime sprite atlas.",
+    "top_center_structure is one connected sprite in the current sheet; it includes the center waterfall/stone structure and the connected curved wall portions."
+  ],
+  "sprites": {
+    "waterfall_left": {
+      "frame": {
+        "x": 123,
+        "y": 4,
+        "w": 195,
+        "h": 269
+      },
+      "uv": {
+        "u0": 0.120117,
+        "v0": 0.003906,
+        "u1": 0.310547,
+        "v1": 0.266602
+      }
+    },
+    "waterfall_right": {
+      "frame": {
+        "x": 704,
+        "y": 4,
+        "w": 202,
+        "h": 269
+      },
+      "uv": {
+        "u0": 0.6875,
+        "v0": 0.003906,
+        "u1": 0.884766,
+        "v1": 0.266602
+      }
+    },
+    "banner_left": {
+      "frame": {
+        "x": 5,
+        "y": 15,
+        "w": 115,
+        "h": 192
+      },
+      "uv": {
+        "u0": 0.004883,
+        "v0": 0.014648,
+        "u1": 0.117188,
+        "v1": 0.202148
+      }
+    },
+    "banner_right": {
+      "frame": {
+        "x": 906,
+        "y": 15,
+        "w": 113,
+        "h": 192
+      },
+      "uv": {
+        "u0": 0.884766,
+        "v0": 0.014648,
+        "u1": 0.995117,
+        "v1": 0.202148
+      }
+    },
+    "top_center_structure": {
+      "frame": {
+        "x": 117,
+        "y": 17,
+        "w": 786,
+        "h": 439
+      },
+      "uv": {
+        "u0": 0.114258,
+        "v0": 0.016602,
+        "u1": 0.881836,
+        "v1": 0.445312
+      }
+    },
+    "torch_pillar_right": {
+      "frame": {
+        "x": 907,
+        "y": 202,
+        "w": 113,
+        "h": 289
+      },
+      "uv": {
+        "u0": 0.885742,
+        "v0": 0.197266,
+        "u1": 0.996094,
+        "v1": 0.479492
+      }
+    },
+    "torch_pillar_left": {
+      "frame": {
+        "x": 4,
+        "y": 203,
+        "w": 114,
+        "h": 288
+      },
+      "uv": {
+        "u0": 0.003906,
+        "v0": 0.198242,
+        "u1": 0.115234,
+        "v1": 0.479492
+      }
+    },
+    "table_main": {
+      "frame": {
+        "x": 175,
+        "y": 272,
+        "w": 673,
+        "h": 621
+      },
+      "uv": {
+        "u0": 0.170898,
+        "v0": 0.265625,
+        "u1": 0.828125,
+        "v1": 0.87207
+      }
+    },
+    "foliage_upper_left": {
+      "frame": {
+        "x": 8,
+        "y": 472,
+        "w": 162,
+        "h": 172
+      },
+      "uv": {
+        "u0": 0.007812,
+        "v0": 0.460938,
+        "u1": 0.166016,
+        "v1": 0.628906
+      }
+    },
+    "foliage_upper_right": {
+      "frame": {
+        "x": 854,
+        "y": 473,
+        "w": 160,
+        "h": 162
+      },
+      "uv": {
+        "u0": 0.833984,
+        "v0": 0.461914,
+        "u1": 0.990234,
+        "v1": 0.620117
+      }
+    },
+    "foliage_lower_left": {
+      "frame": {
+        "x": 3,
+        "y": 629,
+        "w": 213,
+        "h": 220
+      },
+      "uv": {
+        "u0": 0.00293,
+        "v0": 0.614258,
+        "u1": 0.210938,
+        "v1": 0.829102
+      }
+    },
+    "foliage_lower_right": {
+      "frame": {
+        "x": 833,
+        "y": 637,
+        "w": 186,
+        "h": 172
+      },
+      "uv": {
+        "u0": 0.813477,
+        "v0": 0.62207,
+        "u1": 0.995117,
+        "v1": 0.790039
+      }
+    },
+    "rock_small_right": {
+      "frame": {
+        "x": 798,
+        "y": 809,
+        "w": 71,
+        "h": 40
+      },
+      "uv": {
+        "u0": 0.779297,
+        "v0": 0.790039,
+        "u1": 0.848633,
+        "v1": 0.829102
+      }
+    },
+    "book_prop": {
+      "frame": {
+        "x": 846,
+        "y": 825,
+        "w": 172,
+        "h": 185
+      },
+      "uv": {
+        "u0": 0.826172,
+        "v0": 0.805664,
+        "u1": 0.994141,
+        "v1": 0.986328
+      }
+    },
+    "coin_stack": {
+      "frame": {
+        "x": 8,
+        "y": 830,
+        "w": 115,
+        "h": 111
+      },
+      "uv": {
+        "u0": 0.007812,
+        "v0": 0.810547,
+        "u1": 0.120117,
+        "v1": 0.918945
+      }
+    },
+    "bottom_wall": {
+      "frame": {
+        "x": 169,
+        "y": 854,
+        "w": 678,
+        "h": 152
+      },
+      "uv": {
+        "u0": 0.165039,
+        "v0": 0.833984,
+        "u1": 0.827148,
+        "v1": 0.982422
+      }
+    },
+    "rock_foliage_prop_left": {
+      "frame": {
+        "x": 25,
+        "y": 885,
+        "w": 142,
+        "h": 127
+      },
+      "uv": {
+        "u0": 0.024414,
+        "v0": 0.864258,
+        "u1": 0.163086,
+        "v1": 0.988281
+      }
+    }
+  }
+}
