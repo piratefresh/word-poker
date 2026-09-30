@@ -77,13 +77,20 @@ describe("POWER_UPS", () => {
 });
 
 describe("POWER_REJECTION_REASONS", () => {
-  it("pins every Power Draw refusal", () => {
+  it("pins every Power Draw and power-use refusal", () => {
     // Both sides switch on these strings, so reordering or renaming one is a wire change.
     assert.deepEqual([...POWER_REJECTION_REASONS], [
       "not-in-draw",
       "not-offered",
       "already-picked",
       "draw-closed",
+      "powers-off",
+      "not-held",
+      "already-used",
+      "outside-window",
+      "folded",
+      "word-confirmed",
+      "not-your-tile",
     ]);
   });
 });

@@ -16,7 +16,9 @@
  * every word action, and settles the hand when it closes. The window's own rules are not here.
  * §44's Power Draw is the same kind of seam (`power-draw.ts`): at a Wild table `startHand` opens
  * it before pre-flop's first turn, nobody bets while it is open, and the turn clock arms when it
- * closes. A Classic table never carries it, so its hands are exactly what they were before.
+ * closes. A Classic table never carries it, so its hands are exactly what they were before. The
+ * held power is used on the seat's own betting turn or in §19's window; what a swap hands the
+ * seat is `power-swap.ts`'s to decide, and where the new tile lands in the rack is this file's.
  *
  * Two ends of the hand are short-circuits rather than rounds. A fold-out — one seat left
  * un-folded — goes straight to the pot with no reveal and no window (§26). An all-in run-out
@@ -72,6 +74,7 @@ import {
 } from "./errors";
 import * as powerDraw from "./power-draw";
 import type { DrawSeat, HeldPower, PowerDraw } from "./power-draw";
+import { swapTile } from "./power-swap";
 import { resolvePayout, type JudgedSeat } from "./pots";
 import { createRng } from "./rng";
 import { scoreWord } from "./scoring";
@@ -449,6 +452,109 @@ function timeoutPowerDraw(state: OfflineState, nowMs: number): OfflineState {
 }
 
 /**
+ * A seat uses its held power (§44). Every v1 power swaps a private tile: the new plain tile takes
+ * the discarded one's place in the rack, and — inside §19's window — the discarded tile leaves the
+ * seat's draft. Using it is not a betting action: the turn, and its clock, are exactly where they
+ * were, so the seat still acts afterwards.
+ *
+ * @throws {PowerRejectionError} When the table deals no powers, the seat has folded, does not hold
+ *   that power or has used it, has confirmed its word, is outside the power's window, or names a
+ *   tile that is not one of its private tiles.
+ */
+function applyUsePower(
+  state: OfflineState,
+  action: Extract<OfflineAction, { type: "usePowerUp" }>,
+  nowMs: number,
+): OfflineState {
+  const powers = state.powers;
+  if (powers === undefined) throw new PowerRejectionError("powers-off");
+
+  const seatIndex = state.seats.findIndex((candidate) => candidate.id === action.playerId);
+  const seat = state.seats[seatIndex];
+  if (seat?.folded === true) throw new PowerRejectionError("folded");
+
+  const held = powers.held[action.playerId];
+  if (seat === undefined || held === undefined || held.id !== action.powerUpId) {
+    throw new PowerRejectionError("not-held");
+  }
+  if (held.used) throw new PowerRejectionError("already-used");
+
+  const refusal = powerWindowRefusal(state, seatIndex, action.playerId, nowMs);
+  if (refusal !== null) throw new PowerRejectionError(refusal);
+
+  if (!seat.privateTiles.some((tile) => tile.id === action.tileId)) {
+    throw new PowerRejectionError("not-your-tile");
+  }
+
+  const tile = swapTile(action.powerUpId, { dealSeed: state.seed, seat: seatIndex });
+  const seats = [...state.seats];
+  seats[seatIndex] = {
+    ...seat,
+    privateTiles: seat.privateTiles.map((candidate) => (candidate.id === action.tileId ? tile : candidate)),
+  };
+
+  return {
+    ...state,
+    seats,
+    wordWindow: withoutDraftTile(state.wordWindow, action.playerId, action.tileId),
+    powers: {
+      ...powers,
+      held: {
+        ...powers.held,
+        [action.playerId]: { ...held, used: true, swap: { discardedTileId: action.tileId, tile } },
+      },
+    },
+  };
+}
+
+/**
+ * Why the v1 powers' window (`ownTurnOrWordWindow`) is shut to this seat, or `null` when it is
+ * open: the seat's own betting turn with its clock still running, or §19's window before the seat
+ * confirms and before the table's clock runs out. Nothing is open while the Power Draw is.
+ */
+function powerWindowRefusal(
+  state: OfflineState,
+  seatIndex: number,
+  playerId: PlayerId,
+  nowMs: number,
+): "outside-window" | "word-confirmed" | null {
+  if (state.powers?.draw.status === "open") return "outside-window";
+
+  const window = state.wordWindow;
+  if (window?.status === "open") {
+    const slot = window.slots.find((candidate) => candidate.playerId === playerId);
+    if (slot === undefined) return "outside-window";
+    if (slot.status !== "drafting") return "word-confirmed";
+    return nowMs < state.endsAtMs ? null : "outside-window";
+  }
+
+  const onTurn = state.betting !== null && state.toActIndex === seatIndex && nowMs < state.endsAtMs;
+  return onTurn ? null : "outside-window";
+}
+
+/**
+ * §19's window with a discarded tile taken out of one seat's draft (§44): the rest of the draft
+ * keeps its order, and a draft left empty is no draft at all. Outside the window the draft is the
+ * client's own, so there is nothing here to change.
+ */
+function withoutDraftTile(
+  window: WordWindow | null,
+  playerId: PlayerId,
+  tileId: string,
+): WordWindow | null {
+  if (window?.status !== "open") return window;
+
+  return {
+    ...window,
+    slots: window.slots.map((slot) => {
+      if (slot.playerId !== playerId || slot.status !== "drafting" || slot.draft === null) return slot;
+      const plays = slot.draft.plays.filter((play) => play.tileId !== tileId);
+      return { ...slot, draft: plays.length === 0 ? null : { plays } };
+    }),
+  };
+}
+
+/**
  * The first seat at or clockwise from `from` that is dealt into the hand. The button and both
  * blinds ride on the deal, so none of them ever lands on a seat that is sitting the hand out
  * (§5).
@@ -525,6 +631,9 @@ export function reduce(state: OfflineState, action: OfflineAction, nowMs: number
 
     case "timeoutPowerDraw":
       return timeoutPowerDraw(state, nowMs);
+
+    case "usePowerUp":
+      return applyUsePower(state, action, nowMs);
 
     case "checkWord":
       return applyWordCheck(state, action);

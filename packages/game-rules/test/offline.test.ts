@@ -6,13 +6,17 @@ import {
   ROUND_PHASES,
   type BettingAction,
   type OfflineAction,
+  type PowerRejectionReason,
   type PowerUpId,
+  type Tile,
+  type TilePlay,
 } from "@wordpoker/contracts";
 
 import { bettingBounds } from "../src/betting";
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "../src/deal";
 import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/errors";
 import { drawOffers, type PowerDraw } from "../src/power-draw";
+import { swapTile } from "../src/power-swap";
 import {
   OFFLINE_TURN_MS,
   reduce,
@@ -22,7 +26,7 @@ import {
   type StartHandOptions,
 } from "../src/offline";
 import { WORD_WINDOW_MS } from "../src/word-window";
-import { TEST_DICTIONARY, cloneState } from "./fixtures";
+import { TEST_DICTIONARY, cloneState, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
 const SEED = 20260919;
@@ -867,5 +871,244 @@ describe("reduce — §44's Power Draw", () => {
     assert.deepEqual(next.powers?.held, {});
     assert.deepEqual(next.powers?.bots, CPU);
     assert.deepEqual(offersOf(next, "hero"), drawOffers(next.seed, 0));
+  });
+});
+
+describe("reduce — §44's held power", () => {
+  const CPU = ["ellis", "jay", "mira"] as const;
+  const HERO = 0;
+
+  /** A Wild hand where the hero kept `power` and the draw has closed: mira is on the clock. */
+  function holding(power: PowerUpId, options: Partial<StartHandOptions> = {}): OfflineState {
+    const state = dealHand({ powerUps: { deal: "choose3", bots: CPU }, ...options });
+    return reduce(state, { type: "pickPower", playerId: "hero", powerUpId: power }, NOW + 1);
+  }
+
+  /** The hero's first betting turn: pre-flop, mira acts before it. */
+  function heroOnTurn(power: PowerUpId): OfflineState {
+    let state = holding(power);
+    while (state.toActIndex !== HERO) state = reduce(state, politeAction(state), NOW + 2);
+    return state;
+  }
+
+  function use(
+    state: OfflineState,
+    tileId: string,
+    powerUpId: PowerUpId = "random_wild",
+    nowMs = NOW + 3,
+    playerId = "hero",
+  ): OfflineState {
+    return reduce(state, { type: "usePowerUp", playerId, powerUpId, tileId }, nowMs);
+  }
+
+  function heroTile(state: OfflineState, index = 0): Tile {
+    const tile = state.seats[HERO]?.privateTiles[index];
+    assert.ok(tile, `the hero's tile ${index}`);
+    return tile;
+  }
+
+  /** A play of `tile` as itself: a choice tile names its first face. */
+  function playOf(tile: Tile): TilePlay {
+    return "alternativeLetter" in tile ? { tileId: tile.id, chosenFace: tile.letter } : { tileId: tile.id };
+  }
+
+  function refused(reason: PowerRejectionReason): (error: unknown) => boolean {
+    return (error) => error instanceof PowerRejectionError && error.reason === reason;
+  }
+
+  it("swaps the tile in place on the seat's own turn, and the turn goes on", () => {
+    const state = heroOnTurn("random_wild");
+    const discarded = heroTile(state, 0);
+    const kept = heroTile(state, 1);
+    const tile = swapTile("random_wild", { dealSeed: SEED, seat: HERO });
+
+    const used = use(state, discarded.id);
+
+    assert.deepEqual(used.seats[HERO]?.privateTiles, [tile, kept], "the new tile takes the old one's place");
+    assert.deepEqual(used.powers?.held.hero, {
+      id: "random_wild",
+      used: true,
+      swap: { discardedTileId: discarded.id, tile },
+    });
+    // Not a betting action: the same seat is on the same clock, and every other seat is untouched.
+    assert.equal(used.toActIndex, HERO);
+    assert.equal(used.endsAtMs, state.endsAtMs);
+    assert.deepEqual(used.betting, state.betting);
+    assert.deepEqual(used.seats.slice(1), state.seats.slice(1));
+    assert.deepEqual(used.community, state.community);
+    assert.equal(reduce(used, politeAction(used), NOW + 4).toActIndex, HERO + 1, "the hero still acts");
+  });
+
+  it("gives the seat the same letter whichever street it is used on", () => {
+    for (const power of ["random_wild", "vowel_magnet"] as const) {
+      const early = heroOnTurn(power);
+      const onPreflop = use(early, heroTile(early).id, power);
+
+      const late = playToWindow(holding(power), NOW + 2);
+      assert.equal(late.phase, "river");
+      const inWindow = use(late, heroTile(late).id, power, late.endsAtMs - 1);
+
+      assert.deepEqual(heroTile(inWindow), heroTile(onPreflop), power);
+    }
+  });
+
+  it("draws Vowel Magnet's letter from the vowels", () => {
+    const state = heroOnTurn("vowel_magnet");
+    const used = use(state, heroTile(state).id, "vowel_magnet");
+
+    assert.match(heroTile(used).letter, /^[AEIOU]$/);
+  });
+
+  it("refuses a second use in the same hand, leaving the first swap alone", () => {
+    const state = heroOnTurn("random_wild");
+    const used = use(state, heroTile(state, 0).id);
+    const before = cloneState(used);
+
+    assert.throws(() => use(used, heroTile(used, 1).id, "random_wild", NOW + 4), refused("already-used"));
+    assert.throws(() => use(used, heroTile(used, 0).id, "random_wild", NOW + 4), refused("already-used"));
+    assert.deepEqual(used, before);
+  });
+
+  it("refuses a power at a Classic table", () => {
+    const state = dealHand();
+
+    assert.throws(() => use(state, heroTile(state).id), refused("powers-off"));
+  });
+
+  it("refuses a power the seat does not hold, and a CPU seat, which holds none", () => {
+    const state = heroOnTurn("random_wild");
+    assert.throws(() => use(state, heroTile(state).id, "vowel_magnet"), refused("not-held"));
+
+    const mira = holding("random_wild");
+    const miraTile = mira.seats[FIRST_TO_ACT]?.privateTiles[0];
+    assert.ok(miraTile);
+    assert.throws(() => use(mira, miraTile.id, "random_wild", NOW + 2, "mira"), refused("not-held"));
+  });
+
+  it("refuses a power off the seat's own turn, and once its clock has run out", () => {
+    const waiting = holding("random_wild");
+    assert.equal(waiting.toActIndex, FIRST_TO_ACT);
+    assert.throws(() => use(waiting, heroTile(waiting).id), refused("outside-window"));
+
+    const onTurn = heroOnTurn("random_wild");
+    assert.throws(
+      () => use(onTurn, heroTile(onTurn).id, "random_wild", onTurn.endsAtMs),
+      refused("outside-window"),
+    );
+  });
+
+  it("refuses a power while the Power Draw is still open, even to a seat that has picked", () => {
+    const state = dealHand({ powerUps: { deal: "choose3" } });
+    const picked = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: "random_wild" }, NOW + 1);
+
+    assert.equal(picked.powers?.draw.status, "open");
+    assert.throws(() => use(picked, heroTile(picked).id, "random_wild", NOW + 2), refused("outside-window"));
+  });
+
+  it("refuses a power after §19's clock runs out, and after the payout", () => {
+    const window = playToWindow(holding("random_wild"), NOW + 2);
+    assert.throws(
+      () => use(window, heroTile(window).id, "random_wild", window.endsAtMs),
+      refused("outside-window"),
+    );
+
+    const paid = payOut(window);
+    assert.throws(() => use(paid, heroTile(paid).id, "random_wild", paid.endsAtMs + 1), refused("outside-window"));
+  });
+
+  it("refuses a power once the seat has folded", () => {
+    const state = heroOnTurn("random_wild");
+    const folded = reduce(state, { type: "fold", playerId: "hero" }, NOW + 3);
+
+    assert.throws(() => use(folded, heroTile(folded).id, "random_wild", NOW + 4), refused("folded"));
+  });
+
+  it("refuses a power once the seat has confirmed its word", () => {
+    const window = playToWindow(holding("random_wild"), NOW + 2);
+    const plays = [playOf(heroTile(window, 0)), playOf(heroTile(window, 1))];
+    const confirmed = reduce(
+      window,
+      { type: "confirmWord", playerId: "hero", submission: { plays } },
+      window.endsAtMs - 10,
+    );
+
+    assert.equal(confirmed.wordWindow?.status, "open", "the other seats are still building");
+    assert.throws(
+      () => use(confirmed, heroTile(confirmed).id, "random_wild", confirmed.endsAtMs - 5),
+      refused("word-confirmed"),
+    );
+  });
+
+  it("refuses a tile that is not one of the seat's private tiles", () => {
+    const state = heroOnTurn("random_wild");
+    const board = state.community[0];
+    const theirs = state.seats[1]?.privateTiles[0];
+    assert.ok(board && theirs);
+
+    assert.throws(() => use(state, board.id), refused("not-your-tile"));
+    assert.throws(() => use(state, theirs.id), refused("not-your-tile"));
+    assert.equal(state.powers?.held.hero?.used, false, "a refused use spends nothing");
+  });
+
+  it("takes the discarded tile out of the seat's draft in §19's window, keeping the rest in order", () => {
+    const window = playToWindow(holding("random_wild"), NOW + 2);
+    const [first, second] = [heroTile(window, 0), heroTile(window, 1)];
+    const board = window.community.find((tile) => !("alternativeLetter" in tile));
+    assert.ok(board);
+    const plays = [playOf(first), playOf(board), playOf(second)];
+    const drafted = reduce(
+      window,
+      { type: "draftWord", playerId: "hero", submission: { plays } },
+      window.endsAtMs - 10,
+    );
+
+    const used = use(drafted, first.id, "random_wild", drafted.endsAtMs - 5);
+    const slot = used.wordWindow?.slots.find((candidate) => candidate.playerId === "hero");
+
+    assert.deepEqual(slot, {
+      seat: HERO,
+      playerId: "hero",
+      status: "drafting",
+      draft: { plays: [playOf(board), playOf(second)] },
+    });
+    assert.ok(
+      !used.seats[HERO]?.privateTiles.some((tile) => tile.id === first.id),
+      "the discarded tile is gone",
+    );
+  });
+
+  it("lets an all-in seat use its power in §19's window", () => {
+    const state = heroOnTurn("random_wild");
+    const shoved = reduce(state, { type: "allIn", playerId: "hero" }, NOW + 3);
+    const window = playToWindow(shoved, NOW + 4);
+
+    assert.equal(window.seats[HERO]?.allIn, true);
+    assert.equal(window.wordWindow?.status, "open");
+    const used = use(window, heroTile(window).id, "random_wild", window.endsAtMs - 1);
+    assert.equal(used.powers?.held.hero?.used, true);
+  });
+
+  it("scores the new tile at its §6 value in a word at showdown, and marks it as swapped", () => {
+    const tile = swapTile("random_wild", { dealSeed: SEED, seat: HERO });
+    const board = dealHand().community.find(
+      (candidate) => !("alternativeLetter" in candidate) && candidate.multiplier === undefined,
+    );
+    assert.ok(board, "the board has a plain tile");
+    const word = `${tile.letter}${board.letter}`;
+
+    const window = playToWindow(holding("random_wild", { dictionary: testDictionary([word]) }), NOW + 2);
+    const used = use(window, heroTile(window).id, "random_wild", window.endsAtMs - 10);
+    const confirmed = reduce(
+      used,
+      { type: "confirmWord", playerId: "hero", submission: { plays: [{ tileId: tile.id }, { tileId: board.id }] } },
+      window.endsAtMs - 5,
+    );
+    const paid = payOut(confirmed);
+
+    const standing = paid.result?.standings.find((candidate) => candidate.playerId === "hero");
+    assert.equal(standing?.word, word);
+    assert.equal(standing?.score, tile.points + board.points);
+    assert.equal(standing?.place, 1, "the only word at the table");
+    assert.equal(paid.powers?.held.hero?.swap?.tile.id, tile.id, "the ⚡ reads the swapped tile's id");
   });
 });

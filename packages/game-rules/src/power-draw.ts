@@ -18,6 +18,7 @@ import {
   POWER_DRAW_OFFER_COUNT,
   POWER_UP_IDS,
   POWER_UPS,
+  type LetterTile,
   type PlayerId,
   type PowerUpId,
 } from "@wordpoker/contracts";
@@ -62,6 +63,12 @@ export interface DrawSeat {
 export interface HeldPower {
   readonly id: PowerUpId;
   readonly used: boolean;
+  /**
+   * What a swap power did once used: the private tile it discarded and the plain tile that took
+   * its place. The new tile's id is how showdown marks the tile as swapped (the ⚡); the
+   * discarded tile is never shown, so only its id is kept, for the owner's private result.
+   */
+  readonly swap?: { readonly discardedTileId: string; readonly tile: LetterTile };
 }
 
 /**

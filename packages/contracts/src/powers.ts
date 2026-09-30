@@ -93,7 +93,8 @@ export const POWER_DRAW_OFFER_COUNT = 3;
 export const POWER_DRAW_MS = 10_000;
 
 /**
- * Every way a power action can be refused (§44). A string union for the same reason as the
+ * Every way a power action can be refused (§44): the Power Draw's four, then using a held power's.
+ * A string union for the same reason as the
  * betting and word reasons: these cross the wire into logs and UI copy.
  */
 export const POWER_REJECTION_REASONS = [
@@ -105,6 +106,23 @@ export const POWER_REJECTION_REASONS = [
   "already-picked",
   /** The Power Draw has closed, or its clock has run out. */
   "draw-closed",
+  /** The table deals no powers: it is Classic (§40). */
+  "powers-off",
+  /** The seat does not hold the power it named this hand. */
+  "not-held",
+  /** The seat has already used its power this hand; a power is used at most once. */
+  "already-used",
+  /**
+   * Not the power's window: not the seat's own betting turn, the turn's clock has run out, the
+   * Power Draw is still open, §19's window has run out, or the hand has paid out.
+   */
+  "outside-window",
+  /** The seat has folded, and a folded seat's power is lost. */
+  "folded",
+  /** The seat has confirmed its word, and a confirmed word's tiles are locked. */
+  "word-confirmed",
+  /** The swap names a tile that is not one of the seat's private tiles. */
+  "not-your-tile",
 ] as const;
 
 /** Why a power action was refused. */

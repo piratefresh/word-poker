@@ -1,6 +1,6 @@
 /**
- * What the offline game can be told to do: deal a fresh hand, keep a power at §44's Power Draw,
- * take a betting action, work on a word during §19's window, or close either window when its
+ * What the offline game can be told to do: deal a fresh hand, keep a power at §44's Power Draw
+ * or use the one it kept, take a betting action, work on a word during §19's window, or close either window when its
  * clock runs out.
  *
  * Both a betting action and a word action name their seat — a bet because whose turn it is
@@ -29,4 +29,6 @@ export type OfflineAction =
   /** A seat keeps one of the powers the Power Draw offered it (§44). */
   | { type: "pickPower"; playerId: PlayerId; powerUpId: PowerUpId }
   /** The Power Draw's clock ran out: every seat that has not picked keeps its first offer. */
-  | { type: "timeoutPowerDraw" };
+  | { type: "timeoutPowerDraw" }
+  /** A seat uses its held power; the swap family names the private tile it discards (§44). */
+  | { type: "usePowerUp"; playerId: PlayerId; powerUpId: PowerUpId; tileId: string };
