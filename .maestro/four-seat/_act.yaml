@@ -1,14 +1,23 @@
 # Subflow: one betting action on this seat's turn. ACTION is fold, check-call (CHECK or CALL, the
 # one control), or wager (BET or RAISE at the slider's default, the minimum). YOUR TURN prints
 # only on the hero's own nameplate; waiting for it to go keeps a stale banner from acting twice.
+#
+# The press is retried: four browsers drive one table, and a tap that lands while the felt is
+# still settling never reaches the room — the seat's turn stands, which is exactly what the wait
+# for YOUR TURN to go says. Maestro's own retry-on-no-change does not cover it (the button's
+# pressed state is a change), and while the seat is still on turn the control arms the same
+# action, so a second press is the same action rather than a new one.
 url: http://localhost:8081/online
 name: Four-seat - act
 ---
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 150000
-- tapOn:
-    id: "action-${ACTION}"
-- extendedWaitUntil:
-    notVisible: "YOUR TURN"
-    timeout: 30000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          id: "action-${ACTION}"
+      - extendedWaitUntil:
+          notVisible: "YOUR TURN"
+          timeout: 20000

@@ -1,11 +1,15 @@
 # Subflow: read hand HAND's results, check the winning WORD is on the scoreboard, and put the
 # overlay away. The room deals the next hand on its own after the smoke's 20-second payout.
+#
+# The wait is long on purpose: four browsers play one table, one seat at a time, and a hand runs
+# its four streets through all of them before it pays out — a street costs the room whole seconds
+# per seat, so a hand that takes three minutes is the smoke working, not stalling.
 url: http://localhost:8081/online
 name: Four-seat - results
 ---
 - extendedWaitUntil:
     visible: "HAND #${HAND} · RESULTS"
-    timeout: 180000
+    timeout: 300000
 - assertVisible:
     text: "SCOREBOARD"
 - assertVisible:

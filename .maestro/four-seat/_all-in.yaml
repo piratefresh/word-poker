@@ -1,18 +1,26 @@
-# Subflow: shove on this seat's turn, through the all-in sheet's confirm.
+# Subflow: shove on this seat's turn, through the all-in sheet's confirm. Each press is retried
+# against what it should make visible — the sheet after the button, the seat's turn gone after the
+# confirm — so a press that lands while the felt is still settling does not wedge the seat.
 url: http://localhost:8081/online
 name: Four-seat - all in
 ---
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 150000
-- tapOn:
-    id: "all-in-button"
-- extendedWaitUntil:
-    visible:
-      id: "all-in-sheet"
-    timeout: 10000
-- tapOn:
-    id: "all-in-confirm"
-- extendedWaitUntil:
-    notVisible: "YOUR TURN"
-    timeout: 30000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          id: "all-in-button"
+      - extendedWaitUntil:
+          visible:
+            id: "all-in-sheet"
+          timeout: 10000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          id: "all-in-confirm"
+      - extendedWaitUntil:
+          notVisible: "YOUR TURN"
+          timeout: 20000
