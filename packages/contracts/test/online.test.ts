@@ -5,9 +5,13 @@ import {
   BETTING_REJECTION_REASONS,
   GAME_EVENTS,
   GAME_MESSAGES,
+  POWER_ACTION_ID_MAX_LENGTH,
+  POWER_UP_IDS,
   isGameMessagePayload,
   isGameRejectionEvent,
   isOnlineBettingAction,
+  isOnlinePickPowerAction,
+  isOnlineUsePowerUpAction,
   isOnlineWordAction,
   type GameTableState,
   type OnlineBettingAction,
@@ -17,13 +21,19 @@ describe("online message vocabulary", () => {
   it("keeps client messages separate from server-owned transitions", () => {
     assert.deepEqual(GAME_MESSAGES, {
       betting: "betting",
+      checkWord: "checkWord",
       draftWord: "draftWord",
       confirmWord: "confirmWord",
       ready: "ready",
+      pickPower: "pickPower",
+      usePowerUp: "usePowerUp",
     });
     assert.deepEqual(GAME_EVENTS, {
       privateState: "privateState",
       rejected: "rejected",
+      powerDraw: "powerDraw",
+      powerSwap: "powerSwap",
+      powerUsed: "powerUsed",
     });
 
     const actions: readonly OnlineBettingAction[] = [
@@ -51,11 +61,62 @@ describe("online message vocabulary", () => {
   });
 });
 
+describe("power commands", () => {
+  const pick = { actionId: "a1", handId: 3, powerUpId: "vowel_magnet" };
+  const use = { ...pick, tileId: "t-7" };
+
+  it("validates a pick and a use for every power in the catalog", () => {
+    for (const powerUpId of POWER_UP_IDS) {
+      assert.ok(isOnlinePickPowerAction({ ...pick, powerUpId }), powerUpId);
+      assert.ok(isOnlineUsePowerUpAction({ ...use, powerUpId }), powerUpId);
+    }
+    assert.ok(isGameMessagePayload("pickPower", pick));
+    assert.ok(isGameMessagePayload("usePowerUp", use));
+  });
+
+  it("refuses a command that forges a seat, names no power, or misses its hand", () => {
+    for (const value of [
+      null,
+      { ...pick, playerId: "forged" },
+      { ...pick, powerUpId: "double_down" },
+      { ...pick, powerUpId: undefined },
+      { ...pick, actionId: "" },
+      { ...pick, actionId: 7 },
+      { ...pick, actionId: "x".repeat(POWER_ACTION_ID_MAX_LENGTH + 1) },
+      { ...pick, handId: 0 },
+      { ...pick, handId: 1.5 },
+      { ...pick, handId: "3" },
+    ]) {
+      assert.ok(!isOnlinePickPowerAction(value), JSON.stringify(value));
+      assert.ok(!isOnlineUsePowerUpAction(value && { ...value, tileId: "t-7" }), JSON.stringify(value));
+    }
+  });
+
+  it("needs a tile to use a power on", () => {
+    assert.ok(!isOnlineUsePowerUpAction(pick));
+    assert.ok(!isOnlineUsePowerUpAction({ ...use, tileId: "" }));
+    assert.ok(!isOnlineUsePowerUpAction({ ...use, tileId: 7 }));
+    assert.ok(!isGameMessagePayload("usePowerUp", pick));
+  });
+
+  it("keeps an id at the length limit", () => {
+    const actionId = "x".repeat(POWER_ACTION_ID_MAX_LENGTH);
+    assert.ok(isOnlinePickPowerAction({ ...pick, actionId }));
+  });
+});
+
 describe("online state and rejection shapes", () => {
   it("carries a server clock with every deadline", () => {
     const snapshot: GameTableState = {
       now: 1_000,
-      table: { name: "Test", buyIn: 500, smallBlind: 5, bigBlind: 10, maxSeats: 2 },
+      table: {
+        name: "Test",
+        buyIn: 500,
+        smallBlind: 5,
+        bigBlind: 10,
+        maxSeats: 2,
+        powerUps: { deal: "off" },
+      },
       phase: "preflop",
       sessionOver: false,
       handCount: 1,

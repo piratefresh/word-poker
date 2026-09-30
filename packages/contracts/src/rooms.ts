@@ -9,6 +9,11 @@
  */
 
 import { WAITING_PHASE, isRoomPhase, type RoomPhase } from "./phases";
+import {
+  DEFAULT_POWER_UP_SETTINGS,
+  isPowerUpSettings,
+  type PowerUpSettings,
+} from "./powers";
 
 /** The room name the server registers the felt under and the client joins. */
 export const GAME_ROOM_NAME = "game";
@@ -49,17 +54,22 @@ export function isBuyInPreset(value: unknown): value is BuyInPreset {
 }
 
 /**
- * What a client asks the server to create: a name, §2's fixed buy-in, and §5's seat cap. The
- * blinds are deliberately absent — they are derived from the buy-in, server-side.
+ * What a client asks the server to create: a name, §2's fixed buy-in, §5's seat cap, and §40's
+ * power-up deal mode. The blinds are deliberately absent — they are derived from the buy-in,
+ * server-side.
  */
 export interface GameRoomCreateOptions {
   readonly name: string;
   readonly buyIn: BuyInPreset;
   readonly maxSeats: number;
+  readonly powerUps: PowerUpSettings;
 }
 
 /** Which input a refusal is about, so a form can mark the field. */
-export type RoomCreateField = "name" | "buyIn" | "maxSeats";
+export type RoomCreateField = "name" | "buyIn" | "maxSeats" | "powerUps";
+
+/** The one sentence a malformed power-up setting is refused with. */
+const POWER_UPS_REFUSAL = "Pick Classic or Wild power-ups.";
 
 /** Why a create was refused, and the sentence a form and a server rejection both show. */
 export interface RoomCreateRefusal {
@@ -79,6 +89,9 @@ export type RoomCreateValidation =
  *
  * The name is trimmed before it is measured and the trimmed name is what comes back: a name of
  * spaces is an empty name, and the server stores what the validator approved.
+ *
+ * Power-ups are opt-in (§40): a request that names no `powerUps` is Classic. A setting that is
+ * named has to be one the table can run, and only the keys this version knows are stored.
  */
 export function validateRoomCreateOptions(value: unknown): RoomCreateValidation {
   const candidate = (value ?? {}) as Record<keyof GameRoomCreateOptions, unknown>;
@@ -108,7 +121,15 @@ export function validateRoomCreateOptions(value: unknown): RoomCreateValidation 
     return { ok: false, refusal: { field: "maxSeats", message } };
   }
 
-  return { ok: true, options: { name, buyIn: candidate.buyIn, maxSeats } };
+  const powerUps = candidate.powerUps === undefined ? DEFAULT_POWER_UP_SETTINGS : candidate.powerUps;
+  if (!isPowerUpSettings(powerUps)) {
+    return { ok: false, refusal: { field: "powerUps", message: POWER_UPS_REFUSAL } };
+  }
+
+  return {
+    ok: true,
+    options: { name, buyIn: candidate.buyIn, maxSeats, powerUps: { deal: powerUps.deal } },
+  };
 }
 
 /**
@@ -124,6 +145,8 @@ export interface GameRoomMetadata {
   readonly smallBlind: number;
   readonly bigBlind: number;
   readonly maxSeats: number;
+  /** §40's deal mode, so a card and the pre-join sheet can say Classic or Wild. */
+  readonly powerUps: PowerUpSettings;
   readonly status: RoomPhase;
 }
 
@@ -142,6 +165,7 @@ export function isGameRoomMetadata(value: unknown): value is GameRoomMetadata {
     candidate.smallBlind === blinds.smallBlind &&
     candidate.bigBlind === blinds.bigBlind &&
     typeof candidate.maxSeats === "number" &&
+    isPowerUpSettings(candidate.powerUps) &&
     isRoomPhase(candidate.status)
   );
 }

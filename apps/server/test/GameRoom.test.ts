@@ -968,8 +968,20 @@ describe("GameRoom", () => {
         smallBlind: 5,
         bigBlind: 10,
         maxSeats: 2,
+        powerUps: { deal: "off" },
         status: "waiting",
       });
+    });
+
+    it("publishes a Wild table's deal mode", async () => {
+      const room = await colyseus.createRoom("game", {
+        name: "Wild",
+        buyIn: 500,
+        maxSeats: 2,
+        powerUps: { deal: "choose3" },
+      });
+
+      assert.deepStrictEqual(room.metadata.powerUps, { deal: "choose3" });
     });
 
     it("trims the name it stores", async () => {
@@ -986,6 +998,7 @@ describe("GameRoom", () => {
       ["fewer than two seats", { name: "Table", buyIn: 500, maxSeats: 1 }],
       ["more than six seats", { name: "Table", buyIn: 500, maxSeats: 7 }],
       ["a fractional seat count", { name: "Table", buyIn: 500, maxSeats: 3.5 }],
+      ["a deal mode no table runs", { name: "Table", buyIn: 500, maxSeats: 2, powerUps: { deal: "chaos" } }],
       ["no config at all", {}],
     ] as const) {
       it(`refuses ${what}`, async () => {
@@ -1084,6 +1097,7 @@ describe("GameRoom", () => {
         smallBlind: 50,
         bigBlind: 100,
         maxSeats: 3,
+        powerUps: { deal: "off" },
         status: WAITING_PHASE,
       });
 

@@ -168,8 +168,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       throw new ServerError(ErrorCode.APPLICATION_ERROR, validation.refusal.message);
     }
 
-    const { name, buyIn, maxSeats } = validation.options;
-    this.table = { name, buyIn, ...blindsFor(buyIn), maxSeats };
+    const { name, buyIn, maxSeats, powerUps } = validation.options;
+    this.table = { name, buyIn, ...blindsFor(buyIn), maxSeats, powerUps };
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 

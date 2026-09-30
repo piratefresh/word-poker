@@ -85,6 +85,7 @@ type Listing = {
     smallBlind: number;
     bigBlind: number;
     maxSeats: number;
+    powerUps: { deal: string };
     status: string;
   };
 };
@@ -102,6 +103,7 @@ function table(roomId: string, overrides: Partial<Listing> = {}): Listing {
       smallBlind: 5,
       bigBlind: 10,
       maxSeats: 6,
+      powerUps: { deal: "off" },
       status: WAITING_PHASE,
     },
     ...overrides,
@@ -543,7 +545,12 @@ test("creates the table the form describes and shows it", async () => {
   await pressInSheet(view, "create-table-submit");
 
   await waitFor(() =>
-    expect(create).toHaveBeenCalledWith({ name: "Sunday felt", buyIn: 5_000, maxSeats: 3 }),
+    expect(create).toHaveBeenCalledWith({
+      name: "Sunday felt",
+      buyIn: 5_000,
+      maxSeats: 3,
+      powerUps: { deal: "off" },
+    }),
   );
   await waitFor(() =>
     expect(push).toHaveBeenCalledWith({

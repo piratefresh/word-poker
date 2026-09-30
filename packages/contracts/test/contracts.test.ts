@@ -47,6 +47,7 @@ function actionType(action: OfflineAction): string {
     case "call":
     case "raise":
     case "allIn":
+    case "checkWord":
     case "draftWord":
     case "confirmWord":
     case "timeoutTurn":

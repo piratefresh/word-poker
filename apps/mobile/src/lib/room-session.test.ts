@@ -94,7 +94,12 @@ test("keeps an existing seat when the device creates another table", async () =>
   create.mockResolvedValueOnce(second);
 
   await joinTable("table-1");
-  const roomId = await createTable({ name: "Second table", buyIn: 500, maxSeats: 6 });
+  const roomId = await createTable({
+    name: "Second table",
+    buyIn: 500,
+    maxSeats: 6,
+    powerUps: { deal: "off" },
+  });
 
   expect(roomId).toBe("table-2");
   expect(first.leave).not.toHaveBeenCalled();

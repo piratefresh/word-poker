@@ -10,6 +10,7 @@ import {
   BUY_IN_PRESETS,
   MAX_SEATS,
   MIN_SEATS,
+  POWER_UP_DEAL_MODES,
   blindsFor,
   isGameRoomMetadata,
   roomSummaryFromListing,
@@ -18,7 +19,7 @@ import {
   type GameRoomMetadata,
 } from "../src/index";
 
-const TABLE = { name: "Sunset", buyIn: 5_000, maxSeats: 4 } as const;
+const TABLE = { name: "Sunset", buyIn: 5_000, maxSeats: 4, powerUps: { deal: "off" } } as const;
 
 /** §2's middle preset with the blinds ADR 0004 derives from it. */
 const BLINDS = blindsFor(TABLE.buyIn);
@@ -31,7 +32,7 @@ function listing(overrides: Record<string, unknown> = {}) {
     clients: 2,
     maxClients: 4,
     locked: false,
-    metadata: { name: "Sunset", buyIn: 5_000, ...BLINDS, maxSeats: 4, status: "waiting" },
+    metadata: { ...TABLE, ...BLINDS, status: "waiting" },
     ...overrides,
   };
 }
@@ -92,6 +93,47 @@ describe("validateRoomCreateOptions", () => {
     }
   });
 
+  it("makes a table that names no power-ups Classic", () => {
+    const { powerUps: _named, ...unnamed } = TABLE;
+    const checked = validateRoomCreateOptions(unnamed);
+
+    assert.deepStrictEqual(checked.ok && checked.options.powerUps, { deal: "off" });
+  });
+
+  it("takes every deal mode §40 can run", () => {
+    for (const deal of POWER_UP_DEAL_MODES) {
+      const checked = validateRoomCreateOptions({ ...TABLE, powerUps: { deal } });
+      assert.deepStrictEqual(checked.ok && checked.options.powerUps, { deal });
+    }
+  });
+
+  it("stores only the power-up keys it knows", () => {
+    const checked = validateRoomCreateOptions({
+      ...TABLE,
+      powerUps: { deal: "choose3", frequency: 0.3, pool: ["mulligan"] },
+    });
+
+    assert.deepStrictEqual(checked.ok && checked.options.powerUps, { deal: "choose3" });
+  });
+
+  it("refuses a power-up setting the table cannot run, and names the field", () => {
+    for (const powerUps of [
+      null,
+      "choose3",
+      true,
+      {},
+      { deal: "blindDraw" },
+      { deal: "OFF" },
+      { deal: null },
+      [],
+    ]) {
+      const checked = validateRoomCreateOptions({ ...TABLE, powerUps });
+      assert.strictEqual(checked.ok, false, `powerUps ${JSON.stringify(powerUps)}`);
+      assert.strictEqual(checked.ok === false && checked.refusal.field, "powerUps");
+      assert.ok(checked.ok === false && checked.refusal.message.length > 0);
+    }
+  });
+
   it("refuses anything that is not a create request at all", () => {
     for (const value of [null, undefined, "Table", 7, []]) {
       assert.strictEqual(validateRoomCreateOptions(value).ok, false, JSON.stringify(value));
@@ -102,6 +144,11 @@ describe("validateRoomCreateOptions", () => {
 describe("isGameRoomMetadata", () => {
   it("accepts a table's published config", () => {
     assert.strictEqual(isGameRoomMetadata({ ...TABLE, ...BLINDS, status: "flop" }), true);
+  });
+
+  it("accepts a Wild table's published config", () => {
+    const wild = { ...TABLE, ...BLINDS, powerUps: { deal: "choose3" }, status: "waiting" };
+    assert.strictEqual(isGameRoomMetadata(wild), true);
   });
 
   it("rejects a listing that is not one of our tables", () => {
@@ -116,6 +163,9 @@ describe("isGameRoomMetadata", () => {
       { ...published, smallBlind: 10 },
       { ...published, bigBlind: 20 },
       { ...published, status: undefined },
+      { ...published, powerUps: undefined },
+      { ...published, powerUps: { deal: "chaos" } },
+      { ...published, powerUps: "off" },
     ]) {
       assert.strictEqual(isGameRoomMetadata(value), false, JSON.stringify(value));
     }
@@ -139,7 +189,7 @@ describe("roomSummaryFromListing", () => {
       clients: 2,
       maxClients: 4,
       locked: false,
-      metadata: { name: "Sunset", buyIn: 5_000, ...BLINDS, maxSeats: 4, status: "waiting" },
+      metadata: { ...TABLE, ...BLINDS, status: "waiting" },
     });
   });
 
