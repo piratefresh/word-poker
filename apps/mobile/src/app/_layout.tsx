@@ -1,5 +1,6 @@
 import { Inter_400Regular, Inter_500Medium, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
 import { JetBrainsMono_400Regular, JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono';
+import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
 import { NotoSerif_400Regular, NotoSerif_700Bold, NotoSerif_700Bold_Italic } from '@expo-google-fonts/noto-serif';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
@@ -45,6 +46,7 @@ export default function RootLayout() {
     Inter_800ExtraBold,
     JetBrainsMono_400Regular,
     JetBrainsMono_600SemiBold,
+    LilitaOne_400Regular,
     NotoSerif_400Regular,
     NotoSerif_700Bold,
     NotoSerif_700Bold_Italic,

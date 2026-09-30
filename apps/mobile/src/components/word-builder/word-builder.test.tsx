@@ -1,4 +1,8 @@
-import { fireEvent, render, type RenderResult } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  type RenderResult,
+} from "@testing-library/react-native";
 import type { Tile, TilePlay, WordScore } from "@wordpoker/contracts";
 import { WORD_REJECTION_REASONS } from "@wordpoker/contracts";
 import { useState } from "react";
@@ -6,13 +10,20 @@ import { Pressable, StyleSheet } from "react-native";
 
 import { colors, opacity } from "@/constants/theme";
 
-import { WordBuilder, WordHand, WordPreview, type WordBuilderProps } from "./word-builder";
+import {
+  WordBuilder,
+  WordHand,
+  WordPreview,
+  type WordBuilderProps,
+} from "./word-builder";
 import { WordShuffleButton } from "./shuffle-button";
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
 // and the word tile reads it, so the one hook is layered on here.
 jest.mock("react-native-reanimated", () => ({
-  ...jest.requireActual<Record<string, unknown>>("react-native-reanimated/mock"),
+  ...jest.requireActual<Record<string, unknown>>(
+    "react-native-reanimated/mock",
+  ),
   useReducedMotion: () => false,
 }));
 
@@ -31,7 +42,13 @@ const PRIVATE_TILES: readonly Tile[] = [
 /** The board as a street leaves it: a choice tile, a slot the next street fills, and a
  *  doubled letter. */
 const BOARD: readonly (Tile | null)[] = [
-  { id: "c-ts", letter: "T", points: 1, alternativeLetter: "S", alternativePoints: 1 },
+  {
+    id: "c-ts",
+    letter: "T",
+    points: 1,
+    alternativeLetter: "S",
+    alternativePoints: 1,
+  },
   null,
   { id: "c-l", letter: "L", points: 1, multiplier: "double-letter" },
 ];
@@ -102,8 +119,14 @@ function stripOrder(view: RenderResult): readonly string[] {
 }
 
 /** The letters a draft spells, as the engine would report them: one letter per tile (§10). */
-function spell(community: readonly (Tile | null)[], plays: readonly TilePlay[]): string {
-  const dealt = [...PRIVATE_TILES, ...community.filter((tile) => tile !== null)];
+function spell(
+  community: readonly (Tile | null)[],
+  plays: readonly TilePlay[],
+): string {
+  const dealt = [
+    ...PRIVATE_TILES,
+    ...community.filter((tile) => tile !== null),
+  ];
 
   return plays
     .flatMap((play) => {
@@ -137,19 +160,26 @@ function Rack({ boards }: { boards: readonly (readonly (Tile | null)[])[] }) {
       <WordHand />
       <WordPreview />
       <WordShuffleButton />
-      <Pressable onPress={() => setStreet((at) => at + 1)} testID="next-street" />
+      <Pressable
+        onPress={() => setStreet((at) => at + 1)}
+        testID="next-street"
+      />
     </WordBuilder>
   );
 }
 
 /** Whether the shuffle is armed, as the button reports itself to assistive tech. */
 function shuffleArmed(view: RenderResult): boolean {
-  return view.getByTestId("word-builder-shuffle").props.accessibilityState.disabled !== true;
+  return (
+    view.getByTestId("word-builder-shuffle").props.accessibilityState
+      .disabled !== true
+  );
 }
 
 /** What the draft line paints the score in, which is how it says whether the word will count. */
 function scoreColor(view: RenderResult): string | undefined {
-  return StyleSheet.flatten(view.getByTestId("word-builder-score").props.style).color;
+  return StyleSheet.flatten(view.getByTestId("word-builder-score").props.style)
+    .color;
 }
 
 describe("<WordBuilder />", () => {
@@ -188,34 +218,50 @@ describe("<WordBuilder />", () => {
   });
 
   test("takes a played tile back out on a tap, and reads it as held while it is in", async () => {
-    const { onDraft, view } = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
+    const { onDraft, view } = await renderBuilder({
+      plays: DRAFT,
+      score: SCORE,
+      word: "EL",
+    });
 
     // Held tiles are the lit ones, and they say what a tap would do to them — a choice tile
     // naming the face the word is playing (§39).
-    expect(view.getByTestId("word-builder-tile-p-ae").props.accessibilityLabel).toBe(
-      "A or E, 1 point, playing E, in your word, tap to take it back",
-    );
-    expect(StyleSheet.flatten(view.getByTestId("word-builder-tile-p-ae").props.style).opacity).not.toBe(
-      opacity.muted,
-    );
-    expect(view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel).toBe(
-      "A, 1 point, tap to play it",
-    );
-    expect(StyleSheet.flatten(view.getByTestId("word-builder-tile-p-a").props.style).opacity).toBe(
-      opacity.muted,
-    );
+    expect(
+      view.getByTestId("word-builder-tile-p-ae").props.accessibilityLabel,
+    ).toBe("A or E, 1 point, playing E, in your word, tap to take it back");
+    expect(
+      StyleSheet.flatten(view.getByTestId("word-builder-tile-p-ae").props.style)
+        .opacity,
+    ).not.toBe(opacity.muted);
+    expect(
+      view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel,
+    ).toBe("A, 1 point, tap to play it");
+    expect(
+      StyleSheet.flatten(view.getByTestId("word-builder-tile-p-a").props.style)
+        .opacity,
+    ).toBe(opacity.muted);
 
     await fireEvent.press(view.getByTestId("word-builder-tile-p-ae"));
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "c-l" }]);
   });
 
   test("plays the other face of a choice tile that is already in the word, in place", async () => {
-    const { onDraft, view } = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
+    const { onDraft, view } = await renderBuilder({
+      plays: DRAFT,
+      score: SCORE,
+      word: "EL",
+    });
 
     // The chip the word is playing for is the chosen one, and naming the other face swaps it
     // where it stands: the word is E L, so naming A makes it A L.
-    expect(view.getByTestId("word-builder-face-p-ae-E").props.accessibilityState.selected).toBe(true);
-    expect(view.getByTestId("word-builder-face-p-ae-A").props.accessibilityState.selected).toBe(false);
+    expect(
+      view.getByTestId("word-builder-face-p-ae-E").props.accessibilityState
+        .selected,
+    ).toBe(true);
+    expect(
+      view.getByTestId("word-builder-face-p-ae-A").props.accessibilityState
+        .selected,
+    ).toBe(false);
 
     await fireEvent.press(view.getByTestId("word-builder-face-p-ae-A"));
     expect(onDraft).toHaveBeenCalledWith([
@@ -225,17 +271,33 @@ describe("<WordBuilder />", () => {
   });
 
   test("shows the word and what §7 makes it worth, and what a refused one is worth", async () => {
-    const standing = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
-    expect(standing.view.getByTestId("word-builder-word")).toHaveTextContent("EL");
-    expect(standing.view.getByTestId("word-builder-score")).toHaveTextContent(/· 3pts/);
+    const standing = await renderBuilder({
+      plays: DRAFT,
+      score: SCORE,
+      word: "EL",
+    });
+    expect(standing.view.getByTestId("word-builder-word")).toHaveTextContent(
+      "EL",
+    );
+    expect(standing.view.getByTestId("word-builder-score")).toHaveTextContent(
+      /· 3pts/,
+    );
     expect(standing.view.queryByTestId("word-builder-full-rack")).toBeNull();
     expect(scoreColor(standing.view)).toBe(colors.gold);
 
     // §7.3's bonus is the one part of the score a seat cannot read off the tiles, so the line
     // says where it came from.
-    const rack = await renderBuilder({ plays: DRAFT, score: FULL_RACK, word: "EL" });
-    expect(rack.view.getByTestId("word-builder-score")).toHaveTextContent(/· 13pts/);
-    expect(rack.view.getByTestId("word-builder-full-rack")).toHaveTextContent(/\+10 full rack/);
+    const rack = await renderBuilder({
+      plays: DRAFT,
+      score: FULL_RACK,
+      word: "EL",
+    });
+    expect(rack.view.getByTestId("word-builder-score")).toHaveTextContent(
+      /· 13pts/,
+    );
+    expect(rack.view.getByTestId("word-builder-full-rack")).toHaveTextContent(
+      /\+10 full rack/,
+    );
 
     // A draft §11 refuses scores nothing, and the number is drawn as what it is rather than
     // dropped: the seat is still shaping the word it wants to keep.
@@ -245,9 +307,13 @@ describe("<WordBuilder />", () => {
       score: SCORE,
       word: "EL",
     });
-    expect(refused.view.getByTestId("word-builder-score")).toHaveTextContent(/· 3pts/);
+    expect(refused.view.getByTestId("word-builder-score")).toHaveTextContent(
+      /· 3pts/,
+    );
     expect(scoreColor(refused.view)).toBe(colors.textFaint);
-    expect(refused.view.getByRole("alert")).toHaveTextContent("Not in the dictionary");
+    expect(refused.view.getByRole("alert")).toHaveTextContent(
+      "Not in the dictionary",
+    );
   });
 
   test("shuffles the tiles the word does not hold, among the places they hold", async () => {
@@ -255,7 +321,11 @@ describe("<WordBuilder />", () => {
     // shuffle is the same rearrangement every run and the order can be read off the screen.
     const random = jest.spyOn(Math, "random").mockReturnValue(0);
     try {
-      const { onDraft, view } = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
+      const { onDraft, view } = await renderBuilder({
+        plays: DRAFT,
+        score: SCORE,
+        word: "EL",
+      });
       // Each tile sits where it was dealt: the word is p-ae and c-l, but neither jumps the strip.
       expect(stripOrder(view)).toEqual(["p-a", "p-ae", "c-ts", "c-l"]);
 
@@ -275,7 +345,11 @@ describe("<WordBuilder />", () => {
     // shuffle is the same rearrangement every run and the order can be read off the screen.
     const random = jest.spyOn(Math, "random").mockReturnValue(0);
     try {
-      const view = await render(<Rack boards={[BOARD, [...BOARD, { id: "c-z", letter: "Z", points: 10 }]]} />);
+      const view = await render(
+        <Rack
+          boards={[BOARD, [...BOARD, { id: "c-z", letter: "Z", points: 10 }]]}
+        />,
+      );
 
       await fireEvent.press(view.getByTestId("word-builder-shuffle"));
       expect(stripOrder(view)).toEqual(["p-ae", "c-ts", "c-l", "p-a"]);
@@ -296,17 +370,17 @@ describe("<WordBuilder />", () => {
 
     // The strip's edits go back to the screen that owns the draft, and what comes back is the
     // draft the engine judged: the tile is the word's now, and the line says what it spells.
-    expect(view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel).toBe(
-      "A, 1 point, in your word, tap to take it back",
-    );
+    expect(
+      view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel,
+    ).toBe("A, 1 point, in your word, tap to take it back");
     expect(view.getByTestId("word-builder-word")).toHaveTextContent("A");
     expect(view.getByTestId("word-preview")).toBeOnTheScreen();
     expect(stripOrder(view)[0]).toBe("p-a");
 
     await fireEvent.press(view.getByTestId("word-builder-tile-p-a"));
-    expect(view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel).toBe(
-      "A, 1 point, tap to play it",
-    );
+    expect(
+      view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel,
+    ).toBe("A, 1 point, tap to play it");
     // The word is gone with the tile, and so is the line that was reading it.
     expect(view.queryByTestId("word-preview")).toBeNull();
   });
@@ -350,17 +424,17 @@ describe("<WordBuilder />", () => {
   test("arms the shuffle while there is something left to rearrange", async () => {
     // With every tile but one in the word, a shuffle has nowhere to deal: the button says so.
     const tight = await renderBuilder({
-      plays: [
-        { tileId: "p-a" },
-        { tileId: "p-ae" },
-        { tileId: "c-ts" },
-      ],
+      plays: [{ tileId: "p-a" }, { tileId: "p-ae" }, { tileId: "c-ts" }],
       score: SCORE,
       word: "AE",
     });
     expect(shuffleArmed(tight.view)).toBe(false);
 
-    const loose = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
+    const loose = await renderBuilder({
+      plays: DRAFT,
+      score: SCORE,
+      word: "EL",
+    });
     expect(shuffleArmed(loose.view)).toBe(true);
   });
 
@@ -368,16 +442,28 @@ describe("<WordBuilder />", () => {
     ["not-in-dictionary", "Not in the dictionary"],
     ["timer-expired", "The window closed"],
     ["tile-reused", "Each tile plays once"],
-  ] as const)("reads the %s refusal as a line, not a wire string", async (reason, copy) => {
-    const { view } = await renderBuilder({ reason, score: SCORE, word: "EL" });
+  ] as const)(
+    "reads the %s refusal as a line, not a wire string",
+    async (reason, copy) => {
+      const { view } = await renderBuilder({
+        reason,
+        score: SCORE,
+        word: "EL",
+      });
 
-    expect(view.getByRole("alert")).toHaveTextContent(copy);
-    expect(view.queryByText(reason)).toBeNull();
-  });
+      expect(view.getByRole("alert")).toHaveTextContent(copy);
+      expect(view.queryByText(reason)).toBeNull();
+    },
+  );
 
   test("has copy for every reason the contract can send", async () => {
     for (const reason of WORD_REJECTION_REASONS) {
-      const { view } = await renderBuilder({ plays: DRAFT, reason, score: SCORE, word: "EL" });
+      const { view } = await renderBuilder({
+        plays: DRAFT,
+        reason,
+        score: SCORE,
+        word: "EL",
+      });
       const line = view.getByTestId("word-builder-reason").props.children;
 
       expect(typeof line).toBe("string");
@@ -387,7 +473,11 @@ describe("<WordBuilder />", () => {
   });
 
   test("says nothing about a draft that still stands", async () => {
-    const { view } = await renderBuilder({ plays: DRAFT, score: SCORE, word: "EL" });
+    const { view } = await renderBuilder({
+      plays: DRAFT,
+      score: SCORE,
+      word: "EL",
+    });
     expect(view.queryByRole("alert")).toBeNull();
   });
 });

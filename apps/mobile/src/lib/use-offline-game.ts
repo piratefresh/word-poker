@@ -27,7 +27,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { OfflineAction, PlayerId, TilePlay, WordRejectionReason } from "@wordpoker/contracts";
+import type {
+  OfflineAction,
+  PlayerId,
+  PrivateWordCheckState,
+  TilePlay,
+  WordRejectionReason,
+} from "@wordpoker/contracts";
+import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import {
   BettingRejectionError,
   DEFAULT_STAKES,
@@ -78,6 +85,8 @@ export interface OfflineGame {
    * every mode's: the seated table's adapter maps its socket into the same shape.
    */
   words: WordDraft | null;
+  /** The hero's private quota and latest explicit dictionary result. */
+  wordCheck: PrivateWordCheckState;
   /**
    * The settled hand as the results screen renders it, or `null` while no hand has paid out.
    * Mapped off the engine's own numbers — §7's score, §21's order, §25's pots — and handed to
@@ -111,6 +120,8 @@ export interface OfflineGame {
   setDraft: (plays: readonly TilePlay[]) => void;
   /** Confirms the hero's draft as its word (§19). */
   confirmWord: () => void;
+  /** Checks the current draft against this hand's dictionary using one private attempt. */
+  checkWord: () => void;
   /**
    * A chip flight that has landed, so the felt stops drawing it. The layer over the table
    * reports its own flight's id when the chips are down; a new hand drops whatever is still in
@@ -298,7 +309,7 @@ export function useOfflineGame({
     }, duration.cpuBeat);
 
     return () => clearTimeout(timer);
-  }, [act, state]);
+  }, [act, state.endsAtMs, state.phase, state.seats, state.toActIndex, state.wordWindow]);
 
   const deal = useCallback(() => {
     if (state.sessionOver) return;
@@ -388,6 +399,11 @@ export function useOfflineGame({
     act({ type: "confirmWord", playerId: HERO_ID, submission: { plays: [...heroDraft] } });
   }, [act, heroDraft, state]);
 
+  const checkWord = useCallback(() => {
+    if (heroDraft.length < 2 || heroDraft.length > 7) return;
+    act({ type: "checkWord", playerId: HERO_ID, submission: { plays: [...heroDraft] } });
+  }, [act, heroDraft]);
+
   // §19's clock belongs to the table, not to the hero's taps: a window that runs out with a
   // seat still drafting settles on its own, a beat after the deadline so the engine reads the
   // clock as run out rather than a millisecond early.
@@ -475,6 +491,7 @@ export function useOfflineGame({
   return {
     game,
     words: view.words,
+    wordCheck: view.wordCheck,
     results,
     deal,
     fold,
@@ -487,6 +504,7 @@ export function useOfflineGame({
     wager,
     setDraft,
     confirmWord,
+    checkWord,
     endChipFlight,
     sessionOver: game.sessionOver,
     newGame,
@@ -685,6 +703,11 @@ function perspectiveOf(
       hero: slot?.status ?? null,
       confirmedPlays: slot?.status === "confirmed" ? slot.submission.plays : null,
     },
+    wordCheck:
+      state.wordChecks[HERO_ID] ?? {
+        checksRemaining: WORD_CHECKS_PER_HAND,
+        result: null,
+      },
     result: state.result,
     sidePots: state.result?.payout.pots.slice(1).map((pot) => pot.amount) ?? [],
     // The session ends when the table cannot seat a hand any more, and for this screen also when

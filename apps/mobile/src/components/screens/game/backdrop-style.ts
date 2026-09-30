@@ -1,15 +1,29 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
 
-/** Which mesh backdrop the table draws: the painted emerald felt or the original gold ember. */
-export type BackdropStyle = "emerald" | "ember";
+/**
+ * Which backdrop the table draws: a mesh look — the painted emerald felt or the original gold
+ * ember — or one of the repeatable pictures in `assets/images/ui/bgs`, tiled across the room.
+ */
+export const BACKDROP_STYLES = ["emerald", "ember", "wood", "fire", "water"] as const;
+export type BackdropStyle = (typeof BACKDROP_STYLES)[number];
+
+/** The gear's picker names each look by these. */
+export const BACKDROP_LABEL: Record<BackdropStyle, string> = {
+  emerald: "Emerald mesh",
+  ember: "Ember mesh",
+  wood: "Wood (tiled)",
+  fire: "Fire (tiled)",
+  water: "Water room",
+};
 
 // A module-level store rather than props: on the web the backdrop mounts lazily behind
 // `WithSkiaWeb`, and the choice should outlive one table for the rest of the session.
 let current: BackdropStyle = "emerald";
 const listeners = new Set<() => void>();
 
-export function toggleBackdropStyle(): void {
-  current = current === "emerald" ? "ember" : "emerald";
+export function setBackdropStyle(style: BackdropStyle): void {
+  if (style === current) return;
+  current = style;
   for (const listener of listeners) listener();
 }
 

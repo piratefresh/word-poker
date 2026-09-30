@@ -234,9 +234,9 @@ describe("<OfflineGameScreen />", () => {
 
     // The pinned hand posts 10 / 20 and then raises to 60, so the felt states a real call and a
     // real pot — the numbers the engine counted, not a placeholder row.
-    expect(control(view, "action-check-call").getByText("CALL $60")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
     expect(view.getByTestId("pot")).toHaveTextContent(/\$90/);
-    expect(view.getByText("ALL IN · $1,000")).toBeOnTheScreen();
+    expect(control(view, "all-in-button").getByText("ALL IN")).toBeOnTheScreen();
   });
 
   test("deals its own drawn hand for a table the URL does not pin", async () => {
@@ -279,8 +279,8 @@ describe("<OfflineGameScreen />", () => {
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
     expect(control(view, "action-fold").getByText("FOLD")).toBeOnTheScreen();
-    expect(control(view, "action-check-call").getByText("CALL $60")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("RAISE $100")).toBeOnTheScreen();
+    expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("$100")).toBeOnTheScreen();
     expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
@@ -356,7 +356,7 @@ describe("<OfflineGameScreen />", () => {
     // opening bet rather than a raise: the same slider, and the other engine action.
     for (let street = 0; street < 3; street += 1) await takeTurn(view);
     expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("BET $20")).toBeOnTheScreen();
+    expect(control(view, "action-wager").getByText("$20")).toBeOnTheScreen();
 
     const before = potAmount(view);
     await fireEvent.press(view.getByTestId("action-wager"));

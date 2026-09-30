@@ -5,12 +5,26 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
-import { ActionButton } from "@/components/screens/game/game-primitives";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
-import { WordBuilder, WordHand, WordPreview, WordShuffleButton } from "@/components/word-builder";
-import { border, colors, fonts, palette, radius, spacing, type } from "@/constants/theme";
+import { GameButton } from "@/components/ui/game-button";
+import {
+  WordBuilder,
+  WordCheckButton,
+  WordHand,
+  WordPreview,
+  WordShuffleButton,
+} from "@/components/word-builder";
+import {
+  border,
+  colors,
+  fonts,
+  palette,
+  radius,
+  spacing,
+  type,
+} from "@/constants/theme";
 import { pinnedSeed, randomSeed } from "@/lib/offline-seed";
 import { useDictionary } from "@/lib/use-dictionary";
 import { useOfflineGame } from "@/lib/use-offline-game";
@@ -84,8 +98,22 @@ function OfflineTable({
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
-  const { game, words, results, deal, fold, primary, allIn, wager, setDraft, endChipFlight, sessionOver, newGame } =
-    useOfflineGame({ seed, dictionary, turnDurationMs });
+  const {
+    game,
+    words,
+    wordCheck,
+    results,
+    deal,
+    fold,
+    primary,
+    allIn,
+    wager,
+    setDraft,
+    checkWord,
+    endChipFlight,
+    sessionOver,
+    newGame,
+  } = useOfflineGame({ seed, dictionary, turnDurationMs });
   const payout = game.phase === "payout";
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
@@ -101,6 +129,8 @@ function OfflineTable({
     // it keeps the draft. One hand, one row.
     <WordBuilder
       community={game.community}
+      wordCheck={wordCheck}
+      onCheckWord={checkWord}
       confirmable={words?.confirmable ?? false}
       confirmed={words?.confirmed ?? false}
       onDraft={setDraft}
@@ -114,6 +144,7 @@ function OfflineTable({
       <View style={styles.table}>
         <GameScreen
           bettingLeading={<WordShuffleButton />}
+          bettingSlider={<WordCheckButton />}
           game={game}
           onAllIn={allIn}
           // The wager slider names its own action, and `wager` dispatches the one it names: BET
@@ -163,7 +194,10 @@ function SessionOver({
   return (
     <Modal animationType="fade" transparent visible>
       <View style={styles.overlayBackdrop}>
-        <View style={[styles.overlay, { marginBottom: insets.bottom }]} testID="session-over">
+        <View
+          style={[styles.overlay, { marginBottom: insets.bottom }]}
+          testID="session-over"
+        >
           <Text style={styles.overlayTitle}>SESSION OVER</Text>
           <View style={styles.overlaySeats}>
             {game.players.map((player) =>
@@ -174,7 +208,12 @@ function SessionOver({
               ) : null,
             )}
           </View>
-          <ActionButton gold label="NEW GAME" onPress={onNewGame} testID="new-game-button" />
+          <GameButton
+            label="NEW GAME"
+            onPress={onNewGame}
+            testID="new-game-button"
+            variant="gold"
+          />
         </View>
       </View>
     </Modal>

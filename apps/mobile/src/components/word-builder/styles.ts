@@ -1,6 +1,15 @@
 import { StyleSheet } from "react-native";
 
-import { border, colors, fonts, fontSize, opacity, radius, spacing, type } from "@/constants/theme";
+import {
+  border,
+  colors,
+  fonts,
+  fontSize,
+  opacity,
+  radius,
+  spacing,
+  type,
+} from "@/constants/theme";
 
 /**
  * The builder's sheet, in one place because the draft line, the strip, and the shuffle are one
@@ -11,10 +20,84 @@ import { border, colors, fonts, fontSize, opacity, radius, spacing, type } from 
 export const styles = StyleSheet.create({
   // The draft line above the rack: centred over the strip, with the felt behind it, and no
   // sheet of its own — the line is all it is.
+  // A fixed slot above the rack that the line floats in, so a first letter never adds height to the
+  // column: the table above would otherwise shrink the moment a tile is played.
+  previewAnchor: { height: 48, zIndex: 2 },
+  // Small screens: room for the word and its points on two lines, taken from the table above.
+  previewAnchorTight: { height: 36 },
+  // The points sit right under the word rather than a gap below it.
+  previewRowTight: { gap: 0, paddingBottom: 0 },
+  // Line boxes as tall as the type, so the points sit under the word and not a line below it.
+  wordTight: { lineHeight: 22 },
+  scoreTight: { lineHeight: 13 },
+  // A step lower: the rack rides closer to the action row.
+  stripTight: { top: 6 },
   previewRow: {
     alignItems: "center",
-    gap: spacing.xxs,
-    paddingVertical: spacing.xxs,
+    bottom: 0,
+    gap: spacing.sm,
+    left: 0,
+    paddingBottom: spacing.sm,
+    position: "absolute",
+    right: 0,
+  },
+  lettersLabel: {
+    ...type.label,
+    color: colors.textFaint,
+    fontSize: fontSize.caption,
+    letterSpacing: 1,
+  },
+  previewLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: spacing.lg,
+    rowGap: spacing.sm,
+    justifyContent: "center",
+    width: "100%",
+  },
+  previewContent: { alignItems: "center", flexShrink: 1 },
+  previewEmpty: { color: colors.textFaint, fontSize: fontSize.small },
+  checkedResult: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  checkedValid: {
+    color: colors.success,
+    fontFamily: fonts.sansMedium,
+    fontSize: fontSize.small,
+  },
+  checkedInvalid: {
+    color: colors.danger,
+    fontFamily: fonts.sansMedium,
+    fontSize: fontSize.small,
+  },
+  checkedPoints: {
+    ...type.numeric,
+    color: colors.success,
+    fontSize: fontSize.small,
+  },
+  checkNotice: {
+    backgroundColor: colors.surfaceStrong,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    borderWidth: border.hairline,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  checkNoticePressed: { opacity: opacity.pressed },
+  checkNoticeText: {
+    color: colors.textBright,
+    fontFamily: fonts.sansMedium,
+    fontSize: fontSize.caption,
+  },
+  checkLiveRegion: {
+    height: 1,
+    opacity: 0,
+    overflow: "hidden",
+    position: "absolute",
+    width: 1,
   },
   preview: {
     alignItems: "baseline",
@@ -67,18 +150,4 @@ export const styles = StyleSheet.create({
     fontFamily: fonts.monoBold,
     fontSize: fontSize.caption,
   },
-  // The shuffle, at the felt's action row start: the same height as the action buttons beside
-  // it, square, with only the icon drawn — the row reads as one control strip.
-  shuffle: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceStrong,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: border.hairline,
-    height: 48,
-    justifyContent: "center",
-    width: 48,
-  },
-  shuffleSpent: { opacity: opacity.disabled },
-  shufflePressed: { opacity: opacity.pressed },
 });

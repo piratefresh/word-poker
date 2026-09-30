@@ -31,8 +31,11 @@ function feedbackFor(kind: HapticKind): Promise<void> {
     );
   }
 
-  if (kind === "success") return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  if (kind === "success")
+    return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   return Haptics.impactAsync(
-    kind === "lift" ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Soft,
+    kind === "lift"
+      ? Haptics.ImpactFeedbackStyle.Light
+      : Haptics.ImpactFeedbackStyle.Soft,
   );
 }

@@ -1,23 +1,28 @@
 import type {
+  PrivateWordCheckState,
   Tile as TileData,
   TilePlay,
   WordRejectionReason,
   WordScore,
 } from "@wordpoker/contracts";
+import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import type { JSX, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { View } from "react-native";
+import { AccessibilityInfo, Platform, Text, View } from "react-native";
 
+import { GameButton } from "@/components/ui/game-button";
+
+import { useCompactControls } from "@/components/screens/game/screen-scale";
 import { DraftLine } from "./draft-line";
-import { styles } from "./styles";
 import {
-  TileStrip,
   inStripOrder,
   sameDraft,
   shuffleUnheld,
+  TileStrip,
   useStripOrder,
   type StripEntry,
 } from "./strip";
+import { styles } from "./styles";
 
 /**
  * The draft as §19's window holds it, and the shape every mode's adapter speaks.
@@ -34,7 +39,7 @@ export interface WordDraft {
   readonly word: string;
   /** §7's score for the draft as it stands, or null while it does not spell a word yet. */
   readonly score: WordScore | null;
-  /** Why the draft would be refused if confirmed now (§11), or null while it would stand. */
+  /** Why the draft cannot be built from the available tiles, or null while it can. */
   readonly reason: WordRejectionReason | null;
   /** True once the seat confirmed: the word is locked and no control is live (§19). */
   readonly confirmed: boolean;
@@ -88,6 +93,10 @@ export interface WordBuilderProps extends WordDraft {
   privateTiles: readonly TileData[];
   /** The board as it shows; unrevealed slots are null, and bring no tile to the strip yet. */
   community: readonly (TileData | null)[];
+  /** Private server/engine quota and latest explicit lookup. */
+  wordCheck?: PrivateWordCheckState;
+  /** Runs the current draft through the mode's authoritative check path. */
+  onCheckWord?: () => void;
   /** The draft the seat has built, as one submission: the engine judges the whole of it (§19). */
   onDraft: (plays: readonly TilePlay[]) => void;
   /** The felt and the panel, in whatever places the mode draws them. */
@@ -101,6 +110,8 @@ export interface WordBuilderScope {
   readonly live: boolean;
   readonly sortable: boolean;
   readonly draft: WordDraft;
+  readonly wordCheck?: PrivateWordCheckState;
+  readonly onCheckWord?: () => void;
   readonly canShuffle: boolean;
   readonly toggle: (entry: StripEntry, face?: string) => void;
   readonly reorder: (orderedIds: readonly string[]) => void;
@@ -116,7 +127,9 @@ const Scope = createContext<WordBuilderScope | null>(null);
 export function useWordBuilderScope(): WordBuilderScope {
   const scope = useContext(Scope);
   if (scope === null) {
-    throw new Error("the word builder's hand and panel render inside <WordBuilder>");
+    throw new Error(
+      "the word builder's hand and panel render inside <WordBuilder>",
+    );
   }
   return scope;
 }
@@ -136,6 +149,8 @@ export function WordBuilder({
   confirmable,
   privateTiles,
   community,
+  wordCheck,
+  onCheckWord,
   onDraft,
   children,
 }: WordBuilderProps): JSX.Element {
@@ -187,14 +202,18 @@ export function WordBuilder({
           : { tileId: entry.tile.id, chosenFace: playing };
 
       if (inWord && face === undefined) {
-        onDraft(plays.filter((candidate) => candidate.tileId !== entry.tile.id));
+        onDraft(
+          plays.filter((candidate) => candidate.tileId !== entry.tile.id),
+        );
         return;
       }
 
       if (inWord) {
         // The same tile playing its other face keeps the place it holds in the word.
         onDraft(
-          plays.map((candidate) => (candidate.tileId === entry.tile.id ? play : candidate)),
+          plays.map((candidate) =>
+            candidate.tileId === entry.tile.id ? play : candidate,
+          ),
         );
         return;
       }
@@ -238,6 +257,8 @@ export function WordBuilder({
     live,
     sortable,
     draft: { plays, word, score, reason, confirmed, open, confirmable },
+    wordCheck,
+    onCheckWord,
     canShuffle: live && rest.length > 1,
     toggle,
     reorder,
@@ -252,7 +273,8 @@ export function WordBuilder({
  * already are.
  */
 export function WordHand(): JSX.Element {
-  const { strip, held, live, sortable, toggle, reorder } = useWordBuilderScope();
+  const { strip, held, live, sortable, toggle, reorder } =
+    useWordBuilderScope();
 
   return (
     <TileStrip
@@ -275,12 +297,103 @@ export function WordHand(): JSX.Element {
  * there is a word or a refusal to show.
  */
 export function WordPreview(): JSX.Element | null {
-  const { draft } = useWordBuilderScope();
-  if (draft.word.length === 0 && draft.reason === null) return null;
+  const { draft, wordCheck } = useWordBuilderScope();
+  const tight = useCompactControls();
+
+  const result = wordCheck?.result ?? null;
+  const checkedResult =
+    result !== null && sameSubmission(result.submission.plays, draft.plays)
+      ? result
+      : null;
+
+  // The slot is kept while the line is empty, so the first letter played does not move the felt.
+  if (draft.word.length === 0 && draft.reason === null)
+    return (
+      <View
+        style={[styles.previewAnchor, tight && styles.previewAnchorTight]}
+      />
+    );
 
   return (
-    <View style={styles.previewRow} testID="word-preview">
-      <DraftLine reason={draft.reason} score={draft.score} word={draft.word} />
+    <View style={[styles.previewAnchor, tight && styles.previewAnchorTight]}>
+      <View
+        style={[styles.previewRow, tight && styles.previewRowTight]}
+        testID="word-preview"
+      >
+        <View style={styles.previewLine}>
+          <View style={styles.previewContent}>
+            <Text
+              style={[styles.word, tight && styles.wordTight]}
+              testID="word-builder-word"
+            >
+              {draft.word}
+            </Text>
+          </View>
+        </View>
+        <DraftLine
+          checkedResult={checkedResult}
+          reason={draft.reason}
+          score={draft.score}
+          word={draft.word}
+        />
+      </View>
     </View>
   );
+}
+
+/**
+ * The explicit dictionary lookup, for the felt's bet row (`GameScreen`'s `bettingSlider` prop):
+ * it sits beside the slider, and draws nothing in a mode without a check path.
+ */
+export function WordCheckButton(): JSX.Element | null {
+  const { draft, wordCheck, onCheckWord } = useWordBuilderScope();
+
+  const remaining = wordCheck?.checksRemaining ?? 0;
+  const canCheck =
+    onCheckWord !== undefined &&
+    wordCheck !== undefined &&
+    draft.open &&
+    !draft.confirmed &&
+    draft.word.length >= 2 &&
+    draft.word.length <= 7 &&
+    remaining > 0;
+
+  // `canCheck` mirrors the adapters' own guards, so a press that gets this far spends a check:
+  // the count left is known here, without waiting for the result to come back.
+  const handleCheck = () => {
+    onCheckWord?.();
+    if (Platform.OS !== "ios") return;
+    const left = remaining - 1;
+    AccessibilityInfo.announceForAccessibility(
+      left === 0
+        ? "No checks remaining this hand."
+        : `You have ${left} check${left === 1 ? "" : "s"} remaining.`,
+    );
+  };
+
+  if (onCheckWord === undefined) return null;
+
+  return (
+    <GameButton
+      disabled={!canCheck}
+      label={`CHECK ${remaining}/${WORD_CHECKS_PER_HAND}`}
+      onPress={handleCheck}
+      style={{ height: 32 }}
+      testID="word-check-button"
+    />
+  );
+}
+
+function sameSubmission(
+  left: readonly TilePlay[],
+  right: readonly TilePlay[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((play, index) => {
+    const candidate = right[index];
+    return (
+      candidate?.tileId === play.tileId &&
+      candidate?.chosenFace === play.chosenFace
+    );
+  });
 }

@@ -133,7 +133,7 @@ test("hands a pressed action on to its handler", async () => {
 
   // The hero owes the fixture's bet, so the row's second control is the call.
   await fireEvent.press(view.getByText("FOLD"));
-  await fireEvent.press(view.getByText("CALL $20"));
+  await fireEvent.press(view.getByTestId("action-check-call"));
 
   expect(onFold).toHaveBeenCalledTimes(1);
   expect(onCheckOrCall).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ test("calls the wager action the button is labelled with", async () => {
   const view = await renderScreen({ onBet, onRaise });
 
   // Facing a bet, the slider raises: the amount is the round total it would raise to.
-  await fireEvent.press(view.getByText("RAISE $40"));
+  await fireEvent.press(view.getByTestId("action-wager"));
   expect(onRaise).toHaveBeenCalledWith(40);
   expect(onBet).not.toHaveBeenCalled();
 
@@ -172,7 +172,7 @@ test("calls the wager action the button is labelled with", async () => {
     />,
   );
 
-  await fireEvent.press(view.getByText("BET $20"));
+  await fireEvent.press(view.getByTestId("action-wager"));
   expect(onBet).toHaveBeenCalledWith(20);
   expect(onRaise).toHaveBeenCalledTimes(1);
 });
@@ -181,8 +181,8 @@ test("asks before committing the whole stack, and only commits on the confirm", 
   const onAllIn = jest.fn();
   const view = await renderScreen({ onAllIn });
 
-  // The button states the exact amount §22 commits, and opens the felt's own sheet.
-  expect(view.getByText("ALL IN · $980")).toBeOnTheScreen();
+  // The button is a bare action; the sheet it opens states the exact amount §22 commits.
+  expect(view.getByText("ALL IN")).toBeOnTheScreen();
   await fireEvent.press(view.getByTestId("all-in-button"));
   expect(view.getByTestId("all-in-sheet")).toBeOnTheScreen();
   expect(view.getByText("Commits your entire Table Stack.")).toBeOnTheScreen();

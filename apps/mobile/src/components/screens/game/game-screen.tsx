@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import { useCallback, useState, type ReactNode } from "react";
 import {
   Modal,
-  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -15,16 +14,33 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   Hud,
-  HUD_CHROME_HEIGHT,
   TurnClockProvider,
   useTurnClock,
   useTurnTimer,
+  useHudChromeHeight,
   type BalanceView,
 } from "@/components/hud";
 import { ChipLayer, PokerTable, type SeatSlot } from "@/components/table";
-import { colors, fonts, layout, opacity, palette, radius, border } from "@/constants/theme";
+import { GameButton } from "@/components/ui/game-button";
+import { formatCompactAmount } from "./format-amount";
 import {
-  ActionButton,
+  border,
+  colors,
+  fonts,
+  opacity,
+  palette,
+  radius,
+} from "@/constants/theme";
+import { ActionBarShade } from "./action-bar-shade";
+import { BackdropPicker } from "./backdrop-picker";
+import { BackdropUrgencyProvider } from "./backdrop-style";
+import {
+  stageMaxWidth,
+  tableMaxWidth,
+  useCompactControls,
+  useScreenScale,
+} from "./screen-scale";
+import {
   BestWord,
   CommunityStrip,
   PlayerRack,
@@ -38,7 +54,7 @@ import {
   turnKey,
 } from "./game-screen-hud";
 import type { BettingState, GamePlayer, GameScreenState } from "./game-types";
-import { BackdropUrgencyProvider, toggleBackdropStyle } from "./backdrop-style";
+import { playerSeatBounds, tableSeating } from "./seat-metrics";
 import { TableBackdrop } from "./table-backdrop";
 
 export interface GameScreenProps {
@@ -55,6 +71,8 @@ export interface GameScreenProps {
    * row of its own.
    */
   bettingLeading?: ReactNode;
+  /** A mode's own control at the end of the bet slider's row: the word builder's word check. */
+  bettingSlider?: ReactNode;
   onBack?: () => void;
   onHelp?: () => void;
   onSettings?: () => void;
@@ -103,6 +121,7 @@ function GameScreenBody({
   game,
   rack,
   bettingLeading,
+  bettingSlider,
   onBack,
   onHelp,
   onSettings,
@@ -117,18 +136,33 @@ function GameScreenBody({
   waiting,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const hudHeight = useHudChromeHeight();
+  const [backdropOpen, setBackdropOpen] = useState(false);
+  const window = useWindowDimensions();
+  const { height } = window;
+  const stageWidth = stageMaxWidth(window);
+  const tableWidth = tableMaxWidth(window);
+  const shadeFeather = 28 * useScreenScale();
+  const [barHeight, setBarHeight] = useState(0);
   const compact = height - insets.top - insets.bottom < 690;
+  const tight = useCompactControls();
   // The slider's amount belongs to the round, not to the screen: a new street — or a bet the
   // hero has to answer — moves the raise floor, and an amount left over from the last round
   // would offer a raise the engine refuses. Keying on the bounds re-seeds the amount exactly
   // when they move, not while the seat is dragging.
   const boundsKey = `${game.betting.minRaise}:${game.betting.maxRaise}`;
-  const [raise, setRaise] = useState({ key: boundsKey, amount: game.betting.raiseAmount });
-  if (raise.key !== boundsKey) setRaise({ key: boundsKey, amount: game.betting.raiseAmount });
+  const [raise, setRaise] = useState({
+    key: boundsKey,
+    amount: game.betting.raiseAmount,
+  });
+  if (raise.key !== boundsKey)
+    setRaise({ key: boundsKey, amount: game.betting.raiseAmount });
   const raiseAmount = Math.max(
     game.betting.minRaise,
-    Math.min(Math.max(game.betting.maxRaise, game.betting.minRaise), raise.amount),
+    Math.min(
+      Math.max(game.betting.maxRaise, game.betting.minRaise),
+      raise.amount,
+    ),
   );
   // The shared clock's reading, not a fresh clock read: a deadline derived from a new
   // sample during render would land on a slightly different timeline than the one the
@@ -164,38 +198,79 @@ function GameScreenBody({
   // press takes: `canBet` names it BET, and the same fact picks the engine action behind it. A
   // mode that armed the control for a bet is told it was a bet — nothing re-derives it.
   const commitWager = game.betting.canBet ? onBet : onRaise;
+  const seating = tableSeating(game.seatCount);
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
-      <BackdropUrgencyProvider value={waiting || view.paused ? 0 : view.elapsedFraction}>
+      <BackdropUrgencyProvider
+        value={waiting || view.paused ? 0 : view.elapsedFraction}
+      >
         <TableBackdrop />
       </BackdropUrgencyProvider>
+      {/* The painted shadow the action bar sits on: full screen width so it has no side edges,
+          running to the bottom of the screen under the home-indicator inset, and it fades out
+          `shadeFeather` above the bar. Under the content layer, and it takes no touches. */}
+      {barHeight > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.barShade,
+            { height: barHeight + insets.bottom + shadeFeather },
+          ]}
+        >
+          <ActionBarShade feather={shadeFeather} />
+        </View>
+      ) : null}
+      {/* Above the HUD, so the community label reads over the timer banner's hanging tip; the
+          layer takes no touches of its own, so the HUD's buttons stay pressable. */}
       <View
+        pointerEvents="box-none"
         style={[
           styles.content,
           {
+            maxWidth: stageWidth,
             paddingBottom: insets.bottom,
-            paddingTop: insets.top + HUD_CHROME_HEIGHT,
+            paddingTop: insets.top + hudHeight,
           },
         ]}
       >
         <CommunityStrip tiles={game.community} />
         <View
-          style={[styles.tableRegion, compact && styles.tableRegionCompact]}
+          style={[
+            styles.tableRegion,
+            compact && styles.tableRegionCompact,
+            tight && tableWidth === undefined && styles.tableRegionTight,
+            tableWidth !== undefined && {
+              alignSelf: "center",
+              maxWidth: tableWidth,
+              width: "100%",
+            },
+          ]}
         >
           <PokerTable
-            chromeInset={compact ? 36 : 42}
             community={[]}
             hud={
               // The chips in flight go over the felt, inside the table's own layout provider: the
               // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
               <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
             }
-            layoutConfig={{ seatRadius: { x: 0.98, y: 0.96 }, potY: 0.5 }}
-            railWidth={3}
+            // The table runs to the room's edges.
+            chromeInset={0}
+            layoutConfig={seating.layoutConfig}
             renderCommunity={() => null}
-            renderPot={() => <Pot amount={game.pot} sidePots={game.sidePots} blinds={game.blinds} />}
+            renderPot={({ size }) => (
+              <Pot
+                amount={game.pot}
+                sidePots={game.sidePots}
+                blinds={game.blinds}
+                tableWidth={size.width}
+              />
+            )}
             renderSeat={(slot) => <Seat onPress={onSeatPress} slot={slot} />}
+            // The seats scale with the felt and, at up to four, sit inside the table — avatars
+            // on the felt, labels at most on the rail — so the table fills its room.
+            seatBounds={playerSeatBounds}
+            seatPlacement={seating.seatPlacement}
             seatCount={game.seatCount}
             seats={game.players}
             style={styles.table}
@@ -213,42 +288,54 @@ function GameScreenBody({
             privateTiles={game.privateTiles}
           />
         )}
-        {waiting ? (
-          <View style={styles.betting}>{waiting.controls}</View>
-        ) : (
-          <BettingControls
-            amount={raiseAmount}
-            leading={bettingLeading}
-            onAllIn={onAllIn}
-            onAmountChange={changeRaise}
-            onCheckOrCall={onCheckOrCall}
-            onFold={onFold}
-            onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
-            state={game.betting}
-          />
-        )}
+        <View
+          onLayout={(event: LayoutChangeEvent) =>
+            setBarHeight(event.nativeEvent.layout.height)
+          }
+        >
+          {waiting ? (
+            <View style={styles.betting}>{waiting.controls}</View>
+          ) : (
+            <BettingControls
+              amount={raiseAmount}
+              leading={bettingLeading}
+              sliderTrailing={bettingSlider}
+              onAllIn={onAllIn}
+              onAmountChange={changeRaise}
+              onCheckOrCall={onCheckOrCall}
+              onFold={onFold}
+              onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
+              state={game.betting}
+            />
+          )}
+        </View>
       </View>
       <Hud
         balance={BALANCE_UNAVAILABLE}
         handId={game.handId}
         onHelp={onHelp}
         onLeave={goBack}
-        // Until the table has a settings sheet, the gear flips the backdrop between its two looks.
-        onSettings={onSettings ?? toggleBackdropStyle}
+        // Until the table has a settings sheet, the gear opens the backdrop picker.
+        onSettings={onSettings ?? (() => setBackdropOpen((open) => !open))}
         phase={game.phase}
         stamp={waiting?.stamp}
         style={{ top: insets.top }}
         turn={waiting ? null : view}
         turnPhrase={heroTurnPhrase(game)}
       />
+      {backdropOpen ? (
+        <BackdropPicker
+          onClose={() => setBackdropOpen(false)}
+          top={insets.top + hudHeight}
+        />
+      ) : null}
     </LinearGradient>
   );
 }
 
 /**
- * A seat as the table draws it, with the screen's optional tap layered around it. With no
- * handler this is exactly the presentational seat: a seat that looks tappable but goes
- * nowhere is worse than one that never was.
+ * A seat as the table draws it, with the screen's optional tap. The seat owns the press, so the
+ * control is the box the seat is placed by — the avatar on its anchor, and the labels under it.
  */
 function Seat({
   slot,
@@ -257,24 +344,14 @@ function Seat({
   slot: SeatSlot<GamePlayer>;
   onPress?: (player: GamePlayer) => void;
 }) {
-  const player = slot.seat;
-  if (!player || !onPress) return <PlayerSeat {...slot} />;
-  return (
-    <Pressable
-      accessibilityLabel={`${player.name}'s seat`}
-      accessibilityRole="button"
-      hitSlop={layout.hitSlop}
-      onPress={() => onPress(player)}
-    >
-      <PlayerSeat {...slot} />
-    </Pressable>
-  );
+  return <PlayerSeat {...slot} onPress={onPress} />;
 }
 
 function BettingControls({
   state,
   amount,
   leading,
+  sliderTrailing,
   onAmountChange,
   onFold,
   onCheckOrCall,
@@ -285,6 +362,8 @@ function BettingControls({
   amount: number;
   /** A mode's own control for the row's start, drawn before fold. */
   leading?: ReactNode;
+  /** A mode's own control after the slider's amount, sharing the slider's row. */
+  sliderTrailing?: ReactNode;
   onAmountChange: (amount: number) => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
@@ -292,6 +371,8 @@ function BettingControls({
   onWager?: () => void;
   onAllIn?: () => void;
 }) {
+  const scale = useScreenScale();
+  const tight = useCompactControls();
   const [trackWidth, setTrackWidth] = useState(1);
   const [allInOpen, setAllInOpen] = useState(false);
   // The turn can move on under the sheet — the hero's own clock, most often — and a seat that
@@ -306,15 +387,17 @@ function BettingControls({
     );
   };
   // §19's window keeps the check's own word on the confirm: the row's check is what locks it in.
-  const callLabel =
-    state.primary === "call" ? `CALL $${(state.callAmount ?? 0).toLocaleString()}` : "CHECK";
   // The same slider opens the round or raises it: with no bet out the action is a bet, and
   // the amount is the round total either way (§22).
   const wagerLabel = state.wager === "bet" ? "BET" : "RAISE";
   return (
-    <View style={styles.betting}>
+    <View style={[styles.betting, tight && styles.bettingTight]}>
       <View style={styles.raiseRow}>
-        <Text style={styles.raiseLabel}>{wagerLabel}</Text>
+        <Text
+          style={[styles.raiseLabel, scale !== 1 && { fontSize: 9 * scale }]}
+        >
+          {wagerLabel}
+        </Text>
         <View
           accessibilityActions={[
             { name: "increment", label: "Increase raise" },
@@ -343,72 +426,118 @@ function BettingControls({
           onResponderGrant={fromEvent}
           onResponderMove={fromEvent}
           onStartShouldSetResponder={() => state.canRaise || state.canBet}
-          style={styles.slider}
+          style={[styles.slider, scale !== 1 && { height: 3 * scale }]}
         >
-          <View style={[styles.sliderFill, { width: `${progress * 100}%` }]} />
-          <View style={[styles.sliderThumb, { left: `${progress * 100}%` }]} />
+          <View
+            style={[
+              styles.sliderFill,
+              scale !== 1 && { height: 3 * scale },
+              { width: `${progress * 100}%` },
+            ]}
+          />
+          <View
+            style={[
+              styles.sliderThumb,
+              scale !== 1 && {
+                height: 14 * scale,
+                marginLeft: -7 * scale,
+                marginTop: -8.5 * scale,
+                width: 14 * scale,
+              },
+              { left: `${progress * 100}%` },
+            ]}
+          />
         </View>
-        <Text style={styles.raiseAmount}>{`$${amount.toLocaleString()}`}</Text>
+        <Text
+          style={[
+            styles.raiseAmount,
+            scale !== 1 && { fontSize: 12 * scale, minWidth: 32 * scale },
+          ]}
+        >{`${amount.toLocaleString()}`}</Text>
+        {sliderTrailing}
       </View>
-      <View style={styles.actionRow}>
+      <View style={[styles.actionRow, tight && styles.actionRowTight]}>
         {leading}
         {/* The row's controls carry ids as well as labels: the felt's nameplates print
             CHECK, CALL and FOLD as seat status too, so a device flow that matched the
             row by text alone could land on a seat instead of a control (see
             .maestro/native/offline-hand.yaml). */}
-        <ActionButton
-          danger
+        <GameButton
           disabled={!state.canFold}
           label="FOLD"
           onPress={onFold}
+          compact={tight}
+          scale={scale}
+          style={styles.action}
           testID="action-fold"
+          variant="danger"
         />
-        <ActionButton
+        <GameButton
           disabled={!state.canCheck && state.callAmount == null}
-          label={callLabel}
+          amount={
+            state.primary === "call"
+              ? formatCompactAmount(state.callAmount ?? 0)
+              : undefined
+          }
+          label={state.primary === "call" ? "CALL" : "CHECK"}
           onPress={onCheckOrCall}
+          compact={tight}
+          scale={scale}
+          style={styles.callAction}
           // The one control the row arms for two actions, so a test cannot name it by its label:
           // the felt's nameplates print CHECK and CALL as seat status too, and a text selector
           // lands on whichever the tree puts first.
           testID="action-check-call"
         />
-        <ActionButton
+        <GameButton
           disabled={!state.canRaise && !state.canBet}
-          gold
-          label={`${wagerLabel} $${amount.toLocaleString()}`}
+          amount={formatCompactAmount(amount)}
+          label={wagerLabel}
           onPress={onWager}
+          compact={tight}
+          scale={scale}
+          style={styles.wideAction}
           testID="action-wager"
-          wide
+          variant="gold"
         />
-        <ActionButton
-          compact
+        <GameButton
           disabled={!state.canAllIn}
-          gold
-          label={`ALL IN · $${state.allInAmount.toLocaleString()}`}
+          // ALL IN is an action, not an amount: the stack is already on the felt and the
+          // confirm sheet still names what it commits.
+          label="ALL IN"
           onPress={() => setAllInOpen(true)}
+          compact={tight}
+          scale={scale}
+          style={styles.allInAction}
           testID="all-in-button"
+          variant="gold"
         />
       </View>
       <Modal
         animationType="fade"
         onRequestClose={() => setAllInOpen(false)}
         transparent
-        visible={allInOpen}>
+        visible={allInOpen}
+      >
         <View style={styles.sheetBackdrop}>
           <View style={styles.sheet} testID="all-in-sheet">
             <Text style={styles.sheetTitle}>
               {`ALL IN · $${state.allInAmount.toLocaleString()}`}
             </Text>
-            <Text style={styles.sheetBody}>Commits your entire Table Stack.</Text>
+            <Text style={styles.sheetBody}>
+              Commits your entire Table Stack.
+            </Text>
             <View style={styles.sheetActions}>
-              <ActionButton
+              <GameButton
                 label="CANCEL"
                 onPress={() => setAllInOpen(false)}
+                style={styles.action}
                 testID="all-in-cancel"
               />
-              <ActionButton
-                gold
+              <GameButton
                 label="CONFIRM ALL IN"
+                style={styles.action}
+                variant="gold"
                 onPress={() => {
                   setAllInOpen(false);
                   onAllIn?.();
@@ -425,9 +554,12 @@ function BettingControls({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { alignSelf: "center", flex: 1, width: "100%" },
-  tableRegion: { flex: 1, minHeight: 272, paddingHorizontal: 8 },
+  content: { alignSelf: "center", flex: 1, width: "100%", zIndex: 1 },
+  barShade: { bottom: 0, left: 0, position: "absolute", right: 0 },
+  tableRegion: { flex: 1, minHeight: 272 },
   tableRegionCompact: { minHeight: 234 },
+  // A small phone: the felt is narrower than the screen, so the height it keeps goes to the word.
+  tableRegionTight: { alignSelf: "center", width: "86%" },
   table: { backgroundColor: "transparent", flex: 1 },
   betting: { paddingBottom: 7, paddingHorizontal: 18 },
   raiseRow: {
@@ -468,7 +600,15 @@ const styles = StyleSheet.create({
     minWidth: 32,
     textAlign: "right",
   },
+  bettingTight: { paddingHorizontal: 12 },
+  actionRowTight: { gap: 4 },
   actionRow: { flexDirection: "row", gap: 6, paddingTop: 4 },
+  /** A control that shares the row's width with its neighbours. */
+  action: { flex: 1 },
+  /** Call and all in sit a little wider than fold; raise gets the most room (≈62/68/78/68). */
+  callAction: { flex: 1.1 },
+  wideAction: { flex: 1.25 },
+  allInAction: { flex: 1.1 },
   // The all-in sheet is the felt's own surface rather than an OS alert: the amount it commits
   // is the point of the confirmation, and it stays inside the table's frame.
   sheetBackdrop: {

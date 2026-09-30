@@ -31,11 +31,14 @@ import type {
   LetterTile,
   OnlineBettingAction,
   PlayerId,
+  PrivateWordCheckState,
   RoomPhase,
   RoundPhase,
   Tile,
   TilePlay,
+  WordCheckResult,
   WordRejectionReason,
+  WordSubmission,
 } from "@wordpoker/contracts";
 import {
   GAME_EVENTS,
@@ -43,6 +46,8 @@ import {
   ROUND_PHASES,
   WAITING_PHASE,
   isGameRejectionEvent,
+  isWordSubmission,
+  WORD_CHECKS_PER_HAND,
 } from "@wordpoker/contracts";
 import { resolveSubmission, type Dictionary } from "@wordpoker/game-rules";
 
@@ -88,6 +93,8 @@ export interface OnlineGame {
   results: ResultsSnapshot | null;
   /** §19's window as the builder reads it, or null outside it. In the builder's own vocabulary. */
   words: WordDraft | null;
+  /** The hero's private quota and latest explicit dictionary result. */
+  wordCheck: PrivateWordCheckState;
   /** The table's phase, including the waiting room the felt has no hand for. */
   phase: RoomPhase;
   /**
@@ -117,6 +124,8 @@ export interface OnlineGame {
   setDraft: (plays: readonly TilePlay[]) => void;
   /** Confirms the hero's draft as its word (§19). */
   confirmWord: () => void;
+  /** Sends the current draft to the server for one private dictionary check. */
+  checkWord: () => void;
 }
 
 /** One public seat, decoded off the broadcast schema into plain values. */
@@ -185,6 +194,7 @@ interface PrivateView {
   hand: number;
   rack: readonly Tile[];
   isYourTurn: boolean;
+  wordCheck: PrivateWordCheckState;
   word: {
     status: "none" | "drafting" | "confirmed" | "timed-out";
     confirmed: readonly TilePlay[] | null;
@@ -365,6 +375,21 @@ export function useOnlineGame({
     if (viewIdRef.current !== null) setPending({ kind: "confirm", viewId: viewIdRef.current });
   }, [heroDraft, room, view]);
 
+  const checkWord = useCallback(() => {
+    if (
+      view === null ||
+      view.phase === WAITING_PHASE ||
+      view.phase === "payout" ||
+      priv === null ||
+      heroDraft.length < 2 ||
+      heroDraft.length > 7 ||
+      priv.wordCheck.checksRemaining <= 0
+    ) {
+      return;
+    }
+    room.send(GAME_MESSAGES.checkWord, { submission: { plays: [...heroDraft] } });
+  }, [heroDraft, priv, room, view]);
+
   const pendingPill = pending?.kind === "betting" ? pending.pill : null;
   const pendingConfirm = pending?.kind === "confirm";
 
@@ -448,6 +473,8 @@ export function useOnlineGame({
     results,
     // No hand, no word: the waiting felt draws the table with nothing to build.
     words: waiting === null ? (hero?.words ?? null) : null,
+    wordCheck:
+      hero?.wordCheck ?? priv?.wordCheck ?? { checksRemaining: 0, result: null },
     phase: view?.phase ?? WAITING_PHASE,
     waiting,
     setReady,
@@ -461,6 +488,7 @@ export function useOnlineGame({
     wager,
     setDraft,
     confirmWord,
+    checkWord,
   };
 }
 
@@ -547,6 +575,10 @@ function perspectiveOf(
       open: view.word?.status === "open",
       hero: heroWord === undefined || heroWord === "none" ? null : heroWord,
       confirmedPlays: priv?.word.confirmed ?? null,
+    },
+    wordCheck: priv?.wordCheck ?? {
+      checksRemaining: 0,
+      result: null,
     },
     result: view.result,
     sidePots: view.pots.slice(1),
@@ -691,6 +723,7 @@ function decodeTile(value: unknown): Tile {
 function decodePrivate(payload: unknown): PrivateView | null {
   if (!isRecord(payload)) return null;
   const word = isRecord(payload.word) ? payload.word : {};
+  const wordCheck = isRecord(payload.wordCheck) ? payload.wordCheck : null;
   const status = stringOf(word.status);
   const confirmed = isRecord(word.confirmed) ? word.confirmed : null;
 
@@ -698,6 +731,13 @@ function decodePrivate(payload: unknown): PrivateView | null {
     hand: numberOf(payload.hand),
     rack: iterate(payload.rack).map(decodeTile),
     isYourTurn: payload.isYourTurn === true,
+    wordCheck: {
+      checksRemaining:
+        wordCheck === null
+          ? 0
+          : Math.min(WORD_CHECKS_PER_HAND, Math.max(0, numberOf(wordCheck.checksRemaining))),
+      result: decodeWordCheckResult(wordCheck?.result),
+    },
     word: {
       status:
         status === "drafting" || status === "confirmed" || status === "timed-out"
@@ -706,6 +746,23 @@ function decodePrivate(payload: unknown): PrivateView | null {
       confirmed:
         confirmed !== null ? iterate(confirmed.plays).map(decodePlay) : null,
     },
+  };
+}
+
+function decodeWordCheckResult(value: unknown): WordCheckResult | null {
+  if (!isRecord(value) || !isWordSubmission(value.submission) || typeof value.valid !== "boolean") {
+    return null;
+  }
+  if (value.valid && typeof value.points !== "number") return null;
+
+  const submission: WordSubmission = {
+    plays: value.submission.plays.map((play) => decodePlay(play)),
+  };
+  return {
+    submission,
+    word: stringOf(value.word),
+    valid: value.valid,
+    points: value.valid ? numberOf(value.points) : null,
   };
 }
 

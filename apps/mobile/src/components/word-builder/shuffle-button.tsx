@@ -1,11 +1,12 @@
 import type { JSX } from "react";
-import { Pressable } from "react-native";
+import { StyleSheet } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import { GameButton } from "@/components/ui/game-button";
+import { useCompactControls } from "@/components/screens/game/screen-scale";
 import { colors } from "@/constants/theme";
 
 import { haptic } from "./haptics";
-import { styles } from "./styles";
 import { useWordBuilderScope } from "./word-builder";
 
 /**
@@ -16,26 +17,22 @@ import { useWordBuilderScope } from "./word-builder";
  */
 export function WordShuffleButton(): JSX.Element {
   const { canShuffle, shuffle } = useWordBuilderScope();
+  const compact = useCompactControls();
 
   return (
-    <Pressable
+    <GameButton
       accessibilityLabel="Shuffle the tiles your word does not hold"
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !canShuffle }}
       disabled={!canShuffle}
       onPress={() => {
         haptic("settle");
         shuffle();
       }}
-      style={({ pressed }) => [
-        styles.shuffle,
-        !canShuffle && styles.shuffleSpent,
-        pressed && styles.shufflePressed,
-      ]}
+      compact={compact}
+      style={compact ? shuffleStyles.compact : shuffleStyles.button}
       testID="word-builder-shuffle"
     >
       <ShuffleGlyph />
-    </Pressable>
+    </GameButton>
   );
 }
 
@@ -67,3 +64,9 @@ function ShuffleGlyph(): JSX.Element {
     </Svg>
   );
 }
+
+// Square, and the same height as the action buttons beside it: the row reads as one control strip.
+const shuffleStyles = StyleSheet.create({
+  button: { width: 48 },
+  compact: { width: 44 },
+});

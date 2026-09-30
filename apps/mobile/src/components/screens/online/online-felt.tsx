@@ -23,13 +23,29 @@ import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
-import { ActionButton } from "@/components/screens/game/game-primitives";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
-import { WordBuilder, WordHand, WordPreview, WordShuffleButton } from "@/components/word-builder";
-import { colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
+import { GameButton } from "@/components/ui/game-button";
+import {
+  WordBuilder,
+  WordCheckButton,
+  WordHand,
+  WordPreview,
+  WordShuffleButton,
+} from "@/components/word-builder";
+import {
+  colors,
+  fonts,
+  fontSize,
+  palette,
+  radius,
+  spacing,
+} from "@/constants/theme";
 import { useOnlineGame, type GameRoomLike } from "@/lib/use-online-game";
-import { useRoomConnection, type RoomConnectionLike } from "@/lib/use-room-connection";
+import {
+  useRoomConnection,
+  type RoomConnectionLike,
+} from "@/lib/use-room-connection";
 
 export function OnlineFelt({
   room,
@@ -41,8 +57,20 @@ export function OnlineFelt({
   /** Release the seat and leave the table — the felt's own way out (§3). */
   onLeave: () => void;
 }) {
-  const { game, results, words, waiting, setReady, fold, primary, allIn, wager, setDraft } =
-    useOnlineGame({ room, dictionary });
+  const {
+    game,
+    results,
+    words,
+    wordCheck,
+    waiting,
+    setReady,
+    fold,
+    primary,
+    allIn,
+    wager,
+    setDraft,
+    checkWord,
+  } = useOnlineGame({ room, dictionary });
   // The hand whose results the seat has put away: the room keeps the payout on the felt until it
   // deals again, so a dismissed hand must not reopen on the next patch.
   const [dismissed, setDismissed] = useState<number | null>(null);
@@ -68,6 +96,8 @@ export function OnlineFelt({
     ) : (
       <WordBuilder
         community={game.community}
+        wordCheck={wordCheck}
+        onCheckWord={checkWord}
         confirmable={words?.confirmable ?? false}
         confirmed={words?.confirmed ?? false}
         onDraft={setDraft}
@@ -81,6 +111,7 @@ export function OnlineFelt({
         <View style={styles.table}>
           <GameScreen
             bettingLeading={<WordShuffleButton />}
+            bettingSlider={<WordCheckButton />}
             game={game}
             onAllIn={allIn}
             onBack={onLeave}
@@ -139,12 +170,12 @@ function ReadyControls({
         {status}
       </Text>
       <View style={styles.readyRow}>
-        <ActionButton
-          gold={!heroReady}
+        <GameButton
           label={heroReady ? "NOT READY" : "I'M READY"}
           onPress={() => onReady(!heroReady)}
+          style={styles.readyButton}
           testID="action-ready"
-          wide
+          variant={heroReady ? "dark" : "gold"}
         />
       </View>
     </View>
@@ -158,7 +189,11 @@ function ReadyControls({
  */
 function ReconnectingBanner() {
   return (
-    <View pointerEvents="none" style={styles.banner} testID="online-reconnecting">
+    <View
+      pointerEvents="none"
+      style={styles.banner}
+      testID="online-reconnecting"
+    >
       <Text style={styles.bannerText}>Reconnecting…</Text>
     </View>
   );
@@ -188,6 +223,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   readyRow: { flexDirection: "row" },
+  readyButton: { flex: 1 },
   bannerText: {
     color: colors.goldHi,
     fontFamily: fonts.monoBold,

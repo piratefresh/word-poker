@@ -135,7 +135,6 @@ export function FeaturedTableCard({
           chromeInset={FELT_CHROME}
           community={NO_COMMUNITY}
           layoutConfig={FELT_LAYOUT}
-          railWidth={3}
           renderCommunity={NO_COMMUNITY_SLOT}
           renderPot={() => (
             <View style={styles.pot}>
