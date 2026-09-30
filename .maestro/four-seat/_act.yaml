@@ -1,0 +1,14 @@
+# Subflow: one betting action on this seat's turn. ACTION is fold, check-call (CHECK or CALL, the
+# one control), or wager (BET or RAISE at the slider's default, the minimum). YOUR TURN prints
+# only on the hero's own nameplate; waiting for it to go keeps a stale banner from acting twice.
+url: http://localhost:8081/online
+name: Four-seat - act
+---
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 150000
+- tapOn:
+    id: "action-${ACTION}"
+- extendedWaitUntil:
+    notVisible: "YOUR TURN"
+    timeout: 30000

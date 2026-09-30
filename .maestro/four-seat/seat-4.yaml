@@ -1,0 +1,91 @@
+# The four-browser online smoke, seat P4 (STO-483). Seed, racks and taps: the header of seat-1.yaml.
+url: http://localhost:8081/online
+name: Four-seat P4 - opens with a raise, folds to the shove, plays 3-handed
+tags:
+  - web
+  - online
+  - four-seat
+---
+- runFlow: _sign-in-and-open.yaml
+- runFlow: _join.yaml
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
+
+# Hand 1: under the gun raises, calls P2's re-raise and flop bet, checks it down, spells ILEA.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: wager }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-face-AI-1-I"
+- tapOn:
+    id: "word-builder-tile-L-4"
+- tapOn:
+    id: "word-builder-tile-E-5"
+- tapOn:
+    id: "word-builder-tile-A-5"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "1", WORD: ILEA }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "1", WORD: DX }
+
+# Hand 2: the big blind folds to P3's shove.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: fold }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "2", WORD: TAX }
+
+# Hand 3: the button limps, checks it down, spells CALK.
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow:
+    file: _act.yaml
+    env: { ACTION: check-call }
+- runFlow: _river.yaml
+- tapOn:
+    id: "word-builder-tile-C-1"
+- tapOn:
+    id: "word-builder-tile-A-9"
+- tapOn:
+    id: "word-builder-tile-L-3"
+- tapOn:
+    id: "word-builder-tile-K-1"
+- runFlow:
+    file: _confirm.yaml
+    env: { HAND: "3", WORD: CALK }
+- runFlow:
+    file: _results.yaml
+    env: { HAND: "3", WORD: TWEAK }
+
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "3" }
+- tapOn:
+    id: "Leave the table"
+- extendedWaitUntil:
+    visible: "Deal a new table"
+    timeout: 30000

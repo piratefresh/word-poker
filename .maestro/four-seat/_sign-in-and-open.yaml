@@ -1,0 +1,18 @@
+# Subflow: sign in when this browser's fresh profile is bounced to the guard, then open the lobby.
+# The pattern is online-hand.yaml's; every seat runs in its own temporary Chrome profile.
+url: http://localhost:8081/online
+name: Four-seat - sign in and open the lobby
+---
+- openLink: http://localhost:8081/online
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: ../sign-in.yaml
+- openLink: http://localhost:8081/online
+- extendedWaitUntil:
+    visible: "Deal a new table"
+    timeout: 30000
