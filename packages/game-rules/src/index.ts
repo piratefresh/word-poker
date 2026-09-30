@@ -2,7 +2,9 @@
 
 export { LETTER_VALUES } from "./letters";
 export type { Letter } from "./letters";
-export { createRng } from "./rng";
+export { createRng, mixSeed } from "./rng";
+export type { PowerSeedSalt } from "./rng";
+export { weightedSampleWithoutReplacement } from "./sample";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
 export {
