@@ -78,7 +78,10 @@ env:
 - tapOn:
     text: "Sign in"
 
-# Past the guard: home shows the mode picker and the signed-in identity.
+# Past the guard: home shows the mode picker and the signed-in identity. The identity is the
+# home's last row — below the fold of a short viewport, which Maestro's web driver cannot scroll
+# back into reach — so a headless runner has to give the browser room for it (the four-seat
+# smoke asks for 1280x1000, not the 1280x800 a bare headless run gets).
 - extendedWaitUntil:
     visible: "Choose how to play"
     timeout: 60000

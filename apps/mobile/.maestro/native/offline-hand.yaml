@@ -117,29 +117,28 @@ tags:
 # of tiles the seat sorts — is what the flow builds its word through. The phase stays the river
 # while the window is open.
 #
-# Build the word out of the seat's two private tiles, in the order they are tapped. The strip
-# is the only place these ids appear, and the strip's order is the word's order: a tap appends
-# the tile to the word rather than dropping it wherever it sits. These two are the deal's tiles
-# for the seed the deep link pins — N-4 and R-3, 2 points each — so a changed seed or table
-# configuration fails here, loudly, instead of silently playing some other word; §7 makes their
-# word 4 points.
+# Build the word out of two tiles the strip holds for the seed the deep link pins. A tap toggles
+# a tile where it lies, so the word is the played tiles read left to right, not the order they
+# were tapped: T-2 sits left of S-1 in this deal's strip, and the draft spells TS. Those two
+# are 2 points each — §7 makes their word 4 points — so a changed seed or table configuration
+# fails here, loudly, instead of silently playing some other word.
 - tapOn:
-    id: "word-builder-tile-N-4"
+    id: "word-builder-tile-S-1"
 - tapOn:
-    id: "word-builder-tile-R-3"
+    id: "word-builder-tile-T-2"
 - assertVisible:
-    text: "NR"
+    text: "TS"
 - assertVisible:
-    text: "· 4pts"
+    text: "4 pts"
 
 # Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
 # exactly as it was — which is the whole point of shuffling while a word is being built.
 - tapOn:
     id: "word-builder-shuffle"
 - assertVisible:
-    text: "NR"
+    text: "TS"
 - assertVisible:
-    text: "· 4pts"
+    text: "4 pts"
 
 # §19's window turns the check into the confirm: the word as it stands is locked in, and no
 # second control row carries a confirm of its own.

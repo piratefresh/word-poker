@@ -16,6 +16,11 @@
 #     an element's accessibility label). A `css:` selector never settles on this page and
 #     the step hangs without failing.
 #
+# Where a control has a test id, `id:` is that test id on the web too: the app keeps the DOM
+# element's own id in step with `testID` (`webTestID` in src/lib/web-id.ts), because Maestro
+# reads the DOM id before the aria-label and the label would otherwise hide the test id from
+# this flow. Labels are for the elements that have no test id at all.
+#
 # The route sits behind the app's auth guard. A headed run keeps a signed-in
 # session in Maestro's Chrome profile (sign in once — via sign-in.yaml — then
 # rerun); a headless run starts every time on a fresh profile, so the flow
@@ -73,10 +78,15 @@ tags:
 
 # The blinds are posted before the deal, and the seat clockwise from the big blind opens the
 # round a beat later: mira raises the blind to 60, and the row states the call that leaves the
-# hero owing — the engine's number, not a placeholder. This is the seed's line, so a changed seed
-# or table configuration fails here, loudly.
+# hero owing — the engine's number, not a placeholder. The control prints its label and its
+# amount as two nodes, so a selector reaches the amount through the control's own test id
+# (`containsDescendants`) rather than through text that reads "CALL $60" in one piece. This is the
+# seed's line, so a changed seed or table configuration fails here, loudly.
 - extendedWaitUntil:
-    visible: "CALL \\$60"
+    visible:
+      id: "action-check-call"
+      containsDescendants:
+        - text: "\\$60"
     timeout: 20000
 
 # Play the hero's turns to the river. Each pass waits for the hero to hold the table — the
@@ -106,13 +116,18 @@ tags:
     visible: "YOUR TURN"
     timeout: 20000
 - assertVisible:
-    text: "BET \\$20"
+    id: "action-wager"
+    containsDescendants:
+      - text: "\\$20"
 - assertVisible:
     text: "\\$560"
 - tapOn:
     id: "action-wager"
 - extendedWaitUntil:
-    visible: "CALL \\$400"
+    visible:
+      id: "action-check-call"
+      containsDescendants:
+        - text: "\\$400"
     timeout: 20000
 - tapOn:
     id: "action-check-call"
@@ -120,7 +135,9 @@ tags:
     visible: "\\$1,400"
     timeout: 20000
 - assertNotVisible:
-    text: "BET \\$20"
+    id: "action-wager"
+    containsDescendants:
+      - text: "\\$20"
 - assertVisible:
     text: "PHASE 5 · THE RIVER"
 
@@ -128,32 +145,33 @@ tags:
 # strip of tiles the seat sorts — is what the flow builds its word through. The phase stays
 # the river while the window is open.
 #
-# Build the word out of the seat's two private tiles, in the order they are tapped.
+# Build the word out of two tiles the strip holds for this seed. The strip's tiles carry test
+# ids and the felt's copies of them carry none — those draw the state alone — so by its id a tap
+# can only land in the strip. A tap toggles a tile where it lies, so the word is the played
+# tiles read left to right, not the order they were tapped: S-1 sits right of T-2 in this
+# deal's strip, and the draft spells TS.
 #
-# The tiles carry their accessibility label and their state — the felt above draws the same two
-# tiles, and its labels carry the state alone — so a tap can only land in the strip, and the
-# strip's order is the word's order: a tap appends the tile to the word rather than dropping it
-# wherever it sits. Those two are the deal's first two for the seed the URL pins, so a changed
-# seed or table configuration fails here, loudly, instead of silently playing some other word;
-# §7 makes their word 4 points.
+# Those two are the deal's own for the seed the URL pins — T-2 and S-1, 2 points each — so a
+# changed seed or table configuration fails here, loudly, instead of silently playing some other
+# word; §7 makes their word 4 points.
 - tapOn:
-    id: "N, 2 points, tap to play it"
+    id: "word-builder-tile-S-1"
 - tapOn:
-    id: "R, 2 points, tap to play it"
+    id: "word-builder-tile-T-2"
 - assertVisible:
-    text: "NR"
+    text: "TS"
 - assertVisible:
-    text: "· 4pts"
+    text: "4 pts"
 
 # Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
 # exactly as it was — which is the whole point of shuffling while a word is being built. The
-# icon button carries no text, so the hierarchy knows it by its accessibility label.
+# icon button carries no text, so it is reached by the same test id a device flow uses.
 - tapOn:
-    id: "Shuffle the tiles your word does not hold"
+    id: "word-builder-shuffle"
 - assertVisible:
-    text: "NR"
+    text: "TS"
 - assertVisible:
-    text: "· 4pts"
+    text: "4 pts"
 
 # §19's window turns the check into the confirm: the word as it stands is locked in, and no
 # second control row carries a confirm of its own. The row's control is tapped until the hand pays

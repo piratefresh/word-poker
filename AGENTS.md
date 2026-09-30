@@ -86,6 +86,15 @@ Headed is the default (`--headless` hides the browser; headless also takes `--sc
 whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
 it needs.
 
+A flow names a control by `id:`, and on the web that id is the element's *test id* wherever the component
+has one — `webTestID` (`apps/mobile/src/lib/web-id.ts`) keeps the DOM element's own `id` in step with
+`testID`, because Maestro reads the DOM id before the aria-label and the label would otherwise hide the
+test id from the web (its injected `maestro-web.js` falls back to `data-testid` last). Labels are for the
+elements that carry no test id at all. A control prints its label and its amount as separate text nodes,
+so `text:` never sees "CALL $60" in one piece: reach the amount through the control —
+`containsDescendants: [{ text: "\\$60" }]` — and match text whole (Maestro's text matcher is anchored),
+remembering the felt prints "BLINDS $10 / $20" under the pot.
+
 Run the online multiplayer smoke (STO-409) from one Windows terminal at the repository root:
 
 ```powershell
@@ -108,7 +117,7 @@ The four-browser smoke (STO-483) has every seat played by a real browser, each d
 Maestro process:
 
 ```powershell
-pnpm smoke:online:four            # headed; add -Headless for --headless --screen-size 1280x800
+pnpm smoke:online:four            # headed; add -Headless for --headless --screen-size 1280x1000
 ```
 
 It plays one seeded session. Hand 1 has a raise, a fold, a re-raise, calls, a flop bet and three

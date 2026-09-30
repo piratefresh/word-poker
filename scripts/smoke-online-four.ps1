@@ -38,7 +38,10 @@ try {
     return (Get-Content -LiteralPath $watchLog -Raw -ErrorAction SilentlyContinue) -match 'watching the lobby'
   } 60
 
-  $display = if ($Headless) { "--headless --screen-size 1280x800" } else { "" }
+  # 1000 points tall, not the 800 a bare headless run gets: the home screen keeps its identity
+  # row at the very bottom, and a shorter viewport hides it under the fold, where the sign-in
+  # subflow asserts on it (`../sign-in.yaml`) and Maestro's web driver cannot scroll it back.
+  $display = if ($Headless) { "--headless --screen-size 1280x1000" } else { "" }
   $seats = @()
   $roomId = $null
   foreach ($seat in 1..4) {

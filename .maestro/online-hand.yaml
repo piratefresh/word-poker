@@ -16,8 +16,10 @@
 # The room is behind the auth guard. On a fresh headed profile this flow signs in through
 # sign-in.yaml, joins the exact room id supplied by the opponent, and exits after reading results.
 #
-# Web selectors use the accessible id labels. Device selectors are in
-# apps/mobile/.maestro/native/online-hand.yaml; action controls use their test ids.
+# Web selectors use the same test ids the device flow uses — the app keeps the DOM element's id
+# in step with `testID` (`webTestID` in src/lib/web-id.ts), which is what Maestro's web hierarchy
+# reads first — and an element with no test id answers to its accessibility label. Device
+# selectors are in apps/mobile/.maestro/native/online-hand.yaml.
 url: http://localhost:8081/online
 name: Online hand - join, call the blind, build PUB and read results
 tags:
@@ -46,9 +48,10 @@ tags:
 - assertVisible:
     text: "YOU"
 
-# The opponent is ready; the browser is the second seat.
+# The opponent is ready; the browser is the second seat, and readies itself through the same
+# control a device flow taps.
 - tapOn:
-    text: "I'M READY"
+    id: "action-ready"
 - extendedWaitUntil:
     visible: "PHASE 2 · PRE-FLOP"
     timeout: 30000
@@ -73,18 +76,17 @@ tags:
             - waitForAnimationToEnd
 
 # At the river all five board tiles are available to the strip. Build the dictionary word PUB in rack order;
-# choose U explicitly on the O/U choice tile.
+# choose U explicitly on the O/U choice tile. The tiles and the face carry the strip's test ids,
+# the same ids a device flow taps.
 - extendedWaitUntil:
     visible: "COMMUNITY · 5/5"
     timeout: 20000
 - tapOn:
-    id: "P, 4 points, tap to play it"
+    id: "word-builder-tile-P-1"
 - tapOn:
-    id: "O or U, 1 point, double letter, tap to play it"
+    id: "word-builder-face-OU-1-U"
 - tapOn:
-    id: "Play the O/U tile as U"
-- tapOn:
-    id: "B, 4 points, double letter, tap to play it"
+    id: "word-builder-tile-B-1"
 - assertVisible:
     text: "PUB"
 
