@@ -52,7 +52,10 @@ tile dealt — is never fought by a private copy of the list. A tile ignores a p
 `DRAG_SETTLE_MS` after a drop, because the pan does not cancel the tile's own press on the web —
 the pointer never leaves the tile, since the tile travels with it.
 
-The rack is a straight row of `TILE_METRICS`'s `medium` tile, and the places spread into the room
+The rack is a straight row of `TILE_METRICS`'s `medium` tile, grown by the window's `screenScale`
+(`screens/game/screen-scale.ts`; exactly 1 below a 600-point shorter side, then growing with it up to
+a cap, `rackFor` in `strip.tsx`) — the one factor the banner, HUD buttons, community tiles and action
+row grow by too, with the play column bounded by `stageMaxWidth` — and the places spread into the room
 the felt gives them — up to a tile and `MAX_GAP` — closing in on each other (the gap first, then
 some of the tile) when that room is narrower than the row, so a hand of seven stays on screen and
 stays tappable. The strip's places and its drag are measured in that tile, so the two cannot
@@ -100,6 +103,27 @@ on matching versions. The existing mobile/server env files and seeded E2E user a
 
 The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
 signs in when needed, builds PUB, checks the results overlay, and leaves the table.
+
+The four-browser smoke (STO-483) has every seat played by a real browser, each driven by its own
+Maestro process:
+
+```powershell
+pnpm smoke:online:four            # headed; add -Headless for --headless --screen-size 1280x800
+```
+
+It plays one seeded session. Hand 1 has a raise, a fold, a re-raise, calls, a flop bet and three
+words at showdown. In hand 2 a short stack shoves into a side pot, loses and busts. In hand 3 the
+busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
+up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
+seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
+seed, payout delay, turn clock), which the server merges under a create's own options, and only
+behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
+(`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
+the runner starts the next one only then, so join order is seat order. The script lives in
+`apps/server/scripts/four-seat-scenario.ts`. A mocha case replays it over four sockets, and the
+flows in `.maestro/four-seat/` tap it out. After changing the script or the deal, re-probe with
+`pnpm --filter @wordpoker/server exec tsx scripts/probe-four-seat.ts <firstSeed> <lastSeed>`,
+then update the seed (scenario, runner) and the taps (seat flows, seat-1.yaml's header).
 
 ## E2E test user
 

@@ -62,6 +62,36 @@ The offline game plays one hand on the client, with no server in the loop:
   with nothing left to compare (§25) — and the chips move into the winners' Table Stacks. A
   seat with no valid word is ranked at 0 points, exactly as §11 says.
 
+### Offline CPU play styles
+
+The seats keep their styles across hands: Ellis plays cautiously, Jay applies more pressure,
+and Mira mixes traps and bluffs. Styles change betting tendencies, not dictionary access or
+the words a seat is allowed to play. Every bot still selects its best valid word at showdown.
+
+Betting uses the seat's own tiles, the revealed board, public commitments and Table Stacks.
+A private word that improves on what everybody can make from the board supports value bets;
+a high scoring word available to the whole table is not treated as a private advantage.
+Before the river, complementary letters can justify a modest speculative call. Bots consider
+the call's actual stack-capped cost, the pot they can contest, opponents still in the hand,
+position and the current street. Sizes scale with the big blind, pot and effective stacks.
+
+The decision order is: consider a value wager or a situational bluff, sometimes check a
+strong hand to trap, otherwise check for free, call an affordable price, or fold. Bluffs
+are limited to one or two opponents who can still fold. Repeated raises with non-premium
+hands become less frequent. Every wager observes the engine's betting and reopen bounds.
+
+This is a personality heuristic, not a showdown-equity estimate or an optimal poker solver.
+Word-quality bands are not win probabilities. It does not infer opponents' ranges or keep
+cross-hand opponent memory. Decision rolls are reproducible from the hand, seat, street,
+public betting state and a purpose salt; hidden racks, future board tiles and private drafts
+are excluded. The CPU continues to act one seat per beat.
+
+The exact word search prunes dictionary prefixes that cannot form a word, with a full-search
+fallback for dictionaries without prefix lookup. Both paths use the same scorer and word
+tie-breaks, with no time cutoff or cache-dependent decisions. Run
+`pnpm --filter @wordpoker/game-rules exec tsx scripts/benchmark-bots.ts` to measure the
+seeded action mix and latency on the current machine.
+
 ---
 
 # 14. Phase 1: Blinds and Deal

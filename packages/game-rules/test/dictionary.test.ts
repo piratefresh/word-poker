@@ -120,3 +120,12 @@ describe("createDictionary", () => {
     );
   });
 });
+
+describe("dictionary prefix search", () => {
+  it("finds exact words and their prefixes without admitting invalid characters", () => {
+    const dictionary = createDictionary(artifactWith({ count: 3, words: ["AT", "CATS", "QI"] }));
+    for (const prefix of ["", "A", "AT", "CA", "CAT", "CATS", " qi "]) assert.equal(dictionary.hasPrefix?.(prefix), true, prefix);
+    for (const prefix of ["B", "CATZ", "QIY", "ZZ", "?", "A1"]) assert.equal(dictionary.hasPrefix?.(prefix), false, prefix);
+    assert.equal(createDictionary(artifactWith({ count: 0, words: [] })).hasPrefix?.(""), false);
+  });
+});
