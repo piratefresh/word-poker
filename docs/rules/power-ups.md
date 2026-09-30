@@ -77,7 +77,9 @@ The tag is what the seat's nameplate prints when the power is used (see Visibili
 Mulligan changes nobody else's tiles. The deal lays out every seat's private tiles and all five
 community tiles before the first bet (§14), so the tile it takes is one no other seat can ever
 be dealt this hand. The bag holds single letters only (§6), so that tile is already a plain
-letter.
+letter. When more than one seat uses Mulligan in the same hand, each takes a different tile: the
+first seat at the table takes the first tile after the community, the second seat the next, and
+so on. The seat decides which tile, not the order in which the powers are used.
 
 ## Swapping a Tile
 

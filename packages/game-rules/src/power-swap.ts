@@ -7,13 +7,13 @@
  * seat may use its power right now — its turn, §19's window, a fold — and what the swap does to
  * the seat's rack and draft belong to the hand (`offline.ts`).
  *
- * The letter comes from a stream of its own, `mixSeed(dealSeed, seat, "letter")`, never from the
- * deal's generator, and it is the stream's first roll. So a seat's letter is fixed the moment the
- * hand is dealt: it is the same whichever street the power is used on, and a retried use cannot
- * roll again.
+ * A rolled letter comes from a stream of its own, `mixSeed(dealSeed, seat, "letter")`, never from
+ * the deal's generator, and it is the stream's first roll; Mulligan's comes from the rest of the
+ * bag at the seat's own index. Either way a seat's letter is fixed the moment the hand is dealt:
+ * it is the same whichever street the power is used on, and a retried use cannot roll again.
  */
 
-import type { LetterTile, PowerUpId } from "@wordpoker/contracts";
+import type { LetterTile, PowerUpId, Tile } from "@wordpoker/contracts";
 
 import { OfflineActionError } from "./errors";
 import { LETTER_VALUES, type Letter } from "./letters";
@@ -26,8 +26,8 @@ const ALPHABET = Object.keys(LETTER_VALUES) as Letter[];
 const VOWELS: readonly Letter[] = ["A", "E", "I", "O", "U"];
 
 /**
- * The letters each power draws from uniformly. Mulligan is absent: it takes the next tile of the
- * hand's bag instead of rolling a letter (STO-492).
+ * The letters each power draws from uniformly. Mulligan is absent: it takes a tile from the rest
+ * of the hand's bag instead of rolling a letter.
  */
 export const SWAP_LETTERS: Readonly<Partial<Record<PowerUpId, readonly Letter[]>>> = {
   random_wild: ALPHABET,
@@ -38,6 +38,11 @@ export const SWAP_LETTERS: Readonly<Partial<Record<PowerUpId, readonly Letter[]>
 export interface SwapSource {
   readonly dealSeed: number;
   readonly seat: number;
+  /**
+   * What the hand's deal left in the bag, in shuffled order after the community tiles
+   * (`dealHand`'s `rest`). Only Mulligan reads it, so it is asked for rather than handed in.
+   */
+  readonly restOfBag: () => readonly Tile[];
 }
 
 /**
@@ -53,18 +58,45 @@ export function swappedTileId(seat: number): string {
  * The plain tile a swap power hands the seat: its letter at §6's value, no multiplier, never a
  * choice tile, and nothing inherited from the tile it replaces.
  *
- * @throws {OfflineActionError} For a power this family does not deal a letter for yet.
+ * Mulligan's letter is the bag tile at the seat's own index in the rest of the bag: the deal laid
+ * out every private and community tile up front, so that tile is one nobody else can be dealt,
+ * and each seat's is a different one whatever order the seats use their powers in. Only its
+ * letter is kept — the tile is rebuilt plain, under the swap's own id.
+ *
+ * @throws {OfflineActionError} When the bag has no tile left at the seat's index.
  */
-export function swapTile(powerUpId: PowerUpId, { dealSeed, seat }: SwapSource): LetterTile {
+export function swapTile(powerUpId: PowerUpId, source: SwapSource): LetterTile {
+  const letter = powerUpId === "mulligan" ? bagLetter(source) : rolledLetter(powerUpId, source);
+
+  return { id: swappedTileId(source.seat), letter, points: LETTER_VALUES[letter] };
+}
+
+/** Random Wild's and Vowel Magnet's letter: the first roll of the seat's letter stream. */
+function rolledLetter(powerUpId: PowerUpId, { dealSeed, seat }: SwapSource): Letter {
   const letters = SWAP_LETTERS[powerUpId];
   if (letters === undefined) {
-    throw new OfflineActionError(`${powerUpId} has no swap letter to deal yet`);
+    throw new OfflineActionError(`${powerUpId} rolls no swap letter`);
   }
 
   const roll = createRng(mixSeed(dealSeed, seat, "letter"))();
   // `?? "E"` is unreachable — the roll is in [0, 1), so the index is always in range — but the
   // read is optional under `noUncheckedIndexedAccess`, so it is spelled out rather than cast.
-  const letter = letters[Math.floor(roll * letters.length)] ?? "E";
+  return letters[Math.floor(roll * letters.length)] ?? "E";
+}
 
-  return { id: swappedTileId(seat), letter, points: LETTER_VALUES[letter] };
+/** Mulligan's letter: the seat's own tile in the rest of the hand's bag. */
+function bagLetter({ seat, restOfBag }: SwapSource): Letter {
+  const tile = restOfBag()[seat];
+  if (tile === undefined) {
+    throw new OfflineActionError(`the bag has no tile left for seat ${seat}'s Mulligan`);
+  }
+  if (!isLetter(tile.letter)) {
+    throw new OfflineActionError(`bag tile ${tile.id} prints no letter of §6's table`);
+  }
+
+  return tile.letter;
+}
+
+function isLetter(value: string): value is Letter {
+  return Object.hasOwn(LETTER_VALUES, value);
 }
