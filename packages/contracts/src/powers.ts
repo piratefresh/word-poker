@@ -93,6 +93,24 @@ export const POWER_DRAW_OFFER_COUNT = 3;
 export const POWER_DRAW_MS = 10_000;
 
 /**
+ * Every way a power action can be refused (§44). A string union for the same reason as the
+ * betting and word reasons: these cross the wire into logs and UI copy.
+ */
+export const POWER_REJECTION_REASONS = [
+  /** The seat was offered nothing this hand: no Power Draw ran, or the seat was not in it. */
+  "not-in-draw",
+  /** The pick names a power the seat was not offered. */
+  "not-offered",
+  /** The seat has already kept a power this hand; a pick is final. */
+  "already-picked",
+  /** The Power Draw has closed, or its clock has run out. */
+  "draw-closed",
+] as const;
+
+/** Why a power action was refused. */
+export type PowerRejectionReason = (typeof POWER_REJECTION_REASONS)[number];
+
+/**
  * §40's deal modes a room can run today. `off` is Classic, `choose3` is Wild. Blind Draw, Sparse,
  * Chaos and Custom are planned; each joins this list when the engine can deal it.
  */

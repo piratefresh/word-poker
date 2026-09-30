@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 import {
   DEFAULT_POWER_UP_SETTINGS,
   POWER_DRAW_OFFER_COUNT,
+  POWER_REJECTION_REASONS,
   POWER_UP_IDS,
   POWER_UPS,
   isPowerUpDealMode,
@@ -72,6 +73,18 @@ describe("POWER_UPS", () => {
 
   it("holds enough powers to fill a Power Draw", () => {
     assert.ok(POWER_UP_IDS.length >= POWER_DRAW_OFFER_COUNT);
+  });
+});
+
+describe("POWER_REJECTION_REASONS", () => {
+  it("pins every Power Draw refusal", () => {
+    // Both sides switch on these strings, so reordering or renaming one is a wire change.
+    assert.deepEqual([...POWER_REJECTION_REASONS], [
+      "not-in-draw",
+      "not-offered",
+      "already-picked",
+      "draw-closed",
+    ]);
   });
 });
 

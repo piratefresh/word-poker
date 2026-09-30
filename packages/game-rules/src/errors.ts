@@ -11,7 +11,11 @@
  * refuse an action without importing one another.
  */
 
-import type { BettingRejectionReason, WordRejectionReason } from "@wordpoker/contracts";
+import type {
+  BettingRejectionReason,
+  PowerRejectionReason,
+  WordRejectionReason,
+} from "@wordpoker/contracts";
 
 /**
  * An action that does not fit the state it was handed — dealing mid-hand, betting outside a
@@ -54,6 +58,22 @@ export class BettingRejectionError extends OfflineActionError {
   constructor(reason: BettingRejectionReason) {
     super(`the betting action was refused: ${reason}`);
     this.name = "BettingRejectionError";
+    this.reason = reason;
+  }
+}
+
+/**
+ * A power action the engine refused (§44): nothing was kept or used, and `reason` says why. The
+ * power twin of {@link BettingRejectionError} — "you were not offered that" is the table's
+ * answer to the seat, not a programming error.
+ */
+export class PowerRejectionError extends OfflineActionError {
+  /** §44's reason, ready to be shown to the seat that sent it. */
+  readonly reason: PowerRejectionReason;
+
+  constructor(reason: PowerRejectionReason) {
+    super(`the power action was refused: ${reason}`);
+    this.name = "PowerRejectionError";
     this.reason = reason;
   }
 }

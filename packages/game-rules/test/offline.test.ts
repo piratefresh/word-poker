@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { ROUND_PHASES, type BettingAction, type OfflineAction } from "@wordpoker/contracts";
+import {
+  POWER_DRAW_MS,
+  ROUND_PHASES,
+  type BettingAction,
+  type OfflineAction,
+  type PowerUpId,
+} from "@wordpoker/contracts";
 
 import { bettingBounds } from "../src/betting";
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "../src/deal";
-import { BettingRejectionError, OfflineActionError } from "../src/errors";
+import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/errors";
+import { drawOffers, type PowerDraw } from "../src/power-draw";
 import {
   OFFLINE_TURN_MS,
   reduce,
@@ -706,5 +713,159 @@ describe("reduce — illegal actions", () => {
     assert.throws(() => reduce(state, { type: "check", playerId: "hero" }, NOW + 1));
 
     assert.deepEqual(state, before);
+  });
+});
+
+describe("reduce — §44's Power Draw", () => {
+  const CPU = ["ellis", "jay", "mira"] as const;
+
+  function wildHand(options: Partial<StartHandOptions> = {}, nowMs = NOW): OfflineState {
+    return dealHand({ powerUps: { deal: "choose3", bots: CPU }, ...options }, nowMs);
+  }
+
+  function drawOf(state: OfflineState): PowerDraw {
+    assert.ok(state.powers, "a Wild hand carries its powers");
+    return state.powers.draw;
+  }
+
+  function offersOf(state: OfflineState, playerId: string): readonly PowerUpId[] {
+    const slot = drawOf(state).slots.find((candidate) => candidate.playerId === playerId);
+    assert.ok(slot, `${playerId} draws`);
+    return slot.offers;
+  }
+
+  it("leaves a Classic hand exactly as it was", () => {
+    const classic = dealHand({ powerUps: { deal: "off" } });
+
+    assert.deepEqual(classic, dealHand());
+    assert.ok(!("powers" in classic), "a Classic hand has no powers field at all");
+  });
+
+  it("deals the same tiles and posts the same blinds with power-ups on or off", () => {
+    for (let seed = 0; seed < 200; seed += 1) {
+      const off = dealHand({ seed });
+      const on = dealHand({ seed, powerUps: { deal: "choose3" } });
+
+      assert.deepEqual(on.community, off.community, `seed ${seed}: the board`);
+      assert.deepEqual(on.seats, off.seats, `seed ${seed}: the racks and the blinds`);
+    }
+  });
+
+  it("opens the draw before pre-flop's first turn, for every seat but the CPU", () => {
+    const state = wildHand();
+
+    assert.equal(state.phase, "preflop");
+    assert.equal(state.toActIndex, null, "nobody is on the clock while the draw is open");
+    assert.equal(state.endsAtMs, NOW + POWER_DRAW_MS, "the table's clock is the draw's");
+    assert.equal(state.powers?.firstToAct, FIRST_TO_ACT);
+    assert.deepEqual(state.powers?.held, {});
+    assert.deepEqual(
+      drawOf(state).slots.map(({ seat, playerId }) => ({ seat, playerId })),
+      [{ seat: 0, playerId: "hero" }],
+    );
+    assert.deepEqual(offersOf(state, "hero"), drawOffers(SEED, 0));
+  });
+
+  it("offers every seat dealt in when no seat is a bot", () => {
+    const state = dealHand({ powerUps: { deal: "choose3" } });
+
+    assert.deepEqual(drawOf(state).slots.map((slot) => slot.playerId), [...SEATS]);
+  });
+
+  it("refuses every betting action while the draw is open", () => {
+    const state = wildHand();
+    const before = cloneState(state);
+
+    assert.throws(
+      () => reduce(state, { type: "call", playerId: "mira" }, NOW + 1),
+      (error: unknown) => error instanceof BettingRejectionError && error.reason === "power-draw",
+    );
+    assert.throws(() => reduce(state, { type: "timeoutTurn" }, NOW + OFFLINE_TURN_MS), OfflineActionError);
+    assert.deepEqual(state, before);
+  });
+
+  it("closes the moment the last seat picks and puts pre-flop's first seat on the clock", () => {
+    const state = wildHand();
+    const pick = offersOf(state, "hero")[2];
+    assert.ok(pick);
+
+    const picked = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 500);
+
+    assert.equal(picked.powers?.draw.status, "closed");
+    assert.deepEqual(picked.powers?.held, { hero: { id: pick, used: false } });
+    assert.equal(picked.toActIndex, FIRST_TO_ACT);
+    assert.equal(picked.endsAtMs, NOW + 500 + OFFLINE_TURN_MS, "the turn clock starts at the close");
+    // Betting is open now, and the hand plays through to §19's window as any hand does.
+    assert.equal(playToWindow(picked, NOW + 501).wordWindow?.status, "open");
+  });
+
+  it("waits for every drawing seat before it closes", () => {
+    const state = dealHand({ powerUps: { deal: "choose3" } });
+    const pick = offersOf(state, "hero")[0];
+    assert.ok(pick);
+
+    const one = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 1);
+
+    assert.equal(one.powers?.draw.status, "open");
+    assert.equal(one.toActIndex, null);
+    assert.throws(
+      () => reduce(one, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 2),
+      (error: unknown) => error instanceof PowerRejectionError && error.reason === "already-picked",
+    );
+  });
+
+  it("keeps the first offer for a seat the clock ran out on", () => {
+    const state = wildHand();
+    const deadline = state.endsAtMs;
+
+    assert.throws(() => reduce(state, { type: "timeoutPowerDraw" }, deadline - 1), OfflineActionError);
+    const closed = reduce(state, { type: "timeoutPowerDraw" }, deadline);
+
+    assert.deepEqual(closed.powers?.held, { hero: { id: offersOf(state, "hero")[0], used: false } });
+    assert.equal(closed.toActIndex, FIRST_TO_ACT);
+    assert.equal(closed.endsAtMs, deadline + OFFLINE_TURN_MS);
+  });
+
+  it("refuses a pick at a Classic table", () => {
+    assert.throws(
+      () => reduce(dealHand(), { type: "pickPower", playerId: "hero", powerUpId: "mulligan" }, NOW),
+      (error: unknown) => error instanceof PowerRejectionError && error.reason === "not-in-draw",
+    );
+    assert.throws(() => reduce(dealHand(), { type: "timeoutPowerDraw" }, NOW), OfflineActionError);
+  });
+
+  it("rolls to §19's window after the draw when the blinds put every seat all in", () => {
+    const state = dealHand({
+      players: ["hero", "ellis"],
+      stacks: [
+        { playerId: "hero", stack: SMALL_BLIND },
+        { playerId: "ellis", stack: BIG_BLIND },
+      ],
+      powerUps: { deal: "choose3" },
+    });
+
+    assert.equal(state.powers?.draw.status, "open", "the draw still runs; the power is for §19");
+    assert.equal(state.wordWindow, null);
+
+    const closed = reduce(state, { type: "timeoutPowerDraw" }, state.endsAtMs);
+    assert.equal(closed.phase, "river");
+    assert.equal(closed.wordWindow?.status, "open");
+  });
+
+  it("clears every held power on the next deal and draws again from the new seed", () => {
+    const first = wildHand();
+    const pick = offersOf(first, "hero")[0];
+    assert.ok(pick);
+    const played = playToWindow(
+      reduce(first, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 1),
+      NOW + 2,
+    );
+    const next = reduce(payOut(played), { type: "deal" }, NOW + 10_000);
+
+    assert.equal(next.hand, 2);
+    assert.equal(next.powers?.draw.status, "open");
+    assert.deepEqual(next.powers?.held, {});
+    assert.deepEqual(next.powers?.bots, CPU);
+    assert.deepEqual(offersOf(next, "hero"), drawOffers(next.seed, 0));
   });
 });

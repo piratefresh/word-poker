@@ -49,6 +49,7 @@ export {
   startHand,
 } from "./offline";
 export type {
+  HandPowers,
   HandResult,
   OfflineSeat,
   OfflineStanding,
@@ -58,8 +59,11 @@ export type {
 export {
   BettingRejectionError,
   OfflineActionError,
+  PowerRejectionError,
   WordRejectionError,
 } from "./errors";
+export { drawOffers } from "./power-draw";
+export type { DrawSlot, HeldPower, PowerDraw } from "./power-draw";
 export { WORD_WINDOW_MS } from "./word-window";
 export type { WordSlot, WordWindow } from "./word-window";
 export { scoreWord } from "./scoring";

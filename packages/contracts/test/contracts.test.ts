@@ -35,6 +35,8 @@ const OFFLINE_ACTIONS: readonly OfflineAction[] = [
   { type: "timeoutTurn" },
   { type: "foldTurn" },
   { type: "timeoutWords" },
+  { type: "pickPower", playerId: "hero", powerUpId: "mulligan" },
+  { type: "timeoutPowerDraw" },
 ];
 
 /** Fails to compile if an action joins the union, or one of them is renamed. */
@@ -53,6 +55,8 @@ function actionType(action: OfflineAction): string {
     case "timeoutTurn":
     case "foldTurn":
     case "timeoutWords":
+    case "pickPower":
+    case "timeoutPowerDraw":
       return action.type;
     default: {
       const unhandled: never = action;
@@ -130,6 +134,8 @@ describe("wire shapes", () => {
       "timeoutTurn",
       "foldTurn",
       "timeoutWords",
+      "pickPower",
+      "timeoutPowerDraw",
     ]);
   });
 });
@@ -156,6 +162,7 @@ describe("betting vocabulary", () => {
       "insufficient-stack",
       "action-closed",
       "turn-timeout",
+      "power-draw",
     ]);
   });
 

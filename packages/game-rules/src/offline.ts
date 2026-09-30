@@ -14,6 +14,9 @@
  *
  * §19's window is its own module (`word-window.ts`): this file opens it, hands it the table on
  * every word action, and settles the hand when it closes. The window's own rules are not here.
+ * §44's Power Draw is the same kind of seam (`power-draw.ts`): at a Wild table `startHand` opens
+ * it before pre-flop's first turn, nobody bets while it is open, and the turn clock arms when it
+ * closes. A Classic table never carries it, so its hands are exactly what they were before.
  *
  * Two ends of the hand are short-circuits rather than rounds. A fold-out — one seat left
  * un-folded — goes straight to the pot with no reveal and no window (§26). An all-in run-out
@@ -41,6 +44,7 @@ import {
   WORD_CHECKS_PER_HAND,
   type PrivateWordCheckState,
   type PlayerId,
+  type PowerUpDealMode,
   type RoundPhase,
   type ShowdownComparison,
   type ShowdownStanding,
@@ -64,7 +68,10 @@ import type { Dictionary } from "./dictionary";
 import {
   BettingRejectionError,
   OfflineActionError,
+  PowerRejectionError,
 } from "./errors";
+import * as powerDraw from "./power-draw";
+import type { DrawSeat, HeldPower, PowerDraw } from "./power-draw";
 import { resolvePayout, type JudgedSeat } from "./pots";
 import { createRng } from "./rng";
 import { scoreWord } from "./scoring";
@@ -137,6 +144,23 @@ export interface HandResult {
   readonly payout: PayoutResult;
 }
 
+/**
+ * A Wild table's power-ups for one hand (§44): the draw, what each seat holds, and the turn the
+ * draw holds back until it closes. Rebuilt by every deal, so nothing carries over between hands.
+ */
+export interface HandPowers {
+  /** The seats that never draw — the CPU seats, in v1 — carried to every hand of the table. */
+  readonly bots: readonly PlayerId[];
+  readonly draw: PowerDraw;
+  /** Each drawing seat's power once it has picked, by player id. */
+  readonly held: Readonly<Record<PlayerId, HeldPower>>;
+  /**
+   * Pre-flop's first seat to act, held back while the draw is open and put on the clock when it
+   * closes; `null` when the blinds left nobody to act.
+   */
+  readonly firstToAct: number | null;
+}
+
 /** The whole offline table: one hand's deal, the street it is on, and whose turn it is. */
 export interface OfflineState {
   /** Which hand this is, 1-based. */
@@ -195,6 +219,11 @@ export interface OfflineState {
    * the felt and the pot are read off it after the hand has paid out.
    */
   result: HandResult | null;
+  /**
+   * §44's power-ups, present only at a table that deals them (Wild, `choose3`). A Classic hand
+   * has no such field at all, so its state is exactly what it was before power-ups existed.
+   */
+  powers?: HandPowers;
 }
 
 /** What `startHand` needs: a seed, the seats, the caller's clock reading, and the table's rules. */
@@ -230,6 +259,12 @@ export interface StartHandOptions {
   /** The seat holding the dealer button. Absent means seat 0, the first hand's button. */
   dealerSeat?: number;
   turnDurationMs?: number;
+  /**
+   * The table's power-up deal mode (§40, §44). Absent or `off` is Classic: no draw and no
+   * `powers` on the state. `choose3` opens the Power Draw on every deal for every seat dealt in
+   * except `bots`, which v1 leaves without powers.
+   */
+  powerUps?: { deal: PowerUpDealMode; bots?: readonly PlayerId[] };
 }
 
 function freshWordChecks(
@@ -266,6 +301,7 @@ export function startHand({
   stacks,
   dealerSeat,
   turnDurationMs: requestedTurnDurationMs,
+  powerUps,
 }: StartHandOptions): OfflineState {
   const turnDurationMs = requestedTurnDurationMs ?? OFFLINE_TURN_MS;
   if (!Number.isFinite(turnDurationMs) || turnDurationMs <= 0) {
@@ -340,10 +376,76 @@ export function startHand({
     result: null,
   };
 
+  if (powerUps?.deal === "choose3") {
+    return openPowerDraw(state, powerUps.bots ?? [], nowMs);
+  }
+
   // Nobody left to act means the whole table is all in on the posts alone: the streets below
   // have nothing to bet, so the hand rolls straight to §19's window, exactly as it does when
   // the last round closes with everyone all in (§13's all-in run-out).
   return toActIndex === null ? rollStreets(state, nowMs) : state;
+}
+
+/**
+ * Opens §44's Power Draw on a freshly dealt hand: every seat dealt in draws, except the CPU
+ * seats. Pre-flop's first turn waits for the draw to close — the seat is held back on
+ * `firstToAct`, and `endsAtMs` is the draw's clock until then. A table where nobody draws
+ * records an empty, closed draw and plays on as if it had none.
+ */
+function openPowerDraw(state: OfflineState, bots: readonly PlayerId[], nowMs: number): OfflineState {
+  const drawing: DrawSeat[] = [];
+  state.seats.forEach((seat, index) => {
+    if (!seat.sittingOut && !bots.includes(seat.id)) drawing.push({ seat: index, playerId: seat.id });
+  });
+
+  const draw: PowerDraw =
+    drawing.length > 0
+      ? powerDraw.openDraw(drawing, state.seed, nowMs)
+      : { status: "closed", endsAtMs: nowMs, slots: [] };
+  const powers: HandPowers = { bots, draw, held: {}, firstToAct: state.toActIndex };
+
+  return draw.status === "open"
+    ? { ...state, toActIndex: null, endsAtMs: draw.endsAtMs, powers }
+    : closePowerDraw({ ...state, powers }, powers, nowMs);
+}
+
+/**
+ * The Power Draw closing, early or on its clock: pre-flop's first seat goes on the clock from
+ * `nowMs`, or — when the blinds left nobody to act — the hand rolls straight to §19's window.
+ */
+function closePowerDraw(state: OfflineState, powers: HandPowers, nowMs: number): OfflineState {
+  const armed = { ...state, toActIndex: powers.firstToAct };
+
+  return powers.firstToAct === null
+    ? rollStreets(armed, nowMs)
+    : { ...armed, endsAtMs: nowMs + state.turnDurationMs };
+}
+
+/** One seat keeps a power at §44's Power Draw, and pre-flop starts if that was the last pick. */
+function applyPick(
+  state: OfflineState,
+  action: Extract<OfflineAction, { type: "pickPower" }>,
+  nowMs: number,
+): OfflineState {
+  if (state.powers === undefined) throw new PowerRejectionError("not-in-draw");
+
+  const draw = powerDraw.pickPower(state.powers.draw, action.playerId, action.powerUpId, nowMs);
+  const powers: HandPowers = { ...state.powers, draw, held: powerDraw.heldPowers(draw) };
+  const next = { ...state, powers };
+
+  return draw.status === "closed" ? closePowerDraw(next, powers, nowMs) : next;
+}
+
+/** §44's Power Draw closing on its clock: every seat that has not picked keeps its first offer. */
+function timeoutPowerDraw(state: OfflineState, nowMs: number): OfflineState {
+  if (state.powers === undefined) {
+    throw new OfflineActionError(`no Power Draw is open at ${where(state)}`);
+  }
+
+  const draw = powerDraw.timeoutDraw(state.powers.draw, nowMs);
+  const powers: HandPowers = { ...state.powers, draw, held: powerDraw.heldPowers(draw) };
+
+  return closePowerDraw({ ...state, powers }, powers, nowMs);
 }
 
 /**
@@ -418,6 +520,12 @@ export function reduce(state: OfflineState, action: OfflineAction, nowMs: number
       return nextHand(state, nowMs);
     }
 
+    case "pickPower":
+      return applyPick(state, action, nowMs);
+
+    case "timeoutPowerDraw":
+      return timeoutPowerDraw(state, nowMs);
+
     case "checkWord":
       return applyWordCheck(state, action);
 
@@ -451,6 +559,10 @@ function applyBetting(
   nowMs: number,
   allowExpired = false,
 ): OfflineState {
+  // §44: nobody bets while the Power Draw is open; pre-flop's first turn starts when it closes.
+  if (state.powers?.draw.status === "open") {
+    throw new BettingRejectionError("power-draw");
+  }
   const round = state.betting;
   if (round === null || state.toActIndex === null) {
     // No round is open: the seats are building words, or the hand has paid out (§19, §26).
@@ -834,6 +946,7 @@ export function availableTiles(state: OfflineState, seatIndex: number): readonly
 
 /** Where the table is, for a refusal to name: the phase, and §19's window when it is open. */
 function where(state: OfflineState): string {
+  if (state.powers?.draw.status === "open") return `${state.phase} with its Power Draw open`;
   return state.wordWindow?.status === "open" ? `${state.phase} with its word window open` : state.phase;
 }
 
@@ -878,6 +991,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     wordBuilding: { autoSubmitDrafts: state.autoSubmitDrafts },
     stakes: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
     turnDurationMs: state.turnDurationMs,
+    ...(state.powers === undefined ? {} : { powerUps: { deal: "choose3", bots: state.powers.bots } }),
   });
 
   return { ...fresh, hand: state.hand + 1 };
