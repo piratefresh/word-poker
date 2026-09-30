@@ -19,6 +19,7 @@ import { drawOffers, type PowerDraw } from "../src/power-draw";
 import { swapTile } from "../src/power-swap";
 import {
   OFFLINE_TURN_MS,
+  canUsePower,
   reduce,
   revealedCount,
   startHand,
@@ -1096,6 +1097,21 @@ describe("reduce — §44's held power", () => {
     assert.equal(window.wordWindow?.status, "open");
     const used = use(window, heroTile(window).id, "random_wild", window.endsAtMs - 1);
     assert.equal(used.powers?.held.hero?.used, true);
+  });
+
+  it("says when a power could be used, by the same checks the use makes", () => {
+    const waiting = holding("random_wild");
+    const onTurn = heroOnTurn("random_wild");
+    const used = use(onTurn, heroTile(onTurn).id);
+    const window = playToWindow(holding("random_wild"), NOW + 2);
+
+    assert.equal(canUsePower(dealHand(), "hero", NOW), false, "a Classic table");
+    assert.equal(canUsePower(waiting, "hero", NOW + 2), false, "off the seat's turn");
+    assert.equal(canUsePower(waiting, "mira", NOW + 2), false, "a CPU seat holds nothing");
+    assert.equal(canUsePower(onTurn, "hero", NOW + 3), true, "on the seat's turn");
+    assert.equal(canUsePower(onTurn, "hero", onTurn.endsAtMs), false, "the turn's clock ran out");
+    assert.equal(canUsePower(used, "hero", NOW + 4), false, "already used");
+    assert.equal(canUsePower(window, "hero", window.endsAtMs - 1), true, "in §19's window");
   });
 
   it("hands a Mulligan the seat's own tile from the rest of the bag, touching no other tile", () => {

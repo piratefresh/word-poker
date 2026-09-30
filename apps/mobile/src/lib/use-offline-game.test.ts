@@ -1,7 +1,14 @@
 import { act, renderHook } from "@testing-library/react-native";
 
-import type { Tile } from "@wordpoker/contracts";
-import { LETTER_VALUES, WORD_WINDOW_MS, dealHand, type Letter } from "@wordpoker/game-rules";
+import { POWER_DRAW_MS, type PowerUpId, type Tile } from "@wordpoker/contracts";
+import {
+  LETTER_VALUES,
+  WORD_WINDOW_MS,
+  dealHand,
+  drawOffers,
+  swappedTileId,
+  type Letter,
+} from "@wordpoker/game-rules";
 
 import { duration } from "@/constants/theme";
 import type { GamePlayer } from "@/components/screens/game/game-types";
@@ -789,5 +796,190 @@ describe("useOfflineGame — the chips in flight", () => {
     expect(result.current.game.phase).toBe("preflop");
     expect(result.current.game.handId).toBe("offline-hand-2");
     expect(result.current.game.flights).toEqual([]);
+  });
+});
+
+describe("useOfflineGame — the Wild table (§44)", () => {
+  /** A Wild table (`?powers=wild`): the Power Draw opens on every deal, for the hero alone. */
+  async function wildTable(seed = SEED): Promise<Table> {
+    const dictionary = testDictionary([heroWord(seed)]);
+    const { result } = await renderHook(() =>
+      useOfflineGame({ seed, dictionary, powerUps: "choose3" }),
+    );
+    return result as Table;
+  }
+
+  async function pick(result: Table, powerUpId: PowerUpId) {
+    await act(async () => {
+      result.current.pickPower(powerUpId);
+    });
+  }
+
+  async function use(result: Table, powerUpId: PowerUpId, tileId: string) {
+    await act(async () => {
+      result.current.usePower(powerUpId, tileId);
+    });
+  }
+
+  function heroTile(index: number): Tile {
+    const tile = heroTiles()[index];
+    if (tile === undefined) throw new Error(`the hero has no tile ${index}`);
+    return tile;
+  }
+
+  test("leaves a table that asks for no mode exactly as it was", async () => {
+    const classic = await table();
+    const { result } = await renderHook(() =>
+      useOfflineGame({ seed: SEED, dictionary: testDictionary([heroWord()]), powerUps: "off" }),
+    );
+
+    expect(classic.current.powers).toBeNull();
+    expect((result as Table).current.powers).toBeNull();
+    expect((result as Table).current.game.privateTiles).toEqual(classic.current.game.privateTiles);
+  });
+
+  test("opens the hero's draw on the deal and holds the table until it closes", async () => {
+    const result = await wildTable();
+
+    expect(result.current.powers).toMatchObject({
+      draw: { offers: drawOffers(SEED, 0), picked: null },
+      held: null,
+      swap: null,
+      used: [],
+    });
+    // The same tiles as the Classic table: the draw rolls from its own stream.
+    expect(result.current.game.privateTiles).toEqual(heroTiles());
+    // Nobody is on the clock while the draw is open, so no bot moves on its beat.
+    expect(result.current.game.players.map((player) => player?.status)).toEqual([
+      "waiting",
+      "waiting",
+      "waiting",
+      "waiting",
+    ]);
+    await beat();
+    await beat();
+    expect(result.current.game.pot).toBe(BLINDS_POSTED);
+  });
+
+  test("keeps the hero's pick and puts pre-flop's first seat on the clock", async () => {
+    const result = await wildTable();
+    const kept = drawOffers(SEED, 0)[1];
+    if (kept === undefined) throw new Error("the draw offers three powers");
+
+    await pick(result, kept);
+
+    expect(result.current.powers?.draw).toBeNull();
+    // mira is on the clock, so the power is held but cannot be used yet.
+    expect(result.current.powers?.held).toEqual({ id: kept, used: false, usable: false });
+    expect(result.current.game.players[3]?.status).toBe("thinking");
+
+    await passedToTheHero(result);
+    expect(result.current.powers?.held).toEqual({ id: kept, used: false, usable: true });
+  });
+
+  test("keeps the first offer for a hero whose draw clock runs out", async () => {
+    const result = await wildTable();
+
+    await act(async () => {
+      jest.advanceTimersByTime(POWER_DRAW_MS + 100);
+    });
+
+    expect(result.current.powers?.draw).toBeNull();
+    expect(result.current.powers?.held?.id).toBe(drawOffers(SEED, 0)[0]);
+    // The draw closing starts the table: the bots move on their beat again.
+    await passedToTheHero(result);
+    expect(row(result).canFold).toBe(true);
+  });
+
+  test("uses the power on the hero's turn: the tile swaps, the table sees it, the turn stays", async () => {
+    const result = await wildTable();
+    await pick(result, "random_wild");
+    await passedToTheHero(result);
+
+    await use(result, "random_wild", heroTile(0).id);
+
+    const swap = result.current.powers?.swap;
+    expect(swap).toMatchObject({ handId: 1, powerUpId: "random_wild", discardedTileId: heroTile(0).id });
+    expect(swap?.tile.id).toBe(swappedTileId(0));
+    expect(result.current.game.privateTiles).toEqual([swap?.tile, heroTile(1)]);
+    expect(result.current.powers?.held).toEqual({ id: "random_wild", used: true, usable: false });
+    expect(result.current.powers?.used).toEqual([
+      { handId: 1, seat: 0, powerUpId: "random_wild", street: "preflop" },
+    ]);
+    expect(result.current.powers?.tags).toEqual(new Map([[0, "random_wild"]]));
+    // Using a power is not a betting action: the row is still the hero's.
+    expect(row(result).canFold).toBe(true);
+
+    // The hero's call sits beside the tag on the nameplate, rather than replacing it.
+    await act(async () => {
+      result.current.call();
+    });
+    expect(result.current.powers?.tags).toEqual(new Map([[0, "random_wild"]]));
+    expect(result.current.game.players[0]?.status).toBe("call");
+
+    // The felt's card clears, and says so.
+    const [event] = result.current.powers?.used ?? [];
+    if (event === undefined) throw new Error("the use made a public event");
+    await act(async () => {
+      result.current.endPowerUsed(event);
+    });
+    expect(result.current.powers?.used).toEqual([]);
+  });
+
+  test("refuses a use off the hero's turn, and changes nothing", async () => {
+    const result = await wildTable();
+    await pick(result, "random_wild");
+
+    await use(result, "random_wild", heroTile(0).id);
+
+    expect(result.current.powers?.held).toMatchObject({ used: false });
+    expect(result.current.powers?.used).toEqual([]);
+    expect(result.current.game.privateTiles).toEqual(heroTiles());
+  });
+
+  test("takes the discarded tile out of the draft the hero is building between streets", async () => {
+    const result = await wildTable();
+    await pick(result, "vowel_magnet");
+    await passedToTheHero(result);
+    await act(async () => {
+      result.current.setDraft(heroTiles().map(playOf));
+    });
+
+    await use(result, "vowel_magnet", heroTile(0).id);
+
+    expect(result.current.words?.plays).toEqual([playOf(heroTile(1))]);
+  });
+
+  test("uses the power in §19's window, and judges the draft with the new tile in it", async () => {
+    const result = await wildTable();
+    await pick(result, "vowel_magnet");
+    await playToWindow(result);
+
+    await use(result, "vowel_magnet", heroTile(0).id);
+    const tile = result.current.powers?.swap?.tile;
+    if (tile === undefined) throw new Error("the swap landed");
+    expect(tile.letter).toMatch(/^[AEIOU]$/);
+
+    await act(async () => {
+      result.current.setDraft([{ tileId: tile.id }, playOf(heroTile(1))]);
+    });
+
+    expect(result.current.words).toMatchObject({
+      plays: [{ tileId: tile.id }, playOf(heroTile(1))],
+      word: `${tile.letter}${heroTile(1).letter}`,
+    });
+    expect(result.current.powers?.used).toEqual([
+      { handId: 1, seat: 0, powerUpId: "vowel_magnet", street: "river" },
+    ]);
+  });
+
+  test("keeps the Wild table for a new session", async () => {
+    const result = await wildTable();
+
+    await act(async () => {
+      result.current.newGame();
+    });
+
+    expect(result.current.powers?.draw).not.toBeNull();
   });
 });

@@ -1,0 +1,43 @@
+/**
+ * power-view.ts — §44's power-ups as the felt reads them, whichever adapter feeds it.
+ *
+ * The offline adapter decodes the engine's `state.powers` into this; the online adapter will map
+ * the room's private draw, swap and public `powerUsed` events into the same shape (STO-500), so
+ * the Power Draw reveal, the held-power chip and the "power used" card are drawn from one view
+ * and never learn which table they sit at. The swap and the public event are the wire's own
+ * shapes (`@wordpoker/contracts`), because they are exactly what the room sends.
+ *
+ * Only ever the hero's side: the offers, the held power and the swap's result are private, and
+ * the one thing about another seat here is what the whole table sees — that it used a power.
+ */
+
+import type { PowerUpId, PowerUsedEvent, PrivatePowerSwap } from "@wordpoker/contracts";
+
+/** The hero's side of a Wild table's hand. A Classic table has none at all. */
+export interface PowerView {
+  /**
+   * The hero's Power Draw while it is open: the offers in the order drawn — the first is what the
+   * hero keeps if the clock runs out — and when the clock runs out, in epoch ms on this device.
+   * `picked` is set once the hero has kept one and the draw is still waiting on other seats.
+   * `null` when no draw is open for the hero.
+   */
+  readonly draw: {
+    readonly offers: readonly PowerUpId[];
+    readonly endsAtMs: number;
+    readonly picked: PowerUpId | null;
+  } | null;
+  /**
+   * The power the hero holds this hand, and whether it can be used right now — the engine's
+   * answer (its own betting turn, or §19's window before it confirms), never the felt's.
+   */
+  readonly held: { readonly id: PowerUpId; readonly used: boolean; readonly usable: boolean } | null;
+  /** What the hero's swap did, once it has used one: the flip reads it. Private to the hero. */
+  readonly swap: PrivatePowerSwap | null;
+  /**
+   * The public "power used" events of this hand the felt has not shown yet, oldest first: the
+   * center-of-felt card plays them in order and reports each one back when it clears.
+   */
+  readonly used: readonly PowerUsedEvent[];
+  /** The power each seat used on the street in play, by seat index: the nameplate's tag. */
+  readonly tags: ReadonlyMap<number, PowerUpId>;
+}

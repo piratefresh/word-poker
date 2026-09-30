@@ -30,6 +30,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   OfflineAction,
   PlayerId,
+  PowerUpDealMode,
+  PowerUpId,
+  PowerUsedEvent,
   PrivateWordCheckState,
   TilePlay,
   WordRejectionReason,
@@ -38,8 +41,10 @@ import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import {
   BettingRejectionError,
   DEFAULT_STAKES,
+  PowerRejectionError,
   WordRejectionError,
   availableTiles,
+  canUsePower,
   chooseOfflineWord,
   decideOfflineMove,
   reduce,
@@ -57,6 +62,7 @@ import type { WordDraft } from "@/components/word-builder";
 import { colors, duration, palette } from "@/constants/theme";
 import { feltControls, heroView, isUnbuildable, type HeroPerspective } from "@/lib/hero-view";
 import { randomSeed } from "@/lib/offline-seed";
+import type { PowerView } from "@/lib/power-view";
 
 /** The hero always sits in this seat; the bots fill the rest. */
 const HERO_ID: PlayerId = "hero";
@@ -74,6 +80,11 @@ const ROSTER: readonly { id: PlayerId; name: string; initials: string }[] = [
   { id: "jay", name: "Jay", initials: "JA" },
   { id: "mira", name: "Mira", initials: "MI" },
 ];
+
+/** The CPU seats: every seat but the hero's. In v1 they neither draw nor hold a power (§44). */
+const BOT_IDS: readonly PlayerId[] = ROSTER.filter((player) => player.id !== HERO_ID).map(
+  (player) => player.id,
+);
 
 export interface OfflineGame {
   /** The mapped state: exactly what `GameScreen` renders. */
@@ -122,6 +133,18 @@ export interface OfflineGame {
   confirmWord: () => void;
   /** Checks the current draft against this hand's dictionary using one private attempt. */
   checkWord: () => void;
+  /** The hero's side of §44's power-ups; `null` at a Classic table. */
+  powers: PowerView | null;
+  /** Keeps one of the powers the Power Draw offered the hero. */
+  pickPower: (powerUpId: PowerUpId) => void;
+  /**
+   * Uses the hero's held power on one of its private tiles. The new tile takes the discarded
+   * one's place, and the discarded tile leaves the hero's draft. A use the engine refuses — off
+   * the hero's turn, a tap that raced the clock — is dropped, as a stale betting tap is.
+   */
+  usePower: (powerUpId: PowerUpId, tileId: string) => void;
+  /** The felt has shown a "power used" card and it has cleared. */
+  endPowerUsed: (event: PowerUsedEvent) => void;
   /**
    * A chip flight that has landed, so the felt stops drawing it. The layer over the table
    * reports its own flight's id when the chips are down; a new hand drops whatever is still in
@@ -160,6 +183,7 @@ export function useOfflineGame({
   seed,
   dictionary,
   turnDurationMs,
+  powerUps,
 }: {
   /**
    * The seed the whole session replays from: this hand, and every hand after it, since the
@@ -176,19 +200,19 @@ export function useOfflineGame({
    * asks for a clock nobody can run out of gets one.
    */
   turnDurationMs?: number;
+  /**
+   * The table's power-up deal mode (§40): `choose3` is the Wild table, which opens §44's Power
+   * Draw on every deal; absent or `off` is Classic, and plays exactly as the table always has.
+   * It is the table's, so a new session keeps it.
+   */
+  powerUps?: PowerUpDealMode;
 }): OfflineGame {
   const [state, setState] = useState<OfflineState>(() =>
     // The deal leaves the first turn to the seat clockwise from the button — a bot on this
     // roster — and that turn is taken on the same beat as every other one: the table is dealt
-    // with a seat thinking, not with the opening already played out.
-    startHand({
-      seed,
-      players: ROSTER.map((player) => player.id),
-      nowMs: Date.now(),
-      dictionary,
-      stakes: DEFAULT_STAKES,
-      turnDurationMs,
-    }),
+    // with a seat thinking, not with the opening already played out. At a Wild table the Power
+    // Draw holds that turn back until it closes.
+    openTable({ seed, dictionary, turnDurationMs, powerUps }),
   );
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
 
@@ -240,16 +264,31 @@ export function useOfflineGame({
    * street rather than the hand's history.
    */
   const noteSeatAction = useCallback((previous: OfflineState, action: OfflineAction) => {
-    const seat = previous.toActIndex;
+    // A power is used by a named seat — inside §19's window nobody is on the turn — and it sits
+    // beside the street's betting action rather than replacing it: using one does not end a turn.
+    const power = action.type === "usePowerUp" ? action.powerUpId : null;
+    const seat =
+      action.type === "usePowerUp"
+        ? previous.seats.findIndex((candidate) => candidate.id === action.playerId)
+        : previous.toActIndex;
     const status = actionStatus(action);
-    if (seat === null || status === null) return;
+    if (seat === null || seat < 0 || (status === null && power === null)) return;
 
     const street = streetOf(previous);
-    setSeatActions((live) => [
-      ...live.filter((entry) => entry.street === street && entry.seat !== seat),
-      { seat, status, street },
-    ]);
+    setSeatActions((live) => {
+      const earlier = live.find((entry) => entry.street === street && entry.seat === seat);
+      return [
+        ...live.filter((entry) => entry.street === street && entry.seat !== seat),
+        { seat, street, status: status ?? earlier?.status ?? null, power: power ?? earlier?.power ?? null },
+      ];
+    });
   }, []);
+
+  /**
+   * §44's public side: every power used this session that the felt has not shown yet. The felt's
+   * card reports each one back when it clears, and the view drops those of hands gone by.
+   */
+  const [powerEvents, setPowerEvents] = useState<readonly PowerUsedEvent[]>([]);
 
   /**
    * Runs one action of the table's — the hero's tap, §19's clock, a CPU seat's turn — and lets
@@ -260,24 +299,29 @@ export function useOfflineGame({
    * A betting action the engine refused — the hero's clock fired as the hero tapped, or a second
    * tap landed on a control the last transition had already moved — is dropped the same way,
    * without a message: there is nothing for the seat to fix, and the felt is already rendering
-   * the table that refused it.
+   * the table that refused it. A refused power action is the same kind of stale tap.
+   *
+   * Reports whether the action landed, for the dispatcher that has more to do when it did.
    */
   const act = useCallback(
-    (action: OfflineAction, nowMs = Date.now()) => {
+    (action: OfflineAction, nowMs = Date.now()): boolean => {
       // Read through the ref rather than through a render's closure: an action lands on the table
       // as it stands, whoever asked for it.
       const current = stateRef.current;
       try {
         const next = reduce(current, action, nowMs);
         noteSeatAction(current, action);
+        const used = powerUsedBy(current, action);
+        if (used !== null) setPowerEvents((live) => [...live, used]);
         commit(current, next);
         setRefusal(null);
+        return true;
       } catch (error) {
         if (error instanceof WordRejectionError) {
           setRefusal(error.reason);
-          return;
+          return false;
         }
-        if (error instanceof BettingRejectionError) return;
+        if (error instanceof BettingRejectionError || error instanceof PowerRejectionError) return false;
         throw error;
       }
     },
@@ -349,18 +393,9 @@ export function useOfflineGame({
     // that ended would read as words of the new one's street.
     setFlights([]);
     setSeatActions([]);
-    commit(
-      stateRef.current,
-      startHand({
-        seed: randomSeed(),
-        players: ROSTER.map((player) => player.id),
-        nowMs: Date.now(),
-        dictionary,
-        stakes: DEFAULT_STAKES,
-        turnDurationMs,
-      }),
-    );
-  }, [commit, dictionary, turnDurationMs]);
+    setPowerEvents([]);
+    commit(stateRef.current, openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps }));
+  }, [commit, dictionary, powerUps, turnDurationMs]);
 
   /**
    * Replaces the hero's draft with the one the seat has built — playing a tile, taking one back,
@@ -445,6 +480,57 @@ export function useOfflineGame({
     return () => clearTimeout(timer);
   }, [act, state.betting, state.toActIndex, state.endsAtMs, state.seats]);
 
+  // §44's Power Draw holds the table: nobody is on the clock while it is open, so neither the
+  // bots' beat nor the hero's turn clock runs, and pre-flop's first turn arms when it closes. Its
+  // own clock is the table's too — a hero who never picks keeps the first offer when it runs out.
+  const drawOpen = state.powers?.draw.status === "open";
+  useEffect(() => {
+    if (!drawOpen) return;
+
+    const timer = setTimeout(() => {
+      const current = stateRef.current;
+      if (current.powers?.draw.status !== "open") return;
+
+      act({ type: "timeoutPowerDraw" }, Math.max(Date.now(), current.endsAtMs));
+    }, untilDeadline(state.endsAtMs));
+
+    return () => clearTimeout(timer);
+  }, [act, drawOpen, state.endsAtMs]);
+
+  const pickPower = useCallback(
+    (powerUpId: PowerUpId) => {
+      act({ type: "pickPower", playerId: HERO_ID, powerUpId });
+    },
+    [act],
+  );
+
+  const usePower = useCallback(
+    (powerUpId: PowerUpId, tileId: string) => {
+      if (!act({ type: "usePowerUp", playerId: HERO_ID, powerUpId, tileId })) return;
+      // The discarded tile leaves the draft the device holds between streets too; inside §19's
+      // window the engine has already taken it out of the seat's slot.
+      setHeroDraft((draft) => {
+        const kept = draft.filter((play) => play.tileId !== tileId);
+        return kept.length === draft.length ? draft : kept;
+      });
+    },
+    [act],
+  );
+
+  const endPowerUsed = useCallback((event: PowerUsedEvent) => {
+    setPowerEvents((live) => {
+      const remaining = live.filter(
+        (candidate) => candidate.handId !== event.handId || candidate.seat !== event.seat,
+      );
+      return remaining.length === live.length ? live : remaining;
+    });
+  }, []);
+
+  const powers = useMemo(
+    () => powerViewOf(state, powerEvents, seatActions),
+    [powerEvents, seatActions, state],
+  );
+
   /**
    * A flight that has landed: the layer over the felt reports its own id, and the felt stops
    * drawing it. Nothing else ends one — a chip that lands is the layer's to report, and a new
@@ -505,10 +591,92 @@ export function useOfflineGame({
     setDraft,
     confirmWord,
     checkWord,
+    powers,
+    pickPower,
+    usePower,
+    endPowerUsed,
     endChipFlight,
     sessionOver: game.sessionOver,
     newGame,
   };
+}
+
+/**
+ * §44's power-ups as the hero sees them (`PowerView`), or `null` at a Classic table. Everything
+ * here is read off the engine: the hero's slot in the draw, what it holds and whether the engine
+ * would take a use right now, and the swap the held power recorded. The public events and the
+ * nameplate tags are the adapter's own record, kept to this hand and this street.
+ */
+function powerViewOf(
+  state: OfflineState,
+  events: readonly PowerUsedEvent[],
+  seatActions: readonly SeatAction[],
+): PowerView | null {
+  const powers = state.powers;
+  if (powers === undefined) return null;
+
+  const slot = powers.draw.slots.find((candidate) => candidate.playerId === HERO_ID);
+  const held = powers.held[HERO_ID];
+  const street = streetOf(state);
+  // The table's own timers settle every deadline — a turn that runs out is folded, a window that
+  // runs out is closed — so between two transitions the clock in play is still running. Reading
+  // "now" as its last millisecond asks the engine exactly that, without a clock read in render.
+  const nowMs = state.endsAtMs - 1;
+
+  return {
+    draw:
+      powers.draw.status === "open" && slot !== undefined
+        ? { offers: slot.offers, endsAtMs: powers.draw.endsAtMs, picked: slot.picked }
+        : null,
+    held:
+      held === undefined
+        ? null
+        : { id: held.id, used: held.used, usable: canUsePower(state, HERO_ID, nowMs) },
+    swap:
+      held?.swap === undefined
+        ? null
+        : {
+            handId: state.hand,
+            powerUpId: held.id,
+            discardedTileId: held.swap.discardedTileId,
+            tile: held.swap.tile,
+          },
+    used: events.filter((event) => event.handId === state.hand),
+    tags: new Map(
+      seatActions.flatMap((entry) =>
+        entry.street === street && entry.power !== null && entry.seat !== -1
+          ? [[entry.seat, entry.power] as const]
+          : [],
+      ),
+    ),
+  };
+}
+
+/**
+ * Deals a session's first hand at this table: the roster, the offline stakes, the table's clock
+ * and its power-up mode. The first deal and New game both come through here, so a restarted
+ * session is the same table with a fresh seed.
+ */
+function openTable({
+  seed,
+  dictionary,
+  turnDurationMs,
+  powerUps,
+}: {
+  seed: number;
+  dictionary: Dictionary;
+  turnDurationMs: number | undefined;
+  powerUps: PowerUpDealMode | undefined;
+}): OfflineState {
+  return startHand({
+    seed,
+    players: ROSTER.map((player) => player.id),
+    nowMs: Date.now(),
+    dictionary,
+    stakes: DEFAULT_STAKES,
+    turnDurationMs,
+    ...(powerUps === "choose3" ? { powerUps: { deal: "choose3", bots: BOT_IDS } } : {}),
+  });
 }
 
 /**
@@ -556,11 +724,30 @@ function windowRanOut(state: OfflineState, nowMs: number): boolean {
  * What a seat was last seen doing, and the street it did it on: the nameplate's own vocabulary
  * for the actions that leave nothing behind them. FOLD and ALL-IN are not here — the seat's own
  * flags carry those, and a pill saying FOLD for a folded seat is the engine's answer already.
+ * A power used on the street rides beside the betting action (§44): `status` is `null` for a
+ * seat that has used one and not acted yet.
  */
 interface SeatAction {
   readonly seat: number;
-  readonly status: Extract<PlayerStatus, "bet" | "check" | "call" | "raise">;
+  readonly status: Extract<PlayerStatus, "bet" | "check" | "call" | "raise"> | null;
+  readonly power: PowerUpId | null;
   readonly street: string;
+}
+
+/**
+ * The public event a power action makes, read off the table it landed on: who used which power,
+ * on which street. `null` for every other action. Only called once the engine has taken the use,
+ * which it never does at the payout.
+ */
+function powerUsedBy(state: OfflineState, action: OfflineAction): PowerUsedEvent | null {
+  if (action.type !== "usePowerUp" || state.phase === "payout") return null;
+
+  return {
+    handId: state.hand,
+    seat: state.seats.findIndex((seat) => seat.id === action.playerId),
+    powerUpId: action.powerUpId,
+    street: state.phase,
+  };
 }
 
 /** The street an action was taken on, as the felt tells the ones the table has moved past. */
@@ -676,7 +863,9 @@ function perspectiveOf(
     handId: handIdOf(state),
     flights,
     lastActions: new Map(
-      seatActions.filter((entry) => entry.street === street).map((entry) => [entry.seat, entry.status] as const),
+      seatActions.flatMap((entry) =>
+        entry.street === street && entry.status !== null ? [[entry.seat, entry.status] as const] : [],
+      ),
     ),
     phase: state.phase,
     seatCount: toSeatCount(state.seats.length),

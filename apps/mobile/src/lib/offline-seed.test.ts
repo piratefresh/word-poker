@@ -1,4 +1,4 @@
-import { pinnedSeed } from "./offline-seed";
+import { pinnedPowerUps, pinnedSeed } from "./offline-seed";
 
 describe("pinnedSeed", () => {
   test("reads the seed a URL names", () => {
@@ -19,5 +19,20 @@ describe("pinnedSeed", () => {
 
   test("is no pin when the URL names something that is not a number", () => {
     expect(pinnedSeed("not-a-seed")).toBeUndefined();
+  });
+});
+
+describe("pinnedPowerUps", () => {
+  test("reads the Wild table off the URL", () => {
+    expect(pinnedPowerUps("wild")).toBe("choose3");
+    expect(pinnedPowerUps(" Wild ")).toBe("choose3");
+    expect(pinnedPowerUps(["wild", "off"])).toBe("choose3");
+  });
+
+  test("is Classic when the URL names no mode, or one it does not know", () => {
+    expect(pinnedPowerUps(undefined)).toBe("off");
+    expect(pinnedPowerUps("")).toBe("off");
+    expect(pinnedPowerUps("chaos")).toBe("off");
+    expect(pinnedPowerUps("choose3")).toBe("off");
   });
 });

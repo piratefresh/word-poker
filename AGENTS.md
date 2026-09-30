@@ -73,6 +73,12 @@ it was taken on (`seatActions` in the adapter); the engine stores what a seat co
 gesture that committed it, so CHECK, CALL, BET and RAISE have nowhere else to come from. Tests
 that own the table's clock advance it `duration.cpuBeat` at a time.
 
+At a Wild table (`/offline?powers=wild`, §44) the Power Draw opens on every deal and holds the
+table: nobody is on the clock, so no bot beat runs until the hero picks or `POWER_DRAW_MS` runs
+out. A power used on a street rides beside that street's action in `seatActions`, and the power
+UI reads the adapter's `powers` (`PowerView`, `lib/power-view.ts`) — the shape the online adapter
+will fill too. Whether a power can be used is the engine's `canUsePower`, never the felt's.
+
 # End-to-end (web)
 
 UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:

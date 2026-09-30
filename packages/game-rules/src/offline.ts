@@ -46,7 +46,9 @@ import {
   WORD_CHECKS_PER_HAND,
   type PrivateWordCheckState,
   type PlayerId,
+  type PowerRejectionReason,
   type PowerUpDealMode,
+  type PowerUpId,
   type RoundPhase,
   type ShowdownComparison,
   type ShowdownStanding,
@@ -466,21 +468,18 @@ function applyUsePower(
   action: Extract<OfflineAction, { type: "usePowerUp" }>,
   nowMs: number,
 ): OfflineState {
-  const powers = state.powers;
-  if (powers === undefined) throw new PowerRejectionError("powers-off");
+  const refusal = powerUseRefusal(state, action.playerId, action.powerUpId, nowMs);
+  if (refusal !== null) throw new PowerRejectionError(refusal);
 
+  // The refusal above has already found all three; `powers`, `seat` and `held` are re-read
+  // rather than cast, because the checker hands back a reason, not the things it found.
+  const powers = state.powers;
   const seatIndex = state.seats.findIndex((candidate) => candidate.id === action.playerId);
   const seat = state.seats[seatIndex];
-  if (seat?.folded === true) throw new PowerRejectionError("folded");
-
-  const held = powers.held[action.playerId];
-  if (seat === undefined || held === undefined || held.id !== action.powerUpId) {
+  const held = powers?.held[action.playerId];
+  if (powers === undefined || seat === undefined || held === undefined) {
     throw new PowerRejectionError("not-held");
   }
-  if (held.used) throw new PowerRejectionError("already-used");
-
-  const refusal = powerWindowRefusal(state, seatIndex, action.playerId, nowMs);
-  if (refusal !== null) throw new PowerRejectionError(refusal);
 
   if (!seat.privateTiles.some((tile) => tile.id === action.tileId)) {
     throw new PowerRejectionError("not-your-tile");
@@ -511,6 +510,40 @@ function applyUsePower(
       },
     },
   };
+}
+
+/**
+ * Whether a seat could use the power it holds right now, on any of its private tiles: the same
+ * checks `usePowerUp` makes, so a felt can light its power control without deciding legality for
+ * itself. `false` at a Classic table and for a seat that holds nothing.
+ */
+export function canUsePower(state: OfflineState, playerId: PlayerId, nowMs: number): boolean {
+  const held = state.powers?.held[playerId];
+  return held !== undefined && powerUseRefusal(state, playerId, held.id, nowMs) === null;
+}
+
+/**
+ * Why a seat may not use `powerUpId` right now, or `null` when it may — everything `usePowerUp`
+ * refuses except the tile it names.
+ */
+function powerUseRefusal(
+  state: OfflineState,
+  playerId: PlayerId,
+  powerUpId: PowerUpId,
+  nowMs: number,
+): PowerRejectionReason | null {
+  const powers = state.powers;
+  if (powers === undefined) return "powers-off";
+
+  const seatIndex = state.seats.findIndex((candidate) => candidate.id === playerId);
+  const seat = state.seats[seatIndex];
+  if (seat?.folded === true) return "folded";
+
+  const held = powers.held[playerId];
+  if (seat === undefined || held === undefined || held.id !== powerUpId) return "not-held";
+  if (held.used) return "already-used";
+
+  return powerWindowRefusal(state, seatIndex, playerId, nowMs);
 }
 
 /**

@@ -25,7 +25,7 @@ import {
   spacing,
   type,
 } from "@/constants/theme";
-import { pinnedSeed, randomSeed } from "@/lib/offline-seed";
+import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/lib/offline-seed";
 import { useDictionary } from "@/lib/use-dictionary";
 import { useOfflineGame } from "@/lib/use-offline-game";
 
@@ -94,10 +94,13 @@ function OfflineTable({
   dictionary: Dictionary;
   turnDurationMs?: number;
 }) {
-  const params = useLocalSearchParams<{ seed?: string }>();
+  const params = useLocalSearchParams<{ seed?: string; powers?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
+  // The table's power-up mode rides the URL too (`?powers=wild`), and is the table's for the whole
+  // session: read once, on the way in, like the seed.
+  const [powerUps] = useState(() => pinnedPowerUps(params.powers));
   const {
     game,
     words,
@@ -113,7 +116,7 @@ function OfflineTable({
     endChipFlight,
     sessionOver,
     newGame,
-  } = useOfflineGame({ seed, dictionary, turnDurationMs });
+  } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps });
   const payout = game.phase === "payout";
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
