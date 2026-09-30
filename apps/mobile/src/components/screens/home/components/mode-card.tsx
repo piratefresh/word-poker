@@ -5,6 +5,7 @@ import {
   type UniversalStyle,
   type UniversalTextStyle,
 } from "@expo/ui";
+import type { ReactNode } from "react";
 
 import { border, colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 
@@ -20,6 +21,11 @@ export type ModeCardProps = {
   tone?: ModeTone;
   disabled?: boolean;
   onSelect?: () => void;
+  /**
+   * The mode's own choices, under its header (e.g. Offline's Normal | Wild Power). A card that
+   * carries them is not pressed itself: the choices are.
+   */
+  children?: ReactNode;
 };
 
 type Surface = { backgroundColor: string; borderColor: string };
@@ -45,6 +51,7 @@ export function ModeCard({
   tone = "default",
   disabled = false,
   onSelect,
+  children,
 }: ModeCardProps) {
   const ink = inkFor(tone);
 
@@ -93,8 +100,8 @@ export function ModeCard({
   return (
     <Column
       disabled={disabled}
-      onPress={disabled ? undefined : onSelect}
-      spacing={badge ? spacing.sm : spacing.none}
+      onPress={disabled || children ? undefined : onSelect}
+      spacing={badge || children ? spacing.md : spacing.none}
       style={cardStyle}
     >
       {badge ? (
@@ -111,6 +118,7 @@ export function ModeCard({
           <Text textStyle={descText}>{description}</Text>
         </Column>
       </Row>
+      {children}
     </Column>
   );
 }

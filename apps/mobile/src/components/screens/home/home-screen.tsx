@@ -3,6 +3,7 @@ import {
   Button,
   Column,
   Host,
+  RNHostView,
   Row,
   ScrollView,
   Spacer,
@@ -23,14 +24,22 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
+import {
+  ModeVariants,
+  type ModeVariant,
+} from "@/components/screens/home/components/mode-variants";
 import { authClient } from "@/lib/auth-client";
 
 type ModeKey = "tutorial" | "online" | "offline" | "leaderboard";
+
+type Variant = ModeVariant & { href: Href };
 
 type Mode = ModeCardProps & {
   key: ModeKey;
   /** The mode's screen. Modes without one still only mark intent. */
   href?: Href;
+  /** The mode's own choices, each with its own screen, in place of `href`. */
+  variants?: readonly Variant[];
 };
 
 const MODES: Mode[] = [
@@ -54,11 +63,30 @@ const MODES: Mode[] = [
     key: "offline",
     // Temporary: the picker routes straight to the game. STO-269's landing screen owns
     // this entry (and the rows around it) when it lands.
-    href: "/offline",
     glyph: "🤖",
     label: "Offline Mode",
     description: "Play a hand vs. bots, no stakes",
     tone: "warm",
+    variants: [
+      {
+        key: "normal",
+        href: "/offline",
+        art: require("@/assets/images/ui/icons/normal-mode.png"),
+        label: "Normal",
+        description: "Standard rules",
+        testID: "offline-normal",
+      },
+      {
+        key: "wild",
+        // The table's power-ups switch (STO-484): the offline adapter reads it off the route.
+        href: { pathname: "/offline", params: { powers: "wild" } },
+        art: require("@/assets/images/ui/icons/wildpower-mode.png"),
+        label: "Wild Power",
+        description: "Pick a power each hand",
+        tone: "featured",
+        testID: "offline-wild",
+      },
+    ],
   },
   {
     key: "leaderboard",
@@ -95,9 +123,9 @@ export function HomeScreen() {
 
   // Modes with a route navigate; the rest don't exist yet, so selecting one
   // just marks intent for now.
-  const handleSelect = (mode: Mode) => {
-    if (mode.href) {
-      router.push(mode.href);
+  const handleSelect = (mode: Mode, href = mode.href) => {
+    if (href) {
+      router.push(href);
       return;
     }
     setPending(mode.key);
@@ -111,18 +139,32 @@ export function HomeScreen() {
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
 
-          {MODES.map((mode) => (
-            <ModeCard
-              key={mode.key}
-              badge={mode.badge}
-              description={mode.description}
-              disabled={pending !== null && pending !== mode.key}
-              glyph={mode.glyph}
-              label={mode.label}
-              onSelect={() => handleSelect(mode)}
-              tone={mode.tone}
-            />
-          ))}
+          {MODES.map((mode) => {
+            const disabled = pending !== null && pending !== mode.key;
+            const { variants } = mode;
+            return (
+              <ModeCard
+                key={mode.key}
+                badge={mode.badge}
+                description={mode.description}
+                disabled={disabled}
+                glyph={mode.glyph}
+                label={mode.label}
+                onSelect={() => handleSelect(mode)}
+                tone={mode.tone}
+              >
+                {variants ? (
+                  <RNHostView>
+                    <ModeVariants
+                      disabled={disabled}
+                      onSelect={(variant) => handleSelect(mode, variant.href)}
+                      variants={variants}
+                    />
+                  </RNHostView>
+                ) : null}
+              </ModeCard>
+            );
+          })}
 
           <Spacer size={spacing.lg} />
 
