@@ -16,6 +16,7 @@ import {
   type BackdropStyle,
 } from "./backdrop-style";
 import { TableAtmosphere } from "./table-atmosphere";
+import { SceneBackdrop } from "./scene-backdrop";
 
 type BackdropLook = Pick<
   IAnimatedMeshGradient,
@@ -100,6 +101,7 @@ export interface TableBackdropProps {
 export function TableBackdrop({ look }: TableBackdropProps) {
   const chosen = useBackdropStyle();
   const style = look ?? chosen;
+  if (style === "tavern" || style === "planet") return <SceneBackdrop look={style} />;
   const tiled = TILED_LOOKS[style];
   return (
     <>

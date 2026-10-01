@@ -78,7 +78,9 @@ export interface TableImageProps {
 
 /** The painted table for a table top `width` points wide. Decoration only; never takes a touch. */
 export function TableImage({ width, style }: TableImageProps) {
-  const water = useBackdropStyle() === "water";
+  const backdrop = useBackdropStyle();
+  if (backdrop === "tavern" || backdrop === "planet") return null;
+  const water = backdrop === "water";
   const scale = width / TOP.width;
   if (water) {
     const height = TOP.height * scale;

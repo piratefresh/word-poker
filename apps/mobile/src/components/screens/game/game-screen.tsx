@@ -33,7 +33,7 @@ import {
 } from "@/constants/theme";
 import { ActionBarShade } from "./action-bar-shade";
 import { BackdropPicker } from "./backdrop-picker";
-import { BackdropUrgencyProvider } from "./backdrop-style";
+import { BackdropUrgencyProvider, useBackdropStyle } from "./backdrop-style";
 import {
   stageMaxWidth,
   tableMaxWidth,
@@ -147,7 +147,10 @@ function GameScreenBody({
   const window = useWindowDimensions();
   const { height } = window;
   const stageWidth = stageMaxWidth(window);
-  const tableWidth = tableMaxWidth(window);
+  const backdrop = useBackdropStyle();
+  const roomSeating = backdrop === "tavern" || backdrop === "planet";
+  const chromeWidth = tableMaxWidth(window) ?? window.width;
+  const tableWidth = roomSeating ? undefined : tableMaxWidth(window);
   const shadeFeather = 28 * useScreenScale();
   const [barHeight, setBarHeight] = useState(0);
   const compact = height - insets.top - insets.bottom < 690;
@@ -245,7 +248,7 @@ function GameScreenBody({
           style={[
             styles.tableRegion,
             compact && styles.tableRegionCompact,
-            tight && tableWidth === undefined && styles.tableRegionTight,
+            !roomSeating && tight && tableWidth === undefined && styles.tableRegionTight,
             tableWidth !== undefined && {
               alignSelf: "center",
               maxWidth: tableWidth,
@@ -254,6 +257,7 @@ function GameScreenBody({
           ]}
         >
           <PokerTable
+            appearanceWidth={roomSeating ? chromeWidth : undefined}
             community={[]}
             hud={
               // The chips in flight go over the felt, inside the table's own layout provider: the
@@ -264,19 +268,19 @@ function GameScreenBody({
             chromeInset={0}
             layoutConfig={seating.layoutConfig}
             renderCommunity={() => null}
-            renderPot={({ size }) => (
+            renderPot={({ size, appearanceWidth }) => (
               <Pot
                 amount={game.pot}
                 sidePots={game.sidePots}
                 blinds={game.blinds}
-                tableWidth={size.width}
+                tableWidth={appearanceWidth ?? size.width}
               />
             )}
             renderSeat={(slot) => <Seat onPress={onSeatPress} slot={slot} />}
             // The seats scale with the felt and, at up to four, sit inside the table — avatars
             // on the felt, labels at most on the rail — so the table fills its room.
             seatBounds={playerSeatBounds}
-            seatPlacement={seating.seatPlacement}
+            seatPlacement={roomSeating ? "room" : seating.seatPlacement}
             seatCount={game.seatCount}
             seats={game.players}
             style={styles.table}

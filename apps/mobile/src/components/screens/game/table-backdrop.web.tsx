@@ -2,6 +2,8 @@ import { WithSkiaWeb } from "@shopify/react-native-skia/lib/module/web";
 import type { ComponentType } from "react";
 
 import type { TableBackdropProps } from "./mesh-backdrop";
+import { useBackdropStyle } from "./backdrop-style";
+import { SceneBackdrop } from "./scene-backdrop";
 
 export type { TableBackdropProps } from "./mesh-backdrop";
 
@@ -14,6 +16,9 @@ const loadBackdrop = (): Promise<{ default: ComponentType<TableBackdropProps> }>
  * mounting the mesh gradient. Until then the screen's own gradient shows through.
  */
 export function TableBackdrop(props: TableBackdropProps) {
+  const chosen = useBackdropStyle();
+  const look = props.look ?? chosen;
+  if (look === "tavern" || look === "planet") return <SceneBackdrop look={look} />;
   return (
     <WithSkiaWeb
       componentProps={props}
