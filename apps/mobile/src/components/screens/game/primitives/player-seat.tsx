@@ -151,10 +151,9 @@ export function PlayerSeat({
   anchor,
   seatCount,
   size,
-  appearanceWidth,
   onPress,
 }: SeatSlot<GamePlayer> & { onPress?: (player: GamePlayer) => void }) {
-  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width);
+  const { metrics, scaled } = useSeatStyles(size.width);
   const direction = seatDirection(anchor, seatCount);
   const beside = direction !== "stacked";
   const frame = beside
