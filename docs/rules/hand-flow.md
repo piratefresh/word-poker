@@ -72,11 +72,12 @@ Betting uses the seat's own tiles, the revealed board, public commitments and Ta
 A private word that improves on what everybody can make from the board supports value bets;
 a high scoring word available to the whole table is not treated as a private advantage.
 Before the river, complementary letters can justify a modest speculative call. Bots consider
-the call's actual stack-capped cost, the pot they can contest, opponents still in the hand,
+the call's actual stack-capped cost, the share of the final pot that call would be,
+the pot they can contest, opponents still in the hand,
 position and the current street. Sizes scale with the big blind, pot and effective stacks.
 
 The decision order is: consider a value wager or a situational bluff, sometimes check a
-strong hand to trap, otherwise check for free, call an affordable price, or fold. Bluffs
+strong hand to trap, otherwise check for free, call a price the pot justifies, or fold. Bluffs
 are limited to one or two opponents who can still fold. Repeated raises with non-premium
 hands become less frequent. Every wager observes the engine's betting and reopen bounds.
 

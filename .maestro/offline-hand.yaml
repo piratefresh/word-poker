@@ -40,9 +40,9 @@
 #
 # The pinned seed's personality-policy line (also asserted by game-rules/test/bot.test.ts):
 # mira raises preflop to 60, called around; the flop checks through. On the turn Mira bets
-# 160, the hero calls, and Ellis/Jay fold. The river checks to the hero with pot 560.
-# The hero opens for 20, Mira raises to 420, and the hero calls the remaining 400.
-# Pot 1,400 opens the word window. The deal and hero's N/R tiles remain unchanged.
+# 160, the hero and Ellis call, and Jay folds. The river checks to the hero with pot 720.
+# The hero opens for 20, Ellis calls, Mira raises to 340, and the hero calls the remaining 320.
+# Ellis calls the raise too; pot 1,740 opens the word window. The hero's T/S tiles are unchanged.
 #
 # The felt reaches its row by `id:` rather than by text. Its controls carry test ids
 # (`action-check-call` walks the round and, inside §19's window, is the confirm), because the
@@ -120,19 +120,19 @@ tags:
     containsDescendants:
       - text: "\\$20"
 - assertVisible:
-    text: "\\$560"
+    text: "\\$720"
 - tapOn:
     id: "action-wager"
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
       containsDescendants:
-        - text: "\\$400"
+        - text: "\\$320"
     timeout: 20000
 - tapOn:
     id: "action-check-call"
 - extendedWaitUntil:
-    visible: "\\$1,400"
+    visible: "\\$1,740"
     timeout: 20000
 - assertNotVisible:
     id: "action-wager"

@@ -131,10 +131,16 @@ describe("offline bot decisions", () => {
     assert.equal(decideOfflineMove(scenario({ words: [] }), "ellis").type, "check");
   });
 
-  it("defends an affordable word but gives it up to an expensive wager", () => {
+  it("calls a wager the pot prices in and folds a lone overbet", () => {
     const options = { words: ["AT", "CAT"], privateTiles: [letter("C"), letter("O")], closed: true };
+    // Three seats in for 600 make the final pot 2,800: the call is a 0.21 share.
+    assert.equal(decideOfflineMove(scenario({ ...options, cost: 600 }), "ellis").type, "call");
     assert.equal(decideOfflineMove(scenario({ ...options, cost: 20 }), "ellis").type, "call");
-    assert.equal(decideOfflineMove(scenario({ ...options, cost: 600 }), "ellis").type, "fold");
+    // One seat betting the same 600 gives a much worse price.
+    const lone = scenario({ ...options, cost: 600 });
+    lone.seats = lone.seats.map((seat, i) => i === 0 || i === 1 ? seat
+      : { ...seat, committedRound: 0, committedHand: 100 });
+    assert.equal(decideOfflineMove(lone, "ellis").type, "fold");
   });
 
   it("does not confuse a high scoring shared word with a private advantage", () => {
@@ -373,14 +379,20 @@ describe("offline smoke replay", () => {
         : decideOfflineMove(state, id);
       state = reduce(state, action, NOW);
     }
-    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 560);
+    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 720);
     state = reduce(state, { type: "bet", playerId: "hero", amount: 20 }, NOW);
+    const ellis = decideOfflineMove(state, "ellis");
+    assert.deepEqual(ellis, { type: "call", playerId: "ellis" });
+    state = reduce(state, ellis, NOW);
     const answer = decideOfflineMove(state, "mira");
-    assert.deepEqual(answer, { type: "raise", playerId: "mira", amount: 420 });
+    assert.deepEqual(answer, { type: "raise", playerId: "mira", amount: 340 });
     state = reduce(state, answer, NOW);
     state = reduce(state, { type: "call", playerId: "hero" }, NOW);
+    const ellisAnswer = decideOfflineMove(state, "ellis");
+    assert.deepEqual(ellisAnswer, { type: "call", playerId: "ellis" });
+    state = reduce(state, ellisAnswer, NOW);
     assert.equal(state.wordWindow?.status, "open");
-    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 1_400);
+    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 1_740);
   });
 
   it("replays whole sessions across rotating blinds and short stacks", async () => {

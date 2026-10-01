@@ -45,14 +45,19 @@ export function decideBotBet(view: BotObservation, bounds: BettingBounds): Offli
   const pot = Math.max(0, contestable - call);
   const bb = view.bigBlind;
 
-  // A willingness-to-pay heuristic, not call EV: future betting and opponent words are unknown.
+  // A pot-odds price, not call EV: the largest share of the final pot this tier will pay.
   // Amounts scale with the table and exclude side pots this stack cannot reach.
+  const finalPot = pot + call;
+  const share = strength.tier === "strong" ? 0.5
+    : strength.tier === "playable" ? 0.38
+    : view.phase === "preflop" ? 0.2
+    : strength.potential ? 0.2
+    : strength.hasWord ? 0.16 : 0;
+  const floorChips = strength.tier === "strong" ? 4 * bb
+    : strength.tier === "playable" || view.phase === "preflop" ? 1.5 * bb
+    : strength.potential ? bb : 0;
   const budget = strength.tier === "premium" ? Infinity
-    : strength.tier === "strong" ? (view.phase === "preflop" ? 3 * bb + pot * 0.25 : 4 * bb + pot * 0.5)
-    : strength.tier === "playable" ? 1.5 * bb + pot * 0.22
-    : view.phase === "preflop" ? 1.5 * bb + pot * 0.08
-    : strength.potential ? bb + pot * 0.12
-    : strength.hasWord ? pot * 0.16 : 0;
+    : Math.max(share * finalPot, floorChips);
   const willing = call <= budget * style.curiosity / (1 + (count - 1) * 0.12);
   const actionRoll = createRng(botDecisionSeed(view, "action"))();
   const bluffRoll = createRng(botDecisionSeed(view, "bluff"))();
