@@ -17,6 +17,7 @@ const loadBackdrop = (): Promise<{ default: ComponentType<TableBackdropProps> }>
  */
 export function TableBackdrop(props: TableBackdropProps) {
   const chosen = useBackdropStyle();
+  // Static artwork can show immediately without waiting for CanvasKit.
   const look = props.look ?? chosen;
   if (look === "tavern" || look === "planet") return <SceneBackdrop look={look} />;
   return (

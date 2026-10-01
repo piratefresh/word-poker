@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   AccessibilityInfo,
   StyleSheet,
@@ -15,7 +15,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 
 import type { PowerUpId } from "@wordpoker/contracts";
 
@@ -232,6 +232,7 @@ export function PowerDrawReveal({
  * below stay in view — and comes back as the kept card flies.
  */
 function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: boolean }) {
+  const gradientId = useId();
   const shade = useSharedValue(0);
 
   useEffect(() => {
@@ -248,12 +249,19 @@ function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: bool
   const style = useAnimatedStyle(() => ({ opacity: shade.value }));
 
   return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, style]}>
-      <LinearGradient
-        colors={["rgba(2,10,7,0)", "rgba(2,10,7,0.65)", "rgba(2,10,7,0.65)", "rgba(2,10,7,0)"]}
-        locations={[0, 0.2, 0.8, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+      {/* Fade to transparent on every edge of the bounded felt, including desktop's sides. */}
+      <Svg height="100%" preserveAspectRatio="none" viewBox="0 0 100 100" width="100%">
+        <Defs>
+          <RadialGradient cx="50%" cy="50%" id={gradientId} r="50%">
+            <Stop offset="0" stopColor="#020a07" stopOpacity={0.65} />
+            <Stop offset="0.5" stopColor="#020a07" stopOpacity={0.65} />
+            <Stop offset="0.75" stopColor="#020a07" stopOpacity={0.35} />
+            <Stop offset="1" stopColor="#020a07" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect fill={`url(#${gradientId})`} height="100" width="100" />
+      </Svg>
     </Animated.View>
   );
 }
@@ -346,7 +354,6 @@ function Hint({
 }
 
 const styles = StyleSheet.create({
-  scrim: { borderRadius: 24, overflow: "hidden" },
   stage: { alignItems: "center", flex: 1, justifyContent: "center", padding: PAD },
   heading: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "center" },
   headingText: {

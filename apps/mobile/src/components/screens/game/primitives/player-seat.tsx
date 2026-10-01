@@ -1,5 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ChipSprite } from "@/components/chip/chip-sprite";
+import { chipToneForAmount } from "@/components/chip/chip-value";
 
 import type { SeatSlot } from "@/components/table";
 import {
@@ -122,7 +124,6 @@ function seatStyles(m: SeatMetrics) {
     },
     betChip: {
       borderRadius: m.chip / 2,
-      borderWidth: m.chipBorder,
       height: m.chip,
       width: m.chip,
     },
@@ -300,6 +301,9 @@ export function PlayerSeat({
             betChipOffset(anchor, metrics, seatCount),
           ]}
         >
+          <View style={StyleSheet.absoluteFill}>
+            <ChipSprite tone={chipToneForAmount(seat.bet)} size={metrics.chip} />
+          </View>
           <Text style={[styles.betChipText, scaled.betChipText]}>
             {seat.bet}
           </Text>
@@ -390,11 +394,15 @@ const styles = StyleSheet.create({
   },
   betChip: {
     alignItems: "center",
-    backgroundColor: "#c41a1a",
-    borderColor: colors.textBright,
     justifyContent: "center",
     position: "absolute",
     ...elevation.tile,
   },
-  betChipText: { color: "#fff8dc", fontFamily: fonts.sansBlack },
+  betChipText: {
+    color: "#fff8dc",
+    fontFamily: fonts.sansBlack,
+    backgroundColor: "rgba(40, 5, 5, 0.85)",
+    borderRadius: 3,
+    paddingHorizontal: 2,
+  },
 });
