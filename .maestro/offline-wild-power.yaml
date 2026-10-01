@@ -38,6 +38,11 @@ tags:
     visible:
       id: "power-offer-vowel_magnet"
     timeout: 90000
+# The cards land one by one and take no tap until the row has: the hint is the go-ahead.
+- extendedWaitUntil:
+    visible:
+      id: "power-draw-ready"
+    timeout: 5000
 - tapOn:
     id: "power-offer-vowel_magnet"
     retryTapIfNoChange: false

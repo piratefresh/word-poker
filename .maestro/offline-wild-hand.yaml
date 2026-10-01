@@ -8,7 +8,8 @@
 # Vowel Magnet, Mulligan and Random Wild (`drawOffers(20260919, 0)` in game-rules) — so a
 # changed seed or catalog fails at the pick, loudly.
 #
-# Selectors: the reveal is `power-draw`, each card `power-offer-<id>` (a DOM id on the web, via
+# Selectors: the reveal is `power-draw`, each card `power-offer-<id>`, and `power-draw-ready` the
+# "CHOOSE ONE POWER" hint that shows once the cards take a tap (each a DOM id on the web, via
 # `webTestID`). The action row is reached by id, as in offline-hand.yaml. Sign-in composes the
 # same way that flow does.
 url: http://localhost:8081/offline?seed=20260919&powers=wild
@@ -30,14 +31,20 @@ tags:
     file: sign-in.yaml
 - openLink: http://localhost:8081/offline?seed=20260919&powers=wild
 
-# The pack opens once the dictionary has loaded and the hand is dealt. The draw's clock is 10 s
+# The draw opens once the dictionary has loaded and the hand is dealt. The draw's clock is 10 s
 # (POWER_DRAW_MS) and a web step here takes about half a second, so the flow taps the first card as
-# soon as it is up and asserts the rest afterwards; a slower flow sees the clock keep the first
-# card for it, and the tap below fails on a card that has already gone.
+# soon as selection opens (`power-draw-ready`, 0.9 s after the row has a layout) and asserts the
+# rest afterwards; a slower flow sees the clock keep the first card for it, and the tap below
+# fails on a card that has already gone.
 - extendedWaitUntil:
     visible:
       id: "power-offer-vowel_magnet"
     timeout: 90000
+# The cards land one by one and take no tap until the row has: the hint is the go-ahead.
+- extendedWaitUntil:
+    visible:
+      id: "power-draw-ready"
+    timeout: 5000
 - tapOn:
     id: "power-offer-vowel_magnet"
     retryTapIfNoChange: false

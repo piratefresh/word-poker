@@ -1,73 +1,44 @@
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
-  Pressable,
   StyleSheet,
+  Text,
   View,
   type LayoutChangeEvent,
 } from "react-native";
 import Animated, {
-  Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
-  withSequence,
-  withSpring,
   withTiming,
-  interpolate,
-  type SharedValue,
 } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 
 import type { PowerUpId } from "@wordpoker/contracts";
 
-import { easing, palette } from "@/constants/theme";
+import { colors, fonts, palette } from "@/constants/theme";
 import type { PowerView } from "@/lib/power-view";
 import { webTestID } from "@/lib/web-id";
 
-import { POWER_CARD_ASPECT, PowerCard, powerCardLabel } from "./power-card";
+import { POWER_CARD_ASPECT } from "./power-card";
+import { POWER_DRAW_MOTION, revealAtFor } from "./power-draw-motion";
+import { PowerImpact } from "./power-impact";
+import { PowerOfferCard, type OfferFate } from "./power-offer-card";
 
-/**
- * The reveal's beats, each measured from the moment the draw opens. One table of offsets rather
- * than a chain of callbacks, so the beats can overlap and a tap early in the reveal still lands.
- */
-export const POWER_DRAW_BEATS = {
-  /** The pack drops in over the felt. */
-  packIn: 420,
-  /** The top strip tears off, with the burst of light. */
-  tearAt: 520,
-  tear: 300,
-  /** The first card rises out of the pack; each after it `stagger` later. */
-  fanAt: 820,
-  stagger: 130,
-  rise: 420,
-  /** Each card turns face up this long after it starts to rise, taking `turn` to do it. */
-  turnAt: 300,
-  turn: 260,
-  /** The kept card's lift, then its flight to the action row; the others fall away meanwhile. */
-  keptLift: 320,
-  keptFlight: 480,
-  /** Under reduced motion: the cards' fade in, and the kept card's fade out. */
-  fade: 240,
-} as const;
+export { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION } from "./power-draw-motion";
 
-/** How long the kept beat holds the reveal on the felt after the draw has closed. */
-export const POWER_DRAW_KEPT_MS = POWER_DRAW_BEATS.keptLift + POWER_DRAW_BEATS.keptFlight;
+const { entrance, exit: EXIT, reduced: REDUCED } = POWER_DRAW_MOTION;
 
-// Relative, as the felt's other art is: Jest maps `@/` to `src/` only.
-const PACK_SEALED = require("../../../assets/images/ui/card/pack-sealed.webp");
-const PACK_OPEN = require("../../../assets/images/ui/card/pack-open.webp");
-const PACK_STRIP = require("../../../assets/images/ui/card/pack-strip.webp");
-const CARD_BACK = require("../../../assets/images/ui/card/card-back.webp");
-
-/** The pack art's height for its width (512 × 640), and the torn strip's (640 × 252). */
-const PACK_ASPECT = 640 / 512;
-const STRIP_ASPECT = 252 / 640;
-
-const GAP = 10;
 const MAX_CARD_WIDTH = 150;
+/** The room the heading and the hint take above and below the row, and the region's margin. */
+const HEADING_HEIGHT = 32;
+const HINT_HEIGHT = 40;
+const PAD = 12;
+/** The share of a card its hit overshoots by, reserved so the row never clips mid-impact. */
+const OVERSHOOT = entrance.peak - 1;
 
 /** Which draw is on the felt: the same offers and clock are the same draw. */
 function drawKey(draw: NonNullable<PowerView["draw"]>): string {
@@ -75,17 +46,33 @@ function drawKey(draw: NonNullable<PowerView["draw"]>): string {
 }
 
 /**
- * §44's Power Draw as the hero sees it: a foil pack drops over the felt and tears open, the offers
- * fan out of it, and the hero keeps one — the kept card lifts and flies to the action row, the
- * rest fall away. A draw that runs out keeps the first offer and plays the same beat.
+ * The row's size in the region it is given: one row whatever the room, the cards as wide as they
+ * can be up to `MAX_CARD_WIDTH` with room left for the hit's overshoot, the heading and the hint,
+ * and the gaps closing in on a narrow screen.
+ */
+function rowFor(region: { height: number; width: number }, count: number) {
+  const n = Math.max(count, 1);
+  const gap = Math.min(16, Math.max(6, region.width * 0.03));
+  const byWidth = (region.width - PAD * 2 - gap * (n - 1)) / (n + OVERSHOOT);
+  const byHeight = (region.height - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2) / (POWER_CARD_ASPECT * (1 + OVERSHOOT));
+  return { cardWidth: Math.max(0, Math.min(MAX_CARD_WIDTH, byWidth, byHeight)), gap };
+}
+
+/**
+ * §44's Power Draw as the hero sees it: the felt darkens, a pulse of light gathers, and the
+ * offers land face up left to right, each with a hit of its own. Once the row has landed the
+ * seat may choose; the kept card lifts with a stronger hit and flies down toward the action row
+ * while the rest fall away. A draw that runs out keeps the first offer and plays the same exit.
  *
- * The adapter's `draw` is the table's truth and closes the moment the seat has kept one (offline,
- * no other seat draws), so the reveal holds the last draw it was shown until its kept beat has
- * played; which card was kept comes from `held`, the power the table says the hero now holds.
+ * The adapter's `draw` is the table's truth: it names the kept card (`picked`) while the draw is
+ * still open on other seats' choices, and closes the moment every seat has kept one — offline,
+ * the moment the hero has. Once closed, which card was kept comes from `held`, the power the
+ * table says the hero now holds. The reveal holds the last draw it was shown until the kept
+ * card's exit has played, and a pick still waiting on other seats says so once its card has gone.
  *
- * Fans any number of offers, so a mode that deals one card (Blind Draw) plays the same reveal.
- * Placed over the felt, never over the rack: it fills the region it is given and sizes the cards
- * to fit it, so the seat picks with its tiles in view.
+ * Deals any number of offers, so a mode that deals one card (Blind Draw) plays the same reveal.
+ * Placed over the felt, never over the rack: it fills the region it is given and sizes the row to
+ * fit it, so the seat picks with its tiles in view.
  */
 export function PowerDrawReveal({
   draw,
@@ -105,25 +92,45 @@ export function PowerDrawReveal({
   } | null>(null);
   // The card the hero tapped, ahead of the table's answer: a second tap lands on nothing.
   const [tapped, setTapped] = useState<PowerUpId | null>(null);
+  // The card under the pointer, the keyboard's focus or a finger.
+  const [hovered, setHovered] = useState<PowerUpId | null>(null);
+  // Which draw has finished its entrance, and which has finished its exit: a new draw is neither.
+  const [readyKey, setReadyKey] = useState<string | null>(null);
+  const [exitedKey, setExitedKey] = useState<string | null>(null);
   const [region, setRegion] = useState({ height: 0, width: 0 });
 
   // A new draw on the felt — the next hand's — replaces whatever the last one left behind.
   if (draw !== null && shown?.key !== drawKey(draw)) {
     setShown({ key: drawKey(draw), offers: draw.offers, endsAtMs: draw.endsAtMs });
     setTapped(null);
+    setHovered(null);
   }
 
+  const key = shown?.key ?? null;
   // Kept once the table says so: a pick still waiting on other seats, or a draw that has closed —
   // by a pick, or by the clock handing the seat the first offer.
   const kept = shown === null ? null : draw !== null ? draw.picked : (held ?? shown.offers[0] ?? null);
-
-  // The draw closed on the felt: the kept beat plays out, then the reveal leaves.
   const closed = shown !== null && draw === null;
+  const { cardWidth, gap } = rowFor(region, shown?.offers.length ?? 0);
+  const laidOut = cardWidth > 0;
+
+  // Selection opens once the row has landed. Every beat counts from the layout, so a resize
+  // moves the cards without restarting the clock; reduced motion opens it at once.
   useEffect(() => {
-    if (!closed) return;
-    const timer = setTimeout(() => setShown(null), reduceMotion ? POWER_DRAW_BEATS.fade : POWER_DRAW_KEPT_MS);
+    if (key === null || !laidOut || reduceMotion) return;
+    const timer = setTimeout(() => setReadyKey(key), entrance.readyAt);
     return () => clearTimeout(timer);
-  }, [closed, reduceMotion]);
+  }, [key, laidOut, reduceMotion]);
+  const ready = shown !== null && (reduceMotion || readyKey === shown.key);
+
+  // The kept card's exit, once: closing a draw whose pick already played does not play it again.
+  const keptKnown = kept !== null;
+  useEffect(() => {
+    if (key === null || !keptKnown) return;
+    const timer = setTimeout(() => setExitedKey(key), reduceMotion ? REDUCED.fadeOut : EXIT.total);
+    return () => clearTimeout(timer);
+  }, [key, keptKnown, reduceMotion]);
+  const exited = shown !== null && exitedKey === shown.key;
 
   // The window is announced once, when it opens: what to do, and how long there is to do it.
   const opensEndingAtMs = shown?.endsAtMs ?? null;
@@ -133,21 +140,19 @@ export function PowerDrawReveal({
     AccessibilityInfo.announceForAccessibility(`Pick a power, ${seconds} seconds`);
   }, [opensEndingAtMs]);
 
-  if (shown === null) return null;
+  if (shown === null || key === null || (closed && exited)) return null;
 
   const count = shown.offers.length;
-  const cardWidth = Math.max(
-    0,
-    Math.min(
-      MAX_CARD_WIDTH,
-      (region.width - GAP * (count + 1)) / Math.max(count, 1),
-      (region.height - GAP * 2) / POWER_CARD_ASPECT,
-    ),
-  );
+  const cardHeight = cardWidth * POWER_CARD_ASPECT;
+  const rowWidth = count * cardWidth + (count - 1) * gap;
+  const slotX = (index: number) => index * (cardWidth + gap) + cardWidth / 2;
+  const lit = tapped ?? hovered;
+  const leaving = kept !== null;
+  const animated = !reduceMotion;
 
   return (
     <View
-      accessibilityViewIsModal
+      accessibilityViewIsModal={!exited}
       id={webTestID("power-draw")}
       onLayout={(event: LayoutChangeEvent) => {
         const { height, width } = event.nativeEvent.layout;
@@ -157,28 +162,64 @@ export function PowerDrawReveal({
       style={StyleSheet.absoluteFill}
       testID="power-draw"
     >
-      <Scrim closing={closed} />
-      {cardWidth > 0 ? (
-        <View pointerEvents="box-none" style={styles.stage}>
-          {reduceMotion ? null : <Pack cardWidth={cardWidth} />}
-          <View pointerEvents="box-none" style={[styles.fan, { gap: GAP }]}>
-            {shown.offers.map((id, index) => (
-              <OfferCard
-                cardWidth={cardWidth}
-                count={count}
-                disabled={kept !== null || tapped !== null}
-                fate={kept === null ? "offered" : kept === id ? "kept" : "dropped"}
-                flightY={region.height}
-                id={id}
-                index={index}
-                key={`${shown.key}:${id}`}
-                onPress={() => {
-                  setTapped(id);
-                  onPick(id);
-                }}
-                reduceMotion={reduceMotion}
-              />
-            ))}
+      <Scrim key={`scrim:${key}`} leaving={leaving} reduceMotion={reduceMotion} />
+      {laidOut ? (
+        <View key={`stage:${key}`} pointerEvents="box-none" style={styles.stage}>
+          <Heading fontSize={Math.min(26, Math.max(16, cardWidth * 0.16))} leaving={leaving} reduceMotion={reduceMotion} />
+          <View pointerEvents="box-none" style={{ height: cardHeight, marginVertical: (cardHeight * OVERSHOOT) / 2, width: rowWidth }}>
+            {/* The bursts sit under the whole row, so a card's light never covers its neighbour. */}
+            {animated && !exited ? (
+              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                {leaving ? null : (
+                  <View style={[styles.anchor, { left: rowWidth / 2, top: cardHeight / 2 }]}>
+                    <PowerImpact delay={entrance.gatherAt} kind="gather" size={cardWidth * 1.6} />
+                  </View>
+                )}
+                {shown.offers.map((id, index) =>
+                  leaving && id !== kept ? null : (
+                    <View key={`${key}:${id}:${leaving ? "pick" : "reveal"}`} style={[styles.anchor, { left: slotX(index), top: cardHeight / 2 }]}>
+                      {leaving ? (
+                        <PowerImpact delay={EXIT.impactAt} kind="pick" size={cardWidth * 2.9} />
+                      ) : (
+                        <PowerImpact delay={revealAtFor(index)} size={cardWidth * 2.3} />
+                      )}
+                    </View>
+                  ),
+                )}
+              </View>
+            ) : null}
+            {/* Once the exit has played, the cards are gone: a seat still waiting has nothing to pick. */}
+            <View pointerEvents="box-none" style={[styles.row, { gap }]}>
+              {exited ? null : shown.offers.map((id, index) => {
+                const fate: OfferFate = kept === null ? "offered" : kept === id ? "kept" : "dropped";
+                return (
+                  <PowerOfferCard
+                    cardWidth={cardWidth}
+                    dimmed={kept === null && lit !== null && lit !== id}
+                    disabled={!ready || tapped !== null || kept !== null}
+                    fate={fate}
+                    flight={{ x: rowWidth / 2 - slotX(index), y: region.height / 2 + cardHeight * 0.1 }}
+                    id={id}
+                    index={index}
+                    key={`${key}:${id}`}
+                    lit={kept === null ? lit === id : kept === id}
+                    onLight={(on) => setHovered((current) => (on ? id : current === id ? null : current))}
+                    onPress={() => {
+                      setTapped(id);
+                      onPick(id);
+                    }}
+                    reduceMotion={reduceMotion}
+                  />
+                );
+              })}
+            </View>
+          </View>
+          <View style={styles.hintSlot}>
+            {ready && tapped === null && kept === null ? (
+              <Hint reduceMotion={reduceMotion} testID="power-draw-ready" text="CHOOSE ONE POWER" />
+            ) : exited && !closed ? (
+              <Hint quiet reduceMotion={reduceMotion} testID="power-draw-waiting" text="WAITING FOR OTHER PLAYERS" />
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -186,21 +227,30 @@ export function PowerDrawReveal({
   );
 }
 
-/** The felt dims behind the reveal and comes back as the kept card leaves. */
-function Scrim({ closing }: { closing: boolean }) {
+/**
+ * The felt darkens behind the choices — soft at the edges, so the community above and the rack
+ * below stay in view — and comes back as the kept card flies.
+ */
+function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: boolean }) {
   const shade = useSharedValue(0);
 
   useEffect(() => {
-    shade.value = withTiming(closing ? 0 : 1, { duration: POWER_DRAW_BEATS.packIn });
-  }, [closing, shade]);
+    if (!leaving) {
+      shade.value = withTiming(1, { duration: reduceMotion ? REDUCED.fadeIn : entrance.scrim });
+    } else if (reduceMotion) {
+      shade.value = withTiming(0, { duration: REDUCED.fadeOut });
+    } else {
+      shade.value = withDelay(EXIT.flightAt, withTiming(0, { duration: EXIT.flight }));
+    }
+    return () => cancelAnimation(shade);
+  }, [leaving, reduceMotion, shade]);
 
   const style = useAnimatedStyle(() => ({ opacity: shade.value }));
 
-  // Fades out towards the community above and the rack below, so the dim has no hard edge.
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, style]}>
       <LinearGradient
-        colors={["rgba(2,10,7,0)", "rgba(2,10,7,0.6)", "rgba(2,10,7,0.6)", "rgba(2,10,7,0)"]}
+        colors={["rgba(2,10,7,0)", "rgba(2,10,7,0.65)", "rgba(2,10,7,0.65)", "rgba(2,10,7,0)"]}
         locations={[0, 0.2, 0.8, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -208,292 +258,126 @@ function Scrim({ closing }: { closing: boolean }) {
   );
 }
 
-/**
- * The foil pack: drops in sealed with its glow, then its crimped top tears off in a burst of light
- * and the opened pack takes its place, glowing from inside, and fades behind the cards as they
- * rise out of it. Pure motion — it takes no touches and says nothing to a screen reader; the cards
- * are the draw.
- */
-function Pack({ cardWidth }: { cardWidth: number }) {
-  const width = cardWidth * 1.25;
-  const height = width * PACK_ASPECT;
-  const stripWidth = width * 0.92;
-  const drop = useSharedValue(0);
-  const tear = useSharedValue(0);
-  const burst = useSharedValue(0);
-  const fade = useSharedValue(1);
+/** "✦ WILD POWER ✦" over the row: in with the first card, out with the cards not kept. */
+function Heading({ fontSize, leaving, reduceMotion }: { fontSize: number; leaving: boolean; reduceMotion: boolean }) {
+  const shown = useSharedValue(0);
 
   useEffect(() => {
-    drop.value = withSpring(1, easing.springOvershoot);
-    tear.value = withDelay(
-      POWER_DRAW_BEATS.tearAt,
-      withTiming(1, { duration: POWER_DRAW_BEATS.tear, easing: Easing.out(Easing.cubic) }),
-    );
-    burst.value = withDelay(
-      POWER_DRAW_BEATS.tearAt,
-      withSequence(
-        withTiming(1, { duration: POWER_DRAW_BEATS.tear * 0.6 }),
-        withTiming(0, { duration: POWER_DRAW_BEATS.tear * 1.4 }),
-      ),
-    );
-    fade.value = withDelay(
-      POWER_DRAW_BEATS.fanAt + POWER_DRAW_BEATS.stagger,
-      withTiming(0, { duration: POWER_DRAW_BEATS.rise }),
-    );
-  }, [burst, drop, fade, tear]);
+    if (!leaving) {
+      shown.value = reduceMotion
+        ? withTiming(1, { duration: REDUCED.fadeIn })
+        : withDelay(entrance.revealAt, withTiming(1, { duration: entrance.heading }));
+    } else {
+      shown.value = reduceMotion
+        ? withTiming(0, { duration: REDUCED.fadeOut })
+        : withDelay(EXIT.dropAt, withTiming(0, { duration: EXIT.drop }));
+    }
+    return () => cancelAnimation(shown);
+  }, [leaving, reduceMotion, shown]);
 
-  const packStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(drop.value, 1) * fade.value,
-    transform: [{ translateY: (1 - drop.value) * -60 }, { scale: 0.8 + drop.value * 0.2 }],
-  }));
-  // The sealed art carries its own crimp, so the torn strip shows only once the tear starts, and
-  // the opened pack crossfades in under it.
-  const sealedStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(tear.value * 3, 1) }));
-  const openStyle = useAnimatedStyle(() => ({ opacity: Math.min(tear.value * 3, 1) }));
-  const stripStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(tear.value, [0, 0.05, 0.7, 1], [0, 1, 1, 0]),
-    transform: [
-      { translateY: tear.value * -height * 0.35 },
-      { translateX: tear.value * width * 0.3 },
-      { rotate: `${tear.value * 24}deg` },
-    ],
-  }));
-  const burstStyle = useAnimatedStyle(() => ({
-    // A flash, not a disk: the opened pack has to read through it.
-    opacity: burst.value * 0.45,
-    transform: [{ scale: 0.4 + burst.value * 1.6 }],
-  }));
+  const style = useAnimatedStyle(() => ({ opacity: shown.value }));
+  const star = fontSize * 0.7;
 
   return (
-    <Animated.View pointerEvents="none" style={[styles.pack, { height, width }, packStyle]}>
-      <View style={[styles.glow, { borderRadius: width, height: width * 1.3, width: width * 1.3 }]} />
-      <Animated.View style={[styles.packArt, sealedStyle]}>
-        <Image contentFit="contain" source={PACK_SEALED} style={styles.fill} />
-      </Animated.View>
-      <Animated.View style={[styles.packArt, openStyle]}>
-        <Image contentFit="contain" source={PACK_OPEN} style={styles.fill} />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.packStrip,
-          { height: stripWidth * STRIP_ASPECT, left: (width - stripWidth) / 2, top: -height * 0.06, width: stripWidth },
-          stripStyle,
-        ]}
-      >
-        <Image contentFit="contain" source={PACK_STRIP} style={styles.fill} />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.burst,
-          { borderRadius: width, height: width, left: 0, top: -width * 0.35, width },
-          burstStyle,
-        ]}
-      />
+    <Animated.View
+      accessible
+      accessibilityLabel="Wild power"
+      accessibilityRole="header"
+      style={[styles.heading, { height: HEADING_HEIGHT }, style]}
+    >
+      <Sparkle size={star} />
+      <Text numberOfLines={1} style={[styles.headingText, { fontSize }]}>
+        WILD POWER
+      </Text>
+      <Sparkle size={star} />
     </Animated.View>
   );
 }
 
-type Fate = "offered" | "kept" | "dropped";
-
-/**
- * One offer: rises out of the pack to its place in the fan, then — once the table has settled the
- * draw — either lifts and flies down to the action row (the kept card) or dims and falls away.
- */
-function OfferCard({
-  id,
-  index,
-  count,
-  cardWidth,
-  fate,
-  flightY,
-  disabled,
-  onPress,
-  reduceMotion,
-}: {
-  id: PowerUpId;
-  index: number;
-  count: number;
-  cardWidth: number;
-  fate: Fate;
-  /** How far the kept card flies to reach the action row: the height of the region it sits in. */
-  flightY: number;
-  disabled: boolean;
-  onPress: () => void;
-  reduceMotion: boolean;
-}) {
-  // 0 in the pack, 1 in its place in the fan.
-  const rise = useSharedValue(0);
-  // 0 offered; 1 at the end of its fate's beat.
-  const settle = useSharedValue(0);
-  const lift = useSharedValue(0);
-  // 0 face down, 1 face up. Reduced motion never turns a card: it fades in face up.
-  const turn = useSharedValue(reduceMotion ? 1 : 0);
-
-  useEffect(() => {
-    const risesAt = POWER_DRAW_BEATS.fanAt + index * POWER_DRAW_BEATS.stagger;
-    rise.value = reduceMotion
-      ? withTiming(1, { duration: POWER_DRAW_BEATS.fade })
-      : withDelay(risesAt, withSpring(1, easing.spring));
-    if (!reduceMotion) {
-      turn.value = withDelay(
-        risesAt + POWER_DRAW_BEATS.turnAt,
-        withTiming(1, { duration: POWER_DRAW_BEATS.turn, easing: Easing.inOut(Easing.quad) }),
-      );
-    }
-  }, [index, reduceMotion, rise, turn]);
-
-  // The turn is a squash through the card's edge: the back narrows to nothing, the face widens
-  // back out, which reads as a flip without leaning on a 3D backface on every platform.
-  const turnStyle = useAnimatedStyle(() => ({
-    transform: [{ scaleX: Math.max(Math.abs(1 - turn.value * 2), 0.001) }],
-  }));
-  const backStyle = useAnimatedStyle(() => ({ opacity: turn.value < 0.5 ? 1 : 0 }));
-
-  useEffect(() => {
-    if (fate === "offered") return;
-    if (reduceMotion) {
-      settle.value = withTiming(1, { duration: POWER_DRAW_BEATS.fade });
-      return;
-    }
-    if (fate === "dropped") {
-      settle.value = withTiming(1, { duration: POWER_DRAW_BEATS.keptLift, easing: Easing.in(Easing.quad) });
-      return;
-    }
-    lift.value = withTiming(1, { duration: POWER_DRAW_BEATS.keptLift, easing: Easing.out(Easing.back(2)) });
-    settle.value = withDelay(
-      POWER_DRAW_BEATS.keptLift,
-      withTiming(1, { duration: POWER_DRAW_BEATS.keptFlight, easing: Easing.in(Easing.cubic) }),
-    );
-  }, [fate, lift, reduceMotion, settle]);
-
-  const offset = ((count - 1) / 2 - index) * (cardWidth + GAP);
-  const style = useOfferStyle({ rise, settle, lift, fate, offset, flightY, cardWidth, reduceMotion });
-
+/** A four-pointed star, drawn rather than typed: the arcade face has no ✦. */
+function Sparkle({ size }: { size: number }) {
   return (
-    <Animated.View style={style}>
-      <Pressable
-        accessibilityLabel={powerCardLabel(id)}
-        accessibilityRole="button"
-        accessibilityState={{ disabled, selected: fate === "kept" }}
-        disabled={disabled}
-        id={webTestID(`power-offer-${id}`)}
-        onPress={onPress}
-        testID={`power-offer-${id}`}
-      >
-        <Animated.View style={turnStyle}>
-          <PowerCard id={id} width={cardWidth} />
-          {reduceMotion ? null : (
-            <Animated.View pointerEvents="none" style={[styles.cardBack, backStyle]}>
-              <Image contentFit="fill" source={CARD_BACK} style={styles.fill} />
-            </Animated.View>
-          )}
-        </Animated.View>
-        {fate === "kept" ? <View pointerEvents="none" style={[styles.keptGlow, { borderRadius: cardWidth * 0.08 }]} /> : null}
-      </Pressable>
-    </Animated.View>
+    <Svg height={size} viewBox="-1 -1 2 2" width={size}>
+      <Path d="M0 -1 L0.22 -0.22 L1 0 L0.22 0.22 L0 1 L-0.22 0.22 L-1 0 L-0.22 -0.22 Z" fill={palette.gold100} />
+    </Svg>
   );
 }
 
-function useOfferStyle({
-  rise,
-  settle,
-  lift,
-  fate,
-  offset,
-  flightY,
-  cardWidth,
+/**
+ * The line under the row: "CHOOSE ONE POWER" on a gold pill once the seat may choose — the
+ * readiness a flow waits on (`power-draw-ready`) — or, quieter, the wait on other seats.
+ */
+function Hint({
+  text,
+  testID,
+  quiet = false,
   reduceMotion,
 }: {
-  rise: SharedValue<number>;
-  settle: SharedValue<number>;
-  lift: SharedValue<number>;
-  fate: Fate;
-  offset: number;
-  flightY: number;
-  cardWidth: number;
+  text: string;
+  testID: string;
+  quiet?: boolean;
   reduceMotion: boolean;
 }) {
-  return useAnimatedStyle(() => {
-    if (reduceMotion) {
-      return { opacity: rise.value * (1 - settle.value) };
-    }
+  const shown = useSharedValue(0);
 
-    // Out of the pack: from the fan's middle, low and small, to the card's own place.
-    const risen = {
-      translateX: (1 - rise.value) * offset,
-      translateY: (1 - rise.value) * cardWidth * 0.3,
-      scale: 0.55 + rise.value * 0.45,
-    };
+  useEffect(() => {
+    shown.value = withTiming(1, { duration: reduceMotion ? REDUCED.fadeIn : entrance.hint });
+    return () => cancelAnimation(shown);
+  }, [reduceMotion, shown]);
 
-    if (fate === "dropped") {
-      return {
-        opacity: Math.min(rise.value, 1) * (1 - settle.value),
-        transform: [
-          { translateX: risen.translateX },
-          { translateY: risen.translateY + settle.value * cardWidth * 0.5 },
-          { scale: risen.scale * (1 - settle.value * 0.15) },
-        ],
-      };
-    }
+  const style = useAnimatedStyle(() => ({ opacity: shown.value }));
 
-    if (fate === "kept") {
-      // Lifts and brightens, then shrinks as it flies down past the rack to the action row.
-      return {
-        opacity: 1 - settle.value * 0.9,
-        zIndex: 1,
-        transform: [
-          { translateX: risen.translateX + settle.value * offset * 0.4 },
-          { translateY: risen.translateY - lift.value * cardWidth * 0.12 + settle.value * flightY * 0.75 },
-          { scale: risen.scale * (1 + lift.value * 0.08) * (1 - settle.value * 0.75) },
-        ],
-      };
-    }
-
-    return {
-      opacity: Math.min(rise.value * 1.5, 1),
-      transform: [
-        { translateX: risen.translateX },
-        { translateY: risen.translateY },
-        { scale: risen.scale },
-      ],
-    };
-  });
+  return (
+    <Animated.View accessibilityLiveRegion="polite" id={webTestID(testID)} style={style} testID={testID}>
+      {quiet ? (
+        <View style={styles.waiting}>
+          <Text style={styles.waitingText}>{text}</Text>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={[palette.gold100, palette.gold300, palette.gold500]}
+          style={styles.pill}
+        >
+          <Text style={styles.pillText}>{text}</Text>
+        </LinearGradient>
+      )}
+    </Animated.View>
+  );
 }
 
 const styles = StyleSheet.create({
   scrim: { borderRadius: 24, overflow: "hidden" },
-  stage: { alignItems: "center", flex: 1, justifyContent: "center" },
-  fan: { alignItems: "center", flexDirection: "row", justifyContent: "center" },
-  pack: { alignItems: "center", justifyContent: "center", position: "absolute" },
-  glow: {
-    backgroundColor: palette.gold300,
-    opacity: 0.22,
-    position: "absolute",
+  stage: { alignItems: "center", flex: 1, justifyContent: "center", padding: PAD },
+  heading: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "center" },
+  headingText: {
+    color: palette.gold100,
+    fontFamily: fonts.arcade,
+    letterSpacing: 1.5,
+    textShadowColor: "rgba(231,199,90,0.6)",
+    textShadowOffset: { height: 0, width: 0 },
+    textShadowRadius: 10,
+  },
+  anchor: { height: 0, position: "absolute", width: 0 },
+  row: { alignItems: "center", flexDirection: "row", height: "100%", justifyContent: "center" },
+  hintSlot: { alignItems: "center", height: HINT_HEIGHT, justifyContent: "center" },
+  pill: {
+    borderColor: palette.gold050,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
     shadowColor: palette.gold200,
-    shadowOpacity: 0.9,
-    shadowRadius: 40,
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
   },
-  fill: { height: "100%", width: "100%" },
-  packArt: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
-  packStrip: { position: "absolute" },
-  cardBack: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
-  burst: {
-    backgroundColor: palette.gold050,
-    position: "absolute",
-    shadowColor: palette.gold100,
-    shadowOpacity: 1,
-    shadowRadius: 30,
+  pillText: { color: colors.onGold, fontFamily: fonts.arcade, fontSize: 15, letterSpacing: 1 },
+  waiting: {
+    backgroundColor: "rgba(2,10,7,0.7)",
+    borderColor: colors.borderStrong,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
   },
-  keptGlow: {
-    bottom: 0,
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
-    borderColor: palette.gold100,
-    borderWidth: 2,
-    shadowColor: palette.gold100,
-    shadowOpacity: 0.9,
-    shadowRadius: 16,
-  },
+  waitingText: { color: colors.text, fontFamily: fonts.arcade, fontSize: 13, letterSpacing: 1 },
 });
