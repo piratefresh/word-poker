@@ -35,7 +35,7 @@ export function PowerCard({ id, width }: { id: PowerUpId; width: number }) {
         style={[styles.face, { borderRadius: width * 0.065 }]}
       >
         <View style={[styles.art, { paddingTop: width * 0.06 }]}>
-          <PowerEmblem icon={power.icon} size={width * 0.56} />
+          <PowerEmblem icon={power.icon} size={width * 0.72} />
         </View>
         <View style={[styles.banner, { marginHorizontal: -frame, paddingVertical: width * 0.025 }]}>
           <Text

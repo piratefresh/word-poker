@@ -5,7 +5,6 @@ import {
   AccessibilityInfo,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
 } from "react-native";
@@ -18,12 +17,13 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
+  interpolate,
   type SharedValue,
 } from "react-native-reanimated";
 
 import type { PowerUpId } from "@wordpoker/contracts";
 
-import { colors, easing, fonts, palette } from "@/constants/theme";
+import { easing, palette } from "@/constants/theme";
 import type { PowerView } from "@/lib/power-view";
 import { webTestID } from "@/lib/web-id";
 
@@ -43,6 +43,9 @@ export const POWER_DRAW_BEATS = {
   fanAt: 820,
   stagger: 130,
   rise: 420,
+  /** Each card turns face up this long after it starts to rise, taking `turn` to do it. */
+  turnAt: 300,
+  turn: 260,
   /** The kept card's lift, then its flight to the action row; the others fall away meanwhile. */
   keptLift: 320,
   keptFlight: 480,
@@ -54,7 +57,14 @@ export const POWER_DRAW_BEATS = {
 export const POWER_DRAW_KEPT_MS = POWER_DRAW_BEATS.keptLift + POWER_DRAW_BEATS.keptFlight;
 
 // Relative, as the felt's other art is: Jest maps `@/` to `src/` only.
-const PACK_ART = require("../../../assets/images/ui/icons/wildpower-mode.png");
+const PACK_SEALED = require("../../../assets/images/ui/card/pack-sealed.webp");
+const PACK_OPEN = require("../../../assets/images/ui/card/pack-open.webp");
+const PACK_STRIP = require("../../../assets/images/ui/card/pack-strip.webp");
+const CARD_BACK = require("../../../assets/images/ui/card/card-back.webp");
+
+/** The pack art's height for its width (512 × 640), and the torn strip's (640 × 252). */
+const PACK_ASPECT = 640 / 512;
+const STRIP_ASPECT = 252 / 640;
 
 const GAP = 10;
 const MAX_CARD_WIDTH = 150;
@@ -199,13 +209,15 @@ function Scrim({ closing }: { closing: boolean }) {
 }
 
 /**
- * The foil pack: drops in with its glow, loses its top strip in a burst of light, and fades
- * behind the cards as they rise out of it. Pure motion — it takes no touches and says nothing to
- * a screen reader; the cards are the draw.
+ * The foil pack: drops in sealed with its glow, then its crimped top tears off in a burst of light
+ * and the opened pack takes its place, glowing from inside, and fades behind the cards as they
+ * rise out of it. Pure motion — it takes no touches and says nothing to a screen reader; the cards
+ * are the draw.
  */
 function Pack({ cardWidth }: { cardWidth: number }) {
-  const width = cardWidth * 1.15;
-  const height = width * POWER_CARD_ASPECT;
+  const width = cardWidth * 1.25;
+  const height = width * PACK_ASPECT;
+  const stripWidth = width * 0.92;
   const drop = useSharedValue(0);
   const tear = useSharedValue(0);
   const burst = useSharedValue(0);
@@ -234,35 +246,41 @@ function Pack({ cardWidth }: { cardWidth: number }) {
     opacity: Math.min(drop.value, 1) * fade.value,
     transform: [{ translateY: (1 - drop.value) * -60 }, { scale: 0.8 + drop.value * 0.2 }],
   }));
+  // The sealed art carries its own crimp, so the torn strip shows only once the tear starts, and
+  // the opened pack crossfades in under it.
+  const sealedStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(tear.value * 3, 1) }));
+  const openStyle = useAnimatedStyle(() => ({ opacity: Math.min(tear.value * 3, 1) }));
   const stripStyle = useAnimatedStyle(() => ({
-    opacity: 1 - tear.value,
+    opacity: interpolate(tear.value, [0, 0.05, 0.7, 1], [0, 1, 1, 0]),
     transform: [
       { translateY: tear.value * -height * 0.35 },
-      { translateX: tear.value * width * 0.25 },
-      { rotate: `${tear.value * 28}deg` },
+      { translateX: tear.value * width * 0.3 },
+      { rotate: `${tear.value * 24}deg` },
     ],
   }));
   const burstStyle = useAnimatedStyle(() => ({
-    opacity: burst.value,
+    // A flash, not a disk: the opened pack has to read through it.
+    opacity: burst.value * 0.45,
     transform: [{ scale: 0.4 + burst.value * 1.6 }],
   }));
 
   return (
     <Animated.View pointerEvents="none" style={[styles.pack, { height, width }, packStyle]}>
       <View style={[styles.glow, { borderRadius: width, height: width * 1.3, width: width * 1.3 }]} />
-      <LinearGradient
-        colors={[palette.felt400, palette.felt500, palette.felt900]}
-        style={[styles.packBody, { borderRadius: width * 0.08 }]}
+      <Animated.View style={[styles.packArt, sealedStyle]}>
+        <Image contentFit="contain" source={PACK_SEALED} style={styles.fill} />
+      </Animated.View>
+      <Animated.View style={[styles.packArt, openStyle]}>
+        <Image contentFit="contain" source={PACK_OPEN} style={styles.fill} />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.packStrip,
+          { height: stripWidth * STRIP_ASPECT, left: (width - stripWidth) / 2, top: -height * 0.06, width: stripWidth },
+          stripStyle,
+        ]}
       >
-        <Image
-          contentFit="contain"
-          source={PACK_ART}
-          style={{ height: width * 0.62, width: width * 0.62 }}
-        />
-        <Text style={[styles.packLabel, { fontSize: width * 0.11 }]}>WILD POWER</Text>
-      </LinearGradient>
-      <Animated.View style={[styles.packStrip, { height: height * 0.14 }, stripStyle]}>
-        <View style={styles.packStripSeam} />
+        <Image contentFit="contain" source={PACK_STRIP} style={styles.fill} />
       </Animated.View>
       <Animated.View
         style={[
@@ -308,15 +326,28 @@ function OfferCard({
   // 0 offered; 1 at the end of its fate's beat.
   const settle = useSharedValue(0);
   const lift = useSharedValue(0);
+  // 0 face down, 1 face up. Reduced motion never turns a card: it fades in face up.
+  const turn = useSharedValue(reduceMotion ? 1 : 0);
 
   useEffect(() => {
+    const risesAt = POWER_DRAW_BEATS.fanAt + index * POWER_DRAW_BEATS.stagger;
     rise.value = reduceMotion
       ? withTiming(1, { duration: POWER_DRAW_BEATS.fade })
-      : withDelay(
-          POWER_DRAW_BEATS.fanAt + index * POWER_DRAW_BEATS.stagger,
-          withSpring(1, easing.spring),
-        );
-  }, [index, reduceMotion, rise]);
+      : withDelay(risesAt, withSpring(1, easing.spring));
+    if (!reduceMotion) {
+      turn.value = withDelay(
+        risesAt + POWER_DRAW_BEATS.turnAt,
+        withTiming(1, { duration: POWER_DRAW_BEATS.turn, easing: Easing.inOut(Easing.quad) }),
+      );
+    }
+  }, [index, reduceMotion, rise, turn]);
+
+  // The turn is a squash through the card's edge: the back narrows to nothing, the face widens
+  // back out, which reads as a flip without leaning on a 3D backface on every platform.
+  const turnStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: Math.max(Math.abs(1 - turn.value * 2), 0.001) }],
+  }));
+  const backStyle = useAnimatedStyle(() => ({ opacity: turn.value < 0.5 ? 1 : 0 }));
 
   useEffect(() => {
     if (fate === "offered") return;
@@ -349,7 +380,14 @@ function OfferCard({
         onPress={onPress}
         testID={`power-offer-${id}`}
       >
-        <PowerCard id={id} width={cardWidth} />
+        <Animated.View style={turnStyle}>
+          <PowerCard id={id} width={cardWidth} />
+          {reduceMotion ? null : (
+            <Animated.View pointerEvents="none" style={[styles.cardBack, backStyle]}>
+              <Image contentFit="fill" source={CARD_BACK} style={styles.fill} />
+            </Animated.View>
+          )}
+        </Animated.View>
         {fate === "kept" ? <View pointerEvents="none" style={[styles.keptGlow, { borderRadius: cardWidth * 0.08 }]} /> : null}
       </Pressable>
     </Animated.View>
@@ -435,38 +473,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.9,
     shadowRadius: 40,
   },
-  packBody: {
-    alignItems: "center",
-    borderColor: palette.gold300,
-    borderWidth: 2,
-    height: "100%",
-    justifyContent: "center",
-    overflow: "hidden",
-    width: "100%",
-  },
-  packLabel: {
-    color: colors.gold,
-    fontFamily: fonts.arcade,
-    letterSpacing: 1.5,
-    marginTop: 6,
-  },
-  packStrip: {
-    backgroundColor: palette.gold400,
-    borderColor: palette.gold100,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderWidth: 1,
-    justifyContent: "flex-end",
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
-  packStripSeam: {
-    borderBottomWidth: 1.5,
-    borderColor: palette.gold600,
-    borderStyle: "dashed",
-  },
+  fill: { height: "100%", width: "100%" },
+  packArt: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
+  packStrip: { position: "absolute" },
+  cardBack: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
   burst: {
     backgroundColor: palette.gold050,
     position: "absolute",
