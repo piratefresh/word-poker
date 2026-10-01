@@ -5,7 +5,7 @@ import {
   type Dictionary,
   type OfflineState,
 } from "@wordpoker/game-rules";
-import type { OfflineAction } from "@wordpoker/contracts";
+import type { OfflineAction, PowerUpSettings } from "@wordpoker/contracts";
 
 export interface AuthoritativeGameOptions {
   readonly seed: number;
@@ -13,6 +13,8 @@ export interface AuthoritativeGameOptions {
   /** The table's blinds (§5, ADR 0004), derived from its buy-in when the room was created. */
   readonly blinds: { readonly smallBlind: number; readonly bigBlind: number };
   readonly turnDurationMs: number;
+  /** §40's deal mode. The engine carries it from hand to hand once the first is dealt with it. */
+  readonly powerUps: PowerUpSettings;
 }
 
 export interface AuthoritativePlayer {
@@ -43,6 +45,8 @@ export class AuthoritativeGame {
       stacks: players.map((player) => ({ playerId: player.playerId, stack: player.stack })),
       dealerSeat,
       turnDurationMs: this.options.turnDurationMs,
+      // Online, every seat is a person: nobody is left out of the draw as a bot.
+      powerUps: { deal: this.options.powerUps.deal },
     });
   }
 
@@ -67,6 +71,10 @@ export class AuthoritativeGame {
 
   timeoutWords(nowMs: number): void {
     this.dispatch({ type: "timeoutWords" }, nowMs);
+  }
+
+  timeoutPowerDraw(nowMs: number): void {
+    this.dispatch({ type: "timeoutPowerDraw" }, nowMs);
   }
 
   timeoutTurn(nowMs: number): void {

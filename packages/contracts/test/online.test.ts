@@ -141,4 +141,11 @@ describe("online state and rejection shapes", () => {
     assert.ok(isGameRejectionEvent({ action: "draftWord", reason: "too-short" }));
     assert.ok(!isGameRejectionEvent({ action: "draftWord", reason: "turn-timeout" }));
   });
+
+  it("names a refused power command by its action id and a power reason (STO-499)", () => {
+    assert.ok(isGameRejectionEvent({ action: "pickPower", reason: "not-offered", actionId: "a1" }));
+    assert.ok(isGameRejectionEvent({ action: "usePowerUp", reason: "outside-window", actionId: "a2" }));
+    assert.ok(!isGameRejectionEvent({ action: "usePowerUp", reason: "outside-window" }), "no action id");
+    assert.ok(!isGameRejectionEvent({ action: "pickPower", reason: "too-short", actionId: "a3" }));
+  });
 });

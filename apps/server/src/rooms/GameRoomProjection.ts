@@ -2,11 +2,13 @@ import {
   WAITING_PHASE,
   WORD_CHECKS_PER_HAND,
   type GameTableConfig,
+  type PrivatePowerState,
+  type PrivatePowerSwap,
   type PrivateSeatState,
   type PrivateWordState,
 } from "@wordpoker/contracts";
 import type { Tile } from "@wordpoker/contracts";
-import { buildPots, playedWord, type OfflineState } from "@wordpoker/game-rules";
+import { buildPots, canUsePower, playedWord, type OfflineState } from "@wordpoker/game-rules";
 
 import {
   BettingState,
@@ -67,8 +69,11 @@ export class GameRoomProjection {
     const seat = input.game?.seats[input.binding.seat];
     const activeTurn =
       input.game?.wordWindow?.status !== "open" && input.game?.toActIndex === input.binding.seat;
+    // Spread rather than set to `undefined`: a Classic seat's message carries no power key at all.
+    const power = privatePowerState(input.game, input.binding.playerId, input.now);
 
     return {
+      ...(power === undefined ? {} : { power }),
       now: input.now,
       playerId: input.binding.playerId,
       seat: input.binding.seat,
@@ -263,6 +268,50 @@ function projectPot(pot: {
   pot.winners.forEach((playerId) => projected.winners.push(playerId));
   projected.rankingJson = pot.ranking === null ? "" : JSON.stringify(pot.ranking);
   return projected;
+}
+
+/**
+ * What a swap power did, as its owner is told it (§44). The discarded tile is only ever an id —
+ * its letter is never sent anywhere, the owner included.
+ */
+export function privatePowerSwap(game: OfflineState, playerId: string): PrivatePowerSwap | null {
+  const held = game.powers?.held[playerId];
+  if (held?.swap === undefined) return null;
+  return {
+    handId: game.hand,
+    powerUpId: held.id,
+    discardedTileId: held.swap.discardedTileId,
+    tile: { ...held.swap.tile },
+  };
+}
+
+/**
+ * One seat's side of a Wild hand (§44): its open draw, its held power and whether it can use it
+ * now — the engine's `canUsePower`, never the client's guess — and its swap. `undefined` at a
+ * Classic table and for a seat the draw passed over, so neither carries a power field.
+ */
+function privatePowerState(
+  game: OfflineState | null,
+  playerId: string,
+  now: number,
+): PrivatePowerState | undefined {
+  const powers = game?.powers;
+  const slot = powers?.draw.slots.find((candidate) => candidate.playerId === playerId);
+  if (game == null || powers === undefined || slot === undefined) return undefined;
+
+  const held = powers.held[playerId];
+  return {
+    handId: game.hand,
+    draw:
+      powers.draw.status === "open"
+        ? { offers: [...slot.offers], picked: slot.picked, deadline: powers.draw.endsAtMs }
+        : null,
+    held:
+      held === undefined
+        ? null
+        : { powerUpId: held.id, used: held.used, usable: canUsePower(game, playerId, now) },
+    swap: privatePowerSwap(game, playerId),
+  };
 }
 
 function privateWordState(game: OfflineState | null, playerId: string): PrivateWordState {

@@ -124,6 +124,7 @@ export {
   type OnlineWordWindow,
   type PowerUsedEvent,
   type PrivatePowerDraw,
+  type PrivatePowerState,
   type PrivatePowerSwap,
   type PrivateSeatState,
   type PrivateWordState,

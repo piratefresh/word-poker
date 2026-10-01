@@ -8,10 +8,18 @@ import {
   WAITING_PHASE,
   type GameRejectionEvent,
   type OnlineBettingAction,
+  type PowerUsedEvent,
+  type PrivatePowerDraw,
+  type PrivatePowerSwap,
   type PrivateSeatState,
   type Tile,
 } from "@wordpoker/contracts";
-import { chooseOfflineWord, loadDictionary, type OfflineState } from "@wordpoker/game-rules";
+import {
+  chooseOfflineWord,
+  drawOffers,
+  loadDictionary,
+  type OfflineState,
+} from "@wordpoker/game-rules";
 
 import {
   FOUR_SEAT_BUY_IN,
@@ -1200,6 +1208,303 @@ describe("GameRoom", () => {
         [...rows.values()].every((listing) => listing.name === "game"),
         "only tables are listed, not the subscription room every client sits in",
       );
+    });
+  });
+
+  describe("power-ups (STO-499)", () => {
+    /** Every targeted or broadcast event one client received, in order. */
+    type Inbox = { type: string; payload: unknown }[];
+
+    function listen(client: ClientRoom): Inbox {
+      const inbox: Inbox = [];
+      for (const type of Object.values(GAME_EVENTS)) {
+        client.onMessage(type, (payload) => inbox.push({ type, payload }));
+      }
+      return inbox;
+    }
+
+    function ofType<T>(inbox: Inbox, type: string): T[] {
+      return inbox.filter((message) => message.type === type).map((message) => message.payload as T);
+    }
+
+    function last<T>(inbox: Inbox, type: string): T | undefined {
+      return ofType<T>(inbox, type).at(-1);
+    }
+
+    /** A power refusal's action id; the betting and word refusals carry none. */
+    function actionIdOf(event: GameRejectionEvent | undefined): string | undefined {
+      return event !== undefined && "actionId" in event ? event.actionId : undefined;
+    }
+
+    /** Polls until `read` gives a value: events arrive between patches, so a patch is no clock. */
+    async function until<T>(read: () => T | undefined | false, what: string, ms = 5_000): Promise<T> {
+      const deadline = Date.now() + ms;
+      for (;;) {
+        const value = read();
+        if (value !== undefined && value !== false) return value;
+        if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+
+    /** A heads-up Wild table, dealt, with both seats' Power Draws in hand. */
+    async function wildTable(seed: number, knobs: Record<string, unknown> = {}) {
+      const room = await colyseus.createRoom("game", {
+        name: "Wild test",
+        buyIn: 500,
+        maxSeats: 2,
+        seed,
+        tickMs: 5,
+        powerUps: { deal: "choose3" },
+        ...knobs,
+      });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      const inboxes = new Map([
+        [first.sessionId, listen(first)],
+        [second.sessionId, listen(second)],
+      ]);
+      await readyUp(room, [first, second]);
+      await until(
+        () => [...inboxes.values()].every((inbox) => last(inbox, GAME_EVENTS.powerDraw) !== undefined),
+        "both seats' draws",
+      );
+      const inboxOf = (client: ClientRoom) => inboxes.get(client.sessionId)!;
+      return { room, clients: [first, second] as const, inboxOf };
+    }
+
+    /** Both seats keep Random Wild; the draw closes and the seat on the turn is returned first. */
+    async function bothPickWild(table: Awaited<ReturnType<typeof wildTable>>) {
+      for (const client of table.clients) {
+        client.send(GAME_MESSAGES.pickPower, {
+          actionId: `pick-${client.sessionId}`,
+          handId: 1,
+          powerUpId: "random_wild",
+        });
+      }
+      await until(() => table.room.state.toActSeat >= 0, "the draw to close and pre-flop to start");
+
+      const actor = table.clients.find(
+        (client) => table.room.state.seats.get(client.sessionId)?.seat === table.room.state.toActSeat,
+      )!;
+      const opponent = table.clients.find((client) => client !== actor)!;
+      await until(
+        () => last<PrivateSeatState>(table.inboxOf(actor), GAME_EVENTS.privateState)?.power?.held?.usable,
+        "the actor's power to light",
+      );
+      return { actor, opponent };
+    }
+
+    /** The seat on the turn swaps its first private tile with Random Wild. */
+    async function useWild(table: Awaited<ReturnType<typeof wildTable>>, actor: ClientRoom) {
+      const rack = last<PrivateSeatState>(table.inboxOf(actor), GAME_EVENTS.privateState)!.rack;
+      const target = rack[0]!;
+      const use = { actionId: "use-1", handId: 1, powerUpId: "random_wild", tileId: target.id } as const;
+      actor.send(GAME_MESSAGES.usePowerUp, use);
+      const swap = await until(
+        () => last<PrivatePowerSwap>(table.inboxOf(actor), GAME_EVENTS.powerSwap),
+        "the swap",
+      );
+      return { use, target, swap };
+    }
+
+    it("deals each seat its own three offers, privately, and holds the turn until the draw closes", async () => {
+      const table = await wildTable(4_990);
+
+      for (const client of table.clients) {
+        const inbox = table.inboxOf(client);
+        const draws = ofType<PrivatePowerDraw>(inbox, GAME_EVENTS.powerDraw);
+        assert.strictEqual(draws.length, 1, "one draw per seat, never another seat's");
+        const [draw] = draws;
+        const seat = table.room.state.seats.get(client.sessionId)!.seat;
+        assert.strictEqual(draw!.handId, 1);
+        assert.deepStrictEqual(draw!.offers, drawOffers(4_990, seat), "the engine's offers for this seat");
+        assert.ok(draw!.deadline > draw!.now, "the room's clock runs the draw");
+
+        const state = await until(
+          () => last<PrivateSeatState>(inbox, GAME_EVENTS.privateState)?.power,
+          "the draw in the private state",
+        );
+        assert.deepStrictEqual(state.draw, { offers: draw!.offers, picked: null, deadline: draw!.deadline });
+        assert.strictEqual(state.held, null);
+      }
+      assert.strictEqual(table.room.state.toActSeat, -1, "nobody is on the clock during the draw");
+      assert.strictEqual(table.room.state.turnDeadline, 0);
+    });
+
+    it("sends a Classic table no power messages at all", async () => {
+      const room = await colyseus.createRoom("game", {
+        name: "Classic test",
+        buyIn: 500,
+        maxSeats: 2,
+        seed: 4_990,
+        tickMs: 5,
+      });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      const inboxes = [listen(first), listen(second)];
+      await readyUp(room, [first, second]);
+      await until(
+        () => inboxes.every((inbox) => (last<PrivateSeatState>(inbox, GAME_EVENTS.privateState)?.rack.length ?? 0) > 0),
+        "both racks",
+      );
+
+      for (const inbox of inboxes) {
+        assert.deepStrictEqual(
+          inbox.map((message) => message.type).filter((type) => type !== GAME_EVENTS.privateState),
+          [],
+        );
+        for (const state of ofType<PrivateSeatState>(inbox, GAME_EVENTS.privateState)) {
+          assert.ok(!("power" in state), "a Classic seat's private state has no power field");
+        }
+      }
+      assert.ok(room.state.toActSeat >= 0, "pre-flop starts on the deal");
+    });
+
+    it("lets both seats pick and the seat on the turn use Random Wild, telling the other only that it did", async () => {
+      const table = await wildTable(4_991);
+      const { actor, opponent } = await bothPickWild(table);
+      const actorSeat = table.room.state.seats.get(actor.sessionId)!.seat;
+
+      const opponentPower = last<PrivateSeatState>(table.inboxOf(opponent), GAME_EVENTS.privateState)!.power;
+      assert.deepStrictEqual(opponentPower?.held, { powerUpId: "random_wild", used: false, usable: false });
+
+      const { target, swap } = await useWild(table, actor);
+      assert.deepStrictEqual(swap, {
+        handId: 1,
+        powerUpId: "random_wild",
+        discardedTileId: target.id,
+        tile: swap.tile,
+      });
+      assert.strictEqual(swap.tile.id, `power-${actorSeat}`);
+      assert.ok(!("multiplier" in swap.tile), "the new tile is plain");
+
+      const expected = { handId: 1, seat: actorSeat, powerUpId: "random_wild", street: "preflop" };
+      for (const client of table.clients) {
+        assert.deepStrictEqual(
+          await until(() => last<PowerUsedEvent>(table.inboxOf(client), GAME_EVENTS.powerUsed), "powerUsed"),
+          expected,
+        );
+      }
+
+      const restocked = await until(
+        () => {
+          const state = last<PrivateSeatState>(table.inboxOf(actor), GAME_EVENTS.privateState);
+          return state?.rack.some((tile) => tile.id === swap.tile.id) ? state : undefined;
+        },
+        "the new tile in the actor's rack",
+      );
+      assert.ok(!restocked.rack.some((tile) => tile.id === target.id), "the discarded tile is gone");
+      assert.deepStrictEqual(restocked.power?.held, { powerUpId: "random_wild", used: true, usable: false });
+      assert.deepStrictEqual(restocked.power?.swap, swap);
+      assert.strictEqual(table.room.state.toActSeat, actorSeat, "using a power is not a betting action");
+
+      // The opponent hears that a power was used, and nothing of what it gave or took.
+      const heard = JSON.stringify(table.inboxOf(opponent)) + JSON.stringify(opponent.state);
+      assert.ok(!heard.includes(swap.tile.id), "the opponent never sees the new tile");
+      assert.ok(!heard.includes(target.id), "the opponent never sees the discarded tile");
+      assert.strictEqual(ofType(table.inboxOf(opponent), GAME_EVENTS.powerSwap).length, 0);
+    });
+
+    it("answers a repeated actionId with the first result, never a second charge or roll", async () => {
+      const table = await wildTable(4_991);
+      const { actor, opponent } = await bothPickWild(table);
+      const { use, swap } = await useWild(table, actor);
+      await until(() => last(table.inboxOf(opponent), GAME_EVENTS.powerUsed), "the first powerUsed");
+
+      actor.send(GAME_MESSAGES.usePowerUp, use);
+      await until(() => ofType(table.inboxOf(actor), GAME_EVENTS.powerSwap).length === 2, "the replay");
+      assert.deepStrictEqual(last(table.inboxOf(actor), GAME_EVENTS.powerSwap), swap, "the same swap");
+
+      // A fresh id is a fresh gesture: the engine refuses it, because the power is spent.
+      actor.send(GAME_MESSAGES.usePowerUp, { ...use, actionId: "use-2" });
+      const refusal = await until(
+        () => last<GameRejectionEvent>(table.inboxOf(actor), GAME_EVENTS.rejected),
+        "the refusal",
+      );
+      assert.deepStrictEqual(refusal, { action: "usePowerUp", reason: "already-used", actionId: "use-2" });
+
+      // A repeated pick replays too: no refusal for a pick that already landed.
+      actor.send(GAME_MESSAGES.pickPower, {
+        actionId: `pick-${actor.sessionId}`,
+        handId: 1,
+        powerUpId: "random_wild",
+      });
+      // A command for a hand that is not this one is refused rather than landing on it.
+      actor.send(GAME_MESSAGES.pickPower, { actionId: "stale", handId: 2, powerUpId: "mulligan" });
+      await until(
+        () => actionIdOf(last<GameRejectionEvent>(table.inboxOf(actor), GAME_EVENTS.rejected)) === "stale",
+        "the stale refusal",
+      );
+      const refusals = ofType<GameRejectionEvent>(table.inboxOf(actor), GAME_EVENTS.rejected);
+      assert.deepStrictEqual(refusals.map(actionIdOf), ["use-2", "stale"]);
+      assert.strictEqual(ofType(table.inboxOf(opponent), GAME_EVENTS.powerUsed).length, 1, "one broadcast");
+    });
+
+    it("rolls the same offers and the same letter from the same seed", async () => {
+      const rolls: { offers: unknown[]; letter: string }[] = [];
+      for (let run = 0; run < 2; run += 1) {
+        const table = await wildTable(4_992);
+        const offers = table.clients.map((client) => ({
+          seat: table.room.state.seats.get(client.sessionId)!.seat,
+          offers: last<PrivatePowerDraw>(table.inboxOf(client), GAME_EVENTS.powerDraw)!.offers,
+        }));
+        offers.sort((a, b) => a.seat - b.seat);
+        const { actor } = await bothPickWild(table);
+        const { swap } = await useWild(table, actor);
+        rolls.push({ offers, letter: swap.tile.letter });
+        await colyseus.cleanup();
+      }
+      assert.deepStrictEqual(rolls[0], rolls[1]);
+    });
+
+    it("restores the owner's held power and new tile on reconnect", async () => {
+      const table = await wildTable(4_991, { reconnectSeconds: 2 });
+      const { actor } = await bothPickWild(table);
+      const { swap } = await useWild(table, actor);
+
+      actor.reconnection.minUptime = 0;
+      actor.reconnection.minDelay = 1;
+      actor.reconnection.maxDelay = 5;
+      actor.reconnection.backoff = () => 1;
+      let reconnected = false;
+      actor.onReconnect.once(() => {
+        reconnected = true;
+      });
+      const inbox = table.inboxOf(actor);
+      const before = inbox.length;
+      actor.connection.close();
+
+      const restored = await until(
+        () =>
+          reconnected &&
+          inbox
+            .slice(before)
+            .filter((message) => message.type === GAME_EVENTS.privateState)
+            .map((message) => message.payload as PrivateSeatState)
+            .at(-1),
+        "the restored private state",
+      );
+      assert.deepStrictEqual(restored.power?.held, { powerUpId: "random_wild", used: true, usable: false });
+      assert.deepStrictEqual(restored.power?.swap, swap);
+      assert.ok(restored.rack.some((tile) => tile.id === swap.tile.id), "the new tile is back in the rack");
+    });
+
+    it("closes the draw on the room's clock, each seat keeping its first offer", async function (this: Mocha.Context) {
+      this.timeout(20_000);
+      const table = await wildTable(4_993);
+
+      await until(() => table.room.state.toActSeat >= 0, "the draw's clock to run out", 15_000);
+      for (const client of table.clients) {
+        const inbox = table.inboxOf(client);
+        const [first] = last<PrivatePowerDraw>(inbox, GAME_EVENTS.powerDraw)!.offers;
+        const held = await until(
+          () => last<PrivateSeatState>(inbox, GAME_EVENTS.privateState)?.power?.held ?? undefined,
+          "the kept power",
+        );
+        assert.strictEqual(held.powerUpId, first);
+        assert.strictEqual(last<PrivateSeatState>(inbox, GAME_EVENTS.privateState)?.power?.draw, null);
+      }
     });
   });
 });

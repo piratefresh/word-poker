@@ -19,7 +19,12 @@ import {
 } from "./betting";
 import type { RoomPhase, RoundPhase } from "./phases";
 import type { PlayerId } from "./players";
-import { isPowerUpId, type PowerUpId } from "./powers";
+import {
+  POWER_REJECTION_REASONS,
+  isPowerUpId,
+  type PowerRejectionReason,
+  type PowerUpId,
+} from "./powers";
 import type { GameRoomMetadata } from "./rooms";
 import type { ShowdownComparison, ShowdownStanding } from "./showdown";
 import type { LetterTile, Tile } from "./tiles";
@@ -166,6 +171,12 @@ export type GameRejectionEvent =
   | {
       readonly action: "draftWord" | "confirmWord";
       readonly reason: WordRejectionReason;
+    }
+  | {
+      readonly action: "pickPower" | "usePowerUp";
+      readonly reason: PowerRejectionReason;
+      /** The refused command's own id, so the client can tell which gesture was refused. */
+      readonly actionId: string;
     };
 
 /** One public seat in the broadcast snapshot. */
@@ -272,6 +283,34 @@ export interface PrivateSeatState {
   readonly isYourTurn: boolean;
   /** Epoch milliseconds on the server; zero when this seat has no betting turn. */
   readonly turnDeadline: number;
+  /**
+   * The seat's side of a Wild table's hand (§44) — what a reconnect restores. Absent at a Classic
+   * table, before the first deal, and for a seat that is not in the hand's draw.
+   */
+  readonly power?: PrivatePowerState;
+}
+
+/**
+ * One seat's power-ups for one hand, private to that seat: what it was offered, what it kept,
+ * whether it can use it right now (the engine's answer), and what its swap did.
+ */
+export interface PrivatePowerState {
+  readonly handId: number;
+  /** The seat's Power Draw while it is open; `null` once it has closed. */
+  readonly draw: {
+    readonly offers: readonly PowerUpId[];
+    readonly picked: PowerUpId | null;
+    /** Epoch milliseconds on the server when the draw closes. */
+    readonly deadline: number;
+  } | null;
+  /** The power the seat kept, once the draw has given it one. */
+  readonly held: {
+    readonly powerUpId: PowerUpId;
+    readonly used: boolean;
+    /** Whether the seat may use it right now: its own turn, or §19's window before it confirms. */
+    readonly usable: boolean;
+  } | null;
+  readonly swap: PrivatePowerSwap | null;
 }
 
 /** The private draft/confirmation record a seat restores after a reconnect. */
@@ -370,6 +409,13 @@ export function isGameRejectionEvent(value: unknown): value is GameRejectionEven
 
   if (value.action === "draftWord" || value.action === "confirmWord") {
     return (WORD_REJECTION_REASONS as readonly unknown[]).includes(value.reason);
+  }
+
+  if (value.action === "pickPower" || value.action === "usePowerUp") {
+    return (
+      typeof value.actionId === "string" &&
+      (POWER_REJECTION_REASONS as readonly unknown[]).includes(value.reason)
+    );
   }
 
   return false;

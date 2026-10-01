@@ -281,6 +281,9 @@ export function useOnlineGame({
     const handlePrivate = (payload: unknown) => setPriv(decodePrivate(payload));
     const handleRejected = (payload: unknown) => {
       if (!isGameRejectionEvent(payload)) return;
+      // A power refusal answers a power gesture, not the seat's move or word; the power UI takes
+      // it up when the online table deals powers (STO-500).
+      if (payload.action === "pickPower" || payload.action === "usePowerUp") return;
       // The server refused the move: drop the prediction so the row comes back for another try,
       // and — for a word — say why while the seat still has time to fix it.
       setPending(null);
