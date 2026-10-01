@@ -60,6 +60,31 @@ export function PowerCard({ id, width }: { id: PowerUpId; width: number }) {
   );
 }
 
+/**
+ * The card too small to read, as the action row holds it: the same gold frame and felt face with
+ * the power's art alone. The title and line stay on the full card; whoever places this one says
+ * them to a screen reader (`powerCardLabel`).
+ */
+export function PowerCardMini({ id, width }: { id: PowerUpId; width: number }) {
+  const frame = Math.max(1.5, width * 0.06);
+
+  return (
+    <LinearGradient
+      colors={[palette.gold100, palette.gold400, palette.gold600]}
+      end={{ x: 1, y: 1 }}
+      start={{ x: 0, y: 0 }}
+      style={[styles.frame, { borderRadius: width * 0.14, height: width * POWER_CARD_ASPECT, padding: frame, width }]}
+    >
+      <LinearGradient
+        colors={[palette.felt400, palette.felt500, palette.felt800]}
+        style={[styles.face, styles.miniFace, { borderRadius: width * 0.1 }]}
+      >
+        <PowerEmblem icon={POWER_UPS[id].icon} size={width * 0.86} />
+      </LinearGradient>
+    </LinearGradient>
+  );
+}
+
 /** What a screen reader hears for a card: its name, then what it does. */
 export function powerCardLabel(id: PowerUpId): string {
   const power = POWER_UPS[id];
@@ -74,6 +99,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   face: { alignItems: "stretch", flex: 1, overflow: "hidden" },
+  miniFace: { alignItems: "center", justifyContent: "center" },
   art: { alignItems: "center", flex: 1, justifyContent: "center" },
   banner: {
     backgroundColor: palette.gold400,

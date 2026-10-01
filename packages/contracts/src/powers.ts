@@ -32,6 +32,11 @@ export interface PowerUpDefinition<Id extends PowerUpId = PowerUpId> {
   readonly title: string;
   /** The card's one line, shown in the draw and on the felt when the power is used. */
   readonly description: string;
+  /**
+   * What the power hands the seat, as the end of its confirm: "Discard A for {receives}?".
+   * Lower case and unpunctuated, so it reads inside that sentence.
+   */
+  readonly receives: string;
   /** The nameplate's short tag for the street the power was used on. */
   readonly tag: string;
   /** Which art the app draws the card with; a key, so contracts carry no asset paths. */
@@ -50,6 +55,7 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     id: "random_wild",
     title: "Random Wild",
     description: "Swap one of your tiles for a random letter.",
+    receives: "a random letter",
     tag: "WILD",
     icon: "random-wild",
     weight: 10,
@@ -61,6 +67,7 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     id: "vowel_magnet",
     title: "Vowel Magnet",
     description: "Swap one of your tiles for a random vowel.",
+    receives: "a random vowel",
     tag: "VOWEL",
     icon: "vowel-magnet",
     weight: 8,
@@ -72,6 +79,7 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     id: "mulligan",
     title: "Mulligan",
     description: "Swap one of your tiles for the next tile in the bag.",
+    receives: "the next tile in the bag",
     tag: "MULLIGAN",
     icon: "mulligan",
     weight: 8,

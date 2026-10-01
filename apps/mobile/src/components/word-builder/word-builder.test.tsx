@@ -114,7 +114,7 @@ function builderProps(overrides: Partial<WordBuilderProps> = {}) {
  */
 function stripOrder(view: RenderResult): readonly string[] {
   return view
-    .getAllByTestId(/^word-builder-tile-/)
+    .getAllByTestId(/^word-builder-tile-(?!.*-powered$)/)
     .map((tile) => String(tile.props.testID).replace("word-builder-tile-", ""));
 }
 
@@ -479,5 +479,59 @@ describe("<WordBuilder />", () => {
       word: "EL",
     });
     expect(view.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("<WordBuilder /> and a held power (§44)", () => {
+  test("while the seat chooses a tile, a tap on its own tile picks it and the board's take none", async () => {
+    const onPickTile = jest.fn();
+    const { onDraft, view } = await renderBuilder({ onPickTile });
+
+    expect(
+      view.getByTestId("word-builder-tile-p-a").props.accessibilityLabel,
+    ).toBe("A, 1 point, tap to swap it");
+    expect(
+      StyleSheet.flatten(view.getByTestId("word-builder-tile-c-l").props.style)
+        .opacity,
+    ).toBe(opacity.muted);
+
+    await fireEvent.press(view.getByTestId("word-builder-tile-c-l"));
+    await fireEvent.press(view.getByTestId("word-builder-face-p-ae-E"));
+    expect(onPickTile).not.toHaveBeenCalled();
+
+    await fireEvent.press(view.getByTestId("word-builder-tile-p-a"));
+    expect(onPickTile).toHaveBeenCalledWith(PRIVATE_TILES[0]);
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  test("marks a swapped tile with its ⚡ and plays it like any other", async () => {
+    const swapped: Tile = { id: "power-0", letter: "Z", points: 10 };
+    const { onDraft, view } = await renderBuilder({
+      privateTiles: [swapped, PRIVATE_TILES[1]!],
+    });
+
+    expect(view.getByTestId("word-builder-tile-power-0-powered", { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(
+      view.getByTestId("word-builder-tile-power-0").props.accessibilityLabel,
+    ).toBe("Z, 10 points, from your power, tap to play it");
+    expect(view.queryByTestId("word-builder-tile-p-ae-powered", { includeHiddenElements: true })).toBeNull();
+
+    await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
+    expect(onDraft).toHaveBeenCalledWith([{ tileId: "power-0" }]);
+  });
+
+  test("holds the discarded face in the swapped tile's place until the swap is revealed", async () => {
+    const swapped: Tile = { id: "power-0", letter: "Z", points: 10 };
+    const { view } = await renderBuilder({
+      privateTiles: [PRIVATE_TILES[1]!, swapped],
+      swapFlip: { tileId: "power-0", from: PRIVATE_TILES[0]!, revealed: false },
+    });
+
+    // The new tile keeps the discarded one's place, still showing its letter and no ⚡.
+    expect(stripOrder(view)).toEqual(["p-ae", "power-0", "c-ts", "c-l"]);
+    expect(
+      view.getByTestId("word-builder-tile-power-0").props.accessibilityLabel,
+    ).toBe("A, 1 point, tap to play it");
+    expect(view.queryByTestId("word-builder-tile-power-0-powered", { includeHiddenElements: true })).toBeNull();
   });
 });

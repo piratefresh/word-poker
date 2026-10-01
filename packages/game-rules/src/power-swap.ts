@@ -55,6 +55,14 @@ export function swappedTileId(seat: number): string {
 }
 
 /**
+ * Whether a tile is one a swap handed a seat (§44): what the felt's ⚡ marker reads, in the rack
+ * and at showdown. It says only that a power made the tile, never what the tile replaced.
+ */
+export function isSwappedTileId(tileId: string): boolean {
+  return /^power-\d+$/.test(tileId);
+}
+
+/**
  * The plain tile a swap power hands the seat: its letter at §6's value, no multiplier, never a
  * choice tile, and nothing inherited from the tile it replaces.
  *

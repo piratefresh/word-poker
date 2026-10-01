@@ -25,6 +25,8 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
+import { isSwappedTileId } from "@wordpoker/game-rules";
+
 import { Tile } from "@/components/game/word-tile";
 import {
   border,
@@ -273,7 +275,15 @@ function ResultTile({
 
   return (
     <Animated.View style={enter}>
-      <Tile animation="none" side="front" size="small" testID={testID} tile={tile} />
+      <Tile
+        animation="none"
+        // §44: a tile a power handed the seat shows the table its ⚡, and nothing it replaced.
+        powered={isSwappedTileId(tile.id)}
+        side="front"
+        size="small"
+        testID={testID}
+        tile={tile}
+      />
     </Animated.View>
   );
 }

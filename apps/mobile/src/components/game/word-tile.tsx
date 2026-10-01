@@ -28,6 +28,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 
 import {
@@ -74,6 +75,11 @@ export interface TileProps {
   dealDelayMs?: number;
   onPress?: () => void;
   onFlipComplete?: (side: TileSide) => void;
+  /**
+   * §44: a power handed the seat this tile. Its face wears a small ⚡, in the rack and at
+   * showdown, which says a power made the tile and nothing about what it replaced.
+   */
+  powered?: boolean;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -181,6 +187,21 @@ export function getTileAccessibilityLabel(tile: TileData): string {
   return `${letters}, ${points}${tile.multiplier ? `, ${tile.multiplier.replace("-", " ")}` : ""}`;
 }
 
+/** The ⚡ a powered tile wears: a gold bolt with a dark rim, legible on the tile's cream face. */
+function Bolt({ size }: { size: number }) {
+  return (
+    <Svg height={size} viewBox="0 0 12 12" width={size}>
+      <Path
+        d="M7.2 0.6 2 6.9h3.3L4.4 11.4 10 4.8H6.6z"
+        fill={colors.gold}
+        stroke="#5a3508"
+        strokeLinejoin="round"
+        strokeWidth={0.9}
+      />
+    </Svg>
+  );
+}
+
 /** Canonical tile: consumers own position; this component owns faces and local feedback. */
 export function Tile({
   tile,
@@ -194,6 +215,7 @@ export function Tile({
   interactive = false,
   animation = "flip",
   dealDelayMs = 0,
+  powered = false,
   onPress,
   onFlipComplete,
   accessibilityLabel,
@@ -518,6 +540,17 @@ export function Tile({
                 />
               </View>
             )}
+            {powered ? (
+              // A swapped tile is always plain (§44), so the ⚡ takes the corner a multiplier
+              // badge would otherwise hold.
+              <View
+                pointerEvents="none"
+                style={[styles.poweredBadge, { left: metrics.inset, top: metrics.inset }]}
+                testID={testID === undefined ? undefined : `${testID}-powered`}
+              >
+                <Bolt size={metrics.badgeSize + 3} />
+              </View>
+            ) : null}
             {multiplierLabel ? (
               <View
                 style={[
@@ -684,6 +717,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoBold,
     position: "absolute",
   },
+  poweredBadge: { position: "absolute" },
   multiplierBadge: {
     alignItems: "center",
     backgroundColor: colors.gold,

@@ -5,7 +5,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
-import { PowerDrawReveal } from "@/components/powers";
+import {
+  PowerDrawReveal,
+  PowerHeldChip,
+  PowerUsePrompt,
+  swapFlipOf,
+  usePowerTargeting,
+} from "@/components/powers";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
@@ -116,11 +122,16 @@ function OfflineTable({
     checkWord,
     powers,
     pickPower,
+    usePower,
     endChipFlight,
     sessionOver,
     newGame,
   } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps });
   const payout = game.phase === "payout";
+  // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
+  const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
+  const choosing = power.targeting.stage === "picking";
+  const flip = swapFlipOf(powers?.swap, power.discarded);
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.
@@ -146,10 +157,25 @@ function OfflineTable({
       reason={words?.reason ?? null}
       score={words?.score ?? null}
       word={words?.word ?? ""}
+      onPickTile={choosing ? power.pick : undefined}
+      // The flip turns as soon as the swap lands. PW11's "power used" card will hold it until
+      // the card clears (§44, Visibility).
+      swapFlip={flip === null ? null : { ...flip, revealed: true }}
     >
       <View style={styles.table}>
         <GameScreen
-          bettingLeading={<WordShuffleButton />}
+          bettingLeading={
+            <>
+              <WordShuffleButton />
+              {powers === null ? null : (
+                <PowerHeldChip
+                  active={power.targeting.stage !== "idle"}
+                  held={powers.held}
+                  onPress={power.toggle}
+                />
+              )}
+            </>
+          }
           bettingSlider={<WordCheckButton />}
           game={game}
           onAllIn={allIn}
@@ -164,7 +190,15 @@ function OfflineTable({
             // §44's Power Draw, at a Wild table: the pack opens over the felt, above the rack
             // the seat picks with in view. A Classic table has no powers and draws nothing here.
             powers === null ? null : (
-              <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
+              <>
+                <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
+                <PowerUsePrompt
+                  onCancel={power.cancel}
+                  onConfirm={power.confirm}
+                  power={powers.held?.id ?? null}
+                  targeting={power.targeting}
+                />
+              </>
             )
           }
           rack={

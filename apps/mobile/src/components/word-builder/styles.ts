@@ -127,6 +127,19 @@ export const styles = StyleSheet.create({
   // the row — whether it is being dragged or just sits there.
   place: { alignItems: "center", position: "absolute", top: 0 },
   entry: { alignItems: "center", gap: spacing.xs },
+  /** The gold ring round a tile the seat may choose for its power (§44). */
+  pickRing: {
+    borderColor: colors.goldHi,
+    borderRadius: 9,
+    borderWidth: 2,
+    bottom: -3,
+    left: -3,
+    position: "absolute",
+    right: -3,
+    top: -3,
+  },
+  /** The two faces of a swap's cross-fade, stacked in the one place. */
+  swapFace: { left: 0, position: "absolute", top: 0 },
   faces: { flexDirection: "row", gap: spacing.xxs },
   chip: {
     alignItems: "center",

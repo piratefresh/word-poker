@@ -78,6 +78,11 @@ table: nobody is on the clock, so no bot beat runs until the hero picks or `POWE
 out. A power used on a street rides beside that street's action in `seatActions`, and the power
 UI reads the adapter's `powers` (`PowerView`, `lib/power-view.ts`) — the shape the online adapter
 will fill too. Whether a power can be used is the engine's `canUsePower`, never the felt's.
+Using it runs through `components/powers`: `PowerHeldChip` sits in the action row beside the
+shuffle, `usePowerTargeting` holds chip → tile → confirm (and drops to idle the moment the power
+stops being usable), and while the seat chooses, `WordBuilder`'s `onPickTile` turns the strip's
+taps on private tiles into picks. The swap flips in place through `swapFlip`, whose `revealed`
+is the seam the "power used" card holds it on.
 
 # End-to-end (web)
 

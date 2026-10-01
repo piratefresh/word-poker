@@ -20,4 +20,5 @@ export {
   WordPreview,
 } from "./word-builder";
 export type { WordBuilderProps, WordDraft } from "./word-builder";
+export type { SwapFlip } from "./strip";
 export { WordShuffleButton } from "./shuffle-button";

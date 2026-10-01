@@ -1,0 +1,119 @@
+# The held power, used (§44, STO-496): at the offline Wild table the hero keeps Vowel Magnet,
+# spends it on its own pre-flop turn to swap a private tile for a vowel, builds a word with the
+# new tile, and plays the hand to the results, where that tile wears its ⚡.
+#
+#   maestro test --platform web .maestro/offline-wild-power.yaml
+#
+# Same seed as offline-wild-hand.yaml. For it the hero is dealt T-1 (a triple letter) and K-1,
+# is offered Vowel Magnet first, and Vowel Magnet's letter for seat 0 is E (`swapTile` in
+# game-rules, a stream of its own, so the deal and the bots' line are the Classic hand's). The
+# swap takes K-1's place in the strip as `power-0`, and T-1 + E spells TE: T tripled to 6 and E
+# 1, 7 points. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
+#
+# Selectors: the chip is `power-held`, the felt's confirm `power-confirm` (a DOM id on the web,
+# via `webTestID` for the chip; the prompt's buttons are GameButtons, which carry theirs). The
+# strip's tiles are `word-builder-tile-<id>`, and a powered tile's ⚡ is `<tile test id>-powered`.
+# Sign-in composes as the other offline flows do.
+url: http://localhost:8081/offline?seed=20260919&powers=wild
+name: Offline Wild hand — use the held power, build with the new tile
+tags:
+  - web
+  - offline
+  - powers
+---
+- openLink: http://localhost:8081/offline?seed=20260919&powers=wild
+
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/offline?seed=20260919&powers=wild
+
+# The draw's clock is 10 s: tap the card as soon as it is up (see offline-wild-hand.yaml).
+- extendedWaitUntil:
+    visible:
+      id: "power-offer-vowel_magnet"
+    timeout: 90000
+- tapOn:
+    id: "power-offer-vowel_magnet"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible:
+      id: "power-draw"
+    timeout: 5000
+
+# Mira raises the blind to 60, and the table comes round to the hero: its own betting turn is
+# the power's window.
+- extendedWaitUntil:
+    visible:
+      id: "action-check-call"
+      containsDescendants:
+        - text: "\\$60"
+    timeout: 20000
+
+# Chip → the rack waits for a private tile → the felt asks, in the catalog's words → swap.
+- tapOn:
+    id: "power-held"
+- assertVisible: "Tap one of your tiles to swap it"
+- tapOn:
+    id: "word-builder-tile-K-1"
+- assertVisible: "Discard K for a random vowel\\?"
+- tapOn:
+    id: "power-confirm"
+
+# The new tile flips over in K's place, and the chip is spent for the hand.
+- extendedWaitUntil:
+    visible:
+      id: "word-builder-tile-power-0"
+    timeout: 5000
+- waitForAnimationToEnd
+- assertNotVisible:
+    id: "word-builder-tile-K-1"
+- assertVisible: "USED"
+
+# The new letter builds and scores like any other: T-1 then the E in K's old place spells TE.
+- tapOn:
+    id: "word-builder-tile-T-1"
+- tapOn:
+    id: "word-builder-tile-power-0"
+- assertVisible: "TE"
+- assertVisible: "7 pts"
+
+# Using the power did not end the turn: the hero still owes the call.
+- assertVisible:
+    id: "action-check-call"
+    containsDescendants:
+      - text: "\\$60"
+
+# Play it out: the check-or-call answers every turn, and inside §19's window it locks TE in. The
+# window puts no seat on the turn, so on the river the row is tapped whether or not the hero holds
+# it, as offline-hand.yaml does: a tap while a bot holds the table lands on a disabled control.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 6 · PAYOUT"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|PHASE 5 · THE RIVER|PHASE 6 · PAYOUT"
+          timeout: 70000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 10000
+# The hero's card carries the confirmed TE, and the swapped tile shows the table its ⚡.
+- assertNotVisible:
+    text: "The window closed"
+- assertVisible:
+    id: "result-card-hero-tile-1-powered"

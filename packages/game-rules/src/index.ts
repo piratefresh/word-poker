@@ -65,7 +65,7 @@ export {
 } from "./errors";
 export { drawOffers } from "./power-draw";
 export type { DrawSlot, HeldPower, PowerDraw } from "./power-draw";
-export { swappedTileId } from "./power-swap";
+export { isSwappedTileId, swappedTileId } from "./power-swap";
 export { WORD_WINDOW_MS } from "./word-window";
 export type { WordSlot, WordWindow } from "./word-window";
 export { scoreWord } from "./scoring";

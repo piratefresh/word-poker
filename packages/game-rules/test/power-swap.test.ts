@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { dealHand } from "../src/deal";
 import { OfflineActionError } from "../src/errors";
 import { LETTER_VALUES } from "../src/letters";
-import { SWAP_LETTERS, swapTile, swappedTileId, type SwapSource } from "../src/power-swap";
+import { SWAP_LETTERS, isSwappedTileId, swapTile, swappedTileId, type SwapSource } from "../src/power-swap";
 
 /**
  * §44's Swap a Private Tile family on its own: a power, a deal seed and a seat go in, and the
@@ -73,6 +73,16 @@ describe("swapTile", () => {
 
       assert.equal(tile.id, swappedTileId(3));
       assert.doesNotMatch(tile.id, /^[A-Z]+-\d+$/, "not the shape of a bag or choice tile id");
+    }
+  });
+
+  it("tells a swapped tile from every tile the deal makes", () => {
+    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount: PLAYERS });
+
+    assert.ok(isSwappedTileId(swappedTileId(0)));
+    assert.ok(isSwappedTileId(swapTile("random_wild", source(SEED, 5)).id));
+    for (const tile of [...privateTiles.flat(), ...community, ...rest]) {
+      assert.equal(isSwappedTileId(tile.id), false, tile.id);
     }
   });
 });
