@@ -136,7 +136,7 @@ words at showdown. In hand 2 a short stack shoves into a side pot, loses and bus
 busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
 up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
 seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
-seed, payout delay, turn clock), which the server merges under a create's own options, and only
+seed, payout delay, turn clock, and `powerUps` — §40's Classic/Wild, validated like a create's own), which the server merges under a create's own options, and only
 behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
 (`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
 the runner starts the next one only then, so join order is seat order. The script lives in

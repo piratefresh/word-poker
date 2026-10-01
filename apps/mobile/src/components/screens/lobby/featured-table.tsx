@@ -21,6 +21,7 @@ import { type ReactElement, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatAmount } from "@/lib/format";
+import { powersLabel } from "@/lib/power-view";
 
 import {
   DefaultSeat,
@@ -85,6 +86,7 @@ export function FeaturedTableCard({
 }: FeaturedTableCardProps): ReactElement {
   const { room, status, action } = featured;
   const inHand = status === "in-hand";
+  const powers = powersLabel(room.metadata.powerUps);
 
   // One place per seat the felt draws: the first `clients` of them taken, the rest the OPEN seats
   // the rooms draw. The list is as long as the table is drawn, not as long as the listing claims.
@@ -128,7 +130,14 @@ export function FeaturedTableCard({
       <Text numberOfLines={1} style={styles.name}>
         {room.metadata.name}
       </Text>
-      <Text style={styles.terms}>{`${formatAmount(room.metadata.smallBlind)} / ${formatAmount(room.metadata.bigBlind)} BLINDS`}</Text>
+      <View style={styles.termsRow}>
+        <Text style={styles.terms}>{`${formatAmount(room.metadata.smallBlind)} / ${formatAmount(room.metadata.bigBlind)} BLINDS`}</Text>
+        {powers === null ? null : (
+          <Text style={styles.powers} testID="parlor-featured-powers">
+            {powers.toUpperCase()}
+          </Text>
+        )}
+      </View>
 
       <View style={styles.felt}>
         <PokerTable
@@ -227,12 +236,24 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     marginTop: spacing.sm,
   },
+  termsRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
   terms: {
     color: colors.textDim,
     fontFamily: fonts.mono,
     fontSize: fontSize.caption,
     letterSpacing: 1.2,
-    marginTop: spacing.xs,
+  },
+  /** §40's power-up setting, beside the blinds: only a table that deals powers carries it. */
+  powers: {
+    color: colors.gold,
+    fontFamily: fonts.monoBold,
+    fontSize: fontSize.caption,
+    letterSpacing: 1.6,
   },
   felt: {
     paddingVertical: spacing.sm,

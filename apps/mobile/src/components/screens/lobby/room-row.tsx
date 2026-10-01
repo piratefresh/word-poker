@@ -32,6 +32,7 @@ import {
   spacing,
 } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
+import { powersLabel } from "@/lib/power-view";
 import { spokenTable } from "./parlor-view";
 
 export type RoomRowProps = {
@@ -71,6 +72,7 @@ export function RoomRow({ room, yours = false, disabled = false, onPress }: Room
   const state = stateFor(room);
   const offer = offerFor(room, yours);
   const offered = offer === "JOIN";
+  const powers = powersLabel(room.metadata.powerUps);
 
   // §5 caps a table at six. A listing that claims more than the rules allow draws the most the
   // rules allow — the count beside it is the listing's own and stays exact.
@@ -124,9 +126,16 @@ export function RoomRow({ room, yours = false, disabled = false, onPress }: Room
         <Text style={[styles.offer, offered ? styles.gold : styles.dim]}>{offer}</Text>
       </View>
 
-      <Text style={styles.blinds} testID={`lobby-room-blinds-${room.roomId}`}>
-        {blindsLabel(room)}
-      </Text>
+      <View style={styles.terms}>
+        <Text style={styles.blinds} testID={`lobby-room-blinds-${room.roomId}`}>
+          {blindsLabel(room)}
+        </Text>
+        {powers === null ? null : (
+          <Text style={styles.powers} testID={`lobby-room-powers-${room.roomId}`}>
+            {powers.toUpperCase()}
+          </Text>
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -217,6 +226,19 @@ const styles = StyleSheet.create({
   pips: {
     flexDirection: "row",
     gap: 3,
+    marginLeft: "auto",
+  },
+  terms: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  /** §40's power-up setting, beside the blinds: only a table that deals powers carries it. */
+  powers: {
+    color: colors.gold,
+    fontFamily: fonts.monoBold,
+    fontSize: fontSize.micro,
+    letterSpacing: 1.6,
     marginLeft: "auto",
   },
   /** §3's Blinds: the table's two forced bets, under the buy-in it derives them from. */

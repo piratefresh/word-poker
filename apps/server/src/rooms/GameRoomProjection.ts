@@ -93,6 +93,7 @@ export class GameRoomProjection {
     table.smallBlind = input.table.smallBlind;
     table.bigBlind = input.table.bigBlind;
     table.maxSeats = input.table.maxSeats;
+    table.powerUps.deal = input.table.powerUps.deal;
 
     this.state.phase = input.game?.phase ?? WAITING_PHASE;
     this.state.sessionOver = input.game?.sessionOver ?? false;

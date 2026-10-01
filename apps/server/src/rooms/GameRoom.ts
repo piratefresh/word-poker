@@ -64,6 +64,7 @@ interface RoomKnobs {
   turnDuration?: unknown;
   reconnectSeconds?: unknown;
   tickMs?: unknown;
+  powerUps?: unknown;
 }
 
 /** Colyseus lifecycle coordinator for one authoritative table. */
@@ -163,7 +164,17 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   }
 
   async onCreate(rawOptions: unknown) {
-    const validation = validateRoomCreateOptions(rawOptions);
+    // A browser-driven smoke creates its table through the real lobby form, which cannot send a
+    // seed; behind the deterministic gate the smoke runner supplies the knobs here instead, and
+    // anything the create names still wins (STO-483). The power-up setting is the one table
+    // option the env may supply, and it goes through the same validator as the create's own.
+    const smoke = smokeRoomDefaults();
+    const named = (rawOptions ?? {}) as RoomKnobs;
+    const validation = validateRoomCreateOptions(
+      named.powerUps === undefined && smoke.powerUps !== undefined
+        ? { ...named, powerUps: smoke.powerUps }
+        : rawOptions,
+    );
     if ("refusal" in validation) {
       throw new ServerError(ErrorCode.APPLICATION_ERROR, validation.refusal.message);
     }
@@ -173,10 +184,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 
-    // A browser-driven smoke creates its table through the real lobby form, which cannot send a
-    // seed; behind the deterministic gate the smoke runner supplies the knobs here instead, and
-    // anything the create names still wins (STO-483).
-    const knobs = { ...smokeRoomDefaults(), ...((rawOptions ?? {}) as RoomKnobs) };
+    const knobs = { ...smoke, ...named };
     if (
       process.env.WORDPOKER_DETERMINISTIC_SEED === "1" &&
       typeof knobs.seed === "number" &&

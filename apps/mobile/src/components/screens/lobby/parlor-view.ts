@@ -18,6 +18,7 @@
 import { tableStatus, type RoomSummary, type TableStatus } from "@wordpoker/contracts";
 
 import { formatAmount } from "@/lib/format";
+import { powersLabel } from "@/lib/power-view";
 
 /** One chip on the rail: a label, its figure, and the line under it. */
 export interface ParlorStat {
@@ -84,7 +85,8 @@ export function featuredAction(
 export function spokenTable(room: RoomSummary, yours = false): string {
   const status =
     tableStatus(room.metadata) === "waiting" ? "waiting for players" : "a hand in play";
-  const table = `${room.metadata.name}, ${formatAmount(room.metadata.buyIn)} buy-in, blinds ${formatAmount(room.metadata.smallBlind)} and ${formatAmount(room.metadata.bigBlind)}, ${room.clients} of ${room.maxClients} seats taken, ${status}`;
+  const powers = powersLabel(room.metadata.powerUps);
+  const table = `${room.metadata.name}, ${formatAmount(room.metadata.buyIn)} buy-in, blinds ${formatAmount(room.metadata.smallBlind)} and ${formatAmount(room.metadata.bigBlind)}, ${room.clients} of ${room.maxClients} seats taken, ${status}${powers === null ? "" : `, ${powers}`}`;
   if (yours) return `Your table, ${table}`;
   if (room.clients >= room.maxClients) return `Full table, ${table}`;
   if (room.locked) return `Unavailable table, ${table}`;

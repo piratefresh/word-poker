@@ -16,7 +16,14 @@
  */
 
 import type { Room } from "@colyseus/sdk";
-import { GameRoomCreateOptions, GAME_ROOM_NAME, RoomPhase } from "@wordpoker/contracts";
+import {
+  DEFAULT_POWER_UP_SETTINGS,
+  GameRoomCreateOptions,
+  GAME_ROOM_NAME,
+  isPowerUpSettings,
+  PowerUpSettings,
+  RoomPhase,
+} from "@wordpoker/contracts";
 import { useSyncExternalStore } from "react";
 
 import { gameClient } from "./game-client";
@@ -34,6 +41,8 @@ export interface TableSnapshot {
   readonly smallBlind: number;
   readonly bigBlind: number;
   readonly maxSeats: number;
+  /** §40's deal mode, so the summary can say Classic or Wild before the first hand. */
+  readonly powerUps: PowerUpSettings;
   /** Seats taken right now. A seat is a connection, so this is live. */
   readonly seats: number;
   readonly phase: RoomPhase;
@@ -68,6 +77,7 @@ interface TableState {
     smallBlind: number;
     bigBlind: number;
     maxSeats: number;
+    powerUps?: unknown;
   };
   phase: RoomPhase;
   seats: { size: number };
@@ -117,6 +127,10 @@ function tableOf(state: unknown): TableSnapshot {
     smallBlind: table.table.smallBlind,
     bigBlind: table.table.bigBlind,
     maxSeats: table.table.maxSeats,
+    // The schema mutates in place, so the deal is copied out rather than the object kept.
+    powerUps: isPowerUpSettings(table.table.powerUps)
+      ? { deal: table.table.powerUps.deal }
+      : DEFAULT_POWER_UP_SETTINGS,
     seats: table.seats.size,
     phase: table.phase,
   };

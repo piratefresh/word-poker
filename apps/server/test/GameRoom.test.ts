@@ -941,6 +941,34 @@ describe("GameRoom", () => {
         else process.env.WORDPOKER_SMOKE_ROOM = previousKnobs;
       }
     });
+
+    it("takes the smoke runner's power-up setting when the create names none (STO-498)", async () => {
+      const previousGate = process.env.WORDPOKER_DETERMINISTIC_SEED;
+      const previousKnobs = process.env.WORDPOKER_SMOKE_ROOM;
+      process.env.WORDPOKER_DETERMINISTIC_SEED = "1";
+      process.env.WORDPOKER_SMOKE_ROOM = JSON.stringify({ powerUps: { deal: "choose3" } });
+      const table = { name: "Env powers", buyIn: 500, maxSeats: 2 } as const;
+      try {
+        const unnamed = await colyseus.createRoom("game", table);
+        assert.deepStrictEqual(unnamed.metadata.powerUps, { deal: "choose3" }, "the env's setting");
+
+        const named = await colyseus.createRoom("game", { ...table, powerUps: { deal: "off" } });
+        assert.deepStrictEqual(named.metadata.powerUps, { deal: "off" }, "the create's own wins");
+
+        delete process.env.WORDPOKER_DETERMINISTIC_SEED;
+        const ungated = await colyseus.createRoom("game", table);
+        assert.deepStrictEqual(ungated.metadata.powerUps, { deal: "off" }, "no gate, no env");
+
+        process.env.WORDPOKER_DETERMINISTIC_SEED = "1";
+        process.env.WORDPOKER_SMOKE_ROOM = JSON.stringify({ powerUps: { deal: "chaos" } });
+        await assert.rejects(colyseus.createRoom("game", table), "a malformed env setting is refused too");
+      } finally {
+        if (previousGate === undefined) delete process.env.WORDPOKER_DETERMINISTIC_SEED;
+        else process.env.WORDPOKER_DETERMINISTIC_SEED = previousGate;
+        if (previousKnobs === undefined) delete process.env.WORDPOKER_SMOKE_ROOM;
+        else process.env.WORDPOKER_SMOKE_ROOM = previousKnobs;
+      }
+    });
   });
 
   describe("create options", () => {
@@ -982,6 +1010,16 @@ describe("GameRoom", () => {
       });
 
       assert.deepStrictEqual(room.metadata.powerUps, { deal: "choose3" });
+      assert.strictEqual(room.state.table.powerUps.deal, "choose3", "the joined state carries it");
+    });
+
+    it("syncs a Classic table's deal mode into the joined state", async () => {
+      const room = await colyseus.createRoom("game", { name: "Plain", buyIn: 500, maxSeats: 2 });
+      const client = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.table.powerUps.deal, "off");
+      assert.strictEqual((client.state as { table: { powerUps: { deal: string } } }).table.powerUps.deal, "off");
     });
 
     it("trims the name it stores", async () => {

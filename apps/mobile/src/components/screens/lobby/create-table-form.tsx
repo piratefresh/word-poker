@@ -1,5 +1,6 @@
 /**
- * create-table-form.tsx — §2's create flow: a name, one of three fixed buy-ins, and §5's seat cap.
+ * create-table-form.tsx — §2's create flow: a name, one of three fixed buy-ins, §5's seat cap, and
+ * §40's power-ups — Classic, the default, or Wild.
  *
  * The form refuses before it spends a round trip: `validateRoomCreateOptions` is the same function
  * the server runs on the same options, so the field a refusal marks and the sentence it shows are
@@ -31,14 +32,17 @@ import {
   BUY_IN_PRESETS,
   MAX_SEATS,
   MIN_SEATS,
+  POWER_UP_DEAL_MODES,
   validateRoomCreateOptions,
   type BuyInPreset,
+  type PowerUpDealMode,
   type RoomCreateField,
 } from "@wordpoker/contracts";
 
 import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
+import { DEAL_MODE_NAMES } from "@/lib/power-view";
 import { createTable } from "@/lib/room-session";
 
 export type CreateTableFormProps = {
@@ -131,6 +135,7 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
   const [name, setName] = useState("");
   const [buyIn, setBuyIn] = useState<BuyInPreset>(BUY_IN_PRESETS[0]);
   const [maxSeats, setMaxSeats] = useState(DEFAULT_SEATS);
+  const [deal, setDeal] = useState<PowerUpDealMode>("off");
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -142,7 +147,7 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
   const submit = () => {
     // The validator trims the name and is the server's own answer, so a name of spaces is
     // refused here rather than on the wire.
-    const checked = validateRoomCreateOptions({ name, buyIn, maxSeats });
+    const checked = validateRoomCreateOptions({ name, buyIn, maxSeats, powerUps: { deal } });
     if (!checked.ok) {
       setRefusal({ field: checked.refusal.field, message: checked.refusal.message });
       return;
@@ -233,6 +238,24 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
             </Picker>
             {refusal?.field === "maxSeats" ? (
               <Text testID="create-table-seats-refusal" textStyle={refusalText}>
+                {refusal.message}
+              </Text>
+            ) : null}
+          </Column>
+
+          <Column alignment="start" spacing={spacing.xs}>
+            <Text textStyle={fieldLabelText}>POWER-UPS</Text>
+            <Picker
+              onValueChange={(value) => setDeal(value as PowerUpDealMode)}
+              selectedValue={deal}
+              testID="create-table-power-ups"
+            >
+              {POWER_UP_DEAL_MODES.map((mode) => (
+                <Picker.Item key={mode} label={DEAL_MODE_NAMES[mode]} value={mode} />
+              ))}
+            </Picker>
+            {refusal?.field === "powerUps" ? (
+              <Text testID="create-table-power-ups-refusal" textStyle={refusalText}>
                 {refusal.message}
               </Text>
             ) : null}

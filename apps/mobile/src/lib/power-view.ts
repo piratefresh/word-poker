@@ -11,7 +11,30 @@
  * the one thing about another seat here is what the whole table sees — that it used a power.
  */
 
-import type { PowerUpId, PowerUsedEvent, PrivatePowerSwap } from "@wordpoker/contracts";
+import type {
+  PowerUpDealMode,
+  PowerUpId,
+  PowerUpSettings,
+  PowerUsedEvent,
+  PrivatePowerSwap,
+} from "@wordpoker/contracts";
+
+/**
+ * §40's deal modes as a player reads them: the create form's options, the lobby's tag and the
+ * seated summary all name a table's setting from here, so the three cannot call it different things.
+ */
+export const DEAL_MODE_NAMES: { readonly [Mode in PowerUpDealMode]: string } = {
+  off: "Classic",
+  choose3: "Wild",
+};
+
+/**
+ * What the table browser and the pre-join summary call a table that deals powers — "Wild Powers" —
+ * or `null` for a Classic table, which says nothing: the rules as written need no label.
+ */
+export function powersLabel(settings: PowerUpSettings): string | null {
+  return settings.deal === "off" ? null : `${DEAL_MODE_NAMES[settings.deal]} Powers`;
+}
 
 /** The hero's side of a Wild table's hand. A Classic table has none at all. */
 export interface PowerView {
