@@ -3,16 +3,16 @@ import { describe, it } from "node:test";
 
 import type { OfflineAction, Tile, WordSubmission } from "@wordpoker/contracts";
 
-import { chooseOfflineWord, decideOfflineMove } from "../src/bot";
-import { botDecisionSeed, observeBot } from "../src/bot-observation";
-import { botProfile } from "../src/bot-profile";
-import { assessBotStrength } from "../src/bot-strength";
-import { bettingBounds, applyBettingAction, type BettingBounds } from "../src/betting";
-import { resolveSubmission } from "../src/building";
-import { loadDictionary } from "../src/dictionary";
-import { LETTER_VALUES, type Letter } from "../src/letters";
-import { OfflineActionError } from "../src/errors";
-import { availableTiles, reduce, startHand, type OfflineState } from "../src/offline";
+import { chooseOfflineWord, decideOfflineMove } from "../src/bot/bot";
+import { botDecisionSeed, observeBot } from "../src/bot/bot-observation";
+import { botProfile } from "../src/bot/bot-profile";
+import { assessBotStrength } from "../src/bot/bot-strength";
+import { bettingBounds, applyBettingAction, type BettingBounds } from "../src/money/betting";
+import { resolveSubmission } from "../src/words/building";
+import { loadDictionary } from "../src/words/dictionary";
+import { LETTER_VALUES, type Letter } from "../src/tiles/letters";
+import { OfflineActionError } from "../src/core/errors";
+import { availableTiles, reduce, startHand, type OfflineState } from "../src/table/offline";
 import { TEST_DICTIONARY, cloneState, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;

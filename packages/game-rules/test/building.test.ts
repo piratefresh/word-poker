@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 
 import type { Tile, WordEvaluation, WordSubmission } from "@wordpoker/contracts";
 
-import { evaluateWord, spellSubmission } from "../src/building";
-import { DICTIONARIES, createDictionary, loadDictionary, type Dictionary } from "../src/dictionary";
+import { evaluateWord, spellSubmission } from "../src/words/building";
+import { DICTIONARIES, createDictionary, loadDictionary, type Dictionary } from "../src/words/dictionary";
 
 /**
  * A dictionary of the words these tests spell. `createDictionary` refuses an artifact whose

@@ -12,11 +12,11 @@ import {
   type TilePlay,
 } from "@wordpoker/contracts";
 
-import { bettingBounds } from "../src/betting";
-import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand as dealTiles } from "../src/deal";
-import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/errors";
-import { drawOffers, type PowerDraw } from "../src/power-draw";
-import { swapTile } from "../src/power-swap";
+import { bettingBounds } from "../src/money/betting";
+import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand as dealTiles } from "../src/tiles/deal";
+import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/core/errors";
+import { drawOffers, type PowerDraw } from "../src/powers/power-draw";
+import { swapTile } from "../src/powers/power-swap";
 import {
   OFFLINE_TURN_MS,
   canUsePower,
@@ -25,8 +25,8 @@ import {
   startHand,
   type OfflineState,
   type StartHandOptions,
-} from "../src/offline";
-import { WORD_WINDOW_MS } from "../src/word-window";
+} from "../src/table/offline";
+import { WORD_WINDOW_MS } from "../src/words/word-window";
 import { TEST_DICTIONARY, cloneState, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;

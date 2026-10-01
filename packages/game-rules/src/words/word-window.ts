@@ -27,7 +27,7 @@ import type {
 } from "@wordpoker/contracts";
 
 import { resolveSubmission } from "./building";
-import { OfflineActionError, WordRejectionError } from "./errors";
+import { OfflineActionError, WordRejectionError } from "../core/errors";
 
 /**
  * How long §19's word window stays open. One clock for the whole table: the rules give the

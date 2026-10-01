@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dealHand } from "../src/deal";
-import { OfflineActionError } from "../src/errors";
-import { LETTER_VALUES } from "../src/letters";
-import { SWAP_LETTERS, isSwappedTileId, swapTile, swappedTileId, type SwapSource } from "../src/power-swap";
+import { dealHand } from "../src/tiles/deal";
+import { OfflineActionError } from "../src/core/errors";
+import { LETTER_VALUES } from "../src/tiles/letters";
+import { SWAP_LETTERS, isSwappedTileId, swapTile, swappedTileId, type SwapSource } from "../src/powers/power-swap";
 
 /**
  * §44's Swap a Private Tile family on its own: a power, a deal seed and a seat go in, and the

@@ -24,7 +24,7 @@ import type {
   WordScore,
 } from "@wordpoker/contracts";
 
-import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "./deal";
+import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "../tiles/deal";
 
 /**
  * §7.2/§9: what a printed multiplier does to the letters of its tile. A map rather than an

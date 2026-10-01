@@ -217,7 +217,7 @@ export function createDictionary(artifact: DictionaryArtifact): Dictionary {
 
 /** One lazy import per shipped dictionary: the artifact arrives when a mode first asks. */
 const ARTIFACT_LOADERS: Record<DictionaryId, () => Promise<DictionaryArtifact>> = {
-  "en_US-large": () => import("../data/en_US-large.json").then((module) => module.default),
+  "en_US-large": () => import("../../data/en_US-large.json").then((module) => module.default),
 };
 
 /** The dictionaries already loaded this session, by id. */

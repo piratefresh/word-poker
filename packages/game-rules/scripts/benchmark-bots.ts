@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 
-import { chooseOfflineWord, decideOfflineMove } from "../src/bot";
-import { botProfile } from "../src/bot-profile";
-import { loadDictionary } from "../src/dictionary";
-import { availableTiles, reduce, startHand } from "../src/offline";
+import { chooseOfflineWord, decideOfflineMove } from "../src/bot/bot";
+import { botProfile } from "../src/bot/bot-profile";
+import { loadDictionary } from "../src/words/dictionary";
+import { availableTiles, reduce, startHand } from "../src/table/offline";
 
 const firstSeed = Number(process.argv[2] ?? 10_000);
 const hands = Number(process.argv[3] ?? 128);

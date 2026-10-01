@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { awardChips, commitChips, type ChipSeat } from "../src/chips";
+import { awardChips, commitChips, type ChipSeat } from "../src/money/chips";
 
 const SEAT: ChipSeat = { stack: 1_000, committedRound: 0, committedHand: 0 };
 

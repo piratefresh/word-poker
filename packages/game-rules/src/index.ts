@@ -1,34 +1,34 @@
 /** The pure, deterministic engine: no I/O, no framework, no ambient clock or randomness. */
 
-export { LETTER_VALUES } from "./letters";
-export type { Letter } from "./letters";
-export { createRng, mixSeed } from "./rng";
-export type { PowerSeedSalt } from "./rng";
-export { weightedSampleWithoutReplacement } from "./sample";
-export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
-export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
+export { LETTER_VALUES } from "./tiles/letters";
+export type { Letter } from "./tiles/letters";
+export { createRng, mixSeed } from "./core/rng";
+export type { PowerSeedSalt } from "./core/rng";
+export { weightedSampleWithoutReplacement } from "./core/sample";
+export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./tiles/deal";
+export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles/tiles";
 export {
   CHOICE_TILE_PAIRS,
   DEFAULT_SPECIAL_TILES,
   NO_SPECIAL_TILES,
   TWO_LETTER_TILE_LIMIT,
   applySpecialTiles,
-} from "./special-tiles";
-export type { SpecialTilesConfig, SpecialTilesResult } from "./special-tiles";
-export { evaluateWord, resolveSubmission, spellSubmission } from "./building";
-export type { EvaluateWordOptions, ResolveSubmissionOptions, SubmissionResolution } from "./building";
+} from "./tiles/special-tiles";
+export type { SpecialTilesConfig, SpecialTilesResult } from "./tiles/special-tiles";
+export { evaluateWord, resolveSubmission, spellSubmission } from "./words/building";
+export type { EvaluateWordOptions, ResolveSubmissionOptions, SubmissionResolution } from "./words/building";
 export {
   DICTIONARIES,
   DictionaryArtifactError,
   createDictionary,
   loadDictionary,
-} from "./dictionary";
+} from "./words/dictionary";
 export type {
   Dictionary,
   DictionaryArtifact,
   DictionaryInfo,
   DictionarySource,
-} from "./dictionary";
+} from "./words/dictionary";
 export {
   DRAW_SEED_SALT,
   DrawPoolExhaustedError,
@@ -36,10 +36,10 @@ export {
   rankShowdown,
   showdownDrawPool,
   showdownDrawValue,
-} from "./showdown";
-export type { RankShowdownOptions, ShowdownEntry } from "./showdown";
-export { decideOfflineMove, chooseOfflineWord } from "./bot";
-export type { ChooseWordOptions } from "./bot";
+} from "./money/showdown";
+export type { RankShowdownOptions, ShowdownEntry } from "./money/showdown";
+export { decideOfflineMove, chooseOfflineWord } from "./bot/bot";
+export type { ChooseWordOptions } from "./bot/bot";
 export {
   OFFLINE_TURN_MS,
   availableTiles,
@@ -48,7 +48,7 @@ export {
   reduce,
   revealedCount,
   startHand,
-} from "./offline";
+} from "./table/offline";
 export type {
   HandPowers,
   HandResult,
@@ -56,24 +56,24 @@ export type {
   OfflineStanding,
   OfflineState,
   StartHandOptions,
-} from "./offline";
+} from "./table/offline";
 export {
   BettingRejectionError,
   OfflineActionError,
   PowerRejectionError,
   WordRejectionError,
-} from "./errors";
-export { drawOffers } from "./power-draw";
-export type { DrawSlot, HeldPower, PowerDraw } from "./power-draw";
-export { isSwappedTileId, swappedTileId } from "./power-swap";
-export { WORD_WINDOW_MS } from "./word-window";
-export type { WordSlot, WordWindow } from "./word-window";
-export { scoreWord } from "./scoring";
-export { playedWord } from "./played-word";
-export type { PlayedWord } from "./played-word";
-export { awardChips, commitChips } from "./chips";
-export type { ChipSeat, CommitResult } from "./chips";
-export { DEFAULT_STAKES, applyBettingAction, bettingBounds, nextActor } from "./betting";
+} from "./core/errors";
+export { drawOffers } from "./powers/power-draw";
+export type { DrawSlot, HeldPower, PowerDraw } from "./powers/power-draw";
+export { isSwappedTileId, swappedTileId } from "./powers/power-swap";
+export { WORD_WINDOW_MS } from "./words/word-window";
+export type { WordSlot, WordWindow } from "./words/word-window";
+export { scoreWord } from "./words/scoring";
+export { playedWord } from "./words/played-word";
+export type { PlayedWord } from "./words/played-word";
+export { awardChips, commitChips } from "./money/chips";
+export type { ChipSeat, CommitResult } from "./money/chips";
+export { DEFAULT_STAKES, applyBettingAction, bettingBounds, nextActor } from "./money/betting";
 export type {
   BettingApply,
   BettingBounds,
@@ -82,6 +82,6 @@ export type {
   BettingStep,
   BettingStepStatus,
   Stakes,
-} from "./betting";
-export { buildPots, resolvePayout, splitAward } from "./pots";
-export type { JudgedSeat, PotContest, ResolvePayoutOptions, ResolvedPayout } from "./pots";
+} from "./money/betting";
+export { buildPots, resolvePayout, splitAward } from "./money/pots";
+export type { JudgedSeat, PotContest, ResolvePayoutOptions, ResolvedPayout } from "./money/pots";

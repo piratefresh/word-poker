@@ -23,9 +23,9 @@ import {
   type PowerUpId,
 } from "@wordpoker/contracts";
 
-import { OfflineActionError, PowerRejectionError } from "./errors";
-import { createRng, mixSeed } from "./rng";
-import { weightedSampleWithoutReplacement } from "./sample";
+import { OfflineActionError, PowerRejectionError } from "../core/errors";
+import { createRng, mixSeed } from "../core/rng";
+import { weightedSampleWithoutReplacement } from "../core/sample";
 
 /** One seat's place in the draw: what it was offered, and what it kept. */
 export interface DrawSlot {

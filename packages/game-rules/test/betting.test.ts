@@ -10,7 +10,7 @@ import {
   type BettingRoundState,
   type BettingSeatState,
   type BettingStepStatus,
-} from "../src/betting";
+} from "../src/money/betting";
 
 const BIG_BLIND = 20;
 const START = 1_000;

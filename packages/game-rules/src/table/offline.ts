@@ -64,25 +64,25 @@ import {
   type BettingRoundState,
   type BettingSeatState,
   type Stakes,
-} from "./betting";
-import { evaluateWord, spellSubmission } from "./building";
-import { commitChips } from "./chips";
-import { dealHand } from "./deal";
-import type { Dictionary } from "./dictionary";
+} from "../money/betting";
+import { evaluateWord, spellSubmission } from "../words/building";
+import { commitChips } from "../money/chips";
+import { dealHand } from "../tiles/deal";
+import type { Dictionary } from "../words/dictionary";
 import {
   BettingRejectionError,
   OfflineActionError,
   PowerRejectionError,
-} from "./errors";
-import * as powerDraw from "./power-draw";
-import type { DrawSeat, HeldPower, PowerDraw } from "./power-draw";
-import { swapTile } from "./power-swap";
-import { resolvePayout, type JudgedSeat } from "./pots";
-import { createRng } from "./rng";
-import { scoreWord } from "./scoring";
-import { DRAW_SEED_SALT, rankShowdown } from "./showdown";
-import * as wordWindow from "./word-window";
-import type { WindowSeat, WindowTable, WordSlot, WordWindow } from "./word-window";
+} from "../core/errors";
+import * as powerDraw from "../powers/power-draw";
+import type { DrawSeat, HeldPower, PowerDraw } from "../powers/power-draw";
+import { swapTile } from "../powers/power-swap";
+import { resolvePayout, type JudgedSeat } from "../money/pots";
+import { createRng } from "../core/rng";
+import { scoreWord } from "../words/scoring";
+import { DRAW_SEED_SALT, rankShowdown } from "../money/showdown";
+import * as wordWindow from "../words/word-window";
+import type { WindowSeat, WindowTable, WordSlot, WordWindow } from "../words/word-window";
 
 /**
  * How long a seat's betting turn lasts on the injected clock. Online and offline use the same

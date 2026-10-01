@@ -12,7 +12,7 @@
 
 import type { Tile } from "@wordpoker/contracts";
 
-import { createRng } from "./rng";
+import { createRng } from "../core/rng";
 import { applySpecialTiles, DEFAULT_SPECIAL_TILES, type SpecialTilesConfig } from "./special-tiles";
 import { createTileBag, NotEnoughTilesError, swapAt, TILE_BAG_SIZE } from "./tiles";
 

@@ -1,11 +1,11 @@
 /** Offline betting policy: fair observations, stable personalities, and seeded decisions. */
 import type { OfflineAction, PlayerId } from "@wordpoker/contracts";
 
-import { bettingBounds } from "./betting";
+import { bettingBounds } from "../money/betting";
 import { observeBot } from "./bot-observation";
 import { decideBotBet } from "./bot-policy";
-import { OfflineActionError } from "./errors";
-import type { OfflineState } from "./offline";
+import { OfflineActionError } from "../core/errors";
+import type { OfflineState } from "../table/offline";
 
 export { chooseOfflineWord } from "./bot-word";
 export type { ChooseWordOptions } from "./bot-word";

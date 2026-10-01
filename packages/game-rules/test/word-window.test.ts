@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { OfflineAction, PlayerId, Tile, WordSubmission } from "@wordpoker/contracts";
 
-import { OfflineActionError, WordRejectionError } from "../src/errors";
+import { OfflineActionError, WordRejectionError } from "../src/core/errors";
 import {
   WORD_WINDOW_MS,
   applyWord,
@@ -13,7 +13,7 @@ import {
   type WindowTable,
   type WordSlot,
   type WordWindow,
-} from "../src/word-window";
+} from "../src/words/word-window";
 
 /**
  * §19's window on its own: the module is handed four seats and a clock, and everything below is

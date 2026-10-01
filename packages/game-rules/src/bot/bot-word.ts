@@ -1,8 +1,8 @@
 import type { Tile, TilePlay, WordSubmission } from "@wordpoker/contracts";
 
-import { resolveSubmission } from "./building";
-import type { Dictionary } from "./dictionary";
-import { scoreWord } from "./scoring";
+import { resolveSubmission } from "../words/building";
+import type { Dictionary } from "../words/dictionary";
+import { scoreWord } from "../words/scoring";
 
 export interface ChooseWordOptions {
   readonly available: readonly Tile[];

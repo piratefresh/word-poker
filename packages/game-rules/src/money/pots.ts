@@ -30,7 +30,7 @@ import type {
 
 import type { BettingSeatState } from "./betting";
 import { awardChips } from "./chips";
-import { createRng } from "./rng";
+import { createRng } from "../core/rng";
 import { DRAW_SEED_SALT, rankShowdown, type ShowdownEntry } from "./showdown";
 
 /** One contest layer: the chips in it, and the seat indexes that may win it. */
