@@ -85,6 +85,7 @@ type Listing = {
     smallBlind: number;
     bigBlind: number;
     maxSeats: number;
+    powerUps: { deal: string };
     status: string;
   };
 };
@@ -102,6 +103,7 @@ function table(roomId: string, overrides: Partial<Listing> = {}): Listing {
       smallBlind: 5,
       bigBlind: 10,
       maxSeats: 6,
+      powerUps: { deal: "off" },
       status: WAITING_PHASE,
     },
     ...overrides,
@@ -176,7 +178,7 @@ async function pressInSheet(view: RenderResult, testID: string) {
  * iOS and the value itself on the web, so the two shapes are both spelled out here — the seats
  * picker is the one place a test has to reach past the visible options to prove the refusal.
  */
-async function chooseOption(view: RenderResult, testID: string, value: number) {
+async function chooseOption(view: RenderResult, testID: string, value: number | string) {
   const picker = view.getByTestId(testID);
   await act(async () => {
     if (picker.props.onSelectionChange) {
@@ -308,6 +310,25 @@ test("lists the other tables with the stakes, the seats and the state a player p
   expect(beta.getByText("$500 / $1,000 BLINDS")).toBeOnTheScreen();
   expect(beta.getByText("6 / 6 SEATS")).toBeOnTheScreen();
   expect(beta.getByText("FULL")).toBeOnTheScreen();
+});
+
+test("marks a Wild table on its card, its row and its sentence, and leaves a Classic one plain", async () => {
+  const { lobby, view } = await openLobby();
+  const wild = { ...table("wild").metadata, powerUps: { deal: "choose3" } };
+
+  await deliver(lobby, ROOMS, [
+    live("hero", { clients: 5, metadata: { ...live("hero").metadata, powerUps: { deal: "choose3" } } }),
+    table("wild", { metadata: wild }),
+    table("plain"),
+  ]);
+
+  // §40: the setting is shown in the table browser and before joining.
+  expect(within(view.getByTestId("parlor-featured")).getByText("WILD POWERS")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-room-wild")).getByText("WILD POWERS")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-room-plain")).queryByText("WILD POWERS")).toBeNull();
+
+  expect(view.getByTestId("lobby-room-wild").props.accessibilityLabel).toMatch(/, Wild Powers$/);
+  expect(view.getByTestId("lobby-room-plain").props.accessibilityLabel).not.toMatch(/Powers/);
 });
 
 test("takes a seat at the table the hero card offers, then shows it", async () => {
@@ -543,7 +564,12 @@ test("creates the table the form describes and shows it", async () => {
   await pressInSheet(view, "create-table-submit");
 
   await waitFor(() =>
-    expect(create).toHaveBeenCalledWith({ name: "Sunday felt", buyIn: 5_000, maxSeats: 3 }),
+    expect(create).toHaveBeenCalledWith({
+      name: "Sunday felt",
+      buyIn: 5_000,
+      maxSeats: 3,
+      powerUps: { deal: "off" },
+    }),
   );
   await waitFor(() =>
     expect(push).toHaveBeenCalledWith({
@@ -555,6 +581,25 @@ test("creates the table the form describes and shows it", async () => {
   // presented — the native sheet needs it while it dismisses — so the sheet's own state is
   // what says it is closed.)
   expect(view.getByTestId("create-table-sheet").props.isPresented).toBe(false);
+});
+
+// Classic is the default the form opens on: the create above names no setting and sends "off".
+test("creates a Wild table when the form says so", async () => {
+  const { view } = await openLobby();
+  const name = await openForm(view);
+
+  await fireEvent.changeText(name, "Wild night");
+  await chooseOption(view, "create-table-power-ups", "choose3");
+  await pressInSheet(view, "create-table-submit");
+
+  await waitFor(() =>
+    expect(create).toHaveBeenCalledWith({
+      name: "Wild night",
+      buyIn: 500,
+      maxSeats: 6,
+      powerUps: { deal: "choose3" },
+    }),
+  );
 });
 
 test("shows the server's own sentence when the create is refused", async () => {

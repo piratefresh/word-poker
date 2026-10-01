@@ -109,6 +109,8 @@ export const BETTING_REJECTION_REASONS = [
   "action-closed",
   /** The server synthesized an action because this seat's turn clock expired (STO-395). */
   "turn-timeout",
+  /** The Power Draw is open: nobody bets until it closes (§44). */
+  "power-draw",
 ] as const;
 
 /** Why a betting action was refused. */

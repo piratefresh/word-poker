@@ -26,6 +26,7 @@ function table(roomId: string, overrides: Partial<Omit<RoomSummary, "metadata">>
       smallBlind: 5,
       bigBlind: 10,
       maxSeats: 6,
+      powerUps: { deal: "off" },
       status: WAITING_PHASE,
       ...metadata,
     },

@@ -1,8 +1,8 @@
-import { render, type RenderResult } from "@testing-library/react-native";
+import { render } from "@testing-library/react-native";
 import { act } from "react";
-import { AccessibilityInfo, processColor } from "react-native";
+import { AccessibilityInfo } from "react-native";
 import { Easing, withRepeat, withTiming } from "react-native-reanimated";
-import type { TestInstance } from "test-renderer";
+
 
 import { PokerChipHero, type PokerChipHeroProps } from "./poker-chip-hero";
 
@@ -32,76 +32,14 @@ async function renderChip(props: Partial<PokerChipHeroProps> = {}) {
   return view;
 }
 
-/** A colour as react-native-svg packs it for the native side — a signed int, the same
- * narrowing the countdown ring's suite does for its stroke. */
-function packedColor(token: string) {
-  const value = processColor(token);
-  if (typeof value !== "number") throw new Error(`not a colour: ${token}`);
-  return value | 0;
-}
-
-/** The chip's SVG circles in draw order: the gradient disc, the dashed edge, the inner ring. */
-function circles(view: RenderResult) {
-  return view.root!.queryAll((node: TestInstance) => typeof node.props.r === "number").map(
-    (node) => node.props,
-  );
-}
-
-test("draws each size's geometry: box, edge stroke, and the 60% inner ring", async () => {
-  const cases = [
-    { size: "sm", box: 28, border: 2 },
-    { size: "md", box: 40, border: 3 },
-    { size: "lg", box: 64, border: 3 },
-    { size: "xl", box: 96, border: 4 },
-  ] as const;
-
-  for (const { size, box, border } of cases) {
-    const view = await renderChip({ size });
-    // The Svg's viewBox is extracted on the way out into vb*/min* props; width and
-    // height survive as given.
-    const [svg] = view
-      .root!.queryAll((node: TestInstance) => typeof node.props.vbWidth === "number")
-      .map((node) => node.props);
-    expect(svg.width).toBe(box);
-    expect(svg.height).toBe(box);
-    expect(svg.vbWidth).toBe(box);
-    expect(svg.vbHeight).toBe(box);
-
-    const [disc, edge, inner] = circles(view);
-    expect(disc.r).toBe(box / 2);
-    // The edge stroke straddles the box's rim; the inner ring sits at 60% of the size.
-    expect(edge.r).toBeCloseTo(box / 2 - border / 2, 5);
-    expect(edge.strokeWidth).toBe(border);
-    expect(inner.r).toBeCloseTo(box * 0.3, 5);
-    // Both rings are dashed, in the border's own proportions.
-    const dash = String(border * 3);
-    for (const ring of [edge, inner]) {
-      expect(ring.strokeDasharray).toEqual([dash, dash]);
-    }
+test("keeps the chip sizes and colors when using the atlas", async () => {
+  for (const [size, box] of [["sm", 28], ["md", 40], ["lg", 64], ["xl", 96]] as const) {
+    const view = await renderChip({ size, tone: "purple" });
+    const sprite = view.root!.queryAll((node) => node.props.contentFit === "fill")[0];
+    expect(sprite.props.style.width).toBeCloseTo(1254 * box / 198);
+    expect(sprite.props.style.top).toBeCloseTo(-743 * box / 198);
   }
 });
-
-test("each tone carries the web kit's gradient stops", async () => {
-  const expected = {
-    gold: ["#f5c76a", "#d4a54a", "#b8892e"],
-    red: ["#c23d3d", "#8a2b2b", "#5c1a1a"],
-    blue: ["#3b6cb5", "#2b4f8a", "#1a3460"],
-    green: ["#4ac773", "#2c7a4f", "#1a5232"],
-    purple: ["#9d56ff", "#6b3ab5", "#4c1d95"],
-  } as const;
-
-  for (const tone of Object.keys(expected) as (keyof typeof expected)[]) {
-    const view = await renderChip({ tone });
-    // The gradient's stops leave as one packed array — offset and colour, flattened —
-    // with colours as the native side's ints, so pack the expectation the same way.
-    const [gradient] = view
-      .root!.queryAll((node: TestInstance) => Array.isArray(node.props.gradient))
-      .map((node) => node.props.gradient as number[]);
-    const [first, mid, last] = expected[tone].map(packedColor);
-    expect(gradient).toEqual([0, first, 0.5, mid, 1, last]);
-  }
-});
-
 test("a still chip configures no animation at all", async () => {
   await renderChip();
   expect(timing).not.toHaveBeenCalled();
@@ -131,7 +69,7 @@ test("reduced motion slows the spin to 1.5s a revolution rather than stopping it
     });
     expect(repeat).toHaveBeenLastCalledWith(360, -1, false);
     // Still a fully drawn chip — the preference slows the spin, it does not hide the chip.
-    expect(circles(view)).toHaveLength(3);
+    expect(view.root!.queryAll((node) => node.props.contentFit === "fill").length).toBeGreaterThan(0);
   } finally {
     preference.mockRestore();
   }

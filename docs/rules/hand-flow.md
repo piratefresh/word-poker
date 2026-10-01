@@ -111,6 +111,11 @@ Players see their private tiles before making any bet.
 
 After all private tiles have been dealt, the first betting round begins.
 
+In a room with power-ups on ([Formats](formats.md) §40), the **Power Draw** comes first: every
+seat picks the power it holds for the hand, and the first betting round begins when the draw
+closes ([Power-Ups](power-ups.md) §44). The deal itself does not change — the same seed deals
+the same tiles with power-ups on or off.
+
 ---
 
 # 15. Phase 2: First Betting Round (Pre-Flop)

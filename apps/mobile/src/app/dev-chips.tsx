@@ -1,6 +1,7 @@
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useChipImage } from "@/components/chip/use-chip-image";
+import { ChipSprite, type ChipSpritePose, type ChipSpriteTone } from "@/components/chip/chip-sprite";
 import {
   chipTones,
   colors,
@@ -15,6 +16,8 @@ import {
  */
 const SIZES = [13, 28, 64, 96] as const;
 const TILTS = [0, 0.95] as const;
+const SPRITE_TONES: readonly ChipSpriteTone[] = ["red", "blue", "green", "purple", "gold"];
+const SPRITE_POSES: readonly ChipSpritePose[] = ["face", "tilted", "stack"];
 
 function Chip({
   tone,
@@ -44,6 +47,20 @@ export default function DevChips() {
   const tones = Object.keys(chipTones) as ChipTone[];
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+      <Text style={styles.label}>SPRITESHEET — used on the table and splash</Text>
+      {SPRITE_POSES.map((pose) => (
+        <View key={pose} style={styles.section}>
+          <Text style={styles.label}>{pose}</Text>
+          {SIZES.map((size) => (
+            <View key={size} style={styles.row}>
+              {SPRITE_TONES.map((tone) => (
+                <ChipSprite key={tone} tone={tone} size={size} pose={pose} />
+              ))}
+            </View>
+          ))}
+        </View>
+      ))}
+      <Text style={styles.label}>PROCEDURAL — previous artwork for comparison</Text>
       {TILTS.map((tilt) => (
         <View key={tilt} style={styles.section}>
           <Text style={styles.label}>tilt {tilt}</Text>

@@ -23,6 +23,7 @@ keeps its number for life: new material is appended as a new number, never slott
 | [Table Features](rules/table-features.md) | 35–38, 43 | Shuffle, pre-selected actions, anonymity, chip and winner motion, Word Checker |
 | [Accessibility](rules/accessibility.md) | 39 | Text-to-speech, visual settings, audio and motion settings |
 | [Formats: Rooms, Tournaments & Cash Games](rules/formats.md) | 40–42 | Room variations, tournaments, cash-game stakes |
+| [Power-Ups](rules/power-ups.md) | 44 | The Power Draw, the held power, activation windows, the v1 powers, swapping a tile, visibility |
 
 ## Reading the Product Spec
 
@@ -57,3 +58,5 @@ behind the spec, not the other way round:
 - §36, §37 and §39–§42: pre-selected actions, anonymity, the accessibility settings, and
   every format beyond the default No Limit table. §35's shuffle and §38's winner highlight
   already ship.
+- Power-ups (§44) and §40's Power-ups setting: the wire vocabulary and the seeded power
+  randomness exist, but no table runs a Power Draw yet.

@@ -1,4 +1,4 @@
-import type { LetterTile, Tile } from "@wordpoker/contracts";
+import { POWER_DRAW_MS, type LetterTile, type Tile } from "@wordpoker/contracts";
 
 import { testDictionary } from "./dictionary-fixtures";
 import {
@@ -171,6 +171,18 @@ describe("heroView — the action row", () => {
     const { betting } = heroView(perspective({ heroToAct: false, actingIndex: 1 }), LOCAL).game;
 
     expect(betting).toMatchObject({ canFold: false, canCheck: false, canBet: false, canAllIn: false });
+  });
+
+  test("holds the whole table while §44's Power Draw is open, on the draw's own clock", () => {
+    const betting = heroView(perspective(), LOCAL).game;
+    const drawing = heroView(perspective({ powerDraw: true }), LOCAL).game;
+
+    // Pre-flop's first seat is the hero, but nobody is on the clock until the draw closes.
+    expect(drawing.betting).toMatchObject({ canFold: false, canCheck: false, canBet: false, canAllIn: false });
+    expect(drawing.players[0]?.status).toBe("waiting");
+    expect(drawing.secondsRemaining).toBe(POWER_DRAW_MS / 1_000);
+    // A turn of its own, so the HUD restarts its countdown on the betting clock when it closes.
+    expect(drawing.id).not.toBe(betting.id);
   });
 
   test("goes dark at once while the hero's move is on the wire, and wears its pill", () => {

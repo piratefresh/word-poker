@@ -10,6 +10,7 @@
     "start": "pnpm --filter @wordpoker/mobile start",
     "dev:server": "pnpm --filter @wordpoker/server start",
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",
+    "smoke:online:wild": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Wild",
     "smoke:online:four": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online-four.ps1",
     "typecheck": "pnpm -r --if-present typecheck",
     "check:boundaries": "node scripts/check-boundaries.mjs",

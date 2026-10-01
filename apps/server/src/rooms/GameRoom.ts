@@ -13,11 +13,17 @@ import {
   type GameTableConfig,
   type OfflineAction,
   type OnlineBettingAction,
+  type OnlinePickPowerAction,
+  type OnlineUsePowerUpAction,
+  type PowerUsedEvent,
+  type PrivatePowerDraw,
+  type PrivatePowerSwap,
   type RoomPhase,
 } from "@wordpoker/contracts";
 import {
   BettingRejectionError,
   OfflineActionError,
+  PowerRejectionError,
   WordRejectionError,
   OFFLINE_TURN_MS,
   loadDictionary,
@@ -30,6 +36,7 @@ import {
 } from "./AuthoritativeGame.js";
 import {
   GameRoomProjection,
+  privatePowerSwap,
   type ProjectionBinding,
 } from "./GameRoomProjection.js";
 import { GameRoomState } from "./schema/GameRoomState.js";
@@ -58,12 +65,28 @@ interface SeatBinding {
   ready: boolean;
 }
 
+/**
+ * What a power command answered the first time, so a retry with the same `actionId` is answered
+ * the same way instead of being judged again: a second charge, a second roll, or a refusal of a
+ * use that already landed would all be wrong.
+ */
+type PowerOutcome =
+  | { readonly kind: "picked" }
+  | { readonly kind: "swapped"; readonly swap: PrivatePowerSwap }
+  | { readonly kind: "refused"; readonly event: GameRejectionEvent };
+
+interface PowerLedgerEntry {
+  readonly hand: number;
+  readonly outcome: PowerOutcome;
+}
+
 interface RoomKnobs {
   seed?: unknown;
   payoutDelay?: unknown;
   turnDuration?: unknown;
   reconnectSeconds?: unknown;
   tickMs?: unknown;
+  powerUps?: unknown;
 }
 
 /** Colyseus lifecycle coordinator for one authoritative table. */
@@ -81,6 +104,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private payoutDelay = DEFAULT_PAYOUT_DELAY_MS;
   private tickMs = 50;
   private payoutReadyAtMs: number | null = null;
+  /** Power commands already answered, by `${playerId}:${actionId}`. Pruned as hands go by. */
+  private readonly powerLedger = new Map<string, PowerLedgerEntry>();
 
   private get game() {
     return this.engine?.state ?? null;
@@ -147,6 +172,14 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       );
     },
     [GAME_MESSAGES.ready]: (client: Client, payload: unknown) => this.onReady(client, payload),
+    [GAME_MESSAGES.pickPower]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.pickPower, payload)) return;
+      this.powerCommand(client, "pickPower", payload);
+    },
+    [GAME_MESSAGES.usePowerUp]: (client: Client, payload: unknown) => {
+      if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.usePowerUp, payload)) return;
+      this.powerCommand(client, "usePowerUp", payload);
+    },
   };
 
   /** The one message the waiting room answers: a seat saying it is (or is no longer) ready. */
@@ -163,20 +196,27 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   }
 
   async onCreate(rawOptions: unknown) {
-    const validation = validateRoomCreateOptions(rawOptions);
+    // A browser-driven smoke creates its table through the real lobby form, which cannot send a
+    // seed; behind the deterministic gate the smoke runner supplies the knobs here instead, and
+    // anything the create names still wins (STO-483). The power-up setting is the one table
+    // option the env may supply, and it goes through the same validator as the create's own.
+    const smoke = smokeRoomDefaults();
+    const named = (rawOptions ?? {}) as RoomKnobs;
+    const validation = validateRoomCreateOptions(
+      named.powerUps === undefined && smoke.powerUps !== undefined
+        ? { ...named, powerUps: smoke.powerUps }
+        : rawOptions,
+    );
     if ("refusal" in validation) {
       throw new ServerError(ErrorCode.APPLICATION_ERROR, validation.refusal.message);
     }
 
-    const { name, buyIn, maxSeats } = validation.options;
-    this.table = { name, buyIn, ...blindsFor(buyIn), maxSeats };
+    const { name, buyIn, maxSeats, powerUps } = validation.options;
+    this.table = { name, buyIn, ...blindsFor(buyIn), maxSeats, powerUps };
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 
-    // A browser-driven smoke creates its table through the real lobby form, which cannot send a
-    // seed; behind the deterministic gate the smoke runner supplies the knobs here instead, and
-    // anything the create names still wins (STO-483).
-    const knobs = { ...smokeRoomDefaults(), ...((rawOptions ?? {}) as RoomKnobs) };
+    const knobs = { ...smoke, ...named };
     if (
       process.env.WORDPOKER_DETERMINISTIC_SEED === "1" &&
       typeof knobs.seed === "number" &&
@@ -216,6 +256,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       dictionary: this.dictionary,
       blinds: { smallBlind: this.table.smallBlind, bigBlind: this.table.bigBlind },
       turnDurationMs: this.turnDuration,
+      powerUps: this.table.powerUps,
     });
     this.setTimestep(() => this.onTick(), this.tickMs);
     this.project();
@@ -311,6 +352,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   /** Back to the waiting room: everyone says ready again before the next deal. */
   private returnToWaiting() {
     this.authoritative.clear();
+    this.powerLedger.clear();
     for (const [playerId, binding] of this.bindings) {
       if (!binding.present) this.bindings.delete(playerId);
       else binding.ready = false;
@@ -330,6 +372,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.project();
     this.publishPhase();
     this.sendPrivateStatesLater();
+    this.clock.setTimeout(() => this.sendPowerDraws(), 0);
   }
 
   private apply(
@@ -381,6 +424,13 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       if (game === null) return;
 
       if (game.phase !== "payout") this.payoutReadyAtMs = null;
+
+      // §44: nobody is on the clock while the Power Draw is open; its own clock is the deadline.
+      const draw = game.powers?.draw;
+      if (draw?.status === "open") {
+        if (now >= draw.endsAtMs) this.handlePowerDrawTimeout();
+        return;
+      }
 
       if (game.betting !== null && game.toActIndex !== null) {
         if (now >= game.endsAtMs) this.handleTurnTimeout();
@@ -470,6 +520,130 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.project();
     this.publishPhase();
     this.sendPrivateStates();
+    this.prunePowerLedger();
+    this.sendPowerDraws();
+  }
+
+  /**
+   * §44's Power Draw, as each drawing seat is told it: its own offers and the room's deadline,
+   * to it alone. A seat that is not connected learns its draw from its private state on return.
+   */
+  private sendPowerDraws() {
+    const game = this.game;
+    const draw = game?.powers?.draw;
+    if (game == null || draw?.status !== "open") return;
+
+    for (const slot of draw.slots) {
+      const binding = this.bindingFor(slot.playerId);
+      if (binding?.connected !== true) continue;
+      const event: PrivatePowerDraw = {
+        handId: game.hand,
+        offers: [...slot.offers],
+        now: this.now(),
+        deadline: draw.endsAtMs,
+      };
+      binding.client.send(GAME_EVENTS.powerDraw, event);
+    }
+  }
+
+  /** A retry is only ever for this hand or the one just before it; older answers are dropped. */
+  private prunePowerLedger() {
+    const hand = this.game?.hand ?? 0;
+    for (const [key, entry] of this.powerLedger) {
+      if (entry.hand < hand - 1) this.powerLedger.delete(key);
+    }
+  }
+
+  /**
+   * A power command (§44): answered from the ledger when its `actionId` has been seen, else run
+   * through the engine and recorded. The engine is the judge; the room only names the hand.
+   */
+  private powerCommand(
+    client: Client,
+    message: "pickPower" | "usePowerUp",
+    payload: OnlinePickPowerAction | OnlineUsePowerUpAction,
+  ) {
+    const key = `${client.sessionId}:${payload.actionId}`;
+    const earlier = this.powerLedger.get(key);
+    if (earlier !== undefined) {
+      this.answerPower(client, earlier.outcome);
+      return;
+    }
+
+    const hand = this.game?.hand ?? 0;
+    const outcome = this.runPower(client, message, payload);
+    this.powerLedger.set(key, { hand, outcome });
+    // A pick that landed has already sent every seat its private state; nothing more to say.
+    if (outcome.kind !== "picked") this.answerPower(client, outcome);
+  }
+
+  private runPower(
+    client: Client,
+    message: "pickPower" | "usePowerUp",
+    payload: OnlinePickPowerAction | OnlineUsePowerUpAction,
+  ): PowerOutcome {
+    const refuse = (reason: PowerRejectionError["reason"]): PowerOutcome => ({
+      kind: "refused",
+      event: { action: message, reason, actionId: payload.actionId },
+    });
+    const game = this.game;
+    // A command meant for another hand never lands on this one (§44: a power lasts one hand).
+    if (game === null || payload.handId !== game.hand) {
+      return refuse(message === "pickPower" ? "draw-closed" : "outside-window");
+    }
+
+    const playerId = client.sessionId;
+    const street = game.phase;
+    const action: OfflineAction =
+      message === "pickPower"
+        ? { type: "pickPower", playerId, powerUpId: payload.powerUpId }
+        : {
+            type: "usePowerUp",
+            playerId,
+            powerUpId: payload.powerUpId,
+            tileId: (payload as OnlineUsePowerUpAction).tileId,
+          };
+
+    try {
+      this.authoritative.dispatch(action, this.now());
+    } catch (error) {
+      if (error instanceof PowerRejectionError) return refuse(error.reason);
+      if (error instanceof OfflineActionError) return refuse("outside-window");
+      throw error;
+    }
+
+    this.project();
+    this.sendPrivateStates();
+    if (message === "pickPower") return { kind: "picked" };
+
+    const after = this.game;
+    const swap = after === null ? null : privatePowerSwap(after, playerId);
+    const binding = this.bindingFor(playerId);
+    if (swap === null || binding === undefined || street === "payout") {
+      throw new Error("a power use landed without a swap to report");
+    }
+    // The public side (§44): who used which power, on which street — never what it gave.
+    const used: PowerUsedEvent = { handId: swap.handId, seat: binding.seat, powerUpId: swap.powerUpId, street };
+    this.broadcast(GAME_EVENTS.powerUsed, used);
+    return { kind: "swapped", swap };
+  }
+
+  /** The sender's own answer: its swap, its refusal, or — for a pick — its fresh private state. */
+  private answerPower(client: Client, outcome: PowerOutcome) {
+    if (outcome.kind === "swapped") client.send(GAME_EVENTS.powerSwap, outcome.swap);
+    else if (outcome.kind === "refused") this.sendRejection(client, outcome.event);
+    else this.sendPrivateState(client);
+  }
+
+  private handlePowerDrawTimeout(): void {
+    if (this.game?.powers?.draw.status !== "open") return;
+    try {
+      this.authoritative.timeoutPowerDraw(this.now());
+      this.project();
+      this.sendPrivateStates();
+    } catch (error) {
+      console.error("power draw timeout failed", error);
+    }
   }
 
   private syncStacks() {

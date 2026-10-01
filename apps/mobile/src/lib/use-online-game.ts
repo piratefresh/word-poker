@@ -21,6 +21,13 @@
  * across every street and is judged against `game-rules` for the live preview, dispatched to the
  * room with `draftWord` once §19's window opens, and locked in with `confirmWord`. Until the seat
  * confirms, the server has not been told the word.
+ *
+ * At a Wild table (§44) the hero's powers come off the same private message — the draw, the held
+ * power and the swap, so a reconnect restores them with the rack — and the public `powerUsed`
+ * broadcast feeds the felt's "power used" card and the nameplate's tag, in the `PowerView` the
+ * offline adapter fills too. A pick or a use carries an `actionId` minted once per gesture; the
+ * gesture is kept until the room answers it, and a reconnect resends it under the same id, which
+ * the room answers with its first result rather than acting twice.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +38,9 @@ import type {
   LetterTile,
   OnlineBettingAction,
   PlayerId,
+  PowerUpId,
+  PowerUsedEvent,
+  PrivatePowerSwap,
   PrivateWordCheckState,
   RoomPhase,
   RoundPhase,
@@ -46,6 +56,7 @@ import {
   ROUND_PHASES,
   WAITING_PHASE,
   isGameRejectionEvent,
+  isPowerUpId,
   isWordSubmission,
   WORD_CHECKS_PER_HAND,
 } from "@wordpoker/contracts";
@@ -63,6 +74,7 @@ import {
   type HeroPerspective,
   type OptimisticPill,
 } from "@/lib/hero-view";
+import type { PowerView } from "@/lib/power-view";
 
 /** The felt draws 4–6 seats; a smaller table still shows as a four-seat felt with empty places. */
 const MIN_FELT_SEATS = 4;
@@ -81,6 +93,8 @@ export interface GameRoomLike {
   };
   onMessage: (name: string, cb: (payload: unknown) => void) => () => void;
   send: (type: string, payload?: unknown) => void;
+  /** The SDK's reconnect signal: a power gesture the drop left unanswered goes again. */
+  onReconnect?: ((cb: () => void) => unknown) & { remove: (cb: () => void) => void };
 }
 
 export interface OnlineGame {
@@ -126,6 +140,35 @@ export interface OnlineGame {
   confirmWord: () => void;
   /** Sends the current draft to the server for one private dictionary check. */
   checkWord: () => void;
+  /** The hero's side of §44's power-ups; `null` at a Classic table and before the first deal. */
+  powers: PowerView | null;
+  /** Keeps one of the powers the Power Draw offered the hero. */
+  pickPower: (powerUpId: PowerUpId) => void;
+  /** Uses the hero's held power on one of its private tiles. */
+  usePower: (powerUpId: PowerUpId, tileId: string) => void;
+  /** The felt has shown a "power used" card and it has cleared. */
+  endPowerUsed: (event: PowerUsedEvent) => void;
+}
+
+/** The hero's powers as the private message carries them, the draw's deadline on this device. */
+interface PowerPrivate {
+  handId: number;
+  draw: { offers: readonly PowerUpId[]; picked: PowerUpId | null; endsAtMs: number } | null;
+  held: { id: PowerUpId; used: boolean; usable: boolean } | null;
+  swap: PrivatePowerSwap | null;
+}
+
+/** A power gesture the room has not answered yet: what to resend, under the same id, on reconnect. */
+type PowerCommand =
+  | { kind: "pick"; payload: { actionId: string; handId: number; powerUpId: PowerUpId } }
+  | {
+      kind: "use";
+      payload: { actionId: string; handId: number; powerUpId: PowerUpId; tileId: string };
+    };
+
+/** A fresh id per gesture — unique enough for one seat's handful of commands in one room. */
+function mintActionId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** One public seat, decoded off the broadcast schema into plain values. */
@@ -186,6 +229,8 @@ interface RoomView {
   pots: readonly number[];
   word: { status: "open" | "settled"; slots: readonly WordSlotView[] } | null;
   result: ResultView | null;
+  /** §40: the table deals powers (Wild). */
+  wild: boolean;
 }
 
 /** The hero's private rack and word state, decoded off the targeted `privateState` message. */
@@ -199,6 +244,8 @@ interface PrivateView {
     status: "none" | "drafting" | "confirmed" | "timed-out";
     confirmed: readonly TilePlay[] | null;
   };
+  /** §44's side of the hand; `null` at a Classic table or when the seat drew nothing. */
+  power: PowerPrivate | null;
 }
 
 /** The hero's own move, held until the authoritative broadcast reconciles it away (server wins). */
@@ -228,6 +275,17 @@ export function useOnlineGame({
   const heroId = room.sessionId;
   const [view, setView] = useState<RoomView | null>(() => decodeRoom(room.state));
   const [received, setPriv] = useState<PrivateView | null>(null);
+  // The draw's deadline as this device reads it, fixed the first time each draw is seen: the
+  // reveal keys its motion on it, so a draw re-sent as other seats pick must not move it.
+  const drawClock = useRef(new Map<string, number>());
+  // §44's public side: every seat's use the room has announced, and the ones the felt has shown.
+  const [powerEvents, setPowerEvents] = useState<readonly PowerUsedEvent[]>([]);
+  const [shownPowerEvents, setShownPowerEvents] = useState<readonly string[]>([]);
+  const [inFlight, setInFlight] = useState<PowerCommand | null>(null);
+  const inFlightRef = useRef(inFlight);
+  useEffect(() => {
+    inFlightRef.current = inFlight;
+  }, [inFlight]);
   // The private message outruns the patch: the room sends the next hand's rack the instant it
   // deals, and the board that hand deals a patch later. Beside the last hand's board the new rack
   // can repeat a tile the reshuffled bag just handed back, so a rack counts only beside the board
@@ -276,15 +334,36 @@ export function useOnlineGame({
     setRefusal(null);
   }
 
+  // A power gesture is spent once the room's private state shows it landed — the pick kept, the
+  // power used — or once the hand it was made for is gone. A refusal ends it too (above).
+  if (inFlight !== null) {
+    const power = priv?.power;
+    const answered =
+      inFlight.payload.handId !== handCount ||
+      (inFlight.kind === "pick"
+        ? power?.held != null || power?.draw?.picked != null
+        : power?.held?.used === true);
+    if (answered) setInFlight(null);
+  }
+
   useEffect(() => {
     const handleState = (state: unknown) => setView(decodeRoom(state));
-    const handlePrivate = (payload: unknown) => setPriv(decodePrivate(payload));
+    const handlePrivate = (payload: unknown) =>
+      setPriv(decodePrivate(payload, Date.now(), drawClock.current));
     const handleRejected = (payload: unknown) => {
       if (!isGameRejectionEvent(payload)) return;
+      // A power refusal answers a power gesture, not the seat's move or word: it ends that
+      // gesture, and the power reads as the room's private state says again.
+      if (payload.action === "pickPower" || payload.action === "usePowerUp") {
+        const actionId = payload.actionId;
+        setInFlight((current) => (current?.payload.actionId === actionId ? null : current));
+        onRejectRef.current?.(payload);
+        return;
+      }
       // The server refused the move: drop the prediction so the row comes back for another try,
       // and — for a word — say why while the seat still has time to fix it.
       setPending(null);
-      if (payload.action !== "betting") setRefusal(payload.reason);
+      if (payload.action === "draftWord" || payload.action === "confirmWord") setRefusal(payload.reason);
       onRejectRef.current?.(payload);
     };
 
@@ -295,11 +374,28 @@ export function useOnlineGame({
     room.onStateChange(handleState);
     const offPrivate = room.onMessage(GAME_EVENTS.privateState, handlePrivate);
     const offRejected = room.onMessage(GAME_EVENTS.rejected, handleRejected);
+    const offPowerUsed = room.onMessage(GAME_EVENTS.powerUsed, (payload: unknown) => {
+      const event = decodePowerUsed(payload);
+      if (event === null) return;
+      setPowerEvents((live) =>
+        live.some((seen) => powerEventKey(seen) === powerEventKey(event)) ? live : [...live, event],
+      );
+    });
+    // The line came back with a gesture still unanswered: send it again under the same id. The
+    // room answers a repeat with its first result, so a gesture that did land is not acted twice.
+    const resend = () => {
+      const command = inFlightRef.current;
+      if (command === null) return;
+      room.send(command.kind === "pick" ? GAME_MESSAGES.pickPower : GAME_MESSAGES.usePowerUp, command.payload);
+    };
+    room.onReconnect?.(resend);
 
     return () => {
       room.onStateChange.remove(handleState);
       offPrivate();
       offRejected();
+      offPowerUsed();
+      room.onReconnect?.remove(resend);
     };
   }, [room]);
 
@@ -393,10 +489,72 @@ export function useOnlineGame({
   const pendingPill = pending?.kind === "betting" ? pending.pill : null;
   const pendingConfirm = pending?.kind === "confirm";
 
-  const perspective = useMemo(
-    () => (view === null ? null : perspectiveOf(view, priv, heroId, dictionary)),
-    [dictionary, heroId, priv, view],
+  /** One gesture, one id: sent now, and kept until the room answers it. */
+  const sendPower = useCallback(
+    (command: PowerCommand) => {
+      setInFlight(command);
+      room.send(command.kind === "pick" ? GAME_MESSAGES.pickPower : GAME_MESSAGES.usePowerUp, command.payload);
+    },
+    [room],
   );
+  const pickPower = useCallback(
+    (powerUpId: PowerUpId) => {
+      if (priv?.power?.draw == null || inFlight !== null) return;
+      sendPower({ kind: "pick", payload: { actionId: mintActionId(), handId: priv.power.handId, powerUpId } });
+    },
+    [inFlight, priv, sendPower],
+  );
+  const usePower = useCallback(
+    (powerUpId: PowerUpId, tileId: string) => {
+      if (priv?.power?.held?.usable !== true || inFlight !== null) return;
+      sendPower({
+        kind: "use",
+        payload: { actionId: mintActionId(), handId: priv.power.handId, powerUpId, tileId },
+      });
+    },
+    [inFlight, priv, sendPower],
+  );
+  const endPowerUsed = useCallback((event: PowerUsedEvent) => {
+    const key = powerEventKey(event);
+    setShownPowerEvents((shown) => (shown.includes(key) ? shown : [...shown, key]));
+  }, []);
+
+  // This hand's public uses, oldest first. Earlier hands' are history the felt no longer shows.
+  const handPowerEvents = useMemo(
+    () => powerEvents.filter((event) => event.handId === handCount),
+    [handCount, powerEvents],
+  );
+
+  const perspective = useMemo(
+    () => (view === null ? null : perspectiveOf(view, priv, heroId, dictionary, handPowerEvents)),
+    [dictionary, handPowerEvents, heroId, priv, view],
+  );
+
+  const powers = useMemo<PowerView | null>(() => {
+    if (view === null || !view.wild || view.phase === WAITING_PHASE) return null;
+    const power = priv?.power ?? null;
+    const heroSeat = view.seats.find((seat) => seat.playerId === heroId)?.seat ?? null;
+    // The hero's own gesture shows at once: the pick lands on its card, a use spends the chip, and
+    // the room's private state takes over as soon as it answers (server wins on reconcile).
+    const picking = inFlight?.kind === "pick" ? inFlight.payload.powerUpId : null;
+    const using = inFlight?.kind === "use";
+    return {
+      draw:
+        power?.draw == null ? null : { ...power.draw, picked: power.draw.picked ?? picking },
+      held:
+        power?.held == null
+          ? null
+          : { ...power.held, usable: power.held.usable && !using },
+      swap: power?.swap ?? null,
+      used: handPowerEvents
+        .filter((event) => !shownPowerEvents.includes(powerEventKey(event)))
+        .map((event) => ({
+          ...event,
+          name: event.seat === heroSeat ? "You" : `Seat ${event.seat + 1}`,
+          mine: event.seat === heroSeat,
+        })),
+    };
+  }, [handPowerEvents, heroId, inFlight, priv, shownPowerEvents, view]);
   const hero = useMemo(
     () =>
       perspective === null
@@ -489,7 +647,16 @@ export function useOnlineGame({
     setDraft,
     confirmWord,
     checkWord,
+    powers,
+    pickPower,
+    usePower,
+    endPowerUsed,
   };
+}
+
+/** One public use per seat per hand: a seat holds one power, and uses it at most once. */
+function powerEventKey(event: PowerUsedEvent): string {
+  return `${event.handId}:${event.seat}`;
 }
 
 /** The seats in the engine's own order — sorted by seat number, as the room dealt them. */
@@ -515,6 +682,7 @@ function perspectiveOf(
   priv: PrivateView | null,
   heroId: PlayerId,
   dictionary: Dictionary,
+  powerEvents: readonly PowerUsedEvent[] = [],
 ): HeroPerspective | null {
   const waiting = view.phase === WAITING_PHASE;
   const phase = waiting ? "preflop" : roundPhaseOf(view.phase);
@@ -546,6 +714,15 @@ function perspectiveOf(
         ordered.flatMap((seat, index) => (seat.ready ? [[index, "ready" as const] as const] : [])),
       )
     : undefined;
+  // §44's tag rides on the nameplate for the street the power was used on, by engine index.
+  const powerTags = view.wild
+    ? new Map(
+        powerEvents.flatMap((event) => {
+          const index = ordered.findIndex((seat) => seat.seat === event.seat);
+          return event.street === phase && index >= 0 ? [[index, event.powerUpId] as const] : [];
+        }),
+      )
+    : undefined;
 
   return {
     id: idOf(view),
@@ -553,6 +730,9 @@ function perspectiveOf(
     // The chip layer's flights are the offline adapter's only, so far: the room's felt draws none.
     flights: [],
     ...(lastActions ? { lastActions } : {}),
+    ...(powerTags ? { powerTags } : {}),
+    // The hero's own draw is the one it can see: while it is open, nobody is on the clock.
+    ...(view.wild ? { powerDraw: priv?.power?.draw != null } : {}),
     phase,
     seatCount: feltSeatCount(view.maxSeats),
     seats,
@@ -643,6 +823,69 @@ function decodeRoom(state: unknown): RoomView | null {
             ),
           }
         : null,
+    wild: isRecord(table.powerUps) && table.powerUps.deal === "choose3",
+  };
+}
+
+/** The public "power used" broadcast, or null for anything that is not one. */
+function decodePowerUsed(payload: unknown): PowerUsedEvent | null {
+  if (!isRecord(payload) || !isPowerUpId(payload.powerUpId)) return null;
+  const street = payload.street;
+  if (street !== "preflop" && street !== "flop" && street !== "turn" && street !== "river") return null;
+  return {
+    handId: numberOf(payload.handId),
+    seat: numberOf(payload.seat),
+    powerUpId: payload.powerUpId,
+    street,
+  };
+}
+
+/**
+ * The private `power` field, with the draw's deadline moved onto this device's clock: the server
+ * says its own `now` beside the deadline, so the time left is the server's, and only the anchor is
+ * the device's. `clock` keeps the first anchor each draw got, so the deadline holds still.
+ */
+function decodePower(
+  value: unknown,
+  serverNow: number,
+  receivedAtMs: number,
+  clock: Map<string, number>,
+): PowerPrivate | null {
+  if (!isRecord(value)) return null;
+  const handId = numberOf(value.handId);
+  const draw = isRecord(value.draw) ? value.draw : null;
+  const held = isRecord(value.held) ? value.held : null;
+  const swap = isRecord(value.swap) ? value.swap : null;
+
+  let decodedDraw: PowerPrivate["draw"] = null;
+  if (draw !== null) {
+    const deadline = numberOf(draw.deadline);
+    const key = `${handId}:${deadline}`;
+    const endsAtMs = clock.get(key) ?? receivedAtMs + Math.max(0, deadline - serverNow);
+    clock.set(key, endsAtMs);
+    decodedDraw = {
+      offers: iterate(draw.offers).filter(isPowerUpId),
+      picked: isPowerUpId(draw.picked) ? draw.picked : null,
+      endsAtMs,
+    };
+  }
+
+  return {
+    handId,
+    draw: decodedDraw,
+    held:
+      held !== null && isPowerUpId(held.powerUpId)
+        ? { id: held.powerUpId, used: held.used === true, usable: held.usable === true }
+        : null,
+    swap:
+      swap !== null && isPowerUpId(swap.powerUpId) && isRecord(swap.tile)
+        ? {
+            handId: numberOf(swap.handId),
+            powerUpId: swap.powerUpId,
+            discardedTileId: stringOf(swap.discardedTileId),
+            tile: decodeTile(swap.tile) as LetterTile,
+          }
+        : null,
   };
 }
 
@@ -720,7 +963,11 @@ function decodeTile(value: unknown): Tile {
   return base;
 }
 
-function decodePrivate(payload: unknown): PrivateView | null {
+function decodePrivate(
+  payload: unknown,
+  receivedAtMs: number,
+  drawClock: Map<string, number>,
+): PrivateView | null {
   if (!isRecord(payload)) return null;
   const word = isRecord(payload.word) ? payload.word : {};
   const wordCheck = isRecord(payload.wordCheck) ? payload.wordCheck : null;
@@ -746,6 +993,7 @@ function decodePrivate(payload: unknown): PrivateView | null {
       confirmed:
         confirmed !== null ? iterate(confirmed.plays).map(decodePlay) : null,
     },
+    power: decodePower(payload.power, numberOf(payload.now), receivedAtMs, drawClock),
   };
 }
 

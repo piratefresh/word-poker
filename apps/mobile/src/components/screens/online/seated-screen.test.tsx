@@ -18,6 +18,7 @@ const TABLE: TableSnapshot = {
   buyIn: 5_000,
   ...blindsFor(5_000),
   maxSeats: 6,
+  powerUps: { deal: "off" },
   seats: 3,
   phase: WAITING_PHASE,
 };
@@ -151,7 +152,17 @@ describe("<SeatedScreen />", () => {
     expect(textOf(view, "seated-buy-in")).toBe("$5,000");
     expect(textOf(view, "seated-blinds")).toBe("$50 / $100");
     expect(textOf(view, "seated-seats")).toBe("3 / 6");
+    expect(textOf(view, "seated-powers")).toBe("Classic");
     expect(textOf(view, "seated-status")).toBe("WAITING");
+  });
+
+  test("says a Wild table deals powers before the first hand does (§40)", async () => {
+    mockSession = seated({ ...TABLE, powerUps: { deal: "choose3" } });
+
+    const view = await render(<SeatedScreen />);
+
+    expect(textOf(view, "seated-powers")).toBe("Wild");
+    expect(view.getByTestId("seated-table").props.accessibilityLabel).toMatch(/, Wild Powers,/);
   });
 
   test("reads the phase as the table's status, and the seats as they fill", async () => {

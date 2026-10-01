@@ -193,6 +193,16 @@ describe("the rendered seat", () => {
     );
   }
 
+  test("prints a power's tag beside the street's action, and nothing without one (§44)", async () => {
+    const tagged = await renderSeat(640, { ...hero, status: "call", powerTag: "WILD" }, sideAnchor);
+    expect(tagged.getByText("CALL")).toBeTruthy();
+    expect(tagged.getByTestId(`seat-power-tag-${hero.id}`)).toHaveTextContent("WILD");
+    await tagged.unmount();
+
+    const plain = await renderSeat(640, { ...hero, status: "call" }, sideAnchor);
+    expect(plain.queryByTestId(`seat-power-tag-${hero.id}`)).toBeNull();
+  });
+
   test.each([380, 640, 960, 1280])(
     "centres a side seat's avatar on its anchor at a %i-point felt",
     async (tableWidth) => {

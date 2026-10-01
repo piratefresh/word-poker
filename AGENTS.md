@@ -73,6 +73,17 @@ it was taken on (`seatActions` in the adapter); the engine stores what a seat co
 gesture that committed it, so CHECK, CALL, BET and RAISE have nowhere else to come from. Tests
 that own the table's clock advance it `duration.cpuBeat` at a time.
 
+At a Wild table (`/offline?powers=wild`, §44) the Power Draw opens on every deal and holds the
+table: nobody is on the clock, so no bot beat runs until the hero picks or `POWER_DRAW_MS` runs
+out. A power used on a street rides beside that street's action in `seatActions`, and the power
+UI reads the adapter's `powers` (`PowerView`, `lib/power-view.ts`) — the shape the online adapter
+will fill too. Whether a power can be used is the engine's `canUsePower`, never the felt's.
+Using it runs through `components/powers`: `PowerHeldChip` sits in the action row beside the
+shuffle, `usePowerTargeting` holds chip → tile → confirm (and drops to idle the moment the power
+stops being usable), and while the seat chooses, `WordBuilder`'s `onPickTile` turns the strip's
+taps on private tiles into picks. The swap flips in place through `swapFlip`, whose `revealed`
+is the seam the "power used" card holds it on.
+
 # End-to-end (web)
 
 UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
@@ -113,6 +124,19 @@ on matching versions. The existing mobile/server env files and seeded E2E user a
 The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
 signs in when needed, builds PUB, checks the results overlay, and leaves the table.
 
+The Wild variant (STO-500) is the same runner with power-ups on:
+
+```powershell
+pnpm smoke:online:wild            # headed; add -Headless for --headless --screen-size 1280x1000
+```
+
+It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 527 and runs `.maestro/online-wild-hand.yaml`.
+The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds OX
+with the new tile. The opponent keeps its first offer and never uses it. It logs the public use it
+hears, and it logs `LEAK:` if a swapped tile reaches it before the reveal. The runner fails on
+either. After changing the deal, the catalog or the letter stream, re-probe with
+`pnpm --filter @wordpoker/server exec tsx scripts/probe-wild-smoke.ts <firstSeed> <lastSeed>`.
+
 The four-browser smoke (STO-483) has every seat played by a real browser, each driven by its own
 Maestro process:
 
@@ -125,7 +149,7 @@ words at showdown. In hand 2 a short stack shoves into a side pot, loses and bus
 busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
 up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
 seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
-seed, payout delay, turn clock), which the server merges under a create's own options, and only
+seed, payout delay, turn clock, and `powerUps` — §40's Classic/Wild, validated like a create's own), which the server merges under a create's own options, and only
 behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
 (`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
 the runner starts the next one only then, so join order is seat order. The script lives in

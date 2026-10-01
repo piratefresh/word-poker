@@ -1,5 +1,8 @@
+import type { PowerUpDealMode } from "@wordpoker/contracts";
+
 /**
- * offline-seed.ts — where the offline table's seed comes from.
+ * offline-seed.ts — where the offline table's seed comes from, and beside it the power-up mode
+ * its URL asks for.
  *
  * `@wordpoker/game-rules` never reaches for randomness of its own: a seed arrives as an
  * argument and replays the same hand every time it is played (AGENTS.md). Somebody above the
@@ -35,4 +38,16 @@ export function pinnedSeed(param: string | string[] | undefined): number | undef
 
   const seed = Number(raw);
   return Number.isFinite(seed) ? seed : undefined;
+}
+
+/**
+ * The power-up deal mode a URL asks for (`/offline?powers=wild`, §40): `wild` is the Wild table,
+ * `choose3`, and anything else — no param, an unknown one — is Classic, so `/offline?seed=…`
+ * plays exactly the table it always has. It sits beside the seed because the two together name
+ * a hand: the same seed deals the same tiles either way, and the mode decides whether a Power
+ * Draw runs over them. A repeated param takes the first, as `pinnedSeed` does.
+ */
+export function pinnedPowerUps(param: string | string[] | undefined): PowerUpDealMode {
+  const raw = (Array.isArray(param) ? param[0] : param)?.trim().toLowerCase();
+  return raw === "wild" ? "choose3" : "off";
 }

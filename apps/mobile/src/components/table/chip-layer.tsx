@@ -26,7 +26,9 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 
 import type { ChipFlight } from "@/components/screens/game/game-types";
-import { border, colors, duration, easing as motionEasing, palette } from "@/constants/theme";
+import { ChipSprite } from "@/components/chip/chip-sprite";
+import { chipToneForAmount } from "@/components/chip/chip-value";
+import { duration, easing as motionEasing } from "@/constants/theme";
 
 import { useTableLayout } from "./poker-table";
 
@@ -50,7 +52,7 @@ export function chipArrivalMs(count: number): number {
 }
 
 /** The disc a flight draws. Geometry of this layer, not a place on the felt. */
-const CHIP_DIAMETER = 13;
+const CHIP_DIAMETER = 24;
 /** Where a chip starts: small and back at the seat, growing as it lands on the pot. */
 const CHIP_START_SCALE = 0.55;
 /** How much of the flight the chip spends fading in, before the travel reads at all. */
@@ -107,6 +109,7 @@ export function ChipLayer({ flights, onFlightEnd }: ChipLayerProps) {
         const outbound = flight.direction === "out";
         return (
           <Flight
+            amount={flight.amount}
             batchIndex={batches[index] ?? 0}
             from={outbound ? pot : seat}
             id={flight.id}
@@ -127,12 +130,14 @@ export function ChipLayer({ flights, onFlightEnd }: ChipLayerProps) {
  * so a re-render keeps both the node and the beat it left on.
  */
 function Flight({
+  amount,
   id,
   from,
   to,
   batchIndex,
   onEnd,
 }: {
+  amount: number;
   id: string;
   from: { x: number; y: number };
   to: { x: number; y: number };
@@ -186,7 +191,9 @@ function Flight({
     <Animated.View
       style={[styles.chip, { left: to.x, top: to.y }, travel]}
       testID={`chip-flight-${id}`}
-    />
+    >
+      <ChipSprite tone={chipToneForAmount(amount)} size={CHIP_DIAMETER} />
+    </Animated.View>
   );
 }
 
@@ -199,10 +206,6 @@ const styles = StyleSheet.create({
     top: 0,
   },
   chip: {
-    backgroundColor: palette.gold300,
-    borderColor: colors.goldHi,
-    borderRadius: CHIP_DIAMETER / 2,
-    borderWidth: border.hairline,
     height: CHIP_DIAMETER,
     // Centred on the point it lands on: the travel is a transform, so the disc's own box is
     // pulled back over its anchor by margins rather than by a transform of its own.

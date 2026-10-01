@@ -21,6 +21,7 @@ import {
   TileStrip,
   useStripOrder,
   type StripEntry,
+  type SwapFlip,
 } from "./strip";
 import { styles } from "./styles";
 
@@ -99,6 +100,13 @@ export interface WordBuilderProps extends WordDraft {
   onCheckWord?: () => void;
   /** The draft the seat has built, as one submission: the engine judges the whole of it (§19). */
   onDraft: (plays: readonly TilePlay[]) => void;
+  /**
+   * Set while the seat is choosing a private tile for its power (§44): the strip's own tiles pulse
+   * and a tap on one hands it here instead of playing it; the board's tiles dim and nothing drags.
+   */
+  onPickTile?: (tile: TileData) => void;
+  /** The swap the strip turns over in place once the seat has used its power (§44). */
+  swapFlip?: SwapFlip | null;
   /** The felt and the panel, in whatever places the mode draws them. */
   children: ReactNode;
 }
@@ -116,6 +124,8 @@ export interface WordBuilderScope {
   readonly toggle: (entry: StripEntry, face?: string) => void;
   readonly reorder: (orderedIds: readonly string[]) => void;
   readonly shuffle: () => void;
+  readonly pickTile?: (tile: TileData) => void;
+  readonly swapFlip: SwapFlip | null;
 }
 
 const Scope = createContext<WordBuilderScope | null>(null);
@@ -152,6 +162,8 @@ export function WordBuilder({
   wordCheck,
   onCheckWord,
   onDraft,
+  onPickTile,
+  swapFlip = null,
   children,
 }: WordBuilderProps): JSX.Element {
   // The seat builds its word the whole hand, so playing and taking back tiles is live from the
@@ -263,6 +275,8 @@ export function WordBuilder({
     toggle,
     reorder,
     shuffle,
+    pickTile: onPickTile,
+    swapFlip,
   };
 
   return <Scope.Provider value={scope}>{children}</Scope.Provider>;
@@ -273,13 +287,15 @@ export function WordBuilder({
  * already are.
  */
 export function WordHand(): JSX.Element {
-  const { strip, held, live, sortable, toggle, reorder } =
+  const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip } =
     useWordBuilderScope();
 
   return (
     <TileStrip
+      flip={swapFlip}
       held={held}
       live={live}
+      onPick={pickTile}
       onReorder={reorder}
       onToggle={toggle}
       sortable={sortable}

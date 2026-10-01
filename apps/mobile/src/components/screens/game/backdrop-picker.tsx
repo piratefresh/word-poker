@@ -51,7 +51,7 @@ export function BackdropPicker({ top, onClose }: BackdropPickerProps) {
 const styles = StyleSheet.create({
   // Over everything on the felt: the table's content layer sits at zIndex 1, and its tiles and
   // cards carry an elevation that would otherwise draw over the panel on Android.
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 100, zIndex: 100 },
+  overlay: { ...StyleSheet.absoluteFill, elevation: 100, zIndex: 100 },
   panel: {
     backgroundColor: palette.felt800,
     borderColor: colors.goldDeep,

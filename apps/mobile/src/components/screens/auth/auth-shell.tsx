@@ -14,6 +14,8 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import "./autofill-fix";
+
 import {
   border,
   colors,

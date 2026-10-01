@@ -1,0 +1,146 @@
+# One-command Windows runner from the repo root: pnpm smoke:online:wild (STO-500)
+# The online Wild hand: a live room with power-ups on, an automated opponent, and the browser
+# using Random Wild on its own turn, building a word with the new tile, and reading the results.
+#
+# The runner starts the server with WORDPOKER_DETERMINISTIC_SEED=1 and
+# WORDPOKER_SMOKE_ROOM={"powerUps":{"deal":"choose3"}}, so the opponent's create (which names no
+# setting) makes a Wild table; the opponent keeps its first offer and never uses it. By hand:
+#
+#   maestro test --platform web .maestro/online-wild-hand.yaml -e ROOM_ID=the-id-printed-by-opponent
+#
+# Probe for seed 527 (`scripts/probe-wild-smoke.ts`; the browser is seat 1): the browser holds C-1
+# and X-1, every power is offered (the catalog holds three), and Random Wild's letter for seat 1
+# is O. Discarding C-1 puts `power-1` in C's place, and power-1 then X-1 spells OX from the rack
+# alone. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
+#
+# Online, the hero's player id is its session id, which the flow cannot know: the nameplate's tag
+# and the result card's ⚡ are matched by test-id pattern (Maestro ids are regular expressions).
+# The opponent checks the other half — what the table hears — and the runner fails on its log.
+url: http://localhost:8081/online
+name: Online Wild hand - pick, use Random Wild, build OX and read results
+tags:
+  - web
+  - online
+  - powers
+---
+- openLink: http://localhost:8081/online
+
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: sign-in.yaml
+- openLink: http://localhost:8081/online
+
+- openLink: http://localhost:8081/online/${ROOM_ID}
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- tapOn:
+    id: "action-ready"
+
+# The Power Draw opens on the deal and its clock is 10 s: tap the card as soon as the row is up.
+- extendedWaitUntil:
+    visible:
+      id: "power-offer-random_wild"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "power-draw-ready"
+    timeout: 5000
+- tapOn:
+    id: "power-offer-random_wild"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible:
+      id: "power-draw"
+    timeout: 15000
+
+# The opponent holds the button and calls its small blind; the big blind's option is the browser's
+# first turn, and its own betting turn is the power's window.
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 30000
+
+# Chip → the rack waits for a private tile → the felt asks, in the catalog's words → swap.
+- tapOn:
+    id: "power-held"
+- assertVisible: "Tap one of your tiles to swap it"
+- tapOn:
+    id: "word-builder-tile-C-1"
+- assertVisible: "Discard C for a random letter\\?"
+- tapOn:
+    id: "power-confirm"
+
+# The table sees the use, never the letter: the card names the hero, the nameplate wears WILD.
+# The card holds for 1.5 s, so its words are waited for inside it, in one condition — a separate
+# assertion after the wait can land after the card has cleared.
+- extendedWaitUntil:
+    visible:
+      id: "power-used"
+      containsDescendants:
+        - text: "YOU USED"
+    timeout: 5000
+- assertVisible:
+    id: "seat-power-tag-.*"
+    containsDescendants:
+      - text: "WILD"
+- extendedWaitUntil:
+    notVisible:
+      id: "power-used"
+    timeout: 5000
+
+# The new tile flips over in C's place, and the chip is spent for the hand.
+- extendedWaitUntil:
+    visible:
+      id: "word-builder-tile-power-1"
+    timeout: 5000
+- waitForAnimationToEnd
+- assertNotVisible:
+    id: "word-builder-tile-C-1"
+- assertVisible: "USED"
+
+# The new letter builds like any other: power-1 then X-1 spells OX before the board is out.
+- tapOn:
+    id: "word-builder-tile-power-1"
+- tapOn:
+    id: "word-builder-tile-X-1"
+- assertVisible: "OX"
+
+# Using the power did not end the turn. Play it out: CHECK answers every turn, and inside §19's
+# window it locks OX in. The window puts no seat on the turn, so on the river the row is tapped
+# whether or not the browser holds it.
+- repeat:
+    while:
+      notVisible:
+        text: "PHASE 6 · PAYOUT"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|PHASE 5 · THE RIVER|PHASE 6 · PAYOUT"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 30000
+- assertVisible:
+    text: ".*OX.*"
+- assertNotVisible:
+    text: "The window closed"
+# The swapped tile shows the table its ⚡ once the word is revealed.
+- assertVisible:
+    id: "result-card-.*-tile-.*-powered"
+- tapOn:
+    id: "Back to the main menu"
+- waitForAnimationToEnd

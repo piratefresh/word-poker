@@ -24,6 +24,7 @@ import {
   spacing,
 } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
+import { DEAL_MODE_NAMES, powersLabel } from "@/lib/power-view";
 import {
   joinTable,
   leaveTable,
@@ -191,10 +192,11 @@ function TableFace({
   onLeave: () => void;
 }) {
   const waiting = table.phase === WAITING_PHASE;
+  const powers = powersLabel(table.powerUps);
 
   return (
     <View
-      accessibilityLabel={`${table.name}, ${waiting ? "waiting" : "in hand"}, ${table.seats} of ${table.maxSeats} seats taken`}
+      accessibilityLabel={`${table.name}, ${waiting ? "waiting" : "in hand"}, ${powers === null ? "" : `${powers}, `}${table.seats} of ${table.maxSeats} seats taken`}
       style={styles.card}
       testID="seated-table"
     >
@@ -221,6 +223,11 @@ function TableFace({
             value={`${formatAmount(table.smallBlind)} / ${formatAmount(table.bigBlind)}`}
           />
           <Stat label="SEATS" testID="seated-seats" value={`${table.seats} / ${table.maxSeats}`} />
+          <Stat
+            label="POWER-UPS"
+            testID="seated-powers"
+            value={DEAL_MODE_NAMES[table.powerUps.deal]}
+          />
           <Spacer size={spacing.md} />
 
           <Button

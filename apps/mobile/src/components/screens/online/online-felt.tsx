@@ -16,6 +16,10 @@
  * the room's own reveal (STO-430): DEAL ANOTHER only closes it, since the deal is the room's,
  * and the next deal closes it anyway. Leaving goes through the session so the seat is released,
  * then back to the lobby.
+ *
+ * At a Wild table (§44) the felt carries the same power surfaces as the offline table — the Power
+ * Draw over the felt, the held chip in the action row, the confirm, the "power used" card and the
+ * rack's flip — fed by the adapter's `PowerView`, so none of them learns which table it is at.
  */
 
 import { useState } from "react";
@@ -23,6 +27,14 @@ import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import {
+  PowerDrawReveal,
+  PowerHeldChip,
+  PowerUsePrompt,
+  PowerUsedCard,
+  swapFlipOf,
+  usePowerTargeting,
+} from "@/components/powers";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { GameButton } from "@/components/ui/game-button";
@@ -70,7 +82,16 @@ export function OnlineFelt({
     wager,
     setDraft,
     checkWord,
+    powers,
+    pickPower,
+    usePower,
+    endPowerUsed,
   } = useOnlineGame({ room, dictionary });
+  // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
+  const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
+  const choosing = power.targeting.stage === "picking";
+  const flip = swapFlipOf(powers?.swap, power.discarded);
+  const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
   // The hand whose results the seat has put away: the room keeps the payout on the felt until it
   // deals again, so a dismissed hand must not reopen on the next patch.
   const [dismissed, setDismissed] = useState<number | null>(null);
@@ -107,10 +128,39 @@ export function OnlineFelt({
         reason={words?.reason ?? null}
         score={words?.score ?? null}
         word={words?.word ?? ""}
+        onPickTile={choosing ? power.pick : undefined}
+        // The new letter turns over once the felt's "power used" card for the hero's own use has
+        // cleared (§44, Visibility): the table sees the use first, and only the hero the result.
+        swapFlip={flip === null ? null : { ...flip, revealed: !ownCardShowing }}
       >
         <View style={styles.table}>
           <GameScreen
-            bettingLeading={<WordShuffleButton />}
+            bettingLeading={
+              <>
+                <WordShuffleButton />
+                {powers === null ? null : (
+                  <PowerHeldChip
+                    active={power.targeting.stage !== "idle"}
+                    held={powers.held}
+                    onPress={power.toggle}
+                  />
+                )}
+              </>
+            }
+            overFelt={
+              powers === null ? null : (
+                <>
+                  <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
+                  <PowerUsePrompt
+                    onCancel={power.cancel}
+                    onConfirm={power.confirm}
+                    power={powers.held?.id ?? null}
+                    targeting={power.targeting}
+                  />
+                  <PowerUsedCard notices={powers.used} onDone={endPowerUsed} />
+                </>
+              )
+            }
             bettingSlider={<WordCheckButton />}
             game={game}
             onAllIn={allIn}

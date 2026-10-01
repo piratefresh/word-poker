@@ -5,6 +5,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import {
+  PowerDrawReveal,
+  PowerHeldChip,
+  PowerUsePrompt,
+  PowerUsedCard,
+  swapFlipOf,
+  usePowerTargeting,
+} from "@/components/powers";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
@@ -25,7 +33,7 @@ import {
   spacing,
   type,
 } from "@/constants/theme";
-import { pinnedSeed, randomSeed } from "@/lib/offline-seed";
+import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/lib/offline-seed";
 import { useDictionary } from "@/lib/use-dictionary";
 import { useOfflineGame } from "@/lib/use-offline-game";
 
@@ -94,10 +102,13 @@ function OfflineTable({
   dictionary: Dictionary;
   turnDurationMs?: number;
 }) {
-  const params = useLocalSearchParams<{ seed?: string }>();
+  const params = useLocalSearchParams<{ seed?: string; powers?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
+  // The table's power-up mode rides the URL too (`?powers=wild`), and is the table's for the whole
+  // session: read once, on the way in, like the seed.
+  const [powerUps] = useState(() => pinnedPowerUps(params.powers));
   const {
     game,
     words,
@@ -110,11 +121,20 @@ function OfflineTable({
     wager,
     setDraft,
     checkWord,
+    powers,
+    pickPower,
+    usePower,
+    endPowerUsed,
     endChipFlight,
     sessionOver,
     newGame,
-  } = useOfflineGame({ seed, dictionary, turnDurationMs });
+  } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps });
   const payout = game.phase === "payout";
+  // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
+  const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
+  const choosing = power.targeting.stage === "picking";
+  const flip = swapFlipOf(powers?.swap, power.discarded);
+  const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.
@@ -140,10 +160,25 @@ function OfflineTable({
       reason={words?.reason ?? null}
       score={words?.score ?? null}
       word={words?.word ?? ""}
+      onPickTile={choosing ? power.pick : undefined}
+      // The new letter turns over once the felt's "power used" card for the hero's own use has
+      // cleared (§44, Visibility): the table sees the use first, and only the hero the result.
+      swapFlip={flip === null ? null : { ...flip, revealed: !ownCardShowing }}
     >
       <View style={styles.table}>
         <GameScreen
-          bettingLeading={<WordShuffleButton />}
+          bettingLeading={
+            <>
+              <WordShuffleButton />
+              {powers === null ? null : (
+                <PowerHeldChip
+                  active={power.targeting.stage !== "idle"}
+                  held={powers.held}
+                  onPress={power.toggle}
+                />
+              )}
+            </>
+          }
           bettingSlider={<WordCheckButton />}
           game={game}
           onAllIn={allIn}
@@ -154,6 +189,22 @@ function OfflineTable({
           onChipFlightEnd={endChipFlight}
           onFold={fold}
           onRaise={wager}
+          overFelt={
+            // §44's Power Draw, at a Wild table: the offers land over the felt, above the rack
+            // the seat picks with in view. A Classic table has no powers and draws nothing here.
+            powers === null ? null : (
+              <>
+                <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
+                <PowerUsePrompt
+                  onCancel={power.cancel}
+                  onConfirm={power.confirm}
+                  power={powers.held?.id ?? null}
+                  targeting={power.targeting}
+                />
+                <PowerUsedCard notices={powers.used} onDone={endPowerUsed} />
+              </>
+            )
+          }
           rack={
             // The draft reads above the rack it is built from: one line of text over the
             // strip, drawn by the builder and placed by the felt's own rack slot.

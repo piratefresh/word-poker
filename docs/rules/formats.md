@@ -16,6 +16,23 @@ A/B test formats to find the most popular way to play.
 | Choice-tile frequency | 0–1 or 2–3 per hand | 2–3 (§10) |
 | Bonus structure | Variations on the Full Rack Bonus and multiplier chances (§7, §9) | The rules as written |
 | Word submission on timeout | Confirm before the clock runs out, or auto-submit the draft | Confirm (§19) |
+| Power-ups | Classic (no powers) or Wild (pick 1 of 3 every hand) | Classic ([Power-Ups](power-ups.md) §44) |
+
+## Power-Up Deal Modes
+
+The Power-ups setting is the room's deal mode ([Power-Ups](power-ups.md) §44). Classic and Wild
+are the two a room can run today; the rest are planned:
+
+| Deal mode | Behaviour | Status |
+| --------- | --------- | ------ |
+| Classic | No powers | Default |
+| Wild | Every hand opens with a Power Draw: pick 1 of 3 | Available |
+| Blind Draw | Every seat is given 1 random power every hand, with no choice | Planned |
+| Sparse | A Power Draw on roughly 30% of hands, chosen by the hand's seed | Planned |
+| Chaos | Pick 1 of 3 from a stronger, stranger pool that allows powers aimed at other seats | Planned |
+| Custom | The host chooses the pool and how often a Power Draw runs | Planned |
+
+Power-ups are opt-in: a new room is Classic unless its host picks otherwise.
 
 ## Betting Structures
 

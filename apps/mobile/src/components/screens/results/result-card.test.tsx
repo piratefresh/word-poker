@@ -132,6 +132,22 @@ describe("<ResultCard />", () => {
     expect(view.queryByLabelText(getTileAccessibilityLabel(seat.tiles[2]))).toBeNull();
   });
 
+  test("marks a tile a power handed the seat with its ⚡, and no other tile (§44)", async () => {
+    const played = snapshotFixture().seats[0];
+    const seat: ResultsSeat = {
+      ...played,
+      tiles: played.tiles.map((tile, index) =>
+        index === 1 ? { id: "power-0", letter: tile.letter, points: tile.points } : tile,
+      ),
+    };
+    const view = await render(<ResultCard seat={seat} />);
+
+    const marks = view.getAllByTestId(/-powered$/, { includeHiddenElements: true });
+    expect(marks.map((mark) => mark.props.testID)).toEqual([
+      `result-card-${seat.playerId}-tile-1-powered`,
+    ]);
+  });
+
   test("draws §12's longest word, seven letters out of seven tiles", async () => {
     const seat = longWordSnapshot.seats[0];
     const view = await render(<ResultCard seat={seat} />);

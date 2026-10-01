@@ -50,9 +50,9 @@ const BASE = {
   stackSize: 12,
   stackLine: 16,
   stackGap: 2,
-  chip: 17,
+  chip: 30,
   chipBorder: 1.5,
-  chipText: 6,
+  chipText: 10,
   emptyLabelTracking: 1,
   /** A winner's glow radius; `highlightBleed` is how far past the avatar the fit keeps clear. */
   glow: 16,

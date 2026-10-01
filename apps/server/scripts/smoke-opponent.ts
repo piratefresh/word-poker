@@ -14,11 +14,24 @@
  *
  * Override with TABLE_NAME / SEED / GAME_URL / BEAT_MS. The name and seed are what the flow
  * asserts on and spells from, so a different one means pointing the flow at it too.
+ *
+ * At a Wild table (STO-500 — the runner sets WORDPOKER_SMOKE_ROOM's `powerUps`, which this
+ * create leaves unnamed so the server's knob applies) the opponent keeps the first power it is
+ * offered and never uses it. It logs the public `powerUsed` it hears, and it watches for a leak:
+ * it never swaps, so any swapped tile id (`power-N`) in a message or a state patch before the
+ * hand's reveal is another seat's private result, and it logs `LEAK:` — which fails the run.
  */
 
 import { Client } from "@colyseus/sdk";
 
-import { GAME_EVENTS, GAME_MESSAGES, type PrivateSeatState, type Tile } from "@wordpoker/contracts";
+import {
+  GAME_EVENTS,
+  GAME_MESSAGES,
+  type PowerUsedEvent,
+  type PrivatePowerDraw,
+  type PrivateSeatState,
+  type Tile,
+} from "@wordpoker/contracts";
 import { chooseOfflineWord, loadDictionary } from "@wordpoker/game-rules";
 
 const NAME = process.env.TABLE_NAME ?? "Smoke Table";
@@ -53,16 +66,51 @@ console.log(`seated at "${NAME}" (seed ${SEED}) — table ${room.roomId} as ${ro
 
 let rack: PrivateSeatState | null = null;
 room.onMessage(GAME_EVENTS.privateState, (payload: PrivateSeatState) => {
+  watchForLeak("privateState", payload);
   rack = payload;
   decide();
 });
 room.onMessage(GAME_EVENTS.rejected, (payload) => console.log("rejected:", payload));
+room.onMessage(GAME_EVENTS.powerDraw, (draw: PrivatePowerDraw) => {
+  watchForLeak("powerDraw", draw);
+  const [first] = draw.offers;
+  console.log(`power draw: ${draw.offers.join(", ")}`);
+  if (first === undefined) return;
+  later(
+    () =>
+      room.send(GAME_MESSAGES.pickPower, {
+        actionId: `opponent-pick-${draw.handId}`,
+        handId: draw.handId,
+        powerUpId: first,
+      }),
+    `pick ${first}`,
+  );
+});
+room.onMessage(GAME_EVENTS.powerUsed, (event: PowerUsedEvent) => {
+  watchForLeak("powerUsed", event);
+  console.log(`power used: seat ${event.seat} ${event.powerUpId} on the ${event.street}`);
+});
+
+/**
+ * A swapped tile is private to the seat that swapped it until the hand reveals its word (§44,
+ * §20). This seat never swaps, so a `power-N` id reaching it before the payout is a leak.
+ */
+function watchForLeak(what: string, payload: unknown) {
+  const state = room.state as unknown as State;
+  if (state.phase === "payout") return;
+  const text = JSON.stringify(payload);
+  const leaked = /"power-\d+"/.exec(text);
+  if (leaked !== null) console.log(`LEAK: ${what} carried ${leaked[0]} before the reveal: ${text}`);
+}
 
 let busy = false;
 let confirmedHand = 0;
 /** The spot this seat last acted on — hand, street and the bet it faced — so no spot is played twice. */
 let actedOn = "";
-room.onStateChange(() => decide());
+room.onStateChange(() => {
+  watchForLeak("state", (room.state as unknown as { toJSON(): unknown }).toJSON());
+  decide();
+});
 
 function decide() {
   const state = room.state as unknown as State;

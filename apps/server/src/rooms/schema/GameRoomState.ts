@@ -13,6 +13,12 @@ export const TileState = schema({
 }, "TileState");
 export type TileState = SchemaType<typeof TileState>;
 
+/** §40's power-up setting, shaped like the contracts' `PowerUpSettings`. */
+export const PowerUpSettingsState = schema({
+  deal: t.string().default("off"),
+}, "PowerUpSettingsState");
+export type PowerUpSettingsState = SchemaType<typeof PowerUpSettingsState>;
+
 /** Immutable room configuration, nested to keep the root schema small. */
 export const TableConfigState = schema({
   name: t.string().default(""),
@@ -20,6 +26,7 @@ export const TableConfigState = schema({
   smallBlind: t.uint32().default(0),
   bigBlind: t.uint32().default(0),
   maxSeats: t.uint8().default(0),
+  powerUps: PowerUpSettingsState,
 }, "TableConfigState");
 export type TableConfigState = SchemaType<typeof TableConfigState>;
 

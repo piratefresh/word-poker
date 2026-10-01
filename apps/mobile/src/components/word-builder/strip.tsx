@@ -1,6 +1,6 @@
 import type { Tile as TileData, TilePlay } from "@wordpoker/contracts";
-import type { JSX } from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import type { JSX, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   Text,
@@ -10,26 +10,36 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
+  FadeIn,
+  FadeOut,
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
+  withTiming,
   type SharedValue,
 } from "react-native-reanimated";
+
+import { isSwappedTileId } from "@wordpoker/game-rules";
 
 import {
   Tile,
   scaleTileMetrics,
   getTileAccessibilityLabel,
   type TileOwnership,
+  type TileSide,
   type TileSize,
 } from "@/components/game";
 import {
   isCompactWindow,
   screenScale,
 } from "@/components/screens/game/screen-scale";
-import { spacing } from "@/constants/theme";
+import { colors, glow, spacing } from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
 import { haptic } from "./haptics";
@@ -247,13 +257,42 @@ export function shuffleUnheld(
 }
 
 /**
+ * The tiles the table has dealt, in the order the seat arranged: order kept by id, a tile the
+ * table no longer has replaced in place by one it has just dealt, the rest of the new ones
+ * appended.
+ *
+ * The replacement in place is §44's swap: the new tile takes the place the discarded one sat in,
+ * however the seat had arranged the rack.
+ */
+export function arrangedStrip(
+  order: readonly string[],
+  entries: readonly StripEntry[],
+): readonly StripEntry[] {
+  const byId = new Map(entries.map((entry) => [entry.tile.id, entry]));
+  const ordered = new Set(order);
+  // Tiles the arrangement has never seen, in the table's order; each hole takes the first of them.
+  const fresh = entries.filter((entry) => !ordered.has(entry.tile.id));
+  const placed = new Set<string>();
+  const next: StripEntry[] = [];
+
+  for (const id of order) {
+    if (placed.has(id)) continue;
+    placed.add(id);
+    const entry = byId.get(id) ?? fresh.shift();
+    if (entry !== undefined) next.push(entry);
+  }
+  next.push(...fresh);
+
+  return next;
+}
+
+/**
  * The strip as the seat has arranged it: the order is the ids it holds, the tiles are the ones
  * the table has dealt.
  *
  * The table owns which tiles are there and what they print; the seat owns the order it reads
- * them in, which is local, unsubmitted, and survives every draft — order kept by id, tiles the
- * table no longer has dropped, tiles it has just dealt appended — so an arrangement is not
- * undone by the next tap.
+ * them in, which is local, unsubmitted, and survives every draft (`arrangedStrip`), so an
+ * arrangement is not undone by the next tap.
  */
 export function useStripOrder(entries: readonly StripEntry[]): {
   strip: readonly StripEntry[];
@@ -261,23 +300,7 @@ export function useStripOrder(entries: readonly StripEntry[]): {
 } {
   const [order, setOrder] = useState<readonly string[]>([]);
 
-  const strip = useMemo(() => {
-    const byId = new Map(entries.map((entry) => [entry.tile.id, entry]));
-    const placed = new Set<string>();
-    const next: StripEntry[] = [];
-
-    for (const id of order) {
-      const entry = byId.get(id);
-      if (entry === undefined || placed.has(id)) continue;
-      placed.add(id);
-      next.push(entry);
-    }
-    for (const entry of entries) {
-      if (!placed.has(entry.tile.id)) next.push(entry);
-    }
-
-    return next;
-  }, [order, entries]);
+  const strip = useMemo(() => arrangedStrip(order, entries), [order, entries]);
 
   const arrange = useCallback(
     (arranged: readonly StripEntry[]) => setOrder(idsOf(arranged)),
@@ -287,12 +310,34 @@ export function useStripOrder(entries: readonly StripEntry[]): {
   return { strip, arrange };
 }
 
+/**
+ * §44's swap as the rack shows it: the tile a power handed the seat, and the tile it turns over
+ * from. While `revealed` is false the place still shows `from` — the felt's "power used" card is
+ * on screen — and once it is true the tile flips over to the new letter, once.
+ */
+export interface SwapFlip {
+  readonly tileId: string;
+  readonly from: TileData;
+  readonly revealed: boolean;
+}
+
 /** What the strip hands each place: the tile, whether the word holds it, and the face it plays. */
 interface StripDatum {
   readonly id: string;
   readonly entry: StripEntry;
   readonly held: boolean;
   readonly chosenFace: string | undefined;
+  /**
+   * While the seat is choosing a tile for its power: `target` for a tile it may choose (its own),
+   * `off` for one it may not. `null` the rest of the time, when a tap plays the tile.
+   */
+  readonly pick: "target" | "off" | null;
+  /** The swap flip this tile still has to play, or null. */
+  readonly flip: {
+    readonly from: TileData;
+    readonly revealed: boolean;
+    readonly onDone: () => void;
+  } | null;
 }
 
 /**
@@ -318,6 +363,8 @@ export function TileStrip({
   sortable,
   onToggle,
   onReorder,
+  onPick,
+  flip = null,
 }: {
   /** The tiles in the seat's order. */
   strip: readonly StripEntry[];
@@ -331,7 +378,18 @@ export function TileStrip({
   onToggle: (entry: StripEntry, face?: string) => void;
   /** Reports the strip's whole order after a drop. */
   onReorder: (orderedIds: readonly string[]) => void;
+  /**
+   * Set while the seat is choosing a private tile for its power (§44): a tap on one of its own
+   * tiles picks it instead of playing it, the board's tiles take no tap, and nothing drags.
+   */
+  onPick?: (tile: TileData) => void;
+  /** The swap the rack still has to turn over, if the seat has used its power. */
+  flip?: SwapFlip | null;
 }): JSX.Element {
+  const picking = onPick !== undefined;
+  // A flip plays once: a later remount of the live strip — a drag, a shuffle — shows the new tile.
+  const [flipped, setFlipped] = useState<string | null>(null);
+
   // The room the rack was given, measured off the row rather than assumed: the step the places
   // are laid out at is whatever fits this hand into it.
   const [room, setRoom] = useState(0);
@@ -352,9 +410,13 @@ export function TileStrip({
   const toggle = useCallback(
     (entry: StripEntry, face?: string) => {
       if (dragging.current) return;
+      if (onPick !== undefined) {
+        if (entry.ownership === "private") onPick(entry.tile);
+        return;
+      }
       onToggle(entry, face);
     },
-    [onToggle],
+    [onPick, onToggle],
   );
 
   const data = useMemo<readonly StripDatum[]>(
@@ -364,8 +426,17 @@ export function TileStrip({
         entry,
         held: held.has(entry.tile.id),
         chosenFace: held.get(entry.tile.id),
+        pick: picking ? (entry.ownership === "private" ? "target" : "off") : null,
+        flip:
+          flip !== null && flip.tileId === entry.tile.id && flipped !== flip.tileId
+            ? {
+                from: flip.from,
+                revealed: flip.revealed,
+                onDone: () => setFlipped(flip.tileId),
+              }
+            : null,
       })),
-    [strip, held],
+    [strip, held, picking, flip, flipped],
   );
 
   const rack = rackFor(useWindowDimensions());
@@ -389,7 +460,7 @@ export function TileStrip({
           { height: rack.height, width: rowWidth(data.length, step, rack) },
         ]}
       >
-        {sortable ? (
+        {sortable && !picking ? (
           /*
             The strip seeds its places once, from the order it is first handed, so the live
             strip is remounted whenever that order changes — a drop, a shuffle, a freshly dealt
@@ -641,8 +712,10 @@ function TileContent({
   scale: number;
   onToggle: (entry: StripEntry, face?: string) => void;
 }): JSX.Element {
-  const { entry, held, chosenFace } = datum;
+  const { entry, held, chosenFace, pick, flip } = datum;
   const { tile, ownership } = entry;
+  // Choosing a tile for a power: the seat's own tiles are the only ones that answer a tap.
+  const picking = pick !== null;
   const choice = "alternativeLetter" in tile ? tile : null;
   // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
   // held choice tile says the face the word is playing and not only the pair it prints.
@@ -650,28 +723,59 @@ function TileContent({
     choice !== null && held && chosenFace !== undefined
       ? `, playing ${chosenFace}`
       : "";
-  const label = held
-    ? `${getTileAccessibilityLabel(tile)}${playing}, in your word, tap to take it back`
-    : `${getTileAccessibilityLabel(tile)}, tap to play it`;
+  const powered = isSwappedTileId(tile.id);
+  // What the place says: the face it shows — the discarded tile, while a swap is still to turn
+  // over — and what a tap on it would do.
+  const labelFor = (face: TileData): string => {
+    const mark = face === tile && powered ? ", from your power" : "";
+    const spoken = `${getTileAccessibilityLabel(face)}${mark}${playing}`;
+    if (pick === "target") return `${spoken}, tap to swap it`;
+    return held ? `${spoken}, in your word, tap to take it back` : `${spoken}, tap to play it`;
+  };
+  const tileProps = {
+    dimmed: picking ? pick === "off" : live && !held,
+    interactive: picking ? pick === "target" : live,
+    onPress: () => {
+      haptic("settle");
+      onToggle(entry);
+    },
+    ownership,
+    scale,
+    selected: held && !picking,
+    size,
+    testID: `word-builder-tile-${tile.id}`,
+  };
 
   return (
     <View style={styles.entry}>
-      <Tile
-        accessibilityLabel={label}
-        dimmed={live && !held}
-        interactive={live}
-        onPress={() => {
-          haptic("settle");
-          onToggle(entry);
-        }}
-        ownership={ownership}
-        selected={held}
-        side="front"
-        scale={scale}
-        size={size}
-        testID={`word-builder-tile-${tile.id}`}
-        tile={tile}
-      />
+      <PickPulse active={pick === "target"}>
+        {flip === null ? (
+          <Tile
+            {...tileProps}
+            accessibilityLabel={labelFor(tile)}
+            powered={powered}
+            side="front"
+            tile={tile}
+          />
+        ) : (
+          <SwapReveal
+            flip={flip}
+            render={(face, side, onFlipComplete) => (
+              <Tile
+                {...tileProps}
+                accessibilityLabel={labelFor(face)}
+                onFlipComplete={onFlipComplete}
+                powered={face === tile && powered}
+                side={side}
+                tile={face}
+              />
+            )}
+            scale={scale}
+            size={size}
+            tile={tile}
+          />
+        )}
+      </PickPulse>
       {choice === null ? null : (
         <View style={styles.faces}>
           {[choice.letter, choice.alternativeLetter].map((face) => (
@@ -683,7 +787,7 @@ function TileContent({
                 haptic("settle");
                 onToggle(entry, face);
               }}
-              playable={live}
+              playable={live && !picking}
               tile={choice}
             />
           ))}
@@ -692,6 +796,119 @@ function TileContent({
     </View>
   );
 }
+
+/**
+ * A private tile the seat may choose for its power (§44): it breathes, with a gold ring, so the
+ * rack says which tiles the tap is waiting on. Under reduced motion the ring holds still.
+ */
+function PickPulse({ active, children }: { active: boolean; children: ReactNode }): JSX.Element {
+  const reduceMotion = useReducedMotion();
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    if (active && !reduceMotion) {
+      pulse.set(
+        withRepeat(
+          withSequence(withTiming(1, { duration: 520 }), withTiming(0, { duration: 520 })),
+          -1,
+        ),
+      );
+      return;
+    }
+    cancelAnimation(pulse);
+    pulse.set(active ? 1 : 0);
+  }, [active, pulse, reduceMotion]);
+
+  const breathe = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulse.get() * 0.06 }],
+  }));
+  const ring = useAnimatedStyle(() => ({ opacity: 0.45 + pulse.get() * 0.55 }));
+
+  return (
+    <Animated.View style={active ? breathe : undefined}>
+      {children}
+      {active ? (
+        <Animated.View pointerEvents="none" style={[styles.pickRing, glow(colors.gold, 8), ring]} />
+      ) : null}
+    </Animated.View>
+  );
+}
+
+/**
+ * The swap turning over in its place (§44): the tile the seat discarded shows until the swap is
+ * `revealed`, then turns face down and back up as the new letter. Under reduced motion the two
+ * cross-fade instead. `render` draws the one tile the place shows at each beat.
+ */
+function SwapReveal({
+  flip,
+  tile,
+  size,
+  scale,
+  render,
+}: {
+  flip: NonNullable<StripDatum["flip"]>;
+  tile: TileData;
+  size: TileSize;
+  scale: number;
+  render: (
+    face: TileData,
+    side: TileSide,
+    onFlipComplete?: (side: TileSide) => void,
+  ) => JSX.Element;
+}): JSX.Element {
+  const reduceMotion = useReducedMotion();
+  // `from`: the old face, waiting. `hiding`: turning face down. `showing`: up again, the new tile.
+  const [beat, setBeat] = useState<"from" | "hiding" | "showing">("from");
+  const { revealed, onDone } = flip;
+
+  // A beat after the old face is drawn, never during the render that mounts it: the tile has to
+  // be face up before it can turn over, and a tile mounted face down has no turn to report.
+  useEffect(() => {
+    if (!revealed || beat !== "from") return;
+    const timer = setTimeout(() => setBeat(reduceMotion ? "showing" : "hiding"), SWAP_TURN_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [beat, reduceMotion, revealed]);
+
+  // The cross-fade is the whole reveal: the flip is done once the fade has had its beat.
+  useEffect(() => {
+    if (!reduceMotion || beat !== "showing") return;
+    const timer = setTimeout(onDone, SWAP_FADE_MS);
+    return () => clearTimeout(timer);
+  }, [beat, onDone, reduceMotion]);
+
+  if (reduceMotion) {
+    const metrics = scaleTileMetrics(size, scale);
+    return (
+      <View style={{ height: metrics.height, width: metrics.width }}>
+        {beat === "from" ? (
+          <Animated.View exiting={FadeOut.duration(SWAP_FADE_MS)} key="from" style={styles.swapFace}>
+            {render(flip.from, "front")}
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeIn.duration(SWAP_FADE_MS)} key="to" style={styles.swapFace}>
+            {render(tile, "front")}
+          </Animated.View>
+        )}
+      </View>
+    );
+  }
+
+  if (beat === "from") return render(flip.from, "front");
+  if (beat === "hiding") {
+    return render(flip.from, "back", (side) => {
+      if (side === "back") setBeat("showing");
+    });
+  }
+  return render(tile, "front", (side) => {
+    if (side === "front") onDone();
+  });
+}
+
+/** How long a swap's cross-fade takes under reduced motion. */
+const SWAP_FADE_MS = 240;
+
+/** How long the discarded face holds once revealed, so the eye sees what turns over. */
+const SWAP_TURN_DELAY_MS = 150;
 
 /** One face of a choice tile, as the tap that plays the tile for that letter (§10). */
 function FaceChip({

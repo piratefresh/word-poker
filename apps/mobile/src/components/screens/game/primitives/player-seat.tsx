@@ -1,5 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ChipSprite } from "@/components/chip/chip-sprite";
+import { chipToneForAmount } from "@/components/chip/chip-value";
 
 import type { SeatSlot } from "@/components/table";
 import {
@@ -95,10 +97,10 @@ function seatStyles(m: SeatMetrics) {
       borderRadius: m.pillRadius,
       paddingHorizontal: m.pillPadX * 0.75,
     },
+    statusRow: { gap: m.badgeGap, marginTop: m.pillGap },
     statusPill: {
       borderRadius: m.pillRadius,
       borderWidth: m.pillBorder,
-      marginTop: m.pillGap,
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
     },
@@ -122,7 +124,6 @@ function seatStyles(m: SeatMetrics) {
     },
     betChip: {
       borderRadius: m.chip / 2,
-      borderWidth: m.chipBorder,
       height: m.chip,
       width: m.chip,
     },
@@ -253,22 +254,35 @@ export function PlayerSeat({
               <Text style={styles.youLabel}> {"·"} YOU</Text>
             ) : null}
           </Text>
-          <View
-            style={[
-              styles.statusPill,
-              scaled.statusPill,
-              lit && { backgroundColor: statusColor, borderColor: statusColor },
-            ]}
-          >
-            <Text
+          <View style={[styles.statusRow, scaled.statusRow]}>
+            <View
               style={[
-                styles.statusText,
-                scaled.statusText,
-                lit && styles.statusTextLit,
+                styles.statusPill,
+                scaled.statusPill,
+                lit && { backgroundColor: statusColor, borderColor: statusColor },
               ]}
             >
-              {STATUS_LABEL[seat.status]}
-            </Text>
+              <Text
+                style={[
+                  styles.statusText,
+                  scaled.statusText,
+                  lit && styles.statusTextLit,
+                ]}
+              >
+                {STATUS_LABEL[seat.status]}
+              </Text>
+            </View>
+            {/* §44: a power used on this street rides beside the street's action. */}
+            {seat.powerTag ? (
+              <View
+                style={[styles.statusPill, scaled.statusPill, styles.powerTag]}
+                testID={`seat-power-tag-${seat.id}`}
+              >
+                <Text style={[styles.statusText, scaled.statusText, styles.powerTagText]}>
+                  {seat.powerTag}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <ArcadeLabelBand
             style={scaled.stackBand}
@@ -286,6 +300,9 @@ export function PlayerSeat({
             betChipOffset(anchor, metrics, seatCount),
           ]}
         >
+          <View style={StyleSheet.absoluteFill}>
+            <ChipSprite tone={chipToneForAmount(seat.bet)} size={metrics.chip} />
+          </View>
           <Text style={[styles.betChipText, scaled.betChipText]}>
             {seat.bet}
           </Text>
@@ -365,6 +382,10 @@ const styles = StyleSheet.create({
   },
   statusText: { color: palette.green500, fontFamily: fonts.monoBold },
   statusTextLit: { color: colors.onGold },
+  statusRow: { alignItems: "center", flexDirection: "row" },
+  // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
+  powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
+  powerTagText: { color: colors.goldHi },
   folded: { opacity: 0.45 },
   emptySeatLabel: {
     color: colors.textFaint,
@@ -372,11 +393,15 @@ const styles = StyleSheet.create({
   },
   betChip: {
     alignItems: "center",
-    backgroundColor: "#c41a1a",
-    borderColor: colors.textBright,
     justifyContent: "center",
     position: "absolute",
     ...elevation.tile,
   },
-  betChipText: { color: "#fff8dc", fontFamily: fonts.sansBlack },
+  betChipText: {
+    color: "#fff8dc",
+    fontFamily: fonts.sansBlack,
+    backgroundColor: "rgba(40, 5, 5, 0.85)",
+    borderRadius: 3,
+    paddingHorizontal: 2,
+  },
 });

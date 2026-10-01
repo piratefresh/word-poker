@@ -102,17 +102,16 @@ const MATERIALS: Record<GameButtonVariant, Material> = {
     inkShadow: "rgba(0,0,0,0.85)",
     frame: "rgba(255,255,255,0.16)",
   },
-  // The same slab, its inner line drawn in red: the control that gives something up.
+  // The control that gives something up: a struck red slab, same build as `gold`.
   danger: {
-    gradient: ["#2c2726", "#232020", "#1c1918"],
-    lip: "#070303",
-    edge: "#0e0808",
+    gradient: ["#e8897c", "#b23a2c", "#7a2018"],
+    lip: "#3a0f09",
+    edge: "#c9493a",
     ink: colors.textBright,
-    highlight: "rgba(255,255,255,0.06)",
-    sheen: "rgba(255,255,255,0.03)",
-    bevel: "rgba(0,0,0,0.35)",
-    inkShadow: "rgba(0,0,0,0.85)",
-    frame: "rgba(255,93,78,0.5)",
+    highlight: "rgba(255,230,220,0.5)",
+    sheen: "rgba(255,255,255,0.18)",
+    bevel: "rgba(58,15,9,0.45)",
+    inkShadow: "rgba(0,0,0,0.6)",
   },
 };
 

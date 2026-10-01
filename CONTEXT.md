@@ -71,6 +71,17 @@ _Avoid_: reveal (that is the UI moment).
 **Busted**: a seat whose Table Stack reached zero; it sits out the session's remaining hands.
 _Avoid_: broke, eliminated.
 
+**Power-Up**: a one-shot ability a seat holds for one hand, in a room whose deal mode deals them (§44). Every power is defined once, in the contracts' catalog.
+_Avoid_: perk, boost, ability (in UI copy).
+
+**Deal Mode**: the room setting that decides how power-ups are dealt — Classic (none) or Wild (a Power Draw every hand).
+_Avoid_: power mode, cooldown (powers have none).
+
+**Power Draw**: the window after the deal and before the first bet where every seat is offered three powers and keeps one.
+_Avoid_: power phase (it is a window, not a phase), roll.
+
+**Held Power**: the power a seat kept at the Power Draw; lost unused at a fold or the end of the hand.
+
 ## The felt
 
 **Hero View**: the table as one seat sees it — its rack, its turn, its draft — mapped to what the felt draws and the word builder reads; both the offline and online adapters decode into it (`apps/mobile/src/lib/hero-view.ts`).

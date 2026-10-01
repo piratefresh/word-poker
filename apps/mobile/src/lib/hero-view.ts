@@ -12,13 +12,16 @@
  * optimistic state; this only reads what they hand it.
  */
 
-import type {
-  PlayerId,
-  PrivateWordCheckState,
-  RoundPhase,
-  Tile,
-  TilePlay,
-  WordRejectionReason,
+import {
+  POWER_DRAW_MS,
+  POWER_UPS,
+  type PlayerId,
+  type PowerUpId,
+  type PrivateWordCheckState,
+  type RoundPhase,
+  type Tile,
+  type TilePlay,
+  type WordRejectionReason,
 } from "@wordpoker/contracts";
 import {
   DEFAULT_STAKES,
@@ -74,6 +77,11 @@ export interface HeroPerspective {
    * is not acting just waits.
    */
   lastActions?: ReadonlyMap<number, PlayerStatus>;
+  /**
+   * The power each seat used on this street, by engine index (§44, Visibility): the nameplate
+   * prints its tag beside the street's action. Absent at a Classic table.
+   */
+  powerTags?: ReadonlyMap<number, PowerUpId>;
   phase: RoundPhase;
   seatCount: SeatCount;
   /** In engine order — the order `bettingBounds` and the turn indices read. */
@@ -84,6 +92,12 @@ export interface HeroPerspective {
   dealerIndex: number | null;
   /** Whether the betting turn is the hero's (the online private message says so; offline, the turn index). */
   heroToAct: boolean;
+  /**
+   * §44's Power Draw is open and holds the table: nobody is on the betting clock, whoever
+   * pre-flop's first turn belongs to, and the HUD runs the draw's clock instead. Absent at a
+   * Classic table.
+   */
+  powerDraw?: boolean;
   /**
    * The table's own betting-turn budget, in ms. A table that sets one says so here — the tuning
    * preview runs on a clock nobody can run out of — and one that says nothing gets the budget the
@@ -228,11 +242,13 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
   });
 
   return {
-    id: p.id,
+    // The draw is a turn of its own, so the countdown re-anchors on the betting clock when it
+    // closes, even though pre-flop's first seat is the same one it was during the draw.
+    id: p.powerDraw ? `${p.id}:power-draw` : p.id,
     handId: p.handId,
     phase: p.phase,
     phaseNumber: PHASE_NUMBER[p.phase],
-    secondsRemaining: (p.word.open ? WORD_WINDOW_MS : p.turnDurationMs ?? OFFLINE_TURN_MS) / 1_000,
+    secondsRemaining: clockBudgetMs(p) / 1_000,
     seatCount: p.seatCount,
     players,
     // Every chip committed this hand, in §25's layers: the main pot first, side pots above it.
@@ -252,6 +268,13 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
   };
 }
 
+/** The clock the HUD runs down: §44's draw, §19's window, or the betting turn. */
+function clockBudgetMs(p: HeroPerspective): number {
+  if (p.powerDraw) return POWER_DRAW_MS;
+  if (p.word.open) return WORD_WINDOW_MS;
+  return p.turnDurationMs ?? OFFLINE_TURN_MS;
+}
+
 /** Which seats the settled hand paid: the ladder's first place, or §26's one survivor. */
 function winnerIds(result: HeroPerspective["result"]): readonly PlayerId[] {
   if (result === null) return [];
@@ -267,7 +290,7 @@ function winnerIds(result: HeroPerspective["result"]): readonly PlayerId[] {
  * once, so the controls do not invite a second tap while the prediction stands.
  */
 function bettingRow(p: HeroPerspective, local: HeroLocal): BettingState {
-  if (local.pendingPill !== null) return INERT_BETS;
+  if (local.pendingPill !== null || p.powerDraw) return INERT_BETS;
 
   const hero = p.seats[p.heroIndex];
   if (p.heroToAct && p.round !== null && hero !== undefined) {
@@ -346,6 +369,7 @@ function player(
   if (index === p.dealerIndex) roles.push("dealer");
   if (index === blinds.smallBlind) roles.push("small-blind");
   if (index === blinds.bigBlind) roles.push("big-blind");
+  const power = p.powerTags?.get(index);
 
   return {
     id: seat.id,
@@ -359,6 +383,8 @@ function player(
     ...(roles.length === 0 ? {} : { roles }),
     // What the seat has committed this round, drawn as the chip beside it.
     ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
+    // A power used on this street, by the catalog's tag: the result stays private (§44).
+    ...(power === undefined ? {} : { powerTag: POWER_UPS[power].tag }),
     // The hero wears its just-made move the instant it is tapped; every other seat, and the hero
     // once the server echoes, reads its status straight off the table.
     status: isHero && local.pendingPill !== null ? local.pendingPill : seatStatus(p, seat, index, winners),
@@ -378,7 +404,8 @@ function seatStatus(
   if (seat.folded) return "fold";
   if (seat.allIn) return "all-in";
   if (p.phase === "payout") return "waiting";
-  if (p.actingIndex !== index) return p.lastActions?.get(index) ?? "waiting";
+  // Nobody is on the clock while §44's draw holds the table.
+  if (p.powerDraw || p.actingIndex !== index) return p.lastActions?.get(index) ?? "waiting";
   return index === p.heroIndex ? "your-turn" : "thinking";
 }
 

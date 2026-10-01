@@ -24,6 +24,7 @@ import {
   type SeatBounds,
 } from "./table-fit";
 import { TableImage } from "./table-image";
+import { placeSeatsInRoom } from "./room-fit";
 import {
   computeTableLayout,
   dealerButtonAnchor,
@@ -68,6 +69,8 @@ export function useTableLayout(): TableLayoutContextValue {
 /** Metadata handed to every slot renderer. */
 export interface SlotMeta {
   size: PixelSize;
+  /** Width used to size chrome independently of a full-room seating surface. */
+  appearanceWidth?: number;
   /** A responsive scale factor derived from felt size (phone ≈ 0.7, tablet ≈ 1.2). */
   scale: number;
 }
@@ -122,7 +125,9 @@ export interface PokerTableProps<TSeat, TCard> {
    * each seat inside the table — avatar on the felt, labels at most on the rail, bar the near
    * seat's, which may hang below it — so the table fills its room (`placeSeatsOnFelt`).
    */
-  seatPlacement?: "rail" | "felt";
+  seatPlacement?: "rail" | "felt" | "room";
+  /** Chrome size for a room surface whose seats spread independently of the table painting. */
+  appearanceWidth?: number;
   testID?: string;
 }
 
@@ -150,6 +155,7 @@ export function PokerTable<TSeat, TCard>({
   seatBounds,
   chromeInset,
   seatPlacement = "rail",
+  appearanceWidth,
   testID,
 }: PokerTableProps<TSeat, TCard>) {
   const [box, setBox] = useState<PixelSize>({ width: 0, height: 0 });
@@ -159,6 +165,7 @@ export function PokerTable<TSeat, TCard>({
     [seatCount, layoutConfig],
   );
   const onFelt = seatBounds != null && seatPlacement === "felt";
+  const inRoom = seatBounds != null && seatPlacement === "room";
 
   const shortSide = Math.min(box.width, box.height);
   const inset = seatBounds
@@ -166,7 +173,9 @@ export function PokerTable<TSeat, TCard>({
     : (chromeInset ?? Math.max(14, Math.round(shortSide * 0.05)) + 8);
   const { size: felt, origin } = useMemo(
     () =>
-      !seatBounds
+      inRoom
+        ? { size: box, origin: { x: 0, y: 0 } }
+        : !seatBounds
         ? fitFelt(box, inset)
         : fitTable(
             box,
@@ -186,12 +195,19 @@ export function PokerTable<TSeat, TCard>({
                   )
               : undefined,
           ),
-    [box, inset, ringLayout.seats, seatBounds, onFelt, seatCount],
+    [box, inset, ringLayout.seats, seatBounds, onFelt, inRoom, seatCount],
   );
+  const chromeWidth = appearanceWidth ?? felt.width;
 
   // Seats inside the table are placed for the felt's size, so their anchors follow the fit; the
   // layout everything reads (chip flights, the dealer button) carries the placed anchors.
   const layout = useMemo<TableLayout>(() => {
+    if (inRoom && seatBounds) {
+      return {
+        ...ringLayout,
+        seats: placeSeatsInRoom(ringLayout.seats, felt, seatBounds, chromeWidth),
+      };
+    }
     if (!onFelt || !seatBounds) return ringLayout;
     const placed = placeSeatsOnFelt(
       ringLayout.seats,
@@ -206,7 +222,7 @@ export function PokerTable<TSeat, TCard>({
       seats: placed,
       pot: potY == null ? ringLayout.pot : { ...ringLayout.pot, y: potY },
     };
-  }, [ringLayout, onFelt, seatBounds, felt, seatCount]);
+  }, [ringLayout, onFelt, inRoom, seatBounds, felt, seatCount, chromeWidth]);
 
   const scale = felt.width > 0 ? felt.width / 640 : 1;
 
@@ -232,7 +248,7 @@ export function PokerTable<TSeat, TCard>({
   };
 
   const ready = felt.width > 0 && felt.height > 0;
-  const meta: SlotMeta = { size: felt, scale };
+  const meta: SlotMeta = { size: felt, appearanceWidth: chromeWidth, scale };
 
   return (
     <View style={[styles.container, style]} onLayout={onLayout} testID={testID}>

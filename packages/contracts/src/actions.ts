@@ -1,6 +1,7 @@
 /**
- * What the offline game can be told to do: deal a fresh hand, take a betting action, work on
- * a word during §19's window, or close that window when its clock runs out.
+ * What the offline game can be told to do: deal a fresh hand, keep a power at §44's Power Draw
+ * or use the one it kept, take a betting action, work on a word during §19's window, or close either window when its
+ * clock runs out.
  *
  * Both a betting action and a word action name their seat — a bet because whose turn it is
  * still has to be claimed and checked, and §19's window because it is shared by every
@@ -11,6 +12,7 @@
 
 import type { BettingAction } from "./betting";
 import type { PlayerId } from "./players";
+import type { PowerUpId } from "./powers";
 import type { WordSubmission } from "./words";
 
 export type OfflineAction =
@@ -23,4 +25,10 @@ export type OfflineAction =
   | { type: "timeoutTurn" }
   /** The server folds the acting seat — a disconnected seat when action reaches it (§29); clients never send this action. */
   | { type: "foldTurn" }
-  | { type: "timeoutWords" };
+  | { type: "timeoutWords" }
+  /** A seat keeps one of the powers the Power Draw offered it (§44). */
+  | { type: "pickPower"; playerId: PlayerId; powerUpId: PowerUpId }
+  /** The Power Draw's clock ran out: every seat that has not picked keeps its first offer. */
+  | { type: "timeoutPowerDraw" }
+  /** A seat uses its held power; the swap family names the private tile it discards (§44). */
+  | { type: "usePowerUp"; playerId: PlayerId; powerUpId: PowerUpId; tileId: string };

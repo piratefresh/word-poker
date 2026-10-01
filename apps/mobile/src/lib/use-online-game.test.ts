@@ -484,3 +484,209 @@ describe("useOnlineGame", () => {
     expect(handle.current.waiting).toBeNull();
   });
 });
+
+describe("useOnlineGame at a Wild table (STO-500)", () => {
+  const OFFERS = ["vowel_magnet", "random_wild", "mulligan"] as const;
+  /** The server's clock is not the device's: the room says `now`, and the deadline is its own. */
+  const SERVER_NOW = 1_000_000;
+  const DRAW_DEADLINE = SERVER_NOW + 10_000;
+
+  function wildState(over: Record<string, unknown> = {}) {
+    return liveState({
+      table: {
+        name: "Felt",
+        buyIn: 5_000,
+        smallBlind: 50,
+        bigBlind: 100,
+        maxSeats: 6,
+        powerUps: { deal: "choose3" },
+      },
+      ...over,
+    });
+  }
+
+  /** The draw holds the table: nobody is on the turn. */
+  const drawing = () => wildState({ toActSeat: -1 });
+
+  function power(over: Record<string, unknown> = {}) {
+    return {
+      handId: 1,
+      draw: { offers: [...OFFERS], picked: null, deadline: DRAW_DEADLINE },
+      held: null,
+      swap: null,
+      ...over,
+    };
+  }
+
+  const held = (over: Record<string, unknown> = {}) => ({
+    powerUpId: "random_wild",
+    used: false,
+    usable: true,
+    ...over,
+  });
+
+  /** A fake room that can also say it reconnected, as the SDK's room does. */
+  function wildRoom(initial: Record<string, unknown>) {
+    const listeners = new Set<() => void>();
+    const room = makeRoom(HERO, initial);
+    const onReconnect = Object.assign((cb: () => void) => listeners.add(cb), {
+      remove: (cb: () => void) => listeners.delete(cb),
+    });
+    return Object.assign(room, {
+      onReconnect,
+      reconnect: () => listeners.forEach((cb) => cb()),
+    });
+  }
+
+  const powerSends = (room: FakeRoom) =>
+    room.sends.filter(
+      (send) => send.type === GAME_MESSAGES.pickPower || send.type === GAME_MESSAGES.usePowerUp,
+    );
+
+  test("has no powers at a Classic table", async () => {
+    const room = makeRoom(HERO, liveState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+
+    expect(handle.current.powers).toBeNull();
+  });
+
+  test("maps the hero's draw on this device's clock, and keeps that deadline steady", async () => {
+    const room = wildRoom(drawing());
+    const handle = await mount(room);
+    const before = Date.now();
+    await act(async () =>
+      room.emit(GAME_EVENTS.privateState, privateState({ now: SERVER_NOW, isYourTurn: false, power: power() })),
+    );
+
+    const draw = handle.current.powers?.draw;
+    expect(draw?.offers).toEqual(OFFERS);
+    expect(draw?.picked).toBeNull();
+    // Ten seconds from the moment the message landed, whatever the server's clock reads.
+    expect(draw?.endsAtMs).toBeGreaterThanOrEqual(before + 10_000);
+    expect(draw?.endsAtMs).toBeLessThanOrEqual(Date.now() + 10_000);
+
+    // The same draw sent again (another seat picked) must not re-anchor the reveal's clock.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await act(async () =>
+      room.emit(GAME_EVENTS.privateState, privateState({ now: SERVER_NOW + 5, isYourTurn: false, power: power() })),
+    );
+    expect(handle.current.powers?.draw?.endsAtMs).toBe(draw?.endsAtMs);
+    expect(handle.current.game?.players[0]?.status).not.toBe("your-turn");
+  });
+
+  test("picks with a fresh actionId, shows the pick at once, and resends the same id on reconnect", async () => {
+    const room = wildRoom(drawing());
+    const handle = await mount(room);
+    await act(async () =>
+      room.emit(GAME_EVENTS.privateState, privateState({ now: SERVER_NOW, isYourTurn: false, power: power() })),
+    );
+
+    await act(async () => handle.current.pickPower("random_wild"));
+    const [pick] = powerSends(room);
+    expect(pick?.type).toBe(GAME_MESSAGES.pickPower);
+    const payload = pick?.payload as { actionId: string; handId: number; powerUpId: string };
+    expect(payload).toEqual({ actionId: expect.any(String), handId: 1, powerUpId: "random_wild" });
+    expect(handle.current.powers?.draw?.picked).toBe("random_wild");
+
+    // The line dropped before the answer: the same gesture goes again, under the same id.
+    await act(async () => room.reconnect());
+    expect(powerSends(room)).toEqual([pick, pick]);
+
+    // The answer lands; a later reconnect has nothing to resend.
+    await act(async () =>
+      room.emit(
+        GAME_EVENTS.privateState,
+        privateState({
+          now: SERVER_NOW,
+          isYourTurn: false,
+          power: power({ draw: { offers: [...OFFERS], picked: "random_wild", deadline: DRAW_DEADLINE } }),
+        }),
+      ),
+    );
+    await act(async () => room.reconnect());
+    expect(powerSends(room)).toHaveLength(2);
+  });
+
+  test("uses the held power on a tile, and a refusal hands the power back to the server's word", async () => {
+    const room = wildRoom(wildState());
+    const handle = await mount(room);
+    await act(async () =>
+      room.emit(GAME_EVENTS.privateState, privateState({ power: power({ draw: null, held: held() }) })),
+    );
+    expect(handle.current.powers?.held).toEqual({ id: "random_wild", used: false, usable: true });
+
+    await act(async () => handle.current.usePower("random_wild", "t-g"));
+    const [use] = powerSends(room);
+    expect(use?.type).toBe(GAME_MESSAGES.usePowerUp);
+    const payload = use?.payload as { actionId: string };
+    expect(use?.payload).toEqual({
+      actionId: payload.actionId,
+      handId: 1,
+      powerUpId: "random_wild",
+      tileId: "t-g",
+    });
+    // Spent the instant it is tapped, so the chip cannot fire twice while the use is on the wire.
+    expect(handle.current.powers?.held?.usable).toBe(false);
+
+    await act(async () =>
+      room.emit(GAME_EVENTS.rejected, {
+        action: "usePowerUp",
+        reason: "outside-window",
+        actionId: payload.actionId,
+      }),
+    );
+    expect(handle.current.powers?.held?.usable).toBe(true);
+    await act(async () => room.reconnect());
+    expect(powerSends(room)).toHaveLength(1);
+
+    // A fresh tap is a fresh gesture, with an id of its own.
+    await act(async () => handle.current.usePower("random_wild", "t-o"));
+    const second = powerSends(room)[1]?.payload as { actionId: string };
+    expect(second.actionId).not.toBe(payload.actionId);
+  });
+
+  test("reads the swap off the private state, rack and all", async () => {
+    const room = wildRoom(wildState());
+    const handle = await mount(room);
+    const tile = { id: "power-0", letter: "Q", points: 10 };
+    const swap = { handId: 1, powerUpId: "random_wild", discardedTileId: "t-g", tile };
+    await act(async () =>
+      room.emit(
+        GAME_EVENTS.privateState,
+        privateState({
+          rack: [tile, RACK[1]],
+          power: power({ draw: null, held: held({ used: true, usable: false }), swap }),
+        }),
+      ),
+    );
+
+    expect(handle.current.powers?.swap).toEqual(swap);
+    expect(handle.current.game?.privateTiles.map((t) => t?.id)).toEqual(["power-0", "t-o"]);
+  });
+
+  test("queues every seat's public use for the felt's card and tags its nameplate for the street", async () => {
+    const room = wildRoom(wildState());
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ power: power({ draw: null }) })));
+
+    const theirs = { handId: 1, seat: 1, powerUpId: "vowel_magnet", street: "preflop" };
+    await act(async () => room.emit(GAME_EVENTS.powerUsed, theirs));
+    await act(async () => room.emit(GAME_EVENTS.powerUsed, theirs));
+
+    expect(handle.current.powers?.used).toEqual([{ ...theirs, name: "Seat 2", mine: false }]);
+    expect(handle.current.game?.players[1]?.powerTag).toBe("VOWEL");
+
+    await act(async () => handle.current.endPowerUsed(theirs as never));
+    expect(handle.current.powers?.used).toEqual([]);
+    expect(handle.current.game?.players[1]?.powerTag).toBe("VOWEL");
+
+    // The tag is the street's: the flop wipes it, as it wipes the street's CHECK and CALL.
+    await act(async () => room.emitState(wildState({ phase: "flop" })));
+    expect(handle.current.game?.players[1]?.powerTag).toBeUndefined();
+
+    const mine = { handId: 1, seat: 0, powerUpId: "random_wild", street: "flop" };
+    await act(async () => room.emit(GAME_EVENTS.powerUsed, mine));
+    expect(handle.current.powers?.used).toEqual([{ ...mine, name: "You", mine: true }]);
+  });
+});

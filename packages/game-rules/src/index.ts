@@ -2,7 +2,9 @@
 
 export { LETTER_VALUES } from "./letters";
 export type { Letter } from "./letters";
-export { createRng } from "./rng";
+export { createRng, mixSeed } from "./rng";
+export type { PowerSeedSalt } from "./rng";
+export { weightedSampleWithoutReplacement } from "./sample";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles";
 export {
@@ -41,12 +43,14 @@ export type { ChooseWordOptions } from "./bot";
 export {
   OFFLINE_TURN_MS,
   availableTiles,
+  canUsePower,
   handSeed,
   reduce,
   revealedCount,
   startHand,
 } from "./offline";
 export type {
+  HandPowers,
   HandResult,
   OfflineSeat,
   OfflineStanding,
@@ -56,8 +60,12 @@ export type {
 export {
   BettingRejectionError,
   OfflineActionError,
+  PowerRejectionError,
   WordRejectionError,
 } from "./errors";
+export { drawOffers } from "./power-draw";
+export type { DrawSlot, HeldPower, PowerDraw } from "./power-draw";
+export { isSwappedTileId, swappedTileId } from "./power-swap";
 export { WORD_WINDOW_MS } from "./word-window";
 export type { WordSlot, WordWindow } from "./word-window";
 export { scoreWord } from "./scoring";

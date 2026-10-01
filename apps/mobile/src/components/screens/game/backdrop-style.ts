@@ -2,9 +2,9 @@ import { createContext, useContext, useSyncExternalStore } from "react";
 
 /**
  * Which backdrop the table draws: a mesh look — the painted emerald felt or the original gold
- * ember — or one of the repeatable pictures in `assets/images/ui/bgs`, tiled across the room.
+ * ember — a tiled picture, or a full-room scene with its own table.
  */
-export const BACKDROP_STYLES = ["emerald", "ember", "wood", "fire", "water"] as const;
+export const BACKDROP_STYLES = ["emerald", "ember", "wood", "fire", "water", "tavern", "planet"] as const;
 export type BackdropStyle = (typeof BACKDROP_STYLES)[number];
 
 /** The gear's picker names each look by these. */
@@ -14,6 +14,8 @@ export const BACKDROP_LABEL: Record<BackdropStyle, string> = {
   wood: "Wood (tiled)",
   fire: "Fire (tiled)",
   water: "Water room",
+  tavern: "Tavern",
+  planet: "Planet",
 };
 
 // A module-level store rather than props: on the web the backdrop mounts lazily behind
