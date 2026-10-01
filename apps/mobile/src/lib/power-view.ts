@@ -37,7 +37,16 @@ export interface PowerView {
    * The public "power used" events of this hand the felt has not shown yet, oldest first: the
    * center-of-felt card plays them in order and reports each one back when it clears.
    */
-  readonly used: readonly PowerUsedEvent[];
-  /** The power each seat used on the street in play, by seat index: the nameplate's tag. */
-  readonly tags: ReadonlyMap<number, PowerUpId>;
+  readonly used: readonly PowerUsedNotice[];
+}
+
+/**
+ * One public "power used" event as the felt's card prints it: the wire's event, plus the name of
+ * the seat that used it and whether that seat is the hero's — the card says "You used", and the
+ * hero's swap holds its flip until this card clears. The seat's name is the adapter's to resolve,
+ * since only it knows which seat index is whose.
+ */
+export interface PowerUsedNotice extends PowerUsedEvent {
+  readonly name: string;
+  readonly mine: boolean;
 }

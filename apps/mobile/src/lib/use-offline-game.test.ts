@@ -909,10 +909,11 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     expect(swap?.tile.id).toBe(swappedTileId(0));
     expect(result.current.game.privateTiles).toEqual([swap?.tile, heroTile(1)]);
     expect(result.current.powers?.held).toEqual({ id: "random_wild", used: true, usable: false });
+    // Public, and named for the felt's card.
     expect(result.current.powers?.used).toEqual([
-      { handId: 1, seat: 0, powerUpId: "random_wild", street: "preflop" },
+      { handId: 1, seat: 0, powerUpId: "random_wild", street: "preflop", name: "Guest", mine: true },
     ]);
-    expect(result.current.powers?.tags).toEqual(new Map([[0, "random_wild"]]));
+    expect(result.current.game.players[0]?.powerTag).toBe("WILD");
     // Using a power is not a betting action: the row is still the hero's.
     expect(row(result).canFold).toBe(true);
 
@@ -920,7 +921,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     await act(async () => {
       result.current.call();
     });
-    expect(result.current.powers?.tags).toEqual(new Map([[0, "random_wild"]]));
+    expect(result.current.game.players[0]?.powerTag).toBe("WILD");
     expect(result.current.game.players[0]?.status).toBe("call");
 
     // The felt's card clears, and says so.
@@ -990,7 +991,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
       word: `${tile.letter}${heroTile(1).letter}`,
     });
     expect(result.current.powers?.used).toEqual([
-      { handId: 1, seat: 0, powerUpId: "vowel_magnet", street: "river" },
+      { handId: 1, seat: 0, powerUpId: "vowel_magnet", street: "river", name: "Guest", mine: true },
     ]);
   });
 

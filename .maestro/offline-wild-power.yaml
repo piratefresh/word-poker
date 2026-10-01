@@ -70,6 +70,22 @@ tags:
 - tapOn:
     id: "power-confirm"
 
+# The table sees the use, never the letter: the felt's card names the power and the hero, and the
+# hero's nameplate wears VOWEL beside its status (§44, Visibility). The flip waits for the card.
+- extendedWaitUntil:
+    visible:
+      id: "power-used"
+    timeout: 5000
+- assertVisible: "YOU USED"
+- assertVisible:
+    id: "seat-power-tag-hero"
+    containsDescendants:
+      - text: "VOWEL"
+- extendedWaitUntil:
+    notVisible:
+      id: "power-used"
+    timeout: 5000
+
 # The new tile flips over in K's place, and the chip is spent for the hand.
 - extendedWaitUntil:
     visible:

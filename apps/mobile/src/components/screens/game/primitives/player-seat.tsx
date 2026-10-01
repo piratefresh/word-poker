@@ -95,10 +95,10 @@ function seatStyles(m: SeatMetrics) {
       borderRadius: m.pillRadius,
       paddingHorizontal: m.pillPadX * 0.75,
     },
+    statusRow: { gap: m.badgeGap, marginTop: m.pillGap },
     statusPill: {
       borderRadius: m.pillRadius,
       borderWidth: m.pillBorder,
-      marginTop: m.pillGap,
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
     },
@@ -253,22 +253,35 @@ export function PlayerSeat({
               <Text style={styles.youLabel}> {"·"} YOU</Text>
             ) : null}
           </Text>
-          <View
-            style={[
-              styles.statusPill,
-              scaled.statusPill,
-              lit && { backgroundColor: statusColor, borderColor: statusColor },
-            ]}
-          >
-            <Text
+          <View style={[styles.statusRow, scaled.statusRow]}>
+            <View
               style={[
-                styles.statusText,
-                scaled.statusText,
-                lit && styles.statusTextLit,
+                styles.statusPill,
+                scaled.statusPill,
+                lit && { backgroundColor: statusColor, borderColor: statusColor },
               ]}
             >
-              {STATUS_LABEL[seat.status]}
-            </Text>
+              <Text
+                style={[
+                  styles.statusText,
+                  scaled.statusText,
+                  lit && styles.statusTextLit,
+                ]}
+              >
+                {STATUS_LABEL[seat.status]}
+              </Text>
+            </View>
+            {/* §44: a power used on this street rides beside the street's action. */}
+            {seat.powerTag ? (
+              <View
+                style={[styles.statusPill, scaled.statusPill, styles.powerTag]}
+                testID={`seat-power-tag-${seat.id}`}
+              >
+                <Text style={[styles.statusText, scaled.statusText, styles.powerTagText]}>
+                  {seat.powerTag}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <ArcadeLabelBand
             style={scaled.stackBand}
@@ -365,6 +378,10 @@ const styles = StyleSheet.create({
   },
   statusText: { color: palette.green500, fontFamily: fonts.monoBold },
   statusTextLit: { color: colors.onGold },
+  statusRow: { alignItems: "center", flexDirection: "row" },
+  // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
+  powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
+  powerTagText: { color: colors.goldHi },
   folded: { opacity: 0.45 },
   emptySeatLabel: {
     color: colors.textFaint,

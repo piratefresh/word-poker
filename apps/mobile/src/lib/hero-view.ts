@@ -14,7 +14,9 @@
 
 import {
   POWER_DRAW_MS,
+  POWER_UPS,
   type PlayerId,
+  type PowerUpId,
   type PrivateWordCheckState,
   type RoundPhase,
   type Tile,
@@ -75,6 +77,11 @@ export interface HeroPerspective {
    * is not acting just waits.
    */
   lastActions?: ReadonlyMap<number, PlayerStatus>;
+  /**
+   * The power each seat used on this street, by engine index (§44, Visibility): the nameplate
+   * prints its tag beside the street's action. Absent at a Classic table.
+   */
+  powerTags?: ReadonlyMap<number, PowerUpId>;
   phase: RoundPhase;
   seatCount: SeatCount;
   /** In engine order — the order `bettingBounds` and the turn indices read. */
@@ -362,6 +369,7 @@ function player(
   if (index === p.dealerIndex) roles.push("dealer");
   if (index === blinds.smallBlind) roles.push("small-blind");
   if (index === blinds.bigBlind) roles.push("big-blind");
+  const power = p.powerTags?.get(index);
 
   return {
     id: seat.id,
@@ -375,6 +383,8 @@ function player(
     ...(roles.length === 0 ? {} : { roles }),
     // What the seat has committed this round, drawn as the chip beside it.
     ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
+    // A power used on this street, by the catalog's tag: the result stays private (§44).
+    ...(power === undefined ? {} : { powerTag: POWER_UPS[power].tag }),
     // The hero wears its just-made move the instant it is tapped; every other seat, and the hero
     // once the server echoes, reads its status straight off the table.
     status: isHero && local.pendingPill !== null ? local.pendingPill : seatStatus(p, seat, index, winners),

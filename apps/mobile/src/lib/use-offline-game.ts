@@ -550,8 +550,8 @@ export function useOfflineGame({
   }, []);
 
   const powers = useMemo(
-    () => powerViewOf(state, powerEvents, seatActions, ranOutAtMs === state.endsAtMs),
-    [powerEvents, ranOutAtMs, seatActions, state],
+    () => powerViewOf(state, powerEvents, ranOutAtMs === state.endsAtMs),
+    [powerEvents, ranOutAtMs, state],
   );
 
   /**
@@ -627,13 +627,12 @@ export function useOfflineGame({
 /**
  * §44's power-ups as the hero sees them (`PowerView`), or `null` at a Classic table. Everything
  * here is read off the engine: the hero's slot in the draw, what it holds and whether the engine
- * would take a use right now, and the swap the held power recorded. The public events and the
- * nameplate tags are the adapter's own record, kept to this hand and this street.
+ * would take a use right now, and the swap the held power recorded. The public events are the
+ * adapter's own record, kept to this hand and named by the roster.
  */
 function powerViewOf(
   state: OfflineState,
   events: readonly PowerUsedEvent[],
-  seatActions: readonly SeatAction[],
   clockRanOut: boolean,
 ): PowerView | null {
   const powers = state.powers;
@@ -641,7 +640,6 @@ function powerViewOf(
 
   const slot = powers.draw.slots.find((candidate) => candidate.playerId === HERO_ID);
   const held = powers.held[HERO_ID];
-  const street = streetOf(state);
   // The table's own timers settle every deadline — a turn that runs out is folded, a window that
   // runs out is closed — but a beat after it, so the clock in play is either still running or
   // has just run out and is waiting to be settled. Reading "now" as its last millisecond, or as
@@ -667,14 +665,13 @@ function powerViewOf(
             discardedTileId: held.swap.discardedTileId,
             tile: held.swap.tile,
           },
-    used: events.filter((event) => event.handId === state.hand),
-    tags: new Map(
-      seatActions.flatMap((entry) =>
-        entry.street === street && entry.power !== null && entry.seat !== -1
-          ? [[entry.seat, entry.power] as const]
-          : [],
-      ),
-    ),
+    used: events
+      .filter((event) => event.handId === state.hand)
+      .map((event) => ({
+        ...event,
+        name: ROSTER[event.seat]?.name ?? state.seats[event.seat]?.id ?? "",
+        mine: state.seats[event.seat]?.id === HERO_ID,
+      })),
   };
 }
 
@@ -891,6 +888,13 @@ function perspectiveOf(
     lastActions: new Map(
       seatActions.flatMap((entry) =>
         entry.street === street && entry.status !== null ? [[entry.seat, entry.status] as const] : [],
+      ),
+    ),
+    // §44's tag rides beside the street's action, from the same record: the power stays on the
+    // nameplate after the seat checks or calls, until the street is gone.
+    powerTags: new Map(
+      seatActions.flatMap((entry) =>
+        entry.street === street && entry.power !== null ? [[entry.seat, entry.power] as const] : [],
       ),
     ),
     phase: state.phase,

@@ -9,6 +9,7 @@ import {
   PowerDrawReveal,
   PowerHeldChip,
   PowerUsePrompt,
+  PowerUsedCard,
   swapFlipOf,
   usePowerTargeting,
 } from "@/components/powers";
@@ -123,6 +124,7 @@ function OfflineTable({
     powers,
     pickPower,
     usePower,
+    endPowerUsed,
     endChipFlight,
     sessionOver,
     newGame,
@@ -132,6 +134,7 @@ function OfflineTable({
   const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
   const choosing = power.targeting.stage === "picking";
   const flip = swapFlipOf(powers?.swap, power.discarded);
+  const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.
@@ -158,9 +161,9 @@ function OfflineTable({
       score={words?.score ?? null}
       word={words?.word ?? ""}
       onPickTile={choosing ? power.pick : undefined}
-      // The flip turns as soon as the swap lands. PW11's "power used" card will hold it until
-      // the card clears (§44, Visibility).
-      swapFlip={flip === null ? null : { ...flip, revealed: true }}
+      // The new letter turns over once the felt's "power used" card for the hero's own use has
+      // cleared (§44, Visibility): the table sees the use first, and only the hero the result.
+      swapFlip={flip === null ? null : { ...flip, revealed: !ownCardShowing }}
     >
       <View style={styles.table}>
         <GameScreen
@@ -198,6 +201,7 @@ function OfflineTable({
                   power={powers.held?.id ?? null}
                   targeting={power.targeting}
                 />
+                <PowerUsedCard notices={powers.used} onDone={endPowerUsed} />
               </>
             )
           }
