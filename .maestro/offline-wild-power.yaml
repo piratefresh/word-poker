@@ -72,11 +72,13 @@ tags:
 
 # The table sees the use, never the letter: the felt's card names the power and the hero, and the
 # hero's nameplate wears VOWEL beside its status (§44, Visibility). The flip waits for the card.
+# The card holds for 1.5 s: its words are waited for inside it, so the check cannot land after it.
 - extendedWaitUntil:
     visible:
       id: "power-used"
+      containsDescendants:
+        - text: "YOU USED"
     timeout: 5000
-- assertVisible: "YOU USED"
 - assertVisible:
     id: "seat-power-tag-hero"
     containsDescendants:

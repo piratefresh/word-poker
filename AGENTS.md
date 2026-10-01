@@ -124,6 +124,19 @@ on matching versions. The existing mobile/server env files and seeded E2E user a
 The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
 signs in when needed, builds PUB, checks the results overlay, and leaves the table.
 
+The Wild variant (STO-500) is the same runner with power-ups on:
+
+```powershell
+pnpm smoke:online:wild            # headed; add -Headless for --headless --screen-size 1280x1000
+```
+
+It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 527 and runs `.maestro/online-wild-hand.yaml`.
+The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds OX
+with the new tile. The opponent keeps its first offer and never uses it. It logs the public use it
+hears, and it logs `LEAK:` if a swapped tile reaches it before the reveal. The runner fails on
+either. After changing the deal, the catalog or the letter stream, re-probe with
+`pnpm --filter @wordpoker/server exec tsx scripts/probe-wild-smoke.ts <firstSeed> <lastSeed>`.
+
 The four-browser smoke (STO-483) has every seat played by a real browser, each driven by its own
 Maestro process:
 
