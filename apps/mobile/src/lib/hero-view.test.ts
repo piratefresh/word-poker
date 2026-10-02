@@ -1,4 +1,4 @@
-import { POWER_DRAW_MS, type LetterTile, type Tile } from "@wordpoker/contracts";
+import { POWER_DRAW_MS, WORD_CHECKS_PER_HAND, type LetterTile, type Tile } from "@wordpoker/contracts";
 
 import { testDictionary } from "./dictionary-fixtures";
 import {
@@ -58,6 +58,7 @@ function perspective(overrides: Partial<HeroPerspective> = {}): HeroPerspective 
     sidePots: [],
     sessionOver: false,
     dictionary: testDictionary(["GO"]),
+    wordCheck: { checksRemaining: WORD_CHECKS_PER_HAND, result: null },
     ...overrides,
   };
 }

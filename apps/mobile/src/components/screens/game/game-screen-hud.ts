@@ -73,6 +73,31 @@ export function openTurn(
 }
 
 /**
+ * A turn's countdown held or released with the table's clock. Holding pins it where it stands;
+ * releasing moves the whole turn later by however long it was held, so the budget left is what
+ * was left — the same thing the table's own virtual clock does to its deadline. The turn comes
+ * back unchanged when it is already in the asked-for state, so a caller can compare by identity.
+ */
+export function holdTurn(turn: OpenTurn, held: boolean, nowMs: number): OpenTurn {
+  const { pausedAtMs } = turn.timing;
+  if (held && pausedAtMs === null) {
+    return { ...turn, timing: { ...turn.timing, pausedAtMs: nowMs } };
+  }
+  if (!held && pausedAtMs !== null) {
+    const shift = Math.max(0, nowMs - pausedAtMs);
+    return {
+      ...turn,
+      timing: {
+        startedAtMs: turn.timing.startedAtMs + shift,
+        endsAtMs: turn.timing.endsAtMs + shift,
+        pausedAtMs: null,
+      },
+    };
+  }
+  return turn;
+}
+
+/**
  * Who is being asked to act, for the countdown's announcement. Omitted when it is not
  * the hero's turn: "Your turn" would be a lie at another player's turn, and the clock's
  * label already stands on its own without a name.

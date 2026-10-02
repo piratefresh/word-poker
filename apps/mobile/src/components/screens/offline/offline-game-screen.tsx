@@ -13,9 +13,11 @@ import {
   swapFlipOf,
   usePowerTargeting,
 } from "@/components/powers";
+import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
+import { CoachProvider, useCoachTour } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
 import {
   WordBuilder,
@@ -135,6 +137,8 @@ function OfflineTable({
   const choosing = power.targeting.stage === "picking";
   const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
+  // The HUD's "How to play": a tour of the felt's own controls, over the hand in progress.
+  const help = useCoachTour("helper", HELPER_TOUR);
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.
@@ -165,7 +169,7 @@ function OfflineTable({
       // cleared (§44, Visibility): the table sees the use first, and only the hero the result.
       swapFlip={flip === null ? null : { ...flip, revealed: !ownCardShowing }}
     >
-      <View style={styles.table}>
+      <CoachProvider style={styles.table} tour={help.tour}>
         <GameScreen
           bettingLeading={
             <>
@@ -188,6 +192,7 @@ function OfflineTable({
           onCheckOrCall={primary}
           onChipFlightEnd={endChipFlight}
           onFold={fold}
+          onHelp={help.open}
           onRaise={wager}
           overFelt={
             // §44's Power Draw, at a Wild table: the offers land over the felt, above the rack
@@ -214,7 +219,7 @@ function OfflineTable({
             </>
           }
         />
-      </View>
+      </CoachProvider>
       {/*
         The hand's payoff, presented over the felt: every hand that pays out ends here, and
         from here the results' own primary is the only deal on the table (STO-379 decision 4).

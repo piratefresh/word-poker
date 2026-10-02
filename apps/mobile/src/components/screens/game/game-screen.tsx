@@ -33,6 +33,8 @@ import {
 } from "@/constants/theme";
 import { ActionBarShade } from "./action-bar-shade";
 import { BackdropPicker } from "./backdrop-picker";
+import { CoachTarget } from "@/components/ui/coach";
+
 import { BackdropUrgencyProvider, useBackdropStyle } from "./backdrop-style";
 import {
   stageMaxWidth,
@@ -51,6 +53,7 @@ import {
   DEVICE_CLOCK_SAMPLE,
   heroTurnPhrase,
   openTurn,
+  holdTurn,
   turnKey,
 } from "./game-screen-hud";
 import type { BettingState, GamePlayer, GameScreenState } from "./game-types";
@@ -108,6 +111,11 @@ export interface GameScreenProps {
    * is live, so the one thing it can do now (say it is ready) is where its moves will be.
    */
   waiting?: { stamp: string; controls: ReactNode };
+  /**
+   * The table's clock is held — the tutorial's, while the coach explains — so the countdown
+   * stands still with it and carries on from the same place when released.
+   */
+  clockHeld?: boolean;
 }
 
 /** No wallet is wired into the hand yet, so the HUD says so instead of painting `$0`. */
@@ -140,6 +148,7 @@ function GameScreenBody({
   onChipFlightEnd,
   onSeatPress,
   waiting,
+  clockHeld = false,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
   const hudHeight = useHudChromeHeight();
@@ -182,8 +191,12 @@ function GameScreenBody({
   // value and held. Adjusting state during the render that sees a new value is what makes
   // that hold exact — a deadline derived during every render would move forward with each
   // render and the countdown would never move at all.
-  const [turn, setTurn] = useState(() => openTurn(game, nowMs));
-  if (turn.key !== turnKey(game)) setTurn(openTurn(game, nowMs));
+  //
+  // A held clock (the tutorial's, while the coach explains) pins the countdown, and releasing it
+  // moves the turn later by the time it was held — the table's own clock does the same.
+  const [turn, setTurn] = useState(() => holdTurn(openTurn(game, nowMs), clockHeld, nowMs));
+  const nextTurn = holdTurn(turn.key !== turnKey(game) ? openTurn(game, nowMs) : turn, clockHeld, nowMs);
+  if (nextTurn !== turn) setTurn(nextTurn);
   const view = useTurnTimer(turn.timing);
 
   const changeRaise = useCallback(
@@ -243,8 +256,11 @@ function GameScreenBody({
           },
         ]}
       >
-        <CommunityStrip tiles={game.community} />
-        <View
+        <CoachTarget id="community">
+          <CommunityStrip tiles={game.community} />
+        </CoachTarget>
+        <CoachTarget
+          id="table"
           style={[
             styles.tableRegion,
             compact && styles.tableRegionCompact,
@@ -287,18 +303,20 @@ function GameScreenBody({
             testID="poker-table"
           />
           {overFelt}
-        </View>
+        </CoachTarget>
         <BestWord
           payout={game.phase === "payout"}
           score={game.bestScore}
           word={game.bestWord}
         />
-        {rack ?? (
-          <PlayerRack
-            community={game.community}
-            privateTiles={game.privateTiles}
-          />
-        )}
+        <CoachTarget id="rack">
+          {rack ?? (
+            <PlayerRack
+              community={game.community}
+              privateTiles={game.privateTiles}
+            />
+          )}
+        </CoachTarget>
         <View
           onLayout={(event: LayoutChangeEvent) =>
             setBarHeight(event.nativeEvent.layout.height)
@@ -403,7 +421,7 @@ function BettingControls({
   const wagerLabel = state.wager === "bet" ? "BET" : "RAISE";
   return (
     <View style={[styles.betting, tight && styles.bettingTight]}>
-      <View style={styles.raiseRow}>
+      <CoachTarget id="raise" style={styles.raiseRow}>
         <Text
           style={[styles.raiseLabel, scale !== 1 && { fontSize: 9 * scale }]}
         >
@@ -466,8 +484,8 @@ function BettingControls({
           ]}
         >{`${amount.toLocaleString()}`}</Text>
         {sliderTrailing}
-      </View>
-      <View style={[styles.actionRow, tight && styles.actionRowTight]}>
+      </CoachTarget>
+      <CoachTarget id="actions" style={[styles.actionRow, tight && styles.actionRowTight]}>
         {leading}
         {/* The row's controls carry ids as well as labels: the felt's nameplates print
             CHECK, CALL and FOLD as seat status too, so a device flow that matched the
@@ -523,7 +541,7 @@ function BettingControls({
           testID="all-in-button"
           variant="gold"
         />
-      </View>
+      </CoachTarget>
       <Modal
         animationType="fade"
         onRequestClose={() => setAllInOpen(false)}
