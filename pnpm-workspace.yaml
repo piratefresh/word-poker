@@ -23,3 +23,9 @@ allowBuilds:
 # distributed from uNetworking's git repo (it is never published to npm), so the git resolution is
 # unavoidable and legitimate. Allow exotic subdeps so the install completes.
 blockExoticSubdeps: false
+
+# Schema 5.0.33 creates an optional server GC registry during client imports.
+# Hermes lacks FinalizationRegistry; keep the guard until upstream fixes it.
+# Verified by pnpm test:colyseus-runtime.
+patchedDependencies:
+  '@colyseus/schema@5.0.33': patches/@colyseus__schema@5.0.33.patch

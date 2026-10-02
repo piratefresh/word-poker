@@ -9,7 +9,7 @@ import {
   type PowerUpId,
 } from "@wordpoker/contracts";
 
-import { OfflineActionError, PowerRejectionError } from "../src/errors";
+import { OfflineActionError, PowerRejectionError } from "../src/core/errors";
 import {
   drawOffers,
   heldPowers,
@@ -18,7 +18,7 @@ import {
   timeoutDraw,
   type DrawSeat,
   type PowerDraw,
-} from "../src/power-draw";
+} from "../src/powers/power-draw";
 
 /**
  * §44's Power Draw on its own: seats and a clock go in, and nothing else. The offers are read off

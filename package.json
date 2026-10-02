@@ -7,6 +7,7 @@
     "pnpm": ">=12"
   },
   "scripts": {
+    "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm --filter @wordpoker/mobile start",
     "dev:server": "pnpm --filter @wordpoker/server start",
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",

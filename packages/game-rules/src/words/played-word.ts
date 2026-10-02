@@ -10,7 +10,7 @@
 import type { Tile } from "@wordpoker/contracts";
 
 import { evaluateWord } from "./building";
-import { availableTiles, type OfflineState } from "./offline";
+import { availableTiles, type OfflineState } from "../table/offline";
 import { scoreWord } from "./scoring";
 
 /** One seat's confirmed word: §7's three parts, its total, and the tiles it played. */

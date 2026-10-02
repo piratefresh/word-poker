@@ -58,5 +58,3 @@ behind the spec, not the other way round:
 - §36, §37 and §39–§42: pre-selected actions, anonymity, the accessibility settings, and
   every format beyond the default No Limit table. §35's shuffle and §38's winner highlight
   already ship.
-- Power-ups (§44) and §40's Power-ups setting: the wire vocabulary and the seeded power
-  randomness exist, but no table runs a Power Draw yet.

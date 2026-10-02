@@ -98,8 +98,8 @@ from single-letter tiles.
 While a word is being built, the tile must clearly show which face is picked.
 
 <!-- Contract status: §10 ships (STO-467). The bag holds single letters only
-     (`packages/game-rules/src/tiles.ts`), and the deal places the pool above from
-     `packages/game-rules/src/special-tiles.ts` — one copy of each pair, with §10's per-street
+     (`packages/game-rules/src/tiles/tiles.ts`), and the deal places the pool above from
+     `packages/game-rules/src/tiles/special-tiles.ts` — one copy of each pair, with §10's per-street
      limits and the cap of three enforced seat by seat on the deal's seeded generator. The
      tile contract's two-letter shape is `ChoiceTile` alone, played face by face
      (`packages/contracts/src/tiles.ts`), and §39's read-aloud of both faces and the picked one

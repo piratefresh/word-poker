@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { LetterMultiplier, WordScore } from "@wordpoker/contracts";
 
-import { createRng } from "../src/rng";
+import { createRng } from "../src/core/rng";
 import {
   DrawPoolExhaustedError,
   NoContestantsError,
@@ -11,8 +11,8 @@ import {
   showdownDrawPool,
   showdownDrawValue,
   type ShowdownEntry,
-} from "../src/showdown";
-import { TILE_BAG_SIZE } from "../src/tiles";
+} from "../src/money/showdown";
+import { TILE_BAG_SIZE } from "../src/tiles/tiles";
 
 /**
  * One word's §7 breakdown, built straight from its printed letters — the shape scoring hands

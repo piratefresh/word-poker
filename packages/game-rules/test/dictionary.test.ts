@@ -9,7 +9,7 @@ import {
   createDictionary,
   loadDictionary,
   type DictionaryArtifact,
-} from "../src/dictionary";
+} from "../src/words/dictionary";
 
 /**
  * The dictionary is prepared data (`dictionary:prepare`) that no reviewer reads end to end, so

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { TilePlayResolution } from "@wordpoker/contracts";
 
-import { scoreWord } from "../src/scoring";
+import { scoreWord } from "../src/words/scoring";
 
 /** The shape the build step hands to scoring: a tile's letters, each with its own value. */
 function played(

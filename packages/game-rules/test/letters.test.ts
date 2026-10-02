@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { LETTER_VALUES } from "../src/letters";
+import { LETTER_VALUES } from "../src/tiles/letters";
 
 /**
  * The values are transcribed from the rules document, which is where the tiers are decided,

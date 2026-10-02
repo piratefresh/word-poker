@@ -1,11 +1,11 @@
 import type { OfflineAction } from "@wordpoker/contracts";
 
-import type { BettingBounds } from "./betting";
+import type { BettingBounds } from "../money/betting";
 import { botDecisionSeed, type BotObservation } from "./bot-observation";
 import { botProfile } from "./bot-profile";
 import { assessBotStrength } from "./bot-strength";
-import { buildPots } from "./pots";
-import { createRng } from "./rng";
+import { buildPots } from "../money/pots";
+import { createRng } from "../core/rng";
 
 /** Last live actor in the street's order; all-in/folded/sitting-out seats cannot act behind us. */
 function isLatePosition(view: BotObservation): boolean {

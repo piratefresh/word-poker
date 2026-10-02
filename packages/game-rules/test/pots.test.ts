@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 
 import type { WordScore } from "@wordpoker/contracts";
 
-import type { BettingSeatState } from "../src/betting";
-import { buildPots, resolvePayout, splitAward, type JudgedSeat } from "../src/pots";
+import type { BettingSeatState } from "../src/money/betting";
+import { buildPots, resolvePayout, splitAward, type JudgedSeat } from "../src/money/pots";
 
 const START = 1_000;
 

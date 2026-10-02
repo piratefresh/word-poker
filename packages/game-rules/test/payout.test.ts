@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { Tile, TilePlay, WordSubmission } from "@wordpoker/contracts";
 
-import { bettingBounds } from "../src/betting";
+import { bettingBounds } from "../src/money/betting";
 import { dealHand, reduce, startHand, type OfflineState } from "../src/index";
 import { testDictionary } from "./fixtures";
 

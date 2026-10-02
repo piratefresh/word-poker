@@ -1,8 +1,8 @@
 import type { RoundPhase, Tile } from "@wordpoker/contracts";
 
-import type { BettingRoundState, BettingSeatState } from "./betting";
-import type { Dictionary } from "./dictionary";
-import type { OfflineState } from "./offline";
+import type { BettingRoundState, BettingSeatState } from "../money/betting";
+import type { Dictionary } from "../words/dictionary";
+import type { OfflineState } from "../table/offline";
 
 /** The policy's entire knowledge. Hidden racks, future board and drafts cannot cross it. */
 export interface BotObservation {

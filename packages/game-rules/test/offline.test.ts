@@ -12,11 +12,11 @@ import {
   type TilePlay,
 } from "@wordpoker/contracts";
 
-import { bettingBounds } from "../src/betting";
-import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand as dealTiles } from "../src/deal";
-import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/errors";
-import { drawOffers, type PowerDraw } from "../src/power-draw";
-import { swapTile } from "../src/power-swap";
+import { bettingBounds } from "../src/money/betting";
+import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand as dealTiles } from "../src/tiles/deal";
+import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/core/errors";
+import { drawOffers, type PowerDraw } from "../src/powers/power-draw";
+import { swapTile } from "../src/powers/power-swap";
 import {
   OFFLINE_TURN_MS,
   canUsePower,
@@ -25,8 +25,8 @@ import {
   startHand,
   type OfflineState,
   type StartHandOptions,
-} from "../src/offline";
-import { WORD_WINDOW_MS } from "../src/word-window";
+} from "../src/table/offline";
+import { WORD_WINDOW_MS } from "../src/words/word-window";
 import { TEST_DICTIONARY, cloneState, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
@@ -722,10 +722,8 @@ describe("reduce — illegal actions", () => {
 });
 
 describe("reduce — §44's Power Draw", () => {
-  const CPU = ["ellis", "jay", "mira"] as const;
-
   function wildHand(options: Partial<StartHandOptions> = {}, nowMs = NOW): OfflineState {
-    return dealHand({ powerUps: { deal: "choose3", bots: CPU }, ...options }, nowMs);
+    return dealHand({ powerUps: { deal: "choose3" }, ...options }, nowMs);
   }
 
   function drawOf(state: OfflineState): PowerDraw {
@@ -756,7 +754,7 @@ describe("reduce — §44's Power Draw", () => {
     }
   });
 
-  it("opens the draw before pre-flop's first turn, for every seat but the CPU", () => {
+  it("opens the draw before pre-flop's first turn, for every seat dealt in", () => {
     const state = wildHand();
 
     assert.equal(state.phase, "preflop");
@@ -766,15 +764,10 @@ describe("reduce — §44's Power Draw", () => {
     assert.deepEqual(state.powers?.held, {});
     assert.deepEqual(
       drawOf(state).slots.map(({ seat, playerId }) => ({ seat, playerId })),
-      [{ seat: 0, playerId: "hero" }],
+      SEATS.map((playerId, seat) => ({ seat, playerId })),
     );
     assert.deepEqual(offersOf(state, "hero"), drawOffers(SEED, 0));
-  });
-
-  it("offers every seat dealt in when no seat is a bot", () => {
-    const state = dealHand({ powerUps: { deal: "choose3" } });
-
-    assert.deepEqual(drawOf(state).slots.map((slot) => slot.playerId), [...SEATS]);
+    assert.deepEqual(offersOf(state, "ellis"), drawOffers(SEED, 1));
   });
 
   it("refuses every betting action while the draw is open", () => {
@@ -794,10 +787,21 @@ describe("reduce — §44's Power Draw", () => {
     const pick = offersOf(state, "hero")[2];
     assert.ok(pick);
 
-    const picked = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 500);
+    let picked = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 500);
+    for (const playerId of ["ellis", "jay"]) {
+      const powerUpId = offersOf(picked, playerId)[0];
+      assert.ok(powerUpId);
+      picked = reduce(picked, { type: "pickPower", playerId, powerUpId }, NOW + 500);
+      assert.equal(picked.powers?.draw.status, "open");
+      assert.equal(picked.toActIndex, null);
+    }
+    const powerUpId = offersOf(picked, "mira")[0];
+    assert.ok(powerUpId);
+    picked = reduce(picked, { type: "pickPower", playerId: "mira", powerUpId }, NOW + 500);
 
     assert.equal(picked.powers?.draw.status, "closed");
-    assert.deepEqual(picked.powers?.held, { hero: { id: pick, used: false } });
+    assert.equal(picked.powers?.held.hero?.id, pick);
+    assert.deepEqual(Object.keys(picked.powers?.held ?? {}), [...SEATS]);
     assert.equal(picked.toActIndex, FIRST_TO_ACT);
     assert.equal(picked.endsAtMs, NOW + 500 + OFFLINE_TURN_MS, "the turn clock starts at the close");
     // Betting is open now, and the hand plays through to §19's window as any hand does.
@@ -826,7 +830,9 @@ describe("reduce — §44's Power Draw", () => {
     assert.throws(() => reduce(state, { type: "timeoutPowerDraw" }, deadline - 1), OfflineActionError);
     const closed = reduce(state, { type: "timeoutPowerDraw" }, deadline);
 
-    assert.deepEqual(closed.powers?.held, { hero: { id: offersOf(state, "hero")[0], used: false } });
+    assert.deepEqual(closed.powers?.held, Object.fromEntries(SEATS.map((playerId, seat) =>
+      [playerId, { id: drawOffers(SEED, seat)[0], used: false }],
+    )));
     assert.equal(closed.toActIndex, FIRST_TO_ACT);
     assert.equal(closed.endsAtMs, deadline + OFFLINE_TURN_MS);
   });
@@ -837,6 +843,28 @@ describe("reduce — §44's Power Draw", () => {
       (error: unknown) => error instanceof PowerRejectionError && error.reason === "not-in-draw",
     );
     assert.throws(() => reduce(dealHand(), { type: "timeoutPowerDraw" }, NOW), OfflineActionError);
+  });
+
+  it("preserves partial picks on timeout and defaults only unpicked slots", () => {
+    let state = wildHand();
+    for (const playerId of ["hero", "ellis"]) {
+      const powerUpId = offersOf(state, playerId)[2];
+      assert.ok(powerUpId);
+      state = reduce(state, { type: "pickPower", playerId, powerUpId }, NOW + 1);
+    }
+    const held = state.powers?.held;
+    const closed = reduce(state, { type: "timeoutPowerDraw" }, state.endsAtMs);
+    assert.deepEqual(closed.powers?.held.hero, held?.hero);
+    assert.deepEqual(closed.powers?.held.ellis, held?.ellis);
+    for (const playerId of ["jay", "mira"]) {
+      assert.deepEqual(closed.powers?.held[playerId], { id: offersOf(state, playerId)[0], used: false });
+    }
+  });
+
+  it("excludes sitting-out seats from the draw", () => {
+    const state = wildHand({ stacks: SEATS.map((playerId) => ({ playerId, stack: playerId === "jay" ? 0 : 1000 })) });
+    assert.equal(state.seats[2]?.sittingOut, true);
+    assert.deepEqual(drawOf(state).slots.map((slot) => slot.playerId), ["hero", "ellis", "mira"]);
   });
 
   it("rolls to §19's window after the draw when the blinds put every seat all in", () => {
@@ -862,27 +890,35 @@ describe("reduce — §44's Power Draw", () => {
     const pick = offersOf(first, "hero")[0];
     assert.ok(pick);
     const played = playToWindow(
-      reduce(first, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 1),
-      NOW + 2,
+      reduce(reduce(first, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 1),
+        { type: "timeoutPowerDraw" }, first.endsAtMs),
+      first.endsAtMs + 1,
     );
-    const next = reduce(payOut(played), { type: "deal" }, NOW + 10_000);
+    const next = reduce(payOut(played), { type: "deal" }, played.endsAtMs + 1);
 
     assert.equal(next.hand, 2);
     assert.equal(next.powers?.draw.status, "open");
     assert.deepEqual(next.powers?.held, {});
-    assert.deepEqual(next.powers?.bots, CPU);
-    assert.deepEqual(offersOf(next, "hero"), drawOffers(next.seed, 0));
+    assert.deepEqual(drawOf(next).slots.map((slot) => slot.playerId), [...SEATS]);
+    for (const slot of drawOf(next).slots) assert.deepEqual(slot.offers, drawOffers(next.seed, slot.seat));
   });
 });
 
 describe("reduce — §44's held power", () => {
-  const CPU = ["ellis", "jay", "mira"] as const;
   const HERO = 0;
 
   /** A Wild hand where the hero kept `power` and the draw has closed: mira is on the clock. */
   function holding(power: PowerUpId, options: Partial<StartHandOptions> = {}): OfflineState {
-    const state = dealHand({ powerUps: { deal: "choose3", bots: CPU }, ...options });
-    return reduce(state, { type: "pickPower", playerId: "hero", powerUpId: power }, NOW + 1);
+    let state = dealHand({ powerUps: { deal: "choose3" }, ...options });
+    state = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: power }, NOW + 1);
+    assert.ok(state.powers);
+    for (const slot of state.powers.draw.slots) {
+      if (slot.picked !== null) continue;
+      const powerUpId = slot.offers[0];
+      assert.ok(powerUpId);
+      state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId }, NOW + 1);
+    }
+    return state;
   }
 
   /** The hero's first betting turn: pre-flop, mira acts before it. */
@@ -986,14 +1022,22 @@ describe("reduce — §44's held power", () => {
     assert.throws(() => use(state, heroTile(state).id), refused("powers-off"));
   });
 
-  it("refuses a power the seat does not hold, and a CPU seat, which holds none", () => {
+  it("refuses an unheld power and lets a CPU use its actual held power", () => {
     const state = heroOnTurn("random_wild");
     assert.throws(() => use(state, heroTile(state).id, "vowel_magnet"), refused("not-held"));
 
     const mira = holding("random_wild");
     const miraTile = mira.seats[FIRST_TO_ACT]?.privateTiles[0];
     assert.ok(miraTile);
-    assert.throws(() => use(mira, miraTile.id, "random_wild", NOW + 2, "mira"), refused("not-held"));
+    assert.ok(mira.powers);
+    const held = mira.powers.held.mira;
+    assert.ok(held);
+    const missing = { ...mira, powers: { ...mira.powers, held: {} } };
+    assert.throws(() => use(missing, miraTile.id, held.id, NOW + 2, "mira"), refused("not-held"));
+    const used = use(mira, miraTile.id, held.id, NOW + 2, "mira");
+    assert.equal(used.powers?.held.mira?.used, true);
+    assert.equal(used.toActIndex, mira.toActIndex);
+    assert.equal(used.endsAtMs, mira.endsAtMs);
   });
 
   it("refuses a power off the seat's own turn, and once its clock has run out", () => {
@@ -1107,7 +1151,7 @@ describe("reduce — §44's held power", () => {
 
     assert.equal(canUsePower(dealHand(), "hero", NOW), false, "a Classic table");
     assert.equal(canUsePower(waiting, "hero", NOW + 2), false, "off the seat's turn");
-    assert.equal(canUsePower(waiting, "mira", NOW + 2), false, "a CPU seat holds nothing");
+    assert.equal(canUsePower(waiting, "mira", NOW + 2), true, "a CPU seat on its turn");
     assert.equal(canUsePower(onTurn, "hero", NOW + 3), true, "on the seat's turn");
     assert.equal(canUsePower(onTurn, "hero", onTurn.endsAtMs), false, "the turn's clock ran out");
     assert.equal(canUsePower(used, "hero", NOW + 4), false, "already used");

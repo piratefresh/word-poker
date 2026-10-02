@@ -7,6 +7,8 @@ import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixture
 import { duration } from "@/constants/theme";
 import { testDictionary } from "@/lib/dictionary-fixtures";
 import { useOfflineGame, type OfflineGame } from "@/lib/use-offline-game";
+import { WordBuilder } from "@/components/word-builder";
+import { POWER_USED_BEATS } from "@/components/powers/power-used";
 
 import { OfflineGameScreen } from "./offline-game-screen";
 
@@ -17,6 +19,11 @@ import { OfflineGameScreen } from "./offline-game-screen";
 jest.mock("@/lib/use-offline-game", () => {
   const actual = jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/lib/use-offline-game");
   return { ...actual, useOfflineGame: jest.fn(actual.useOfflineGame) };
+});
+
+jest.mock("@/components/word-builder", () => {
+  const actual = jest.requireActual<typeof import("@/components/word-builder")>("@/components/word-builder");
+  return { ...actual, WordBuilder: jest.fn(actual.WordBuilder) };
 });
 
 // `useSafeAreaInsets` throws without a provider, and the shipped provider needs native
@@ -31,7 +38,7 @@ jest.mock("react-native-safe-area-context", () =>
 // thing that can pin the hand it plays.
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => false), replace: jest.fn() },
-  useLocalSearchParams: () => ({ seed: mockSeedParam }),
+  useLocalSearchParams: () => ({ seed: mockSeedParam, powers: mockPowerParam }),
   // The HUD's loop gate reads this to learn whether its screen is on top, and a suite stands
   // in for a screen that is: with nothing to run, the gate keeps its focused default.
   useFocusEffect: () => undefined,
@@ -62,6 +69,7 @@ const DRAWN_TILES: readonly Tile[] =
 
 /** What the route's params say, when they say anything: an absent seed is what a draw is for. */
 let mockSeedParam: string | undefined = String(SEED);
+let mockPowerParam: string | undefined;
 
 const mockRandomSeed = jest.fn(() => DRAWN_SEED);
 
@@ -121,7 +129,7 @@ async function passedToTheHero(view: RenderResult) {
 
 async function renderTable() {
   const view = await render(<OfflineGameScreen />);
-  await fireEvent(view.getByTestId("poker-table"), "layout", FELT_BOX);
+  await fireEvent(view.getByTestId("poker-table", { includeHiddenElements: true }), "layout", FELT_BOX);
   // The deal leaves the first turn to a bot, and the felt says so — a seat thinking while the
   // hero's row is dark. Every test here reads the table once the CPU has played it to the hero.
   await passedToTheHero(view);
@@ -205,6 +213,7 @@ describe("<OfflineGameScreen />", () => {
     jest.useFakeTimers();
     mockDictionary = testDictionary([HERO_WORD]);
     mockSeedParam = String(SEED);
+    mockPowerParam = undefined;
   });
 
   afterEach(() => {
@@ -237,6 +246,46 @@ describe("<OfflineGameScreen />", () => {
     expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
     expect(view.getByTestId("pot")).toHaveTextContent(/\$90/);
     expect(control(view, "all-in-button").getByText("ALL IN")).toBeOnTheScreen();
+  });
+
+  test("queues the hero behind a real CPU card and holds its flip until its own card clears", async () => {
+    mockSeedParam = "7";
+    mockPowerParam = "wild";
+    const heroRack = dealHand({ seed: 7, playerCount: 4 }).privateTiles[0] ?? [];
+    mockDictionary = testDictionary([heroRack.map((tile) => tile.letter).join("")]);
+    const view = await renderTable();
+    const live = () => {
+      const results = jest.mocked(useOfflineGame).mock.results;
+      const last = results[results.length - 1];
+      if (last?.type !== "return") throw new Error("the screen has no adapter");
+      return last.value as OfflineGame;
+    };
+    const flip = () => jest.mocked(WordBuilder).mock.calls.at(-1)?.[0].swapFlip;
+    await act(async () => live().pickPower("random_wild"));
+    for (let step = 0; step < 4; step += 1) await beat();
+    expect(within(view.getByTestId("power-used")).getByText("MIRA USED")).toBeOnTheScreen();
+    expect(view.getByTestId("seat-power-tag-mira")).toHaveTextContent("MULLIGAN");
+    expect(stripTiles(view)).not.toContain("power-3");
+    await beat();
+    expect(view.getByText("YOUR TURN")).toBeOnTheScreen();
+    const discarded = live().game.privateTiles[0];
+    if (discarded === undefined) throw new Error("the hero has no tile");
+    await fireEvent.press(view.getByTestId("power-held"));
+    await fireEvent.press(view.getByTestId(`word-builder-tile-${discarded.id}`));
+    await fireEvent.press(view.getByTestId("power-confirm"));
+    expect(live().powers?.used.map((event) => event.mine)).toEqual([false, true]);
+    expect(flip()).toMatchObject({ tileId: "power-0", revealed: false });
+    await act(async () => jest.advanceTimersByTime(
+      POWER_USED_BEATS.enterMs + POWER_USED_BEATS.holdMs + POWER_USED_BEATS.exitMs - BEAT_MS,
+    ));
+    expect(within(view.getByTestId("power-used")).getByText("YOU USED")).toBeOnTheScreen();
+    expect(flip()?.revealed).toBe(false);
+    await act(async () => jest.advanceTimersByTime(
+      POWER_USED_BEATS.enterMs + POWER_USED_BEATS.holdMs + POWER_USED_BEATS.exitMs,
+    ));
+    expect(live().powers?.used.some((notice) => notice.mine)).toBe(false);
+    expect(flip()?.revealed).toBe(true);
+    expect(view.queryByTestId("power-used")).toBeNull();
   });
 
   test("deals its own drawn hand for a table the URL does not pin", async () => {

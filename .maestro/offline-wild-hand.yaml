@@ -3,8 +3,8 @@
 #
 #   maestro test --platform web .maestro/offline-wild-hand.yaml
 #
-# Same seed as offline-hand.yaml: the Power Draw rolls from streams of its own, so the deal and
-# the bots' line are the Classic hand's. For that seed the hero is offered, in order,
+# Same seed as offline-hand.yaml: the Power Draw rolls from streams of its own, so the initial
+# tiles are the Classic hand's; CPU swaps change their later line. The hero is offered, in order,
 # Vowel Magnet, Mulligan and Random Wild (`drawOffers(20260919, 0)` in game-rules) — so a
 # changed seed or catalog fails at the pick, loudly.
 #
@@ -47,14 +47,26 @@ tags:
     timeout: 5000
 - tapOn:
     id: "power-offer-vowel_magnet"
+    waitToSettleTimeoutMs: 0
     retryTapIfNoChange: false
 
-# The pick settles the draw at once (no bot draws): the kept beat plays, the reveal leaves, and
-# pre-flop starts on its clock.
+# The three CPUs pick on separate 900 ms beats, then pre-flop starts on its clock.
 - extendedWaitUntil:
     notVisible:
       id: "power-draw"
     timeout: 5000
+
+# The shipped-dictionary probe pins Mira's Mulligan on its first turn, before its raise.
+- extendedWaitUntil:
+    visible:
+      id: "power-used"
+      containsDescendants:
+        - text: "MIRA USED"
+    timeout: 5000
+- assertVisible:
+    id: "seat-power-tag-mira"
+    containsDescendants:
+      - text: "MULLIGAN"
 
 # The seed's pre-flop line, now that the table runs: mira raises the blind to 60.
 - extendedWaitUntil:
@@ -86,3 +98,6 @@ tags:
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 10000
+# Mira's played swap is revealed only here, with §44's marker on the A in DRAGS.
+- assertVisible:
+    id: "result-card-mira-tile-2-powered"

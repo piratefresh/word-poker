@@ -1,12 +1,17 @@
 import { act, renderHook } from "@testing-library/react-native";
 
-import { POWER_DRAW_MS, type PowerUpId, type Tile } from "@wordpoker/contracts";
+import { POWER_DRAW_MS, WORD_CHECKS_PER_HAND, type PowerUpId, type Tile } from "@wordpoker/contracts";
 import {
   LETTER_VALUES,
   OFFLINE_TURN_MS,
   WORD_WINDOW_MS,
   dealHand,
   drawOffers,
+  chooseBotPower,
+  decideBotPowerUse,
+  startHand,
+  chooseOfflineWord,
+  availableTiles,
   swappedTileId,
   type Letter,
 } from "@wordpoker/game-rules";
@@ -22,6 +27,11 @@ import { useOfflineGame, type OfflineGame } from "./use-offline-game";
 // the one hook is all this suite needs to answer: with nothing to run, the gate keeps its
 // focused default and the loops are enabled, which is what a table in front of the seat is.
 jest.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
+
+jest.mock("@wordpoker/game-rules", () => {
+  const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
+  return { ...actual, startHand: jest.fn(actual.startHand), chooseBotPower: jest.fn(actual.chooseBotPower), decideBotPowerUse: jest.fn(actual.decideBotPowerUse) };
+});
 
 const SEED = 7;
 /** A seed whose first bot raises: the hero starts preflop facing a raise over the big blind. */
@@ -801,7 +811,205 @@ describe("useOfflineGame — the chips in flight", () => {
 });
 
 describe("useOfflineGame — the Wild table (§44)", () => {
-  /** A Wild table (`?powers=wild`): the Power Draw opens on every deal, for the hero alone. */
+  beforeEach(() => {
+    jest.mocked(chooseBotPower).mockClear();
+    jest.mocked(decideBotPowerUse).mockClear();
+  });
+
+  test("replays actual CPU picks in seat order, one per beat, with no eager policy work", async () => {
+    async function run() {
+      const origin = Date.now();
+      const dictionary = testDictionary([heroWord()]);
+      const hook = await renderHook(() => useOfflineGame({ seed: SEED, dictionary, powerUps: "choose3" }));
+      const result = hook.result as Table;
+      await beat();
+      await beat();
+      expect(chooseBotPower).not.toHaveBeenCalled();
+      expect(decideBotPowerUse).not.toHaveBeenCalled();
+      await act(async () => result.current.pickPower("random_wild"));
+      expect(chooseBotPower).not.toHaveBeenCalled();
+      for (const [index, id] of ["ellis", "jay", "mira"].entries()) {
+        await beat();
+        expect(chooseBotPower).toHaveBeenCalledTimes(index + 1);
+        const [state, playerId] = jest.mocked(chooseBotPower).mock.calls[index] ?? [];
+        expect(playerId).toBe(id);
+        const power = jest.mocked(chooseBotPower).mock.results[index]?.value;
+        expect(state?.powers?.draw.slots.find((slot) => slot.playerId === id)?.offers).toContain(power);
+        expect(result.current.game.pot).toBe(BLINDS_POSTED);
+        expect(result.current.powers?.draw === null).toBe(index === 2);
+      }
+      expect(decideBotPowerUse).not.toHaveBeenCalled();
+      const trace = jest.mocked(chooseBotPower).mock.calls.map(([, id], index) =>
+        [id, jest.mocked(chooseBotPower).mock.results[index]?.value],
+      );
+      await hook.unmount();
+      jest.setSystemTime(origin);
+      jest.mocked(chooseBotPower).mockClear();
+      return trace;
+    }
+    const first = await run();
+    expect(await run()).toEqual(first);
+    // Seed 7's weak racks choose Mulligan for Ellis/Mira; Jay's aggressive style chooses Wild.
+    expect(first).toEqual([["ellis", "mulligan"], ["jay", "random_wild"], ["mira", "mulligan"]]);
+  });
+
+  test("preserves a late hero pick and one bot pick when the shared draw deadline supplies the rest", async () => {
+    const result = await wildTable();
+    await act(async () => jest.advanceTimersByTime(POWER_DRAW_MS - BEAT_MS * 1.5));
+    await pick(result, "random_wild");
+    await beat();
+    expect(chooseBotPower).toHaveBeenCalledTimes(1);
+    expect(result.current.powers?.draw?.picked).toBe("random_wild");
+    await act(async () => jest.advanceTimersByTime(BEAT_MS * 0.5 + 25));
+    expect(result.current.powers?.draw).toBeNull();
+    expect(result.current.powers?.held?.id).toBe("random_wild");
+    expect(result.current.game.secondsRemaining).toBe(OFFLINE_TURN_MS / 1000);
+    expect(chooseBotPower).toHaveBeenCalledTimes(1);
+  });
+
+  test("commits Mira's actual power use separately from its bet and keeps its swap private", async () => {
+    const result = await wildTable();
+    await pick(result, "random_wild");
+    for (let step = 0; step < 3; step += 1) await beat();
+    const before = result.current.game;
+    await beat();
+    const event = { handId: 1, seat: 3, name: "Mira", mine: false, powerUpId: "mulligan", street: "preflop" } as const;
+    expect(result.current.powers?.used).toEqual([event]);
+    expect(result.current.game.players[3]?.powerTag).toBe("MULLIGAN");
+    expect(result.current.game.players[3]?.status).toBe("thinking");
+    expect(result.current.game.pot).toBe(before.pot);
+    expect(result.current.game.betting).toEqual(before.betting);
+    expect(result.current.game.privateTiles).toEqual(before.privateTiles);
+    expect(result.current.powers?.swap).toBeNull();
+    expect(result.current.powers?.held?.used).toBe(false);
+    const [state, id, now] = jest.mocked(decideBotPowerUse).mock.calls[0] ?? [];
+    expect(id).toBe("mira");
+    expect(state?.endsAtMs).toBe((now ?? 0) - BEAT_MS + OFFLINE_TURN_MS);
+    const deadline = state?.endsAtMs;
+    await beat();
+    const next = jest.mocked(decideBotPowerUse).mock.calls[1]?.[0];
+    expect(next?.endsAtMs).toBe(deadline);
+    expect(next?.powers?.held.mira?.used).toBe(true);
+    expect(result.current.game.pot).toBeGreaterThan(before.pot);
+    expect(result.current.game.players[3]?.powerTag).toBe("MULLIGAN");
+    expect(result.current.game.players[3]?.status).toBe("call");
+    expect(JSON.stringify(result.current.game)).not.toContain("power-3");
+    await act(async () => result.current.endPowerUsed(event));
+    expect(result.current.powers?.used).toEqual([]);
+  });
+
+  test("an all-in wordless bot uses in the word window and confirms the new word on a later beat", async () => {
+    const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
+    // Seed 0: Ellis holds R + S/L; Mulligan replaces R with I, making IS from a wordless rack/board.
+    jest.mocked(startHand).mockImplementationOnce((options) => actual.startHand({ ...options,
+      players: ["hero", "ellis"], stacks: [{ playerId: "hero", stack: 10 }, { playerId: "ellis", stack: 20 }],
+    }));
+    const dictionary = testDictionary(["IS"]);
+    const hook = await renderHook(() => useOfflineGame({ seed: 0, dictionary, powerUps: "choose3" }));
+    const result = hook.result as Table;
+    await pick(result, "mulligan");
+    await beat();
+    expect(result.current.words?.confirmable).toBe(true);
+    const before = result.current.game;
+    await beat();
+    const [state, id] = jest.mocked(decideBotPowerUse).mock.calls[0] ?? [];
+    expect(id).toBe("ellis");
+    expect(state?.seats[1]?.allIn).toBe(true);
+    if (state === undefined) throw new Error("the real policy was called");
+    expect(chooseOfflineWord({ available: availableTiles(state, 1), dictionary })).toBeNull();
+    expect(result.current.powers?.used).toEqual([
+      { handId: 1, seat: 1, name: "Ellis", mine: false, powerUpId: "mulligan", street: "river" },
+    ]);
+    expect(result.current.game.pot).toBe(before.pot);
+    expect(result.current.results).toBeNull();
+    expect(JSON.stringify(result.current.game)).not.toContain("power-1");
+    expect(result.current.wordCheck).toEqual({ checksRemaining: WORD_CHECKS_PER_HAND, result: null });
+    await beat();
+    const afterUse = jest.mocked(decideBotPowerUse).mock.calls[1]?.[0];
+    expect(afterUse?.endsAtMs).toBe(state.endsAtMs);
+    expect(afterUse?.seats[1]?.privateTiles.map((tile) => tile.id)).toContain("power-1");
+    // Even a confirmed CPU word is private until payout.
+    expect(result.current.results).toBeNull();
+    expect(JSON.stringify({ game: result.current.game, words: result.current.words, powers: result.current.powers,
+      wordCheck: result.current.wordCheck })).not.toContain("power-1");
+    await act(async () => jest.advanceTimersByTime(WORD_WINDOW_MS));
+    const ellis = result.current.results?.seats.find((seat) => seat.playerId === "ellis");
+    expect(ellis?.word).toBe("IS");
+    expect(ellis?.tiles.some((tile) => tile.id === "power-1")).toBe(true);
+    expect(ellis?.tiles.some((tile) => tile.id === "R-3")).toBe(false);
+  });
+
+  test("a wordless window stops scheduling policy searches when no bot can make a move", async () => {
+    const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
+    jest.mocked(startHand).mockImplementationOnce((options) => actual.startHand({ ...options,
+      players: ["hero", "ellis"], stacks: [{ playerId: "hero", stack: 10 }, { playerId: "ellis", stack: 20 }],
+    }));
+    const dictionary = testDictionary(["ZZZZZZZ"]);
+    const hook = await renderHook(() => useOfflineGame({ seed: 0, dictionary, powerUps: "choose3" }));
+    const result = hook.result as Table;
+    await pick(result, "mulligan");
+    for (let step = 0; step < 3; step += 1) await beat();
+    const calls = jest.mocked(decideBotPowerUse).mock.calls.length;
+    expect(calls).toBe(2); // One use, then one unsuccessful word beat from the swapped rack.
+    for (let step = 0; step < 4; step += 1) await beat();
+    expect(decideBotPowerUse).toHaveBeenCalledTimes(calls);
+    expect(result.current.results).toBeNull();
+    await act(async () => jest.advanceTimersByTime(WORD_WINDOW_MS));
+    expect(result.current.game.phase).toBe("payout");
+  });
+
+  test("drops a use if policy evaluation crosses the deadline and never renews the clock", async () => {
+    const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
+    const result = await wildTable();
+    await pick(result, "random_wild");
+    for (let step = 0; step < 3; step += 1) await beat();
+    jest.mocked(decideBotPowerUse).mockImplementationOnce((state, id, now) => {
+      const answer = actual.decideBotPowerUse(state, id, now);
+      expect(answer).not.toBeNull();
+      jest.spyOn(Date, "now").mockReturnValue(state.endsAtMs);
+      return answer;
+    });
+    await beat();
+    expect(result.current.powers?.used).toEqual([]);
+    expect(result.current.game.pot).toBe(BLINDS_POSTED);
+    jest.mocked(Date.now).mockRestore();
+    await act(async () => jest.advanceTimersByTime(OFFLINE_TURN_MS - BEAT_MS + 25));
+    expect(result.current.game.players[3]?.status).toBe("fold");
+    expect(result.current.powers?.used).toEqual([]);
+  });
+
+  test("a delayed draw callback at the deadline makes no policy pick", async () => {
+    const result = await wildTable();
+    const deadline = result.current.powers?.draw?.endsAtMs;
+    if (deadline === undefined) throw new Error("the draw has no clock");
+    await pick(result, "mulligan");
+    const clock = jest.spyOn(Date, "now").mockReturnValue(deadline);
+    await beat();
+    clock.mockRestore();
+    expect(chooseBotPower).not.toHaveBeenCalled();
+    expect(result.current.powers?.draw?.picked).toBe("mulligan");
+    await act(async () => jest.advanceTimersByTime(POWER_DRAW_MS - BEAT_MS + 25));
+    expect(result.current.powers?.draw).toBeNull();
+    expect(chooseBotPower).not.toHaveBeenCalled();
+  });
+
+  test("a power spent with one beat of turn budget left does not reserve time for a bet", async () => {
+    const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
+    jest.mocked(startHand).mockImplementationOnce((options) => actual.startHand({ ...options,
+      turnDurationMs: BEAT_MS + 10,
+    }));
+    const result = await wildTable();
+    await pick(result, "mulligan");
+    for (let step = 0; step < 4; step += 1) await beat();
+    expect(result.current.powers?.used[0]?.name).toBe("Mira");
+    expect(result.current.game.pot).toBe(BLINDS_POSTED);
+    await act(async () => jest.advanceTimersByTime(35));
+    expect(result.current.game.players[3]?.status).toBe("fold");
+    expect(result.current.game.pot).toBe(BLINDS_POSTED);
+    expect(jest.mocked(decideBotPowerUse).mock.calls.map(([, id]) => id)).toEqual(["mira"]);
+  });
+
+  /** A Wild table (`?powers=wild`): every dealt-in seat draws. */
   async function wildTable(seed = SEED): Promise<Table> {
     const dictionary = testDictionary([heroWord(seed)]);
     const { result } = await renderHook(() =>
@@ -872,6 +1080,14 @@ describe("useOfflineGame — the Wild table (§44)", () => {
 
     await pick(result, kept);
 
+    expect(result.current.powers?.draw?.picked).toBe(kept);
+    for (let step = 0; step < 2; step += 1) {
+      await beat();
+      expect(result.current.powers?.draw).not.toBeNull();
+      expect(result.current.game.pot).toBe(BLINDS_POSTED);
+      expect(row(result).canFold).toBe(false);
+    }
+    await beat();
     expect(result.current.powers?.draw).toBeNull();
     // mira is on the clock, so the power is held but cannot be used yet.
     expect(result.current.powers?.held).toEqual({ id: kept, used: false, usable: false });
@@ -910,7 +1126,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     expect(result.current.game.privateTiles).toEqual([swap?.tile, heroTile(1)]);
     expect(result.current.powers?.held).toEqual({ id: "random_wild", used: true, usable: false });
     // Public, and named for the felt's card.
-    expect(result.current.powers?.used).toEqual([
+    expect(result.current.powers?.used.filter((event) => event.mine)).toEqual([
       { handId: 1, seat: 0, powerUpId: "random_wild", street: "preflop", name: "Guest", mine: true },
     ]);
     expect(result.current.game.players[0]?.powerTag).toBe("WILD");
@@ -925,12 +1141,13 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     expect(result.current.game.players[0]?.status).toBe("call");
 
     // The felt's card clears, and says so.
-    const [event] = result.current.powers?.used ?? [];
+    const others = result.current.powers?.used.filter((event) => !event.mine);
+    const event = result.current.powers?.used.find((event) => event.mine);
     if (event === undefined) throw new Error("the use made a public event");
     await act(async () => {
       result.current.endPowerUsed(event);
     });
-    expect(result.current.powers?.used).toEqual([]);
+    expect(result.current.powers?.used).toEqual(others);
   });
 
   test("stops offering the power on the deadline, before the clock settles the turn", async () => {
@@ -990,7 +1207,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
       plays: [{ tileId: tile.id }, playOf(heroTile(1))],
       word: `${tile.letter}${heroTile(1).letter}`,
     });
-    expect(result.current.powers?.used).toEqual([
+    expect(result.current.powers?.used.filter((event) => event.mine)).toEqual([
       { handId: 1, seat: 0, powerUpId: "vowel_magnet", street: "river", name: "Guest", mine: true },
     ]);
   });

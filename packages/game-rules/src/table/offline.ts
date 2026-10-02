@@ -64,25 +64,25 @@ import {
   type BettingRoundState,
   type BettingSeatState,
   type Stakes,
-} from "./betting";
-import { evaluateWord, spellSubmission } from "./building";
-import { commitChips } from "./chips";
-import { dealHand } from "./deal";
-import type { Dictionary } from "./dictionary";
+} from "../money/betting";
+import { evaluateWord, spellSubmission } from "../words/building";
+import { commitChips } from "../money/chips";
+import { dealHand } from "../tiles/deal";
+import type { Dictionary } from "../words/dictionary";
 import {
   BettingRejectionError,
   OfflineActionError,
   PowerRejectionError,
-} from "./errors";
-import * as powerDraw from "./power-draw";
-import type { DrawSeat, HeldPower, PowerDraw } from "./power-draw";
-import { swapTile } from "./power-swap";
-import { resolvePayout, type JudgedSeat } from "./pots";
-import { createRng } from "./rng";
-import { scoreWord } from "./scoring";
-import { DRAW_SEED_SALT, rankShowdown } from "./showdown";
-import * as wordWindow from "./word-window";
-import type { WindowSeat, WindowTable, WordSlot, WordWindow } from "./word-window";
+} from "../core/errors";
+import * as powerDraw from "../powers/power-draw";
+import type { DrawSeat, HeldPower, PowerDraw } from "../powers/power-draw";
+import { swapTile } from "../powers/power-swap";
+import { resolvePayout, type JudgedSeat } from "../money/pots";
+import { createRng } from "../core/rng";
+import { scoreWord } from "../words/scoring";
+import { DRAW_SEED_SALT, rankShowdown } from "../money/showdown";
+import * as wordWindow from "../words/word-window";
+import type { WindowSeat, WindowTable, WordSlot, WordWindow } from "../words/word-window";
 
 /**
  * How long a seat's betting turn lasts on the injected clock. Online and offline use the same
@@ -154,8 +154,6 @@ export interface HandResult {
  * draw holds back until it closes. Rebuilt by every deal, so nothing carries over between hands.
  */
 export interface HandPowers {
-  /** The seats that never draw — the CPU seats, in v1 — carried to every hand of the table. */
-  readonly bots: readonly PlayerId[];
   readonly draw: PowerDraw;
   /** Each drawing seat's power once it has picked, by player id. */
   readonly held: Readonly<Record<PlayerId, HeldPower>>;
@@ -267,9 +265,9 @@ export interface StartHandOptions {
   /**
    * The table's power-up deal mode (§40, §44). Absent or `off` is Classic: no draw and no
    * `powers` on the state. `choose3` opens the Power Draw on every deal for every seat dealt in
-   * except `bots`, which v1 leaves without powers.
+   * including CPU and all-in seats.
    */
-  powerUps?: { deal: PowerUpDealMode; bots?: readonly PlayerId[] };
+  powerUps?: { deal: PowerUpDealMode };
 }
 
 function freshWordChecks(
@@ -382,7 +380,7 @@ export function startHand({
   };
 
   if (powerUps?.deal === "choose3") {
-    return openPowerDraw(state, powerUps.bots ?? [], nowMs);
+    return openPowerDraw(state, nowMs);
   }
 
   // Nobody left to act means the whole table is all in on the posts alone: the streets below
@@ -392,22 +390,22 @@ export function startHand({
 }
 
 /**
- * Opens §44's Power Draw on a freshly dealt hand: every seat dealt in draws, except the CPU
+ * Opens §44's Power Draw on a freshly dealt hand: every seat dealt in draws, including all-in
  * seats. Pre-flop's first turn waits for the draw to close — the seat is held back on
  * `firstToAct`, and `endsAtMs` is the draw's clock until then. A table where nobody draws
  * records an empty, closed draw and plays on as if it had none.
  */
-function openPowerDraw(state: OfflineState, bots: readonly PlayerId[], nowMs: number): OfflineState {
+function openPowerDraw(state: OfflineState, nowMs: number): OfflineState {
   const drawing: DrawSeat[] = [];
   state.seats.forEach((seat, index) => {
-    if (!seat.sittingOut && !bots.includes(seat.id)) drawing.push({ seat: index, playerId: seat.id });
+    if (!seat.sittingOut) drawing.push({ seat: index, playerId: seat.id });
   });
 
   const draw: PowerDraw =
     drawing.length > 0
       ? powerDraw.openDraw(drawing, state.seed, nowMs)
       : { status: "closed", endsAtMs: nowMs, slots: [] };
-  const powers: HandPowers = { bots, draw, held: {}, firstToAct: state.toActIndex };
+  const powers: HandPowers = { draw, held: {}, firstToAct: state.toActIndex };
 
   return draw.status === "open"
     ? { ...state, toActIndex: null, endsAtMs: draw.endsAtMs, powers }
@@ -1139,7 +1137,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     wordBuilding: { autoSubmitDrafts: state.autoSubmitDrafts },
     stakes: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
     turnDurationMs: state.turnDurationMs,
-    ...(state.powers === undefined ? {} : { powerUps: { deal: "choose3", bots: state.powers.bots } }),
+    ...(state.powers === undefined ? {} : { powerUps: { deal: "choose3" } }),
   });
 
   return { ...fresh, hand: state.hand + 1 };

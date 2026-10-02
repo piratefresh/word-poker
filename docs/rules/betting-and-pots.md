@@ -63,7 +63,7 @@ one printed value.
   reusing one.
 
 <!-- Contract status: the whole of §21 ships. The ladder is
-     `packages/game-rules/src/showdown.ts` (`rankShowdown`,
+     `packages/game-rules/src/money/showdown.ts` (`rankShowdown`,
      STO-320/STO-321/STO-322/STO-323), with the draw's pool and tile values behind
      `showdownDrawPool` / `showdownDrawValue`, and the ranking's wire shape is
      `packages/contracts/src/showdown.ts`. The retired highest-letter step, the draw that adds
@@ -240,21 +240,21 @@ The winning player:
 
 <!-- Contract status: §22–§26 are implemented in the shared engine, blinds included. Every hand
      opens with both blinds posted before the deal (§5, §14; `startHand` in
-     `packages/game-rules/src/offline.ts`, STO-466), the posted big blind is the first round's
+     `packages/game-rules/src/table/offline.ts`, STO-466), the posted big blind is the first round's
      opening Current Bet and the table's minimum bet, and the raise floor is
      `currentBet + max(lastRaiseSize, bigBlind)`. The wire vocabulary —
      the action union, the refusal reasons, and the pot/seat shapes — is
      `packages/contracts/src/betting.ts` (STO-336), with the table's blinds on
      `packages/contracts/src/rooms.ts` (`blindsFor`, ADR 0004). The stack model is
-     `packages/game-rules/src/chips.ts` (`commitChips`/`awardChips`, STO-337), and the
+     `packages/game-rules/src/money/chips.ts` (`commitChips`/`awardChips`, STO-337), and the
      betting-round machine — legality, the current bet, the minimum bet, the raise
      floor, and the reopen rule for full vs short all-in raises — is
-     `packages/game-rules/src/betting.ts` (`applyBettingAction`/`bettingBounds`/`nextActor`,
+     `packages/game-rules/src/money/betting.ts` (`applyBettingAction`/`bettingBounds`/`nextActor`,
      STO-338/STO-339). §25's layering and settlement are
-     `packages/game-rules/src/pots.ts` (`buildPots`/`resolvePayout`, STO-340/STO-341), with
+     `packages/game-rules/src/money/pots.ts` (`buildPots`/`resolvePayout`, STO-340/STO-341), with
      each pot ranked independently and an unbreakable §21.3 tie split evenly — odd chips
      clockwise from the dealer — rather than refused. §26's fold-out skips the window and the
      reveal entirely (`judged: []`, STO-342). The offline round machine wires all of it in
-     (`packages/game-rules/src/offline.ts`, STO-343) with the bot policy in `src/bot.ts`
+     (`packages/game-rules/src/table/offline.ts`, STO-343) with the bot policy in `src/bot/bot.ts`
      (STO-344), and the offline felt renders it (`apps/mobile/src/lib/use-offline-game.ts`,
      STO-345). The offline table's stack is ADR 0002 and its blinds are ADR 0004. -->

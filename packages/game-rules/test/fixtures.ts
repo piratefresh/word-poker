@@ -7,7 +7,7 @@
  * from 141,962 entries to what a test can read in its source.
  */
 
-import { DICTIONARIES, createDictionary, type Dictionary } from "../src/dictionary";
+import { DICTIONARIES, createDictionary, type Dictionary } from "../src/words/dictionary";
 
 /** Words the rules' own fixtures use — real entries of the shipped en_US-large list (§8). */
 export const TEST_WORDS = ["AA", "QI", "STRONG", "MONSTER"] as const;

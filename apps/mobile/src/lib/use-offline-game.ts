@@ -46,6 +46,8 @@ import {
   availableTiles,
   canUsePower,
   chooseOfflineWord,
+  chooseBotPower,
+  decideBotPowerUse,
   decideOfflineMove,
   reduce,
   resolveSubmission,
@@ -81,10 +83,29 @@ const ROSTER: readonly { id: PlayerId; name: string; initials: string }[] = [
   { id: "mira", name: "Mira", initials: "MI" },
 ];
 
-/** The CPU seats: every seat but the hero's. In v1 they neither draw nor hold a power (§44). */
-const BOT_IDS: readonly PlayerId[] = ROSTER.filter((player) => player.id !== HERO_ID).map(
-  (player) => player.id,
-);
+/**
+ * A table that is not ordinary offline play — the tutorial's guided hand (STO-507) — brings its
+ * own clock, deal, gate and opponents. Absent, the table is the one `/offline` plays, on the
+ * device clock with the heuristic bots.
+ */
+export interface OfflineSession {
+  /** Reads the table's clock. The tutorial's is virtual: it stands still while held. */
+  now: () => number;
+  /**
+   * While held nothing on the table moves by itself: no CPU beat and no deadline — betting turn,
+   * §19's window or Power Draw — can fire, and a backgrounded app comes back to the same table.
+   */
+  held: boolean;
+  /** Deals the session's table: its first hand, and every restart. */
+  open: (nowMs: number) => OfflineState;
+  /**
+   * Applies one action through the engine, or refuses it with `null` — the table stays where it
+   * was, as it does for a stale tap. The engine's own refusals still throw as they always do.
+   */
+  reduce: (state: OfflineState, action: OfflineAction, nowMs: number) => OfflineState | null;
+  /** The opponents' one move for this beat, or `null` when none is owed. */
+  nextMove: (state: OfflineState, nowMs: number) => OfflineAction | null;
+}
 
 export interface OfflineGame {
   /** The mapped state: exactly what `GameScreen` renders. */
@@ -170,8 +191,8 @@ export interface OfflineGame {
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /** How long to wait before the table's own deadline settles the turn. */
-function untilDeadline(endsAtMs: number): number {
-  return Math.min(Math.max(endsAtMs - Date.now(), 0) + 25, MAX_TIMER_MS);
+function untilDeadline(endsAtMs: number, nowMs: number): number {
+  return Math.min(Math.max(endsAtMs - nowMs, 0) + 25, MAX_TIMER_MS);
 }
 
 /**
@@ -184,6 +205,7 @@ export function useOfflineGame({
   dictionary,
   turnDurationMs,
   powerUps,
+  session,
 }: {
   /**
    * The seed the whole session replays from: this hand, and every hand after it, since the
@@ -206,8 +228,20 @@ export function useOfflineGame({
    * It is the table's, so a new session keeps it.
    */
   powerUps?: PowerUpDealMode;
+  /** The tutorial's table; absent for ordinary offline play. */
+  session?: OfflineSession;
 }): OfflineGame {
+  // The session is read through a ref by the timers and the seam, like the state: a timer answers
+  // the table — and the clock — as they stand when it fires.
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  const now = useCallback(() => sessionRef.current?.now() ?? Date.now(), []);
+  const held = session?.held ?? false;
+
   const [state, setState] = useState<OfflineState>(() =>
+    session !== undefined ? session.open(session.now()) :
     // The deal leaves the first turn to the seat clockwise from the button — a bot on this
     // roster — and that turn is taken on the same beat as every other one: the table is dealt
     // with a seat thinking, not with the opening already played out. At a Wild table the Power
@@ -304,12 +338,15 @@ export function useOfflineGame({
    * Reports whether the action landed, for the dispatcher that has more to do when it did.
    */
   const act = useCallback(
-    (action: OfflineAction, nowMs = Date.now()): boolean => {
+    (action: OfflineAction, at?: number): boolean => {
+      const nowMs = at ?? now();
       // Read through the ref rather than through a render's closure: an action lands on the table
       // as it stands, whoever asked for it.
       const current = stateRef.current;
       try {
-        const next = reduce(current, action, nowMs);
+        const gate = sessionRef.current?.reduce;
+        const next = gate === undefined ? reduce(current, action, nowMs) : gate(current, action, nowMs);
+        if (next === null) return false;
         noteSeatAction(current, action);
         const used = powerUsedBy(current, action);
         if (used !== null) setPowerEvents((live) => [...live, used]);
@@ -325,7 +362,7 @@ export function useOfflineGame({
         throw error;
       }
     },
-    [commit, noteSeatAction],
+    [commit, noteSeatAction, now],
   );
 
   /**
@@ -339,21 +376,23 @@ export function useOfflineGame({
    * settles that one.
    */
   useEffect(() => {
-    if (nextCpuMove(state) === null) return;
-    if (state.wordWindow?.status === "open" && state.endsAtMs - Date.now() <= duration.cpuBeat) return;
+    if (held || !cpuBeatPending(stateRef.current, now())) return;
+    if (state.wordWindow?.status === "open" && state.endsAtMs - now() <= duration.cpuBeat) return;
 
     const timer = setTimeout(() => {
       // The move is read again against the state the table is in, not the one the beat was armed
       // for: a timer that fires late — a backgrounded app is the usual way — has to answer the
       // table as it stands, and past §19's deadline there is nothing left for a seat to answer.
       const current = stateRef.current;
-      const move = nextCpuMove(current);
-      if (move === null || windowRanOut(current, Date.now())) return;
-      act(move);
+      const move = (sessionRef.current?.nextMove ?? nextCpuMove)(current, now());
+      const nowMs = now();
+      if (move === null || cpuDeadlinePassed(current, nowMs)) return;
+      if (move.type === "usePowerUp" && !canUsePower(current, move.playerId, nowMs)) return;
+      act(move, nowMs);
     }, duration.cpuBeat);
 
     return () => clearTimeout(timer);
-  }, [act, state.endsAtMs, state.phase, state.seats, state.toActIndex, state.wordWindow]);
+  }, [act, held, now, state.endsAtMs, state.phase, state.powers, state.seats, state.toActIndex, state.wordWindow]);
 
   const deal = useCallback(() => {
     if (state.sessionOver) return;
@@ -394,8 +433,12 @@ export function useOfflineGame({
     setFlights([]);
     setSeatActions([]);
     setPowerEvents([]);
-    commit(stateRef.current, openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps }));
-  }, [commit, dictionary, powerUps, turnDurationMs]);
+    const table = sessionRef.current;
+    commit(
+      stateRef.current,
+      table !== undefined ? table.open(now()) : openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps }),
+    );
+  }, [commit, dictionary, now, powerUps, turnDurationMs]);
 
   /**
    * Replaces the hero's draft with the one the seat has built — playing a tile, taking one back,
@@ -443,7 +486,7 @@ export function useOfflineGame({
   // seat still drafting settles on its own, a beat after the deadline so the engine reads the
   // clock as run out rather than a millisecond early.
   useEffect(() => {
-    if (state.wordWindow?.status !== "open") return;
+    if (held || state.wordWindow?.status !== "open") return;
 
     const timer = setTimeout(() => {
       // The window may have closed while this timer was armed — the hero confirmed, the hand
@@ -452,50 +495,52 @@ export function useOfflineGame({
       const current = stateRef.current;
       if (current.wordWindow?.status !== "open") return;
 
-      act({ type: "timeoutWords" }, Math.max(Date.now(), current.endsAtMs));
-    }, untilDeadline(state.endsAtMs));
+      act({ type: "timeoutWords" }, Math.max(now(), current.endsAtMs));
+    }, untilDeadline(state.endsAtMs, now()));
 
     return () => clearTimeout(timer);
-  }, [act, state.wordWindow, state.endsAtMs]);
+  }, [act, held, now, state.wordWindow, state.endsAtMs]);
 
-  // A betting turn belongs to the table's clock too: when the hero's clock runs out the engine's
+  // A betting turn belongs to the table's clock too: when any seat's clock runs out the engine's
   // own `timeoutTurn` folds the seat, whatever it owed and whether or not it could have checked
   // (§15, ADR 0006) — and the bots answer on their beat as they answer a tap.
   useEffect(() => {
     const index = state.toActIndex;
-    if (state.betting === null || index === null || state.seats[index]?.id !== HERO_ID) return;
+    if (held || state.betting === null || index === null || state.seats[index] === undefined) return;
+    const playerId = state.seats[index].id;
 
     const timer = setTimeout(() => {
       // The turn may have moved on while this timer was armed, and a seat that is no longer the
       // one to act is not the seat this clock is for.
       const current = stateRef.current;
       const currentIndex = current.toActIndex;
-      if (current.betting === null || currentIndex === null || current.seats[currentIndex]?.id !== HERO_ID) {
+      if (current.betting === null || currentIndex === null || current.seats[currentIndex]?.id !== playerId) {
         return;
       }
 
-      act({ type: "timeoutTurn" }, Math.max(Date.now(), current.endsAtMs));
-    }, untilDeadline(state.endsAtMs));
+      act({ type: "timeoutTurn" }, Math.max(now(), current.endsAtMs));
+    }, untilDeadline(state.endsAtMs, now()));
 
     return () => clearTimeout(timer);
-  }, [act, state.betting, state.toActIndex, state.endsAtMs, state.seats]);
+  }, [act, held, now, state.betting, state.toActIndex, state.endsAtMs, state.seats]);
 
   // §44's Power Draw holds the table: nobody is on the clock while it is open, so neither the
-  // bots' beat nor the hero's turn clock runs, and pre-flop's first turn arms when it closes. Its
+  // betting beat nor the hero's turn clock runs; after the hero picks, CPUs pick on their beats.
+  // Pre-flop's first turn arms when the draw closes. Its
   // own clock is the table's too — a hero who never picks keeps the first offer when it runs out.
   const drawOpen = state.powers?.draw.status === "open";
   useEffect(() => {
-    if (!drawOpen) return;
+    if (held || !drawOpen) return;
 
     const timer = setTimeout(() => {
       const current = stateRef.current;
       if (current.powers?.draw.status !== "open") return;
 
-      act({ type: "timeoutPowerDraw" }, Math.max(Date.now(), current.endsAtMs));
-    }, untilDeadline(state.endsAtMs));
+      act({ type: "timeoutPowerDraw" }, Math.max(now(), current.endsAtMs));
+    }, untilDeadline(state.endsAtMs, now()));
 
     return () => clearTimeout(timer);
-  }, [act, drawOpen, state.endsAtMs]);
+  }, [act, drawOpen, held, now, state.endsAtMs]);
 
   // The deadline the felt has seen pass. The settling timers above wait a beat past it, so until
   // they fire the table still shows the clock that ran out; this one fires on the deadline itself,
@@ -503,16 +548,16 @@ export function useOfflineGame({
   const [ranOutAtMs, setRanOutAtMs] = useState<number | null>(null);
   const tracksPowers = state.powers !== undefined;
   useEffect(() => {
-    if (!tracksPowers) return;
+    if (held || !tracksPowers) return;
 
     const endsAtMs = state.endsAtMs;
     const timer = setTimeout(
       () => setRanOutAtMs(endsAtMs),
-      Math.min(Math.max(endsAtMs - Date.now(), 0), MAX_TIMER_MS),
+      Math.min(Math.max(endsAtMs - now(), 0), MAX_TIMER_MS),
     );
 
     return () => clearTimeout(timer);
-  }, [tracksPowers, state.endsAtMs]);
+  }, [held, now, tracksPowers, state.endsAtMs]);
 
   const pickPower = useCallback(
     (powerUpId: PowerUpId) => {
@@ -527,7 +572,7 @@ export function useOfflineGame({
         // A tap the clock beat — its timer delayed or suspended — still shows the power as spent
         // rather than leaving it lit for a second tap the engine will refuse too.
         const endsAtMs = stateRef.current.endsAtMs;
-        if (Date.now() >= endsAtMs) setRanOutAtMs(endsAtMs);
+        if (now() >= endsAtMs) setRanOutAtMs(endsAtMs);
         return;
       }
       // The discarded tile leaves the draft the device holds between streets too; inside §19's
@@ -537,7 +582,7 @@ export function useOfflineGame({
         return kept.length === draft.length ? draft : kept;
       });
     },
-    [act],
+    [act, now],
   );
 
   const endPowerUsed = useCallback((event: PowerUsedEvent) => {
@@ -698,7 +743,7 @@ function openTable({
     dictionary,
     stakes: DEFAULT_STAKES,
     turnDurationMs,
-    ...(powerUps === "choose3" ? { powerUps: { deal: "choose3", bots: BOT_IDS } } : {}),
+    ...(powerUps === "choose3" ? { powerUps: { deal: "choose3" } } : {}),
   });
 }
 
@@ -711,14 +756,27 @@ function openTable({
  * A bot whose tiles spell nothing the table counts is passed over rather than stopping the pass:
  * §19 leaves its slot to the clock, and the seats behind it in seat order still get to answer.
  */
-function nextCpuMove(state: OfflineState): OfflineAction | null {
+function nextCpuMove(state: OfflineState, nowMs: number): OfflineAction | null {
   // A settled hand is dealt by the seat, not by a bot: `deal` is the felt's own control.
-  if (state.phase === "payout") return null;
+  if (state.phase === "payout" || cpuDeadlinePassed(state, nowMs)) return null;
+
+  const draw = state.powers?.draw;
+  if (draw?.status === "open") {
+    const hero = draw.slots.find((slot) => slot.playerId === HERO_ID);
+    if (hero === undefined || hero.picked === null) return null;
+    const slot = draw.slots.find((slot) => slot.playerId !== HERO_ID && slot.picked === null);
+    return slot === undefined ? null : {
+      type: "pickPower", playerId: slot.playerId, powerUpId: chooseBotPower(state, slot.playerId),
+    };
+  }
 
   const window = state.wordWindow;
   if (window?.status === "open") {
     for (const slot of window.slots) {
       if (slot.playerId === HERO_ID || slot.status !== "drafting") continue;
+
+      const use = decideBotPowerUse(state, slot.playerId, nowMs);
+      if (use !== null) return { type: "usePowerUp", playerId: slot.playerId, ...use };
 
       const submission = chooseOfflineWord({
         available: availableTiles(state, slot.seat),
@@ -735,12 +793,29 @@ function nextCpuMove(state: OfflineState): OfflineAction | null {
   const acting = index === null ? undefined : state.seats[index];
   if (index === null || acting === undefined || acting.id === HERO_ID) return null;
 
-  return decideOfflineMove(state, acting.id);
+  const use = decideBotPowerUse(state, acting.id, nowMs);
+  return use === null ? decideOfflineMove(state, acting.id) : { type: "usePowerUp", playerId: acting.id, ...use };
 }
 
-/** Whether §19's window is out of time: a window is a deadline, not a stay. */
-function windowRanOut(state: OfflineState, nowMs: number): boolean {
-  return state.wordWindow?.status === "open" && nowMs >= state.endsAtMs;
+/** A cheap timer predicate: all word searches run only inside the scheduled beat. */
+function cpuBeatPending(state: OfflineState, nowMs: number): boolean {
+  if (state.phase === "payout" || cpuDeadlinePassed(state, nowMs)) return false;
+  const draw = state.powers?.draw;
+  if (draw?.status === "open") {
+    const hero = draw.slots.find((slot) => slot.playerId === HERO_ID);
+    return hero !== undefined && hero.picked !== null &&
+      draw.slots.some((slot) => slot.playerId !== HERO_ID && slot.picked === null);
+  }
+  if (state.wordWindow?.status === "open") {
+    return state.wordWindow.slots.some((slot) => slot.playerId !== HERO_ID && slot.status === "drafting");
+  }
+  const acting = state.toActIndex === null ? undefined : state.seats[state.toActIndex];
+  return acting !== undefined && acting.id !== HERO_ID;
+}
+
+/** Deadline timers settle the table; a delayed or slow CPU decision never extends them. */
+function cpuDeadlinePassed(state: OfflineState, nowMs: number): boolean {
+  return nowMs >= (state.powers?.draw.status === "open" ? state.powers.draw.endsAtMs : state.endsAtMs);
 }
 
 /**

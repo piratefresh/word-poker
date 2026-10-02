@@ -60,11 +60,11 @@ pair pool, which is where §10's frequency and its cap of three are enforced —
 [Choice Tiles](tiles.md) §10.
 
 <!-- Contract status: the bag is the 98 single-letter tiles above, with §6's values pinned to
-     the table by a drift-guard test (`packages/game-rules/src/tiles.ts`, STO-467). §10's choice
+     the table by a drift-guard test (`packages/game-rules/src/tiles/tiles.ts`, STO-467). §10's choice
      tiles are placed by the deal rather than held in the bag
-     (`packages/game-rules/src/special-tiles.ts`), which is also where §9's multiplier rolls
-     live. Word-building honours §10–§12 (`packages/game-rules/src/building.ts`), and scoring is
-     implemented in `packages/game-rules/src/scoring.ts` (`scoreWord`, §7's per-letter
+     (`packages/game-rules/src/tiles/special-tiles.ts`), which is also where §9's multiplier rolls
+     live. Word-building honours §10–§12 (`packages/game-rules/src/words/building.ts`), and scoring is
+     implemented in `packages/game-rules/src/words/scoring.ts` (`scoreWord`, §7's per-letter
      breakdown). -->
 
 ---
@@ -196,7 +196,7 @@ below put numbers on that recommendation.
 
 Every physical tile the deal puts on the table is eligible — private or community, single
 or choice — and the roll happens once per tile at deal time, on the deal's seeded
-generator (`packages/game-rules/src/special-tiles.ts`). A tile carries at most one
+generator (`packages/game-rules/src/tiles/special-tiles.ts`). A tile carries at most one
 multiplier: §9 does not stack them.
 
 The defaults:

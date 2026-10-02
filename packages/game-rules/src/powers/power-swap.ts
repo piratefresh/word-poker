@@ -15,9 +15,9 @@
 
 import type { LetterTile, PowerUpId, Tile } from "@wordpoker/contracts";
 
-import { OfflineActionError } from "./errors";
-import { LETTER_VALUES, type Letter } from "./letters";
-import { createRng, mixSeed } from "./rng";
+import { OfflineActionError } from "../core/errors";
+import { LETTER_VALUES, type Letter } from "../tiles/letters";
+import { createRng, mixSeed } from "../core/rng";
 
 /** Random Wild's letters: all 26 of §6's faces, each equally likely. */
 const ALPHABET = Object.keys(LETTER_VALUES) as Letter[];

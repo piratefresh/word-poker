@@ -29,8 +29,8 @@ import type {
   WordScore,
 } from "@wordpoker/contracts";
 
-import { shuffle } from "./deal";
-import { createTileBag } from "./tiles";
+import { shuffle } from "../tiles/deal";
+import { createTileBag } from "../tiles/tiles";
 
 /** One seat contesting the showdown: §7's breakdown when it had a valid word. */
 export interface ShowdownEntry {

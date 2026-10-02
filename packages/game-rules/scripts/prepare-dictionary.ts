@@ -20,7 +20,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DICTIONARIES } from "../src/dictionary";
+import { DICTIONARIES } from "../src/words/dictionary";
 import type { DictionaryId } from "@wordpoker/contracts";
 
 const here = dirname(fileURLToPath(import.meta.url));
