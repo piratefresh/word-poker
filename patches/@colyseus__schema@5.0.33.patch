@@ -1,0 +1,129 @@
+diff --git a/build/index.cjs b/build/index.cjs
+index fef98b9894202d52036b51e0245d7c9d1f6e6d31..ea1d19112a034fa01ca25f81c535d6a34aab33d2 100644
+--- a/build/index.cjs
++++ b/build/index.cjs
+@@ -8575,7 +8575,8 @@ function _clearViewBitFromAllTrees(root, slot, bit) {
+  * clears the view's leftover bits from every ChangeTree. Backstop for
+  * forgotten `view.dispose()` calls; timing is non-deterministic but bounded.
+  */
+-const _disposeRegistry = new FinalizationRegistry(({ root, id, slot, bit }) => {
++// Optional GC backstop; explicit StateView.dispose() still performs cleanup.
++const _disposeRegistry = typeof FinalizationRegistry === "undefined" ? undefined : new FinalizationRegistry(({ root, id, slot, bit }) => {
+     _clearViewBitFromAllTrees(root, slot, bit);
+     root.releaseViewId(id);
+ });
+@@ -8673,7 +8674,7 @@ class StateView {
+         this._slot = this.id >> 5;
+         this._bit = 1 << (this.id & 31);
+         root.registerView(this);
+-        _disposeRegistry.register(this, { root, id: this.id, slot: this._slot, bit: this._bit }, this);
++        _disposeRegistry?.register(this, { root, id: this.id, slot: this._slot, bit: this._bit }, this);
+     }
+     /**
+      * Release this view's ID back to the Root for reuse, AND clear all
+@@ -8691,7 +8692,7 @@ class StateView {
+         this._root.unregisterView(this);
+         _clearViewBitFromAllTrees(this._root, this._slot, this._bit);
+         this._root.releaseViewId(this.id);
+-        _disposeRegistry.unregister(this);
++        _disposeRegistry?.unregister(this);
+         this._root = undefined;
+         this.id = -1;
+     }
+diff --git a/build/index.js b/build/index.js
+index ba496ed4ea0f30c764b253f16758db30aa0ae0ab..b7aa426d1e354bf3751527a06eaa00340b1fc2cb 100644
+--- a/build/index.js
++++ b/build/index.js
+@@ -8579,7 +8579,8 @@
+      * clears the view's leftover bits from every ChangeTree. Backstop for
+      * forgotten `view.dispose()` calls; timing is non-deterministic but bounded.
+      */
+-    const _disposeRegistry = new FinalizationRegistry(({ root, id, slot, bit }) => {
++    // Optional GC backstop; explicit StateView.dispose() still performs cleanup.
++    const _disposeRegistry = typeof FinalizationRegistry === "undefined" ? undefined : new FinalizationRegistry(({ root, id, slot, bit }) => {
+         _clearViewBitFromAllTrees(root, slot, bit);
+         root.releaseViewId(id);
+     });
+@@ -8677,7 +8678,7 @@
+             this._slot = this.id >> 5;
+             this._bit = 1 << (this.id & 31);
+             root.registerView(this);
+-            _disposeRegistry.register(this, { root, id: this.id, slot: this._slot, bit: this._bit }, this);
++            _disposeRegistry?.register(this, { root, id: this.id, slot: this._slot, bit: this._bit }, this);
+         }
+         /**
+          * Release this view's ID back to the Root for reuse, AND clear all
+@@ -8695,7 +8696,7 @@
+             this._root.unregisterView(this);
+             _clearViewBitFromAllTrees(this._root, this._slot, this._bit);
+             this._root.releaseViewId(this.id);
+-            _disposeRegistry.unregister(this);
++            _disposeRegistry?.unregister(this);
+             this._root = undefined;
+             this.id = -1;
+         }
+diff --git a/build/index.mjs b/build/index.mjs
+index bf37dade02f9ab617f3dc5e3af42d3fb7fad261e..375f5a42dfb98b50975b0c6cf3f09a6efecc2e50 100644
+--- a/build/index.mjs
++++ b/build/index.mjs
+@@ -8573,7 +8573,8 @@ function _clearViewBitFromAllTrees(root, slot, bit) {
+  * clears the view's leftover bits from every ChangeTree. Backstop for
+  * forgotten `view.dispose()` calls; timing is non-deterministic but bounded.
+  */
+-const _disposeRegistry = new FinalizationRegistry(({ root, id, slot, bit }) => {
++// Optional GC backstop; explicit StateView.dispose() still performs cleanup.
++const _disposeRegistry = typeof FinalizationRegistry === "undefined" ? undefined : new FinalizationRegistry(({ root, id, slot, bit }) => {
+     _clearViewBitFromAllTrees(root, slot, bit);
+     root.releaseViewId(id);
+ });
+@@ -8671,7 +8672,7 @@ class StateView {
+         this._slot = this.id >> 5;
+         this._bit = 1 << (this.id & 31);
+         root.registerView(this);
+-        _disposeRegistry.register(this, { root, id: this.id, slot: this._slot, bit: this._bit }, this);
++        _disposeRegistry?.register(this, { root, id: this.id, slot: this._slot, bit: this._bit }, this);
+     }
+     /**
+      * Release this view's ID back to the Root for reuse, AND clear all
+@@ -8689,7 +8690,7 @@ class StateView {
+         this._root.unregisterView(this);
+         _clearViewBitFromAllTrees(this._root, this._slot, this._bit);
+         this._root.releaseViewId(this.id);
+-        _disposeRegistry.unregister(this);
++        _disposeRegistry?.unregister(this);
+         this._root = undefined;
+         this.id = -1;
+     }
+diff --git a/src/encoder/StateView.ts b/src/encoder/StateView.ts
+index 5a6ed55519ec5bdb065dae7025baf931a13069be..34b923af040adb4ecf91a58d3231d893598a169e 100644
+--- a/src/encoder/StateView.ts
++++ b/src/encoder/StateView.ts
+@@ -48,7 +48,9 @@ function _clearViewBitFromAllTrees(root: Root, slot: number, bit: number): void
+  * clears the view's leftover bits from every ChangeTree. Backstop for
+  * forgotten `view.dispose()` calls; timing is non-deterministic but bounded.
+  */
+-const _disposeRegistry = new FinalizationRegistry<{ root: Root; id: number; slot: number; bit: number }>(
++// Decoding clients (including Hermes) may not provide this optional GC backstop.
++// Explicit StateView.dispose() still performs the complete cleanup.
++const _disposeRegistry = typeof FinalizationRegistry === "undefined" ? undefined : new FinalizationRegistry<{ root: Root; id: number; slot: number; bit: number }>(
+     ({ root, id, slot, bit }) => {
+         _clearViewBitFromAllTrees(root, slot, bit);
+         root.releaseViewId(id);
+@@ -146,7 +148,7 @@ export class StateView {
+         this._slot = this.id >> 5;
+         this._bit = 1 << (this.id & 31);
+         root.registerView(this);
+-        _disposeRegistry.register(
++        _disposeRegistry?.register(
+             this,
+             { root, id: this.id, slot: this._slot, bit: this._bit },
+             this,
+@@ -168,7 +170,7 @@ export class StateView {
+         this._root.unregisterView(this);
+         _clearViewBitFromAllTrees(this._root, this._slot, this._bit);
+         this._root.releaseViewId(this.id);
+-        _disposeRegistry.unregister(this);
++        _disposeRegistry?.unregister(this);
+         this._root = undefined;
+         this.id = -1;
+     }
