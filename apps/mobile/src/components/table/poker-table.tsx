@@ -275,9 +275,9 @@ export function PokerTable<TSeat, TCard>({
           >
             {/* Pot */}
             {renderPot ? (
-              <AnchoredSlot point={ctx.resolve(layout.pot)}>
+              <BoxedSlot point={ctx.resolve(layout.pot)} size={felt}>
                 {renderPot(meta)}
-              </AnchoredSlot>
+              </BoxedSlot>
             ) : null}
 
             {/* Community cards */}
@@ -353,7 +353,46 @@ function AnchoredSlot({
   );
 }
 
+/**
+ * Centers its child on a pixel point like `AnchoredSlot`, but inside a real box: the largest
+ * one centred on the point that stays on the felt. Android does not draw the pot's amount
+ * spilling out of a zero-size anchor (STO-516), so the pot gets room of its own.
+ */
+function BoxedSlot({
+  point,
+  size,
+  children,
+}: {
+  point: { x: number; y: number };
+  size: { width: number; height: number };
+  children: ReactNode;
+}) {
+  const halfWidth = Math.max(0, Math.min(point.x, size.width - point.x));
+  const halfHeight = Math.max(0, Math.min(point.y, size.height - point.y));
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.box,
+        {
+          height: halfHeight * 2,
+          left: point.x - halfWidth,
+          top: point.y - halfHeight,
+          width: halfWidth * 2,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  box: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   container: {
     flex: 1,
     backgroundColor: colors.bgElevated,

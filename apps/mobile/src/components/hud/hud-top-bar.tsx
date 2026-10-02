@@ -162,11 +162,6 @@ export function HudTopBar({
         />
         {/* Only the lettering rises on a phase change: the banner itself stays hung. */}
         <Animated.View style={[StyleSheet.absoluteFill, entrance]}>
-          <View style={banner.stampPlate}>
-            <LabelBand style={banner.stampBand} textStyle={banner.stamp}>
-              {stamp ?? `PHASE ${phaseNumber} · ${PHASE_LABEL[phase]}`}
-            </LabelBand>
-          </View>
           <View style={banner.clockPlate}>
             <BannerClock
               clockStyle={banner.clock}
@@ -178,6 +173,15 @@ export function HudTopBar({
           </View>
         </Animated.View>
       </View>
+      {/* The stamp rises with the clock, laid out in the bar rather than hung off the frame. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[banner.stampPlate, entrance]}
+      >
+        <LabelBand style={banner.stampBand} textStyle={banner.stamp}>
+          {stamp ?? `PHASE ${phaseNumber} · ${PHASE_LABEL[phase]}`}
+        </LabelBand>
+      </Animated.View>
       {/* After the banner, so the controls draw over its pole ends and cloth. */}
       <View pointerEvents="box-none" style={[styles.bar, banner.bar]}>
         <GlassButton label="Leave the table" onPress={onLeave} size="leading">
