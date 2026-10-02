@@ -90,8 +90,7 @@ export function drawOffers(dealSeed: number, seat: number): readonly PowerUpId[]
 
 /**
  * Opens the Power Draw: one slot per seat handed in, each with its offers, on one clock that
- * starts at `nowMs`. The caller decides who draws — a seat sitting the hand out does not, and in
- * v1 neither does a CPU seat.
+ * starts at `nowMs`. The caller includes every seat dealt in; sitting-out seats do not draw.
  */
 export function openDraw(drawing: readonly DrawSeat[], dealSeed: number, nowMs: number): PowerDraw {
   return {

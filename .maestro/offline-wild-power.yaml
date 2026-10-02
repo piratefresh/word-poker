@@ -6,7 +6,8 @@
 #
 # Same seed as offline-wild-hand.yaml. For it the hero is dealt T-1 (a triple letter) and K-1,
 # is offered Vowel Magnet first, and Vowel Magnet's letter for seat 0 is E (`swapTile` in
-# game-rules, a stream of its own, so the deal and the bots' line are the Classic hand's). The
+# game-rules, a stream of its own). CPU swaps change their later line: Mira uses Mulligan then
+# raises to 60, Ellis uses Wild then folds, and Jay uses Vowel Magnet then calls. The
 # swap takes K-1's place in the strip as `power-0`, and T-1 + E spells TE: T tripled to 6 and E
 # 1, 7 points. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
 #
@@ -45,6 +46,7 @@ tags:
     timeout: 5000
 - tapOn:
     id: "power-offer-vowel_magnet"
+    waitToSettleTimeoutMs: 0
     retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible:
@@ -63,12 +65,15 @@ tags:
 # Chip → the rack waits for a private tile → the felt asks, in the catalog's words → swap.
 - tapOn:
     id: "power-held"
+    waitToSettleTimeoutMs: 0
 - assertVisible: "Tap one of your tiles to swap it"
 - tapOn:
     id: "word-builder-tile-K-1"
+    waitToSettleTimeoutMs: 0
 - assertVisible: "Discard K for a random vowel\\?"
 - tapOn:
     id: "power-confirm"
+    waitToSettleTimeoutMs: 0
 
 # The table sees the use, never the letter: the felt's card names the power and the hero, and the
 # hero's nameplate wears VOWEL beside its status (§44, Visibility). The flip waits for the card.
@@ -86,6 +91,8 @@ tags:
 - extendedWaitUntil:
     notVisible:
       id: "power-used"
+      containsDescendants:
+        - text: "YOU USED"
     timeout: 5000
 
 # The new tile flips over in K's place, and the chip is spent for the hand.
@@ -93,7 +100,8 @@ tags:
     visible:
       id: "word-builder-tile-power-0"
     timeout: 5000
-- waitForAnimationToEnd
+- waitForAnimationToEnd:
+    timeout: 500
 - assertNotVisible:
     id: "word-builder-tile-K-1"
 - assertVisible: "USED"
@@ -101,8 +109,10 @@ tags:
 # The new letter builds and scores like any other: T-1 then the E in K's old place spells TE.
 - tapOn:
     id: "word-builder-tile-T-1"
+    waitToSettleTimeoutMs: 0
 - tapOn:
     id: "word-builder-tile-power-0"
+    waitToSettleTimeoutMs: 0
 - assertVisible: "TE"
 - assertVisible: "7 pts"
 

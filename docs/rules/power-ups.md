@@ -120,8 +120,18 @@ These rules hold for every power in the Swap a Private Tile family:
 
 ## Offline Play
 
-At an offline Wild table, only the player draws and holds a power; the CPU seats (§13) do not.
-Giving the CPU seats powers is a planned follow-up.
+At an offline Wild table, every seat dealt in draws and holds a power, including CPU and all-in
+seats (§13). After the player picks, CPUs choose in seat order, one pick per CPU beat. Until
+every seat picks or the shared draw clock runs out, nobody is on the betting clock. The timeout
+preserves existing picks and keeps the first offer for each seat still choosing.
+
+CPU choices are seeded and use only their own tiles, the revealed board and public betting
+state. They weigh their offers by rack fit and personality, then may use their held power on
+their own turn or in §19's window before confirming. They prefer swapping a private tile outside
+their best current word, otherwise their lowest printed-value tile. A use takes its own beat;
+the next beat recomputes the bet or word from the changed rack. It never renews the clock and
+does not guarantee a better word. The public card, street tag and showdown marker follow the
+same visibility rules as the player's; CPU offers, held powers and swap results remain private.
 
 ## Open Questions
 

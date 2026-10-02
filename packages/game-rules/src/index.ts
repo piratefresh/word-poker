@@ -85,3 +85,4 @@ export type {
 } from "./money/betting";
 export { buildPots, resolvePayout, splitAward } from "./money/pots";
 export type { JudgedSeat, PotContest, ResolvePayoutOptions, ResolvedPayout } from "./money/pots";
+export { chooseBotPower, decideBotPowerUse } from "./bot/bot-power";
