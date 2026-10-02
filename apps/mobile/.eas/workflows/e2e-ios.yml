@@ -1,0 +1,21 @@
+name: iOS simulator E2E
+
+on:
+  workflow_dispatch: {}
+  pull_request_labeled:
+    labels:
+      - e2e
+
+jobs:
+  build_ios_for_e2e:
+    type: build
+    params:
+      platform: ios
+      profile: e2e-test
+
+  maestro_test:
+    needs: [build_ios_for_e2e]
+    type: maestro
+    params:
+      build_id: ${{ needs.build_ios_for_e2e.outputs.build_id }}
+      flow_path: .maestro/native/offline-hand.yaml

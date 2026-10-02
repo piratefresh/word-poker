@@ -11,6 +11,7 @@ import {
   type UniversalTextStyle,
 } from "@expo/ui";
 import { useState } from "react";
+import { useWindowDimensions } from "react-native";
 
 import {
   ModeCard,
@@ -97,6 +98,8 @@ const MODES: Mode[] = [
   },
 ];
 
+const CARD_PADDING = spacing.lg;
+
 const titleText = {
   color: colors.textBright,
   fontFamily: fonts.serifBold,
@@ -120,6 +123,10 @@ const signedInText = {
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
   const [pending, setPending] = useState<ModeKey | null>(null);
+  // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
+  // card shrinks to its own content, so the column's width is handed down as a number.
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = windowWidth - spacing.gutter * 2;
 
   // Modes with a route navigate; the rest don't exist yet, so selecting one
   // just marks intent for now.
@@ -134,7 +141,11 @@ export function HomeScreen() {
   return (
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
-        <Column alignment="start" spacing={spacing.md} style={styles.screen}>
+        <Column
+          alignment="start"
+          spacing={spacing.md}
+          style={{ ...styles.screen, width: windowWidth }}
+        >
           <Text textStyle={titleText}>Choose how to play</Text>
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
@@ -152,13 +163,15 @@ export function HomeScreen() {
                 label={mode.label}
                 onSelect={() => handleSelect(mode)}
                 tone={mode.tone}
+                width={contentWidth}
               >
                 {variants ? (
-                  <RNHostView>
+                  <RNHostView matchContents>
                     <ModeVariants
                       disabled={disabled}
                       onSelect={(variant) => handleSelect(mode, variant.href)}
                       variants={variants}
+                      width={contentWidth - CARD_PADDING * 2}
                     />
                   </RNHostView>
                 ) : null}
@@ -168,8 +181,8 @@ export function HomeScreen() {
 
           <Spacer size={spacing.lg} />
 
-          <Column spacing={spacing.md} style={styles.footer}>
-            <Row alignment="center" style={{ width: "100%" }}>
+          <Column spacing={spacing.md} style={{ ...styles.footer, width: contentWidth }}>
+            <Row alignment="center" style={{ width: contentWidth - spacing.lg * 2 }}>
               <Text textStyle={signedInText}>Signed in as</Text>
               <Spacer flexible />
               <Text textStyle={signedInText}>
@@ -199,13 +212,11 @@ const styles = {
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.gutter,
     paddingTop: spacing.huge,
-    width: "100%" as const,
   },
   footer: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    width: "100%" as const,
   },
 };

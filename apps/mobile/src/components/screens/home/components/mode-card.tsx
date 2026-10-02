@@ -21,6 +21,8 @@ export type ModeCardProps = {
   tone?: ModeTone;
   disabled?: boolean;
   onSelect?: () => void;
+  /** The card's outer width in points; SwiftUI ignores a percentage. */
+  width: number;
   /**
    * The mode's own choices, under its header (e.g. Offline's Normal | Wild Power). A card that
    * carries them is not pressed itself: the choices are.
@@ -51,6 +53,7 @@ export function ModeCard({
   tone = "default",
   disabled = false,
   onSelect,
+  width,
   children,
 }: ModeCardProps) {
   const ink = inkFor(tone);
@@ -62,8 +65,10 @@ export function ModeCard({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     opacity: disabled ? 0.55 : 1,
-    width: "100%",
+    width,
   };
+  // The frame wraps the padding, so the rows inside get the width less both gutters.
+  const innerWidth = width - spacing.lg * 2;
 
   const labelText: UniversalTextStyle = {
     color: ink.label,
@@ -105,13 +110,17 @@ export function ModeCard({
       style={cardStyle}
     >
       {badge ? (
-        <Row style={{ width: "100%" }}>
+        <Row style={{ width: innerWidth }}>
           <Row alignment="center" style={badgePill}>
             <Text textStyle={badgeText}>{badge.toUpperCase()}</Text>
           </Row>
         </Row>
       ) : null}
-      <Row alignment="center" spacing={spacing.md} style={{ width: "100%" }}>
+      <Row
+        alignment="center"
+        spacing={spacing.md}
+        style={{ width: innerWidth }}
+      >
         <Text textStyle={glyphText}>{glyph}</Text>
         <Column spacing={spacing.xxs}>
           <Text textStyle={labelText}>{label}</Text>

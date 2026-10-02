@@ -200,6 +200,7 @@ cd apps/mobile
 eas build --platform android --profile e2e-test    # or --platform ios
 eas build:run --platform android --latest          # installs it on a booted emulator/device
 maestro test --platform android .maestro/native/offline-hand.yaml
+# On a Mac with an iOS Simulator, use --platform ios for both build:run and maestro test.
 ```
 
 Android wants a booted emulator or an adb-visible device; `--platform ios` needs a Mac with a
@@ -207,11 +208,11 @@ Simulator. The flow takes the action row by testID (`action-check-call`, `action
 nameplates print CHECK and CALL as seat status too, so a text selector there is ambiguous — and
 everything else by the string a component prints, matched whole and case-sensitively, unlike the web.
 
-EAS Workflows can run these flows on its own emulator and simulator — a `maestro` job with
-`flow_path: .maestro/native` behind the `e2e-test` profile, as the Expo E2E example shows — but that
-job type and the workers it needs (`linux-*-nested-virtualization` for Android, `macos-*` for iOS)
-require a paid Expo plan on this account (September 2026), so no workflow file is checked in. Add
-one when that changes; trigger it from an `e2e` label on a pull request, or by hand.
+EAS Workflows runs the iOS offline hand from `apps/mobile/.eas/workflows/e2e-ios.yml`. It builds
+with `e2e-test`, then runs `.maestro/native/offline-hand.yaml` on an iOS simulator. Trigger it
+manually from `apps/mobile` with `eas workflow:run .eas/workflows/e2e-ios.yml`, or add the `e2e`
+label to a pull request. EAS Workflows and its Maestro job require an Expo plan that includes
+those services.
 
 ## Online device smoke
 
