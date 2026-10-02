@@ -29,6 +29,7 @@ import {
   type ModeVariant,
 } from "@/components/screens/home/components/mode-variants";
 import { authClient } from "@/lib/auth-client";
+import { fullWidth } from "@/lib/full-width";
 
 type ModeKey = "tutorial" | "online" | "offline" | "leaderboard";
 
@@ -134,7 +135,7 @@ export function HomeScreen() {
   return (
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
-        <Column alignment="start" spacing={spacing.md} style={styles.screen}>
+        <Column alignment="start" spacing={spacing.md} {...fullWidth(styles.screen)}>
           <Text textStyle={titleText}>Choose how to play</Text>
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
@@ -168,8 +169,8 @@ export function HomeScreen() {
 
           <Spacer size={spacing.lg} />
 
-          <Column spacing={spacing.md} style={styles.footer}>
-            <Row alignment="center" style={{ width: "100%" }}>
+          <Column spacing={spacing.md} {...fullWidth(styles.footer)}>
+            <Row alignment="center" {...fullWidth()}>
               <Text textStyle={signedInText}>Signed in as</Text>
               <Spacer flexible />
               <Text textStyle={signedInText}>

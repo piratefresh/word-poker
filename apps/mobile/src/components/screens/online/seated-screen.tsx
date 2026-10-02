@@ -34,6 +34,7 @@ import {
   type TableSnapshot,
 } from "@/lib/room-session";
 import { useDictionary } from "@/lib/use-dictionary";
+import { fullWidth } from "@/lib/full-width";
 
 import { OnlineFelt } from "./online-felt";
 
@@ -254,7 +255,7 @@ function Stat({
   testID: string;
 }) {
   return (
-    <Row alignment="center" spacing={spacing.md} style={styles.stat}>
+    <Row alignment="center" spacing={spacing.md} {...fullWidth()}>
       <Text textStyle={factLabelText}>{label}</Text>
       <Spacer flexible />
       <Text testID={testID} textStyle={factValueText}>
@@ -338,5 +339,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     width: "100%",
   },
-  stat: { width: "100%" },
 });

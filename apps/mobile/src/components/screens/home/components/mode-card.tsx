@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react";
 
 import { border, colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
+import { fullWidth } from "@/lib/full-width";
 
 export type ModeTone = "default" | "recommended" | "warm";
 
@@ -102,16 +103,16 @@ export function ModeCard({
       disabled={disabled}
       onPress={disabled || children ? undefined : onSelect}
       spacing={badge || children ? spacing.md : spacing.none}
-      style={cardStyle}
+      {...fullWidth(cardStyle)}
     >
       {badge ? (
-        <Row style={{ width: "100%" }}>
+        <Row {...fullWidth()}>
           <Row alignment="center" style={badgePill}>
             <Text textStyle={badgeText}>{badge.toUpperCase()}</Text>
           </Row>
         </Row>
       ) : null}
-      <Row alignment="center" spacing={spacing.md} style={{ width: "100%" }}>
+      <Row alignment="center" spacing={spacing.md} {...fullWidth()}>
         <Text textStyle={glyphText}>{glyph}</Text>
         <Column spacing={spacing.xxs}>
           <Text textStyle={labelText}>{label}</Text>

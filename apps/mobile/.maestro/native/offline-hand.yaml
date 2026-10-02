@@ -51,6 +51,12 @@ tags:
 ---
 - launchApp
 
+# On a cold start the root layout renders nothing until the fonts load, and a link that
+# lands then is dropped (STO-516): wait for home before sending it.
+- extendedWaitUntil:
+    visible: "Choose how to play"
+    timeout: 30000
+
 # The web flow pins the seed in its URL; a device gets the same route as a deep link. The
 # scheme is app.json's `scheme`, so expo-router reads this as /offline?seed=…
 - openLink: wordpoker://offline?seed=20260919

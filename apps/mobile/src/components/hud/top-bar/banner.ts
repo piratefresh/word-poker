@@ -120,16 +120,18 @@ export function bannerLayout(window: { width: number; height: number }) {
       top: -BANNER_PAINTED.top * scale,
       width: BANNER_IMAGE.width * scale,
     },
-    // The title's band, centred over the plate; the band may reach past the frame's ends,
-    // since its shade fades out there anyway.
+    // The title's band, in the margin above the frame and centred over the plate. It is laid
+    // out in the bar's own box rather than hung off the frame's: on Android a view outside its
+    // parent's box draws dim through the entrance's fade and drops out of the accessibility
+    // tree (STO-516).
     stampPlate: {
       alignItems: "center",
       height: stampBand(type),
       justifyContent: "center",
-      left: -LABEL_BAND_PAD.horizontal * type,
+      left: 0,
       position: "absolute",
-      right: -LABEL_BAND_PAD.horizontal * type,
-      top: -stampTop,
+      right: 0,
+      top: BAR_TOP_PAD,
     },
     stampBand: {
       paddingHorizontal: LABEL_BAND_PAD.horizontal * type,
