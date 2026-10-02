@@ -49,6 +49,28 @@ export {
   revealedCount,
   startHand,
 } from "./table/offline";
+export {
+  TUTORIAL_HERO,
+  TUTORIAL_PLAYERS,
+  TUTORIAL_RAISE_TO,
+  TUTORIAL_SCRIPT,
+  TUTORIAL_SEED,
+  TUTORIAL_TARGET_WORD,
+  TUTORIAL_VERSION,
+  applyTutorialAction,
+  nextScriptedAction,
+  startTutorial,
+  tutorialCheckpoint,
+} from "./table/tutorial";
+export type {
+  StartTutorialOptions,
+  TutorialApply,
+  TutorialCheckpoint,
+  TutorialDivergence,
+  TutorialHeroMove,
+  TutorialRun,
+  TutorialStep,
+} from "./table/tutorial";
 export type {
   HandPowers,
   HandResult,
