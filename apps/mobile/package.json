@@ -26,6 +26,7 @@
     "@shopify/react-native-skia": "^2.12.0",
     "@wordpoker/contracts": "workspace:*",
     "@wordpoker/db": "workspace:*",
+    "@wordpoker/economy": "workspace:*",
     "@wordpoker/game-rules": "workspace:*",
     "better-auth": "^1.7.4",
     "dotenv": "17.4.2",

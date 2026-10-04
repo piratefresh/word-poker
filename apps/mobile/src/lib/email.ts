@@ -142,3 +142,62 @@ export function passwordResetEmail({
 
   return { subject, html, text };
 }
+
+/** The verification mail: one button, and the welcome coins it unlocks. */
+export function verifyEmailEmail({
+  name,
+  buttonUrl,
+  coins,
+}: {
+  name: string;
+  /** Better Auth's http(s) verification URL; it verifies, then redirects to the callback. */
+  buttonUrl: string;
+  /** The welcome grant, already formatted ("5,000"). */
+  coins: string;
+}): Omit<Email, "to"> {
+  const who = escapeHtml(name.trim() || "player");
+  const href = escapeHtml(buttonUrl);
+  const subject = `Confirm your email to claim your ${coins} welcome coins`;
+
+  const text = [
+    `Hi ${name.trim() || "player"},`,
+    "",
+    `Confirm your email to claim your ${coins} welcome coins (link good for ${LINK_LIFETIME}):`,
+    "",
+    buttonUrl,
+    "",
+    "If you didn't create a Word Poker account, ignore this email.",
+  ].join("\n");
+
+  const html = `<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:${brand.felt};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${brand.felt};padding:40px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background:${brand.card};border:1px solid ${brand.border};border-radius:14px;">
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0;font-family:${sans};font-size:11px;letter-spacing:2.2px;text-transform:uppercase;color:${brand.gold};">Word Poker</p>
+                <h1 style="margin:20px 0 0;font-family:${serif};font-size:24px;line-height:32px;font-weight:700;color:${brand.cream};">Claim your ${coins} coins.</h1>
+                <p style="margin:12px 0 0;font-family:${sans};font-size:15px;line-height:22px;color:${brand.dim};">Hi ${who} — confirm your email and your welcome coins land in your Wallet.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;">
+                  <tr>
+                    <td style="background:${brand.gold};border-radius:4px;">
+                      <a href="${href}" style="display:inline-block;padding:14px 28px;font-family:${sans};font-size:14px;font-weight:700;letter-spacing:0.5px;color:${brand.onGold};text-decoration:none;">Confirm my email</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:24px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">The link is good for ${LINK_LIFETIME}. If you didn't create a Word Poker account, ignore this email.</p>
+                <p style="margin:8px 0 0;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:18px;word-break:break-all;color:${brand.faint};">${href}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return { subject, html, text };
+}

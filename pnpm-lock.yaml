@@ -204,6 +204,9 @@ importers:
       '@wordpoker/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@wordpoker/economy':
+        specifier: workspace:*
+        version: link:../../packages/economy
       '@wordpoker/game-rules':
         specifier: workspace:*
         version: link:../../packages/game-rules

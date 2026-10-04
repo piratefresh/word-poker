@@ -5,6 +5,7 @@ import { Pool } from "pg";
 
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
+import { afterEmailVerification, sendVerificationEmail } from "./auth-verification";
 import { passwordResetEmail, sendEmail } from "./email";
 
 // `dotenv` leaves pre-existing variables untouched by default, so a shell that
@@ -88,6 +89,12 @@ export const auth = betterAuth({
       : []),
   ],
   plugins: [expo()],
+  // Verifying pays the Wallet's welcome grant (STO-346); signing in does not wait on it.
+  emailVerification: {
+    sendOnSignUp: true,
+    sendVerificationEmail,
+    afterEmailVerification,
+  },
   emailAndPassword: {
     enabled: true,
     // A reset is what a locked-out user reaches for when the account is

@@ -56,7 +56,11 @@ const LAYERING = [
  */
 const SERVER_ONLY_PACKAGES = /^@wordpoker\/economy$/;
 const APP_SOURCE = "apps/mobile/src";
-const APP_SERVER_SIDE = [/^apps\/mobile\/src\/app\/api\//, /^apps\/mobile\/src\/lib\/auth\.ts$/];
+const APP_SERVER_SIDE = [
+  /^apps\/mobile\/src\/app\/api\//,
+  /^apps\/mobile\/src\/lib\/auth\.ts$/,
+  /^apps\/mobile\/src\/lib\/auth-verification\.ts$/,
+];
 const TEST_FILE = /\.test\.(?:ts|tsx|mjs)$/;
 
 const IMPORT_SPECIFIERS = [
