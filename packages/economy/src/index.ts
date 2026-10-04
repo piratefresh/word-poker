@@ -23,6 +23,7 @@ export {
 } from "./revenuecat";
 export {
   applyWalletChange,
+  getCoinBalance,
   grantWelcome,
   retryPending,
   type WalletChangeExtras,

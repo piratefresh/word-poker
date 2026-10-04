@@ -17,6 +17,15 @@ import { defineConfig } from "@mikro-orm/postgresql";
 
 import { ResultsRating, WalletEvent } from "./src/entities/index";
 
+/**
+ * libpq reads `sslrootcert=system` as "trust the system's CAs", but `pg` reads every `sslrootcert`
+ * as a file path and fails to open one called `system`. Without the parameter `pg` verifies against
+ * Node's own CA store, which is the same intent, so it is dropped and `sslmode` is kept.
+ */
+export function pgConnectionString(url: string): string {
+  return url.replace(/([?&])sslrootcert=system(&|$)/, (_, lead: string, tail: string) => (tail ? lead : ""));
+}
+
 function connection() {
   const url = process.env.DATABASE_URL;
 
@@ -24,7 +33,7 @@ function connection() {
     // `clientUrl` on its own is not enough. MikroORM splits it into host/port/user/password and
     // drops the query string, and with it the `sslmode` the managed host insists on; handing the
     // same string to `pg` keeps libpq's meaning (`sslmode=verify-full`, `sslrootcert`, ...).
-    return { clientUrl: url, driverOptions: { connectionString: url } };
+    return { clientUrl: url, driverOptions: { connectionString: pgConnectionString(url) } };
   }
 
   const host = process.env.DATABASE_HOST;

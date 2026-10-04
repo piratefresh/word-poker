@@ -109,6 +109,11 @@ export async function applyWalletChange(
   return send(row, deps);
 }
 
+/** A player's balance, read from RevenueCat. */
+export function getCoinBalance(userId: string, deps: Pick<WalletDeps, "client"> = {}): Promise<number> {
+  return (deps.client ?? revenueCat()).getCoinBalance(userId);
+}
+
 /** The once-per-player welcome grant, paid when the player verifies their email. */
 export function grantWelcome(userId: string, deps: WalletDeps = {}): Promise<WalletChangeResult> {
   return applyWalletChange(userId, "welcome", WELCOME_GRANT, {}, deps);

@@ -12,9 +12,11 @@ import { randomUUID } from "node:crypto";
 import { MikroORM } from "@mikro-orm/postgresql";
 import type { Client } from "pg";
 
-import config from "../mikro-orm.config";
+import config, { pgConnectionString } from "../mikro-orm.config";
 
-export const serverUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const rawServerUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+
+export const serverUrl = rawServerUrl ? pgConnectionString(rawServerUrl) : undefined;
 
 /** Where this run's tables live; `schema` is set only on the fallback path. */
 export interface RunTarget {
