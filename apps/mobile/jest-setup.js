@@ -38,3 +38,20 @@ jest.mock("@/components/game/tile-choice-beam", () => ({
     return React.createElement(View, { style: { backgroundColor: color, height } });
   },
 }));
+
+// RevenueCat's SDK is a native module; tests that buy coins mock `@/lib/revenuecat` itself, and this
+// keeps anything else that loads the SDK from reaching for a binding Node does not have.
+jest.mock("react-native-purchases", () => {
+  const Purchases = {
+    configure: jest.fn(),
+    logIn: jest.fn(async () => ({ customerInfo: {}, created: false })),
+    logOut: jest.fn(async () => ({})),
+    getOfferings: jest.fn(async () => ({ current: null, all: {} })),
+    purchasePackage: jest.fn(async () => ({ customerInfo: {}, productIdentifier: "" })),
+  };
+  return {
+    __esModule: true,
+    default: Purchases,
+    PURCHASES_ERROR_CODE: { PURCHASE_CANCELLED_ERROR: "1" },
+  };
+});

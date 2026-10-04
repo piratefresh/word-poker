@@ -19,6 +19,7 @@ import {
   type Destination,
 } from '@/lib/pending-destination';
 import { leaveTable } from '@/lib/room-session';
+import { useRevenueCatIdentity } from '@/lib/use-revenuecat';
 import { E2E_AUTH_BYPASS } from '@/lib/e2e';
 
 SplashScreen.preventAutoHideAsync();
@@ -32,6 +33,8 @@ const styles = StyleSheet.create({ root: { flex: 1 } });
 
 export default function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
+  // Purchases credit the signed-in player's Wallet, so RevenueCat follows the session (STO-346).
+  useRevenueCatIdentity(session?.user.id);
 
   // E2E builds have no auth server and no account: the guard takes their word for it instead
   // of holding the table behind a session nothing can start (`src/lib/e2e.ts`).
