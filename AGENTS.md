@@ -276,6 +276,12 @@ them — it lives in a shared package so client and server can never disagree on
   action/command types, server→client event and state shapes, shared enums (e.g.
   `ROUND_PHASES`), and their validators. `apps/server` and `apps/mobile` both import this
   to type the socket boundary.
+- **`packages/economy`** — server-only Wallet operations (STO-346): the RevenueCat
+  Developer API v2 client (the Wallet's balance is RevenueCat Virtual Currency `COIN`),
+  `applyWalletChange`/`grantWelcome`/`retryPending` over `packages/db`'s `wallet_event`
+  log, the coin catalog, and webhook parsing. It holds the secret key, so only
+  `apps/mobile`'s API routes (and the server-only `src/lib/auth.ts`) and `apps/server` may
+  import it — `pnpm check:boundaries` refuses it anywhere else.
 
 Authority model: the **server is the source of truth** — it owns all mutation, runs
 `game-rules` to advance state and reject illegal actions. The **client imports the same

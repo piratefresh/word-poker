@@ -436,6 +436,25 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  packages/economy:
+    dependencies:
+      '@wordpoker/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@wordpoker/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.4
+        version: 24.13.4
+      tsx:
+        specifier: ^4.21.0
+        version: 4.23.13
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
   packages/game-rules:
     dependencies:
       '@wordpoker/contracts':
