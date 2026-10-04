@@ -6,3 +6,9 @@
  */
 
 export { ResultsRating, type ResultsRatingRow } from "./results-rating";
+export {
+  WALLET_EVENT_STATUSES,
+  WalletEvent,
+  type WalletEventRow,
+  type WalletEventStatus,
+} from "./wallet-event";

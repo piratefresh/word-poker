@@ -16,8 +16,13 @@ import type { Constructor } from "@mikro-orm/core";
 import type { Migration } from "@mikro-orm/migrations";
 
 import { Migration20260921030429_results_rating } from "./Migration20260921030429_results_rating";
+import { Migration20261004120000_wallet_event } from "./Migration20261004120000_wallet_event";
 
 export { Migration20260921030429_results_rating } from "./Migration20260921030429_results_rating";
+export { Migration20261004120000_wallet_event } from "./Migration20261004120000_wallet_event";
 
 /** Every migration this package has, oldest first. */
-export const migrations: Constructor<Migration>[] = [Migration20260921030429_results_rating];
+export const migrations: Constructor<Migration>[] = [
+  Migration20260921030429_results_rating,
+  Migration20261004120000_wallet_event,
+];
