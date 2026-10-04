@@ -31,7 +31,15 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { fullWidth } from "@/lib/full-width";
 
-type ModeKey = "tutorial" | "online" | "offline" | "leaderboard";
+type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store";
+
+/**
+ * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
+ * `EXPO_PUBLIC_*` name at build time; reading it here rather than at module load lets a test set it.
+ */
+function coinStoreEnabled(): boolean {
+  return process.env.EXPO_PUBLIC_COIN_STORE === "1";
+}
 
 type Variant = ModeVariant & { href: Href };
 
@@ -98,6 +106,14 @@ const MODES: Mode[] = [
   },
 ];
 
+const STORE_MODE: Mode = {
+  key: "store",
+  href: "/store",
+  glyph: "🪙",
+  label: "Coin Store",
+  description: "Top up your Wallet",
+};
+
 const titleText = {
   color: colors.textBright,
   fontFamily: fonts.serifBold,
@@ -140,7 +156,7 @@ export function HomeScreen() {
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
 
-          {MODES.map((mode) => {
+          {(coinStoreEnabled() ? [...MODES, STORE_MODE] : MODES).map((mode) => {
             const disabled = pending !== null && pending !== mode.key;
             const { variants } = mode;
             return (
