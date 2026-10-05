@@ -109,3 +109,5 @@ export type {
 export { buildPots, resolvePayout, splitAward } from "./money/pots";
 export type { JudgedSeat, PotContest, ResolvePayoutOptions, ResolvedPayout } from "./money/pots";
 export { chooseBotPower, decideBotPowerUse } from "./bot/bot-power";
+export { QUEST_CATALOG, applyQuestHand, emptyQuestProgress } from "./quests";
+export type { QuestDefinition, QuestProgressEntry, QuestProgressMap } from "./quests";
