@@ -7,13 +7,22 @@
  * different deal (STRONG, a server-held showdown); this is rewritten against seed 34's hand.
  *
  * Targets are the `CoachTarget` ids `GameScreen` marks: `community`, `table`, `rack`, `raise`
- * and `actions`.
+ * (the slider's row), `actions` (the whole action row), and `check` and `wager` (one button each,
+ * for a step that asks for that one press).
  */
 
 import type { CoachStep } from "@/components/ui/coach";
 
 /** The `CoachTarget` ids `GameScreen` provides. */
-export const FELT_TARGETS = ["community", "table", "rack", "raise", "actions"] as const;
+export const FELT_TARGETS = [
+  "community",
+  "table",
+  "rack",
+  "raise",
+  "actions",
+  "check",
+  "wager",
+] as const;
 
 /** The felt's "How to play": every control, one at a time. */
 export const HELPER_TOUR: readonly CoachStep[] = [
@@ -76,12 +85,25 @@ export const HELPER_TOUR: readonly CoachStep[] = [
 ];
 
 /**
+ * What the seat sets up before a move, which the script never sees: the slider standing on an
+ * amount the lesson accepts, and the rack spelling the coached word.
+ */
+export type LessonPrep = "raise" | "word";
+
+/**
  * One step of the lesson. `checkpoint` names the scripted move (`TUTORIAL_SCRIPT`'s step id) the
  * step waits for: an `action` step is done when the player has made it, and a `next` step with
- * one is shown when the lesson reaches it.
+ * one is shown when the lesson reaches it. An `action` step with `prep` is the set-up for that
+ * move — it is done as soon as the seat has it ready, so the coach moves on to the press itself.
  */
 export interface LessonCoachStep extends CoachStep {
   checkpoint?: string;
+  prep?: LessonPrep;
+  /**
+   * The step holds the player on it until it is done: the felt's actions are disabled and the
+   * card offers no way back, so the only thing left to do is what it asks.
+   */
+  holds?: boolean;
 }
 
 export const LESSON_TOUR: readonly LessonCoachStep[] = [
@@ -114,7 +136,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     body:
       "Mira folded. Now it's your turn, and Jay's big blind means you owe 20. Tap CALL to stay " +
       "in the hand.",
-    target: "actions",
+    target: "check",
     side: "top",
     advance: "action",
     checkpoint: "preflop-hero-call",
@@ -132,54 +154,87 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     checkpoint: "flop-hero-raise",
   },
   {
-    id: "lesson-raise",
+    id: "lesson-raise-amount",
     icon: "E",
     title: "Raise",
     body:
-      "Jay bet 20. You have a strong word, so raise: slide to 60 and tap RAISE. That's your " +
-      "total for the round.",
+      "Jay bet 20. You have a strong word, so raise: slide to 60. That's your total for the " +
+      "round, not what you add on top.",
     target: "raise",
+    side: "top",
+    advance: "action",
+    checkpoint: "flop-hero-raise",
+    prep: "raise",
+  },
+  {
+    id: "lesson-raise",
+    icon: "F",
+    title: "Make the raise",
+    body: "Now tap RAISE to put your 60 in.",
+    target: "wager",
     side: "top",
     advance: "action",
     checkpoint: "flop-hero-raise",
   },
   {
     id: "lesson-turn",
-    icon: "F",
+    icon: "G",
     title: "The turn",
     body:
       "Ellis folded and Jay called. Nothing is owed now, so tap CHECK to see the next letter " +
       "for free.",
-    target: "actions",
+    target: "check",
     side: "top",
     advance: "action",
     checkpoint: "turn-hero-check",
   },
   {
     id: "lesson-river",
-    icon: "G",
+    icon: "H",
     title: "The river",
     body: "The last shared letter is out. Jay checked again — tap CHECK to close the betting.",
-    target: "actions",
+    target: "check",
     side: "top",
     advance: "action",
     checkpoint: "river-hero-check",
   },
   {
+    id: "lesson-word-build",
+    icon: "I",
+    title: "Spell your word",
+    body:
+      "The Word Window is open. Tap B, R, O, W and N to put them in your word, and drag them " +
+      "into that order: it reads left to right. CHECK unlocks once your rack spells BROWN.",
+    target: "rack",
+    side: "top",
+    advance: "action",
+    checkpoint: "window-hero-word",
+    prep: "word",
+    holds: true,
+    // Recorded off `/dev-word-demo` on the web build: the lesson's own tiles, tapped and dragged
+    // into BROWN. Re-record it there when the strip's look or the deal changes.
+    media: {
+      // Relative, not `@/assets`: Jest maps `@/` to `src/` alone.
+      source: require("../../../assets/images/tutorial/spell-word.gif"),
+      aspectRatio: 412 / 260,
+      label: "Tapping W, B, N, R and O, then dragging W and N into place to spell BROWN",
+    },
+  },
+  {
     id: "lesson-word",
-    icon: "H",
+    icon: "J",
     title: "Lock in your word",
     body:
-      "The Word Window is open. Make sure your rack spells BROWN, then tap CHECK to lock it in. " +
-      "A locked word is final — even if it isn't in the dictionary.",
-    target: "rack",
+      "Your rack spells BROWN. Tap CHECK to lock it in. A locked word is final — even if it " +
+      "isn't in the dictionary.",
+    target: "check",
     side: "top",
     advance: "action",
     checkpoint: "window-hero-word",
   },
   {
     id: "lesson-showdown",
-    icon: "I",
+    icon: "K",
     title: "Showdown",
     body:
       "BROWN scores 22: B 4, R 2×2, O 1×2, W 5×2, N 2. When Jay locks in, the best word takes " +

@@ -1,5 +1,5 @@
 /**
- * game-screen-hud.ts — the seam between the hand's state and the in-hand HUD.
+ * turn-anchor.ts — the seam between the hand's state and the in-hand HUD.
  *
  * The screen owns game state and the HUD owns view models, so the mapping between the
  * two lives here as pure functions. Two of them carry the real weight: the turn anchor,
@@ -9,7 +9,7 @@
 
 import type { ClockSample, TurnTiming } from "@/components/hud";
 
-import type { GameScreenState } from "./game-types";
+import type { GameScreenState } from "../game-types";
 
 /** Wall-clock-free monotonic reading, so a sample is immune to local clock changes. */
 export function monotonicNow(): number {

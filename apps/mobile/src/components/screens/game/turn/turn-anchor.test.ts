@@ -1,4 +1,4 @@
-import { holdTurn, openTurn } from "./game-screen-hud";
+import { holdTurn, openTurn } from "./turn-anchor";
 
 const GAME = { id: "turn-1", secondsRemaining: 60 };
 

@@ -27,6 +27,8 @@ type ModeVariantsProps<V extends ModeVariant> = {
   variants: readonly V[];
   disabled?: boolean;
   onSelect: (variant: V) => void;
+  /** The row's width. A host sized from its content gives the row no width to stretch to. */
+  width?: number;
 };
 
 const ART_SIZE = 56;
@@ -35,9 +37,10 @@ export function ModeVariants<V extends ModeVariant>({
   variants,
   disabled = false,
   onSelect,
+  width,
 }: ModeVariantsProps<V>) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, width === undefined ? null : { width }]}>
       {variants.map((variant) => {
         const featured = variant.tone === "featured";
         return (

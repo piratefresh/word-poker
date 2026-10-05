@@ -9,13 +9,13 @@ jest.mock("react-native-reanimated", () => require("react-native-reanimated/mock
 
 // The table's mesh-gradient backdrop is Skia, which needs a GPU canvas a test renderer doesn't
 // have; it is decoration only, so tests draw nothing in its place.
-jest.mock("@/components/screens/game/table-backdrop", () => ({ TableBackdrop: () => null }));
+jest.mock("@/components/screens/game/backdrop/table-backdrop", () => ({ TableBackdrop: () => null }));
 
 // The table's painted rail and felt are Skia too, and decoration only: tests draw no table art.
 jest.mock("@/components/table/table-art/table-art", () => ({ TableArt: () => null }));
 
 // The turn beam around an avatar is a Skia shader, and decoration only: tests see the avatar alone.
-jest.mock("@/components/screens/game/seat-beam", () => ({
+jest.mock("@/components/screens/game/primitives/seat-beam", () => ({
   SeatBeam: ({ children }) => children,
 }));
 
@@ -24,7 +24,7 @@ jest.mock("@/components/screens/game/seat-beam", () => ({
 jest.mock("@/components/hud/top-bar/timer-glass", () => ({ TimerGlass: () => null }));
 
 // The painted shadow behind the action bar is a Skia shader, and decoration only.
-jest.mock("@/components/screens/game/action-bar-shade", () => ({ ActionBarShade: () => null }));
+jest.mock("@/components/screens/game/backdrop/action-bar-shade", () => ({ ActionBarShade: () => null }));
 
 // The tile's pixel-art face is painted by Skia, which Jest has no canvas for: tests see the
 // gradient face it falls back to (STO-479).

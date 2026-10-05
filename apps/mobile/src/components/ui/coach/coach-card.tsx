@@ -12,6 +12,7 @@
  * Presentational only: which step it is and what the buttons do are the caller's.
  */
 
+import { Image, type ImageSource } from "expo-image";
 import { type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -19,6 +20,17 @@ import { webTestID } from "@/lib/web-id";
 import { border, colors, elevation, fonts, fontSize, opacity, palette, radius, spacing } from "@/constants/theme";
 
 export type CoachKind = "coach" | "helper";
+
+/**
+ * A step's clip: a bundled asset (`require` of a GIF) and the width-to-height ratio it was
+ * recorded at, so the card holds its place before the first frame decodes.
+ */
+export interface CoachMedia {
+  source: ImageSource | number;
+  aspectRatio: number;
+  /** What the clip shows, for a screen reader. */
+  label: string;
+}
 
 export interface CoachCardProps {
   kind: CoachKind;
@@ -31,6 +43,7 @@ export interface CoachCardProps {
   total: number;
   /** Whether the step advances on Next, or waits for the player's own action. */
   advance: "next" | "action";
+  media?: CoachMedia;
   onNext?: () => void;
   onPrevious?: () => void;
   onClose?: () => void;
@@ -41,6 +54,7 @@ export function CoachCard({
   icon,
   title,
   body,
+  media,
   index,
   total,
   advance,
@@ -79,6 +93,17 @@ export function CoachCard({
           {title}
         </Text>
       </View>
+
+      {media === undefined ? null : (
+        <Image
+          accessibilityLabel={media.label}
+          autoplay
+          contentFit="cover"
+          source={media.source}
+          style={[styles.media, { aspectRatio: media.aspectRatio }]}
+          testID="coach-media"
+        />
+      )}
 
       {typeof body === "string" ? <Text style={styles.body}>{body}</Text> : body}
 
@@ -201,6 +226,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fonts.sansBold,
     fontSize: fontSize.body,
+  },
+  media: {
+    backgroundColor: palette.felt500,
+    borderRadius: radius.sm,
+    marginBottom: spacing.sm,
+    width: "100%",
   },
   body: {
     color: INK,

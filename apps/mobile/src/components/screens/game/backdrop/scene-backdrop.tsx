@@ -1,15 +1,17 @@
 import { Image } from "expo-image";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 
+import { TavernLight } from "./tavern-light";
+
 // Relative paths keep these bundled assets available to Jest as well as Metro.
 const SCENES = {
   tavern: {
-    portrait: require("../../../../assets/images/ui/bgs/bg-tavern-9-16.png"),
-    landscape: require("../../../../assets/images/ui/bgs/bg-tavern-16-9.png"),
+    portrait: require("../../../../../assets/images/ui/bgs/bg-tavern-9-16.png"),
+    landscape: require("../../../../../assets/images/ui/bgs/bg-tavern-16-9.png"),
   },
   planet: {
-    portrait: require("../../../../assets/images/ui/bgs/bg-planet-9-16.png"),
-    landscape: require("../../../../assets/images/ui/bgs/bg-planet-16-9.png"),
+    portrait: require("../../../../../assets/images/ui/bgs/bg-planet-9-16.png"),
+    landscape: require("../../../../../assets/images/ui/bgs/bg-planet-16-9.png"),
   },
 };
 
@@ -25,6 +27,7 @@ export function SceneBackdrop({ look }: { look: keyof typeof SCENES }) {
         style={StyleSheet.absoluteFill}
         testID={`${look}-backdrop`}
       />
+      {look === "tavern" ? <TavernLight landscape={width > height} /> : null}
       {look === "planet" ? <View style={styles.planetShade} /> : null}
     </View>
   );

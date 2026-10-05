@@ -8,8 +8,8 @@
  * builder a `WordDraft` — the draft its engine holds, in the builder's words — plus the tiles
  * on the table and where to report an edit.
  *
- * The controls are the table's: the shuffle is `WordShuffleButton`, placed in the felt's own
- * action row beside fold, check and the bet, and the confirm is that row's check while §19's
+ * The controls are the table's: the shuffle is `WordShuffleButton`, placed in the row the felt
+ * draws under the rack, beside the word check, and the confirm is the action row's check while §19's
  * window is open — so the builder itself carries no button row.
  */
 

@@ -15,7 +15,7 @@ import {
 } from "@/components/table";
 
 import { FOUR_PLAYER_FLOP_FIXTURE } from "./game-fixtures";
-import { PlayerSeat } from "./game-primitives";
+import { PlayerSeat } from "./primitives";
 import type { GamePlayer } from "./game-types";
 import {
   MIN_AVATAR,

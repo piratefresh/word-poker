@@ -1,0 +1,32 @@
+# Run with the e2e-test build. At phone size the first coach card overlaps the rack and action
+# row: tapping Next must reach the coach, then the lesson's CALL must still reach the felt.
+appId: dev.wordpoker.wordpoker
+name: Tutorial coach advances above the felt (native)
+tags:
+  - native
+  - tutorial
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Choose how to play"
+    timeout: 30000
+- openLink: wordpoker://tutorial
+- extendedWaitUntil:
+    visible: "Your seat"
+    timeout: 90000
+- tapOn:
+    id: "coach-next"
+- assertVisible: "Your tiles"
+- tapOn:
+    id: "coach-next"
+- extendedWaitUntil:
+    visible: "Call the blind"
+    timeout: 20000
+- assertNotVisible:
+    id: "coach-next"
+- tapOn:
+    id: "action-check-call"
+- extendedWaitUntil:
+    visible: "The flop"
+    timeout: 20000
