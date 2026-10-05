@@ -2,7 +2,7 @@
  * rating-card.tsx - the one ask the payoff makes of the player (STO-385, spec section 5).
  *
  * A row of five cumulative chips, a panel of tags and a note behind `Tell us more`, and one
- * Send. Everything the card knows goes out through `@/lib/results-rating`'s `sendResultsRating`
+ * Send. Everything the card knows goes out through `@/components/screens/results/results-rating`'s `sendResultsRating`
  * - the form has no idea what a fetch is, which is what lets its tests stub the module and
  * assert the exact body a hand would post (see `rating-card.test.tsx`).
  *
@@ -40,7 +40,7 @@ import {
   RATING_TAGS,
   sendResultsRating,
   type RatingTag,
-} from "@/lib/results-rating";
+} from "./results-rating";
 
 /** The five levels, in the order the chips sit: 1 is the roughest hand, 5 the best. */
 const RATING_LEVELS = [1, 2, 3, 4, 5] as const;

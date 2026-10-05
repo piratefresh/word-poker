@@ -1,23 +1,39 @@
 /**
  * index.ts — what the rest of the workspace may use this package for (STO-379, spec §6).
  *
- * Two things: the entity (so a caller can query it) and one writer for the results screen's
- * rating. Nothing validates here — the API route owns the request shape and refuses a bad body
- * before it reaches this package, and the entity's column types are the backstop under that.
+ * The entities (so a caller can query them), one writer for the results screen's rating, and the
+ * Wallet's audit log (STO-346). Nothing validates here — the API route owns the request shape and
+ * refuses a bad body before it reaches this package, and the entity's column types are the
+ * backstop under that.
  *
- * The ORM is cached for the life of the process. An API route is a long-lived server process
- * serving many requests, and a per-request `MikroORM.init` would open (and leak) a connection
- * pool per request. `getOrm`/`closeOrm` are exported so a test can drive the same instance, and
- * `saveResultsRating` takes an optional `orm` so a test can point at its own database without
- * touching the process-wide one.
+ * The ORM is cached for the life of the process (`orm.ts`). Every writer takes an optional `orm`
+ * so a test can point at its own database without touching the process-wide one.
  */
 
-import { MikroORM } from "@mikro-orm/postgresql";
+import type { MikroORM } from "@mikro-orm/postgresql";
 
-import config from "../mikro-orm.config";
 import { ResultsRating } from "./entities/index";
+import { getOrm } from "./orm";
 
-export { ResultsRating } from "./entities/index";
+export {
+  ResultsRating,
+  WALLET_EVENT_STATUSES,
+  WalletEvent,
+  type WalletEventRow,
+  type WalletEventStatus,
+} from "./entities/index";
+export { closeOrm, getOrm } from "./orm";
+export {
+  hasWelcomeEvent,
+  openWalletEvent,
+  pendingWalletEvents,
+  recordReportedEvent,
+  settleWalletEvent,
+  type OpenWalletEventInput,
+  type ReportedWalletEventInput,
+  type SettleWalletEventInput,
+  type WalletEventRecord,
+} from "./wallet-event";
 
 /** One hand's report: which hand, how it felt, and what stood out about it. */
 export interface ResultsRatingInput {
@@ -30,26 +46,6 @@ export interface ResultsRatingInput {
   readonly tags: readonly string[];
   /** The player's own words; empty when the form was left to the chips. */
   readonly note: string;
-}
-
-let orm: Promise<MikroORM> | undefined;
-
-/** The process's one ORM instance, connected on first use. */
-export function getOrm(): Promise<MikroORM> {
-  orm ??= MikroORM.init(config);
-
-  return orm;
-}
-
-/** Closes the process's ORM instance; safe to call when nothing was opened. */
-export async function closeOrm(): Promise<void> {
-  const pending = orm;
-  orm = undefined;
-
-  if (pending) {
-    const instance = await pending;
-    await instance.close(true);
-  }
 }
 
 /** Stores one rating and resolves with its id. */

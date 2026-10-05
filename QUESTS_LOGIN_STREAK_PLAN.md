@@ -106,6 +106,12 @@ export interface QuestClaimResponse { readonly completed: readonly QuestId[]; re
 
 ### Step 3 — Persistence in `packages/db`
 
+> **Superseded in part by `REVENUECAT_COIN_STORE_PLAN.md` (2026-10-04).** The Wallet lives in RevenueCat
+> Virtual Currency, not in `player_wallet`/`wallet_entry`: drop both tables and `creditWallet`, credit
+> rewards through `@wordpoker/economy`'s `applyWalletChange(userId, "quest" | "streak", amount, { ref })`
+> (logged in `wallet_event`), and import `WALLET_EVENT_KINDS` from contracts. The quest and streak tables
+> below still stand. Rework this step when this plan runs.
+
 New entities (defineEntity style, mirroring `entities/results-rating.ts`) in `entities/index.ts`:
 
 - `PlayerWallet` — table `player_wallet`: `userId` text PK (Better Auth user id), `coins` integer not null default 0, `updatedAt` datetime.
@@ -129,7 +135,7 @@ Tests `test/quests.test.ts` mirror `results-rating.test.ts`: self-provisioning t
 
 New `apps/mobile/src/app/api/quests+api.ts` (mirrors `results-rating+api.ts` conventions: validate body, refuse with `{ error }` 400, never leak exception text):
 
-- `GET` — authenticate with the server-side Better Auth instance from `src/lib/auth.ts` (`auth.api.getSession({ headers: request.headers })` — follow the wiring `app/api/auth/[...all]+api.ts` uses; verify the exact call against Better Auth ^1.7 docs). 401 when no session. Then `creditDailyStreak` (so the first authenticated open of the day pays, on the server's clock) and return `getQuestState`.
+- `GET` — authenticate with the server-side Better Auth instance from `src/auth/server/auth.ts` (`auth.api.getSession({ headers: request.headers })` — follow the wiring `app/api/auth/[...all]+api.ts` uses; verify the exact call against Better Auth ^1.7 docs). 401 when no session. Then `creditDailyStreak` (so the first authenticated open of the day pays, on the server's clock) and return `getQuestState`.
 - `POST` — body is a `QuestHandClaim`; refuse anything `isQuestHandClaim` rejects; 401 when unauthenticated; return `QuestClaimResponse`.
 
 No `apps/server` change: online quest facts are derived from the state the room already broadcasts (the reveal payload `GameRoomProjection` builds with `playedWord`).
@@ -164,10 +170,10 @@ No `apps/server` change: online quest facts are derived from the state the room 
 ## Critical files & anchors
 
 - `apps/mobile/src/components/screens/results/results-snapshot.ts` — `SettledHand`/`buildSettledSnapshot`: the seam both tables already share; gets `decidedBy`.
-- `apps/mobile/src/app/api/results-rating+api.ts` + `apps/mobile/src/lib/results-rating.ts` — the route/client conventions Steps 4–5 copy verbatim in spirit.
+- `apps/mobile/src/app/api/results-rating+api.ts` + `apps/mobile/src/components/screens/results/results-rating.ts` — the route/client conventions Steps 4–5 copy verbatim in spirit.
 - `packages/db/src/entities/results-rating.ts` + `packages/db/test/results-rating.test.ts` — entity + self-provisioning test patterns Step 3 copies.
 - `packages/game-rules/src/index.ts` — export surface for the new `quests.ts`.
-- `apps/mobile/src/lib/power-view.ts` — where both adapters' power state is already decoded; source of `heroUsedPower`.
+- `apps/mobile/src/features/table/power-view.ts` — where both adapters' power state is already decoded; source of `heroUsedPower`.
 
 ## Verification
 

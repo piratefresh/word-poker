@@ -41,8 +41,8 @@ import {
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
-import { beatProgress } from "@/lib/use-results-entrance";
-import { WORD_REJECTION_COPY } from "@/lib/word-rejection-copy";
+import { beatProgress } from "./use-results-entrance";
+import { WORD_REJECTION_COPY } from "@/features/table/word-rejection-copy";
 
 import type { ResultsSeat } from "./results-types";
 

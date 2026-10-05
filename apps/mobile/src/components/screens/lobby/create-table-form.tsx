@@ -42,8 +42,8 @@ import {
 import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
-import { DEAL_MODE_NAMES } from "@/lib/power-view";
-import { createTable } from "@/lib/room-session";
+import { DEAL_MODE_NAMES } from "@/features/table/power-view";
+import { createTable } from "@/features/online/room-session";
 
 export type CreateTableFormProps = {
   visible: boolean;

@@ -140,7 +140,7 @@ function spell(
 /**
  * The builder as a screen holds it: the hand and the panel as a mode places them, the draft
  * living above them, and the tiles changing under them as the streets open. It stands in for a
- * mode's adapter — `@/lib/use-offline-game` is the real one — so the suite can watch an edit
+ * mode's adapter — `@/features/offline/use-offline-game` is the real one — so the suite can watch an edit
  * travel out to the screen and come back in as the draft the engine reported.
  */
 function Rack({ boards }: { boards: readonly (readonly (Tile | null)[])[] }) {

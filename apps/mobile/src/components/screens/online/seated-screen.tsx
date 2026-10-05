@@ -24,7 +24,7 @@ import {
   spacing,
 } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
-import { DEAL_MODE_NAMES, powersLabel } from "@/lib/power-view";
+import { DEAL_MODE_NAMES, powersLabel } from "@/features/table/power-view";
 import {
   joinTable,
   leaveTable,
@@ -32,8 +32,8 @@ import {
   useRoomSession,
   useSeatedRoom,
   type TableSnapshot,
-} from "@/lib/room-session";
-import { useDictionary } from "@/lib/use-dictionary";
+} from "@/features/online/room-session";
+import { useDictionary } from "@/features/table/use-dictionary";
 import { fullWidth } from "@/lib/full-width";
 
 import { OnlineFelt } from "./online-felt";

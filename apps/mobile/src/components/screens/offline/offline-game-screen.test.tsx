@@ -5,8 +5,8 @@ import { dealHand, type Dictionary } from "@wordpoker/game-rules";
 
 import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
 import { duration } from "@/constants/theme";
-import { testDictionary } from "@/lib/dictionary-fixtures";
-import { useOfflineGame, type OfflineGame } from "@/lib/use-offline-game";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
+import { useOfflineGame, type OfflineGame } from "@/features/offline/use-offline-game";
 import { WordBuilder } from "@/components/word-builder";
 import { POWER_USED_BEATS } from "@/components/powers/power-used";
 
@@ -16,8 +16,8 @@ import { OfflineGameScreen } from "./offline-game-screen";
 // reaches it by busting the hero — a hand the tests cannot deal without rigging the deck. The
 // one test that needs it injects the mapped state; every other test runs the hook for real,
 // which is why the mock delegates to it by default.
-jest.mock("@/lib/use-offline-game", () => {
-  const actual = jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/lib/use-offline-game");
+jest.mock("@/features/offline/use-offline-game", () => {
+  const actual = jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/features/offline/use-offline-game");
   return { ...actual, useOfflineGame: jest.fn(actual.useOfflineGame) };
 });
 
@@ -54,7 +54,7 @@ jest.mock("react-native-reanimated", () => ({
 /**
  * The seed the URL pins, and the hero's own two tiles under it: `mockSeedParam` below is what
  * the screen reads, so this is the hand every test but the unpinned one plays. A table the URL
- * does not pin draws its own seed (`@/lib/offline-seed`), and a drawn seed is not knowable in
+ * does not pin draws its own seed (`@/features/offline/offline-seed`), and a drawn seed is not knowable in
  * advance, so the draw is stood in for with {@link DRAWN_SEED}.
  */
 const SEED = 20_260_919;
@@ -75,8 +75,8 @@ const mockRandomSeed = jest.fn(() => DRAWN_SEED);
 
 // The port is the real one — a pinned seed has to parse for the pinned hand to be dealt — and
 // only the draw is stood in for.
-jest.mock("@/lib/offline-seed", () => ({
-  ...jest.requireActual<Record<string, unknown>>("@/lib/offline-seed"),
+jest.mock("@/features/offline/offline-seed", () => ({
+  ...jest.requireActual<Record<string, unknown>>("@/features/offline/offline-seed"),
   randomSeed: () => mockRandomSeed(),
 }));
 
@@ -86,7 +86,7 @@ const HERO_WORD = HERO_TILES.map((tile) => tile.letter).join("");
 /** The table's vocabulary, injected: the drawer this screen loads holds the hero's word. */
 let mockDictionary: Dictionary | null = testDictionary([HERO_WORD]);
 
-jest.mock("@/lib/use-dictionary", () => ({
+jest.mock("@/features/table/use-dictionary", () => ({
   useDictionary: () => mockDictionary,
 }));
 

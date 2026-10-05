@@ -2,8 +2,8 @@
  * theme.ts — design tokens for the Word Poker / Four-in-a-Row app (Expo / React Native).
  * Derived from the existing casino-felt prototypes: deep felt greens, gold, parchment cream.
  *
- * import { theme } from '@/constants/theme';
- * or cherry-pick: import { colors, spacing, radius, type } from '@/constants/theme';
+ * import { theme } from './theme';
+ * or cherry-pick: import { colors, spacing, radius, type } from './theme';
  */
 
 import { Platform, TextStyle, ViewStyle } from "react-native";

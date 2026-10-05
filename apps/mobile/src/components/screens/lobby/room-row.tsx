@@ -32,7 +32,7 @@ import {
   spacing,
 } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
-import { powersLabel } from "@/lib/power-view";
+import { powersLabel } from "@/features/table/power-view";
 import { spokenTable } from "./parlor-view";
 
 export type RoomRowProps = {

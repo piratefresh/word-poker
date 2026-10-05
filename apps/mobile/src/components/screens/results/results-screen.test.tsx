@@ -27,7 +27,7 @@ jest.mock("react-native-safe-area-context", () =>
 
 // The rating card is its own surface with its own tests; the screen under test only has to
 // place it, and its POST must never run from a test that is not about it.
-jest.mock("@/lib/results-rating", () => ({
+jest.mock("./results-rating", () => ({
   sendResultsRating: jest.fn(async () => ({ id: "rating-1" })),
   RATING_TAGS: ["Gameplay", "Scoring", "Pacing", "Visuals", "Bug", "Suggestion"],
   RATING_NOTE_MAX: 500,

@@ -51,6 +51,7 @@ export {
 } from "./table/offline";
 export {
   TUTORIAL_HERO,
+  TUTORIAL_MAX_RAISE_TO,
   TUTORIAL_PLAYERS,
   TUTORIAL_RAISE_TO,
   TUTORIAL_SCRIPT,

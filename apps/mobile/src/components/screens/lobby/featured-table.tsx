@@ -21,7 +21,7 @@ import { type ReactElement, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatAmount } from "@/lib/format";
-import { powersLabel } from "@/lib/power-view";
+import { powersLabel } from "@/features/table/power-view";
 
 import {
   DefaultSeat,

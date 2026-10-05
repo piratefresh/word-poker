@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 
 import type { PowerUpId, Tile as TileData } from "@wordpoker/contracts";
 
-import type { PowerView } from "@/lib/power-view";
+import type { PowerView } from "@/features/table/power-view";
 
 /**
  * Where the hero is in using its held power (§44): nothing yet, choosing which private tile to

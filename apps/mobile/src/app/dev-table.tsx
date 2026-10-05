@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { TableBackdrop } from "@/components/screens/game/table-backdrop";
+import { TableBackdrop } from "@/components/screens/game/backdrop/table-backdrop";
 import { TABLE_ASPECT, TABLE_REACH, TableImage } from "@/components/table";
 import { colors, fonts, palette, spacing } from "@/constants/theme";
 

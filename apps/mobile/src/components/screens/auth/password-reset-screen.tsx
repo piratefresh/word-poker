@@ -7,10 +7,10 @@ import {
   Field,
   FooterLine,
   GoldButton,
-} from "@/components/screens/auth/auth-shell";
+} from "./auth-shell";
 import { colors, theme } from "@/constants/theme";
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 
 /** `type` is the token group's own name: rename it so it reads as a style set. */
 const { type: typography } = theme;

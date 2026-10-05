@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 
-import { useBackdropStyle } from "../screens/game/backdrop-style";
+import { useBackdropStyle } from "../screens/game/backdrop/backdrop-style";
 
 /**
  * The painted parlor table (wood rail, gold bands, slate stones, felt), scaled as one picture: it

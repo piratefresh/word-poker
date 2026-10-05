@@ -18,7 +18,7 @@
 import { tableStatus, type RoomSummary, type TableStatus } from "@wordpoker/contracts";
 
 import { formatAmount } from "@/lib/format";
-import { powersLabel } from "@/lib/power-view";
+import { powersLabel } from "@/features/table/power-view";
 
 /** One chip on the rail: a label, its figure, and the line under it. */
 export interface ParlorStat {

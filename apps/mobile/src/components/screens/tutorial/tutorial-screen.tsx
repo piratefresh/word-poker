@@ -15,8 +15,8 @@ import {
   WordShuffleButton,
 } from "@/components/word-builder";
 import { colors, type } from "@/constants/theme";
-import { useDictionary } from "@/lib/use-dictionary";
-import { useTutorialGame } from "@/lib/use-tutorial-game";
+import { useDictionary } from "@/features/table/use-dictionary";
+import { useTutorialGame } from "@/features/tutorial/use-tutorial-game";
 
 /**
  * The guided first hand (STO-251): the offline table, played to a script, with the coach pointing
@@ -68,8 +68,13 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
     >
       <CoachProvider style={styles.table} tour={help.tour ?? lesson.coach}>
         <GameScreen
-          bettingLeading={<WordShuffleButton />}
-          bettingSlider={<WordCheckButton />}
+          actionsLocked={lesson.actionsLocked}
+          rackActions={
+            <>
+              <WordShuffleButton />
+              <WordCheckButton />
+            </>
+          }
           clockHeld={lesson.held}
           game={game}
           onAllIn={lesson.allIn}
@@ -79,6 +84,7 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
           onFold={lesson.fold}
           onHelp={help.open}
           onRaise={lesson.wager}
+          onRaiseAmountChange={lesson.changeRaise}
           rack={
             <>
               <WordPreview />

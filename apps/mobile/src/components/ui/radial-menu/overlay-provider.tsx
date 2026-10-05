@@ -75,7 +75,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
       {children}
       {isVisible && (
         <>
-          <Animated.View style={[StyleSheet.absoluteFillObject, overlayStyle]}>
+          <Animated.View style={[StyleSheet.absoluteFill, overlayStyle]}>
             <AnimatedBlurView
               tint="dark"
               style={StyleSheet.absoluteFill}
@@ -88,7 +88,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
               ]}
             />
           </Animated.View>
-          <Animated.View style={[StyleSheet.absoluteFillObject, contentStyle]}>
+          <Animated.View style={[StyleSheet.absoluteFill, contentStyle]}>
             {overlayContent}
           </Animated.View>
         </>

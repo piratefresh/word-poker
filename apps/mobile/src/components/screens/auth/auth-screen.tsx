@@ -1,20 +1,27 @@
 import { router, type Href } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { Platform, StyleSheet, Text } from "react-native";
 
 import {
   AuthShell,
   Field,
   FooterLine,
   GoldButton,
-} from "@/components/screens/auth/auth-shell";
+} from "./auth-shell";
+import { EMAIL_VERIFIED_DEEP_LINK } from "@/constants/links";
 import { colors, theme } from "@/constants/theme";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 
 /** `type` is the token group's own name: rename it so it reads as a style set. */
 const { type: typography } = theme;
 
 type AuthMode = "sign-in" | "sign-up";
+
+/**
+ * Where the verification mail's link lands once Better Auth has verified it: Home, in the app on a
+ * phone, or on the same web origin in a browser (a desktop has no `wordpoker://` handler).
+ */
+const EMAIL_VERIFIED_CALLBACK = Platform.OS === "web" ? "/" : EMAIL_VERIFIED_DEEP_LINK;
 
 const NETWORK_ERROR =
   "Could not reach the server — check your connection and try again.";
@@ -66,7 +73,7 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     try {
       const { error: authError } =
         mode === "sign-up"
-          ? await authClient.signUp.email({ name, email, password })
+          ? await authClient.signUp.email({ name, email, password, callbackURL: EMAIL_VERIFIED_CALLBACK })
           : await authClient.signIn.email({ email, password });
 
       if (authError) {

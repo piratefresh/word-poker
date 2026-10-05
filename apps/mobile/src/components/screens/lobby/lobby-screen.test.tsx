@@ -6,8 +6,8 @@ import { LobbyScreen } from "./lobby-screen";
 
 // The socket the lobby subscribes through is the test's own, and the two things a tap can do to
 // a table — take a seat, or make one — are stubbed: this suite is about what the screen shows.
-jest.mock("@/lib/game-client", () => ({ gameClient: { joinOrCreate: jest.fn() } }));
-jest.mock("@/lib/room-session", () => ({
+jest.mock("@/features/online/game-client", () => ({ gameClient: { joinOrCreate: jest.fn() } }));
+jest.mock("@/features/online/room-session", () => ({
   createTable: jest.fn(),
   joinTable: jest.fn(),
   useActiveRoomId: jest.fn(() => null),
@@ -20,7 +20,7 @@ jest.mock("expo-router", () => ({
 }));
 
 // The session is what the masthead's avatar is drawn from; the lobby reads nothing else of it.
-jest.mock("@/lib/auth-client", () => ({
+jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: jest.fn(() => ({ data: { user: { name: "Dylan", email: "d@x.dev" } } })) },
 }));
 
@@ -30,8 +30,8 @@ jest.mock("react-native-safe-area-context", () =>
 
 import { router } from "expo-router";
 
-import { gameClient } from "@/lib/game-client";
-import { createTable, joinTable, useActiveRoomId } from "@/lib/room-session";
+import { gameClient } from "@/features/online/game-client";
+import { createTable, joinTable, useActiveRoomId } from "@/features/online/room-session";
 
 const joinOrCreate = gameClient.joinOrCreate as unknown as jest.Mock;
 const join = joinTable as unknown as jest.Mock;

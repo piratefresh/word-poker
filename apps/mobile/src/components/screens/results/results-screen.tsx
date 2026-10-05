@@ -31,7 +31,7 @@ import {
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
-import { useResultsEntrance } from "@/lib/use-results-entrance";
+import { useResultsEntrance } from "./use-results-entrance";
 
 import { RatingCard } from "./rating-card";
 import { ResultCard } from "./result-card";

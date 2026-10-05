@@ -8,7 +8,7 @@ import { AccessibilityInfo } from "react-native";
 
 import type { Tile } from "@wordpoker/contracts";
 
-import type { PowerView } from "@/lib/power-view";
+import type { PowerView } from "@/features/table/power-view";
 
 import { PowerHeldChip, PowerUsePrompt } from "./power-use";
 import { swapFlipOf, usePowerTargeting } from "./use-power-targeting";

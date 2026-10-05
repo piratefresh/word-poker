@@ -7,7 +7,7 @@
  * and `@wordpoker/db` stores what it is handed.
  *
  * The store lives in the workspace's one database package. This app never opens a Postgres
- * connection of its own — `src/lib/auth.ts` owns the only pool, and it is the auth provider's.
+ * connection of its own — `src/auth/server/auth.ts` owns the only pool, and it is the auth provider's.
  */
 
 import { saveResultsRating } from "@wordpoker/db";
@@ -15,7 +15,7 @@ import { saveResultsRating } from "@wordpoker/db";
 /**
  * The six things a player can flag. Written out rather than imported from the card's module:
  * that one reaches for `SecureStore` and Expo's constants, which have no business in a server
- * route. The card (`src/lib/results-rating.ts`) and this route are the pair that has to agree.
+ * route. The card (`src/components/screens/results/results-rating.ts`) and this route are the pair that has to agree.
  */
 const TAGS = ["Gameplay", "Scoring", "Pacing", "Visuals", "Bug", "Suggestion"] as const;
 

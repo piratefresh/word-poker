@@ -13,7 +13,7 @@ import {
   type OfflineState,
 } from "@wordpoker/game-rules";
 
-import { testDictionary } from "@/lib/dictionary-fixtures";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
 
 import { buildResultsSnapshot } from "./results-snapshot";
 import type { ResultsSeat } from "./results-types";
