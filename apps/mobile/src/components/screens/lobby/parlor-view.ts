@@ -17,7 +17,7 @@
 
 import { tableStatus, type RoomSummary, type TableStatus } from "@wordpoker/contracts";
 
-import { formatAmount } from "@/lib/format";
+import { formatAmount, formatCoins } from "@/lib/format";
 import { powersLabel } from "@/features/table/power-view";
 
 /** One chip on the rail: a label, its figure, and the line under it. */
@@ -150,6 +150,8 @@ export function featuredTable(
 export function parlorStats(
   rooms: readonly RoomSummary[],
   activeRoomId: string | null,
+  /** The Wallet's coins (STO-525); `null` while there is none to show — no chip then. */
+  coins: number | null = null,
 ): ParlorStat[] {
   const waiting = rooms.filter((room) => tableStatus(room.metadata) === "waiting").length;
   const inHand = rooms.length - waiting;
@@ -158,6 +160,16 @@ export function parlorStats(
 
   const stats: ParlorStat[] = [];
   const yours = rooms.find((room) => room.roomId === activeRoomId);
+
+  if (coins !== null) {
+    stats.push({
+      key: "wallet",
+      label: "WALLET",
+      value: formatCoins(coins),
+      sub: "coins",
+      accent: yours === undefined,
+    });
+  }
 
   if (yours !== undefined) {
     const waitingHere = tableStatus(yours.metadata) === "waiting";
@@ -176,7 +188,7 @@ export function parlorStats(
       label: "TABLES",
       value: String(rooms.length),
       sub: waiting === 1 ? "1 waiting" : `${waiting} waiting`,
-      accent: yours === undefined,
+      accent: yours === undefined && coins === null,
     },
     {
       key: "seats",
@@ -201,6 +213,7 @@ export function parlorStats(
 export function parlorView(
   rooms: readonly RoomSummary[],
   activeRoomId: string | null,
+  coins: number | null = null,
 ): ParlorView {
   const featured = featuredTable(rooms, activeRoomId);
 
@@ -208,6 +221,6 @@ export function parlorView(
     featured,
     others:
       featured === null ? [...rooms] : rooms.filter((room) => room.roomId !== featured.room.roomId),
-    stats: parlorStats(rooms, activeRoomId),
+    stats: parlorStats(rooms, activeRoomId, coins),
   };
 }

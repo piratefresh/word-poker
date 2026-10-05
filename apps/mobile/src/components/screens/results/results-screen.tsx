@@ -16,6 +16,7 @@
  * re-rendered mid-entrance would show a hand nobody played.
  */
 
+import { QUEST_CATALOG } from "@wordpoker/game-rules";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState, type ReactElement } from "react";
 import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -28,9 +29,11 @@ import {
   fontSize,
   gradients,
   layout,
+  radius,
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
+import { useQuests } from "@/lib/quests-provider";
 import { useResultsEntrance } from "./use-results-entrance";
 
 import { RatingCard } from "./rating-card";
@@ -54,6 +57,7 @@ export function ResultsScreen({ snapshot, onDeal, onExit }: ResultsScreenProps):
   // Frozen here, once: the surface renders the hand it was opened on, whatever the table does
   // next (STO-380's acceptance criterion, and the reason this is a `useState` and not a prop).
   const [hand] = useState(() => snapshot);
+  const { lastCompletions } = useQuests();
 
   const heroWon = hand.seats.some((seat) => seat.isYou && seat.takesPot);
   const { clock, fade, ready } = useResultsEntrance({ heroWon });
@@ -116,6 +120,22 @@ export function ResultsScreen({ snapshot, onDeal, onExit }: ResultsScreenProps):
               ))}
             </View>
 
+            {/* The quests this hand completed (STO-525); nothing renders when none did, so
+                `.maestro/offline-hand.yaml` sees the same screen it always has. */}
+            {lastCompletions.length > 0 ? (
+              <View style={styles.questChips} testID="quest-completions">
+                {lastCompletions.map((id) => {
+                  const def = QUEST_CATALOG.find((candidate) => candidate.id === id);
+                  if (def === undefined) return null;
+                  return (
+                    <View key={id} style={styles.questChip} testID={`quest-complete-${id}`}>
+                      <Text style={styles.questChipText}>{`★ ${def.title} · +${def.reward}`}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+
             {/* A rating is only worth its replay: a table that keeps its seed has no card. */}
             {hand.seed !== null ? (
               <View style={styles.rating}>
@@ -167,4 +187,17 @@ const styles = StyleSheet.create({
   cards: { gap: spacing.md, marginTop: -spacing.xs },
   // The rating is the afterthought of the payoff: under the scoreboard, spaced off it.
   rating: { marginTop: spacing.md },
+  questChips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.sm },
+  questChip: {
+    backgroundColor: colors.goldDeep,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  questChipText: {
+    color: colors.goldHi,
+    fontFamily: fonts.monoBold,
+    fontSize: fontSize.caption,
+    letterSpacing: 1,
+  },
 });

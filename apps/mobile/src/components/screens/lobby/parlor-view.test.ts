@@ -179,6 +179,25 @@ describe("parlorStats", () => {
   test("reads a hand under way at your own table back to you", () => {
     expect(parlorStats([inHand("mine")], "mine")[0]?.sub).toBe("a hand in play");
   });
+
+  test("leads with a WALLET chip when coins are given, lit when no seat is held", () => {
+    const stats = parlorStats([table("a")], null, 12_345);
+
+    expect(stats[0]).toEqual({ key: "wallet", label: "WALLET", value: "12,345", sub: "coins", accent: true });
+    // The wallet chip claims the accent the room-size chip would otherwise have taken.
+    expect(stats.find((stat) => stat.key === "tables")?.accent).toBe(false);
+  });
+
+  test("the wallet chip yields its accent to the seat this device holds", () => {
+    const stats = parlorStats([table("mine")], "mine", 500);
+
+    expect(stats[0]).toMatchObject({ key: "wallet", accent: false });
+    expect(stats.find((stat) => stat.key === "yours")?.accent).toBe(true);
+  });
+
+  test("shows no wallet chip at all without coins", () => {
+    expect(parlorStats([table("a")], null).some((stat) => stat.key === "wallet")).toBe(false);
+  });
 });
 
 describe("parlorView", () => {

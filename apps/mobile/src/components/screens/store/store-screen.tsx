@@ -23,17 +23,11 @@ import { useState } from "react";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
+import { formatCoins } from "@/lib/format";
 import { fullWidth } from "@/lib/full-width";
 
 import type { CoinPackRow } from "./coin-packs";
 import { useCoinStore, type PurchaseNotice } from "./use-coin-store";
-
-/** `12,000` — grouped by hand like `formatAmount`, so every platform prints the same digits. */
-function formatCoins(coins: number): string {
-  return Math.trunc(coins)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
 
 function noticeText(notice: PurchaseNotice): string {
   if (notice.kind === "added") return `+${formatCoins(notice.coins)} COINS ADDED`;

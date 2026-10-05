@@ -33,8 +33,20 @@ jest.mock("./results-rating", () => ({
   RATING_NOTE_MAX: 500,
 }));
 
+// The provider is its own surface with its own tests; this one only has to draw whatever
+// `lastCompletions` it holds, and the real module pulls in Better Auth's client, which Jest
+// cannot parse.
+let mockLastCompletions: readonly string[] = [];
+jest.mock("@/lib/quests-provider", () => ({
+  useQuests: () => ({ lastCompletions: mockLastCompletions }),
+}));
+
 const reduced = jest.mocked(useReducedMotion);
 const timing = jest.mocked(withTiming);
+
+beforeEach(() => {
+  mockLastCompletions = [];
+});
 
 beforeEach(() => {
   reduced.mockReturnValue(false);
@@ -107,6 +119,17 @@ describe("<ResultsScreen />", () => {
     // so a hand that has paid out is never re-entered by backing into it.
     await fireEvent(view.getByTestId("results-modal"), "requestClose");
     expect(onExit).toHaveBeenCalledTimes(2);
+  });
+
+  test("shows a chip per completed quest, and none at all when nothing completed", async () => {
+    const { view } = await renderResults();
+    expect(view.queryByTestId("quest-completions")).toBeNull();
+
+    mockLastCompletions = ["win-word-3"];
+    const withCompletion = await renderResults();
+    expect(withCompletion.view.getByTestId("quest-complete-win-word-3")).toHaveTextContent(
+      "★ TRIPLE THREAT · +75",
+    );
   });
 
   test("goes quiet under Reduce Motion: final values, live primary", async () => {

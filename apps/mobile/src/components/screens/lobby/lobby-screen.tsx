@@ -46,6 +46,7 @@ import {
 import { authClient } from "@/auth/client/auth-client";
 import { joinTable, useActiveRoomId } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
+import { useQuests } from "@/lib/quests-provider";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
 import { ParlorBackground } from "./parlor-background";
@@ -62,11 +63,12 @@ export function LobbyScreen() {
   const { status, rooms, refreshing, error, refresh } = useLobby();
   const activeRoomId = useActiveRoomId();
   const { data: session } = authClient.useSession();
+  const { coins } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const { featured, others, stats } = parlorView(rooms, activeRoomId);
+  const { featured, others, stats } = parlorView(rooms, activeRoomId, coins);
   const joiningRoom =
     joining === null
       ? undefined

@@ -30,8 +30,11 @@ import {
   spacing,
 } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
+import { formatCoins } from "@/lib/format";
+import { fullWidth } from "@/lib/full-width";
+import { useQuests } from "@/lib/quests-provider";
 
-type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store";
+type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store" | "quests";
 
 /**
  * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
@@ -114,6 +117,15 @@ const STORE_MODE: Mode = {
   description: "Top up your Wallet",
 };
 
+const QUESTS_MODE: Mode = {
+  key: "quests",
+  href: "/quests",
+  glyph: "📜",
+  label: "Quests",
+  description: "Earn coins for wins & streaks",
+  tone: "warm",
+};
+
 const CARD_PADDING = spacing.lg;
 
 const titleText = {
@@ -136,8 +148,16 @@ const signedInText = {
   fontSize: fontSize.small,
 } satisfies UniversalTextStyle;
 
+const bannerText = {
+  color: colors.goldHi,
+  fontFamily: fonts.monoBold,
+  fontSize: fontSize.small,
+  letterSpacing: 1.2,
+} satisfies UniversalTextStyle;
+
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
+  const { streakBanner, dismissStreakBanner } = useQuests();
   const [pending, setPending] = useState<ModeKey | null>(null);
   // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
   // card shrinks to its own content, so the column's width is handed down as a number.
@@ -166,7 +186,20 @@ export function HomeScreen() {
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
 
-          {(coinStoreEnabled() ? [...MODES, STORE_MODE] : MODES).map((mode) => {
+          {streakBanner ? (
+            <Column
+              onPress={dismissStreakBanner}
+              spacing={spacing.none}
+              testID="quest-streak-banner"
+              {...fullWidth(styles.banner)}
+            >
+              <Text textStyle={bannerText}>
+                {`DAY ${streakBanner.day} STREAK · +${formatCoins(streakBanner.reward)} COINS`}
+              </Text>
+            </Column>
+          ) : null}
+
+          {(coinStoreEnabled() ? [...MODES, QUESTS_MODE, STORE_MODE] : MODES).map((mode) => {
             const disabled = pending !== null && pending !== mode.key;
             const { variants } = mode;
             return (
@@ -234,5 +267,11 @@ const styles = {
     borderRadius: radius.card,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
+  },
+  banner: {
+    backgroundColor: colors.goldDeep,
+    borderRadius: radius.card,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
 };
