@@ -134,7 +134,8 @@ describe(
     });
 
     it("reverts the table on the migration's down path", async () => {
-      await orm.migrator.down();
+      // Every migration after this one, not just the last: later tables sit on top of this one.
+      await orm.migrator.down({ to: 0 });
 
       const [count] = await orm.em.getConnection().execute<{ count: string }[]>(
         `select count(*) as count

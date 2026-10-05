@@ -15,7 +15,7 @@
 import { Migrator } from "@mikro-orm/migrations";
 import { defineConfig } from "@mikro-orm/postgresql";
 
-import { ResultsRating, WalletEvent } from "./src/entities/index";
+import { QuestHandLog, QuestProgress, ResultsRating, WalletEvent } from "./src/entities/index";
 
 /**
  * libpq reads `sslrootcert=system` as "trust the system's CAs", but `pg` reads every `sslrootcert`
@@ -62,7 +62,7 @@ function connection() {
 }
 
 export default defineConfig({
-  entities: [ResultsRating, WalletEvent],
+  entities: [ResultsRating, WalletEvent, QuestProgress, QuestHandLog],
   extensions: [Migrator],
   // Resolved from this file rather than `process.cwd()`: `pnpm --filter` runs the script from the
   // package, but a stray `node packages/db/src/cli/migrate.ts` from the workspace root would

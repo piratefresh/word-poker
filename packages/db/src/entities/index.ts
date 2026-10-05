@@ -12,3 +12,5 @@ export {
   type WalletEventRow,
   type WalletEventStatus,
 } from "./wallet-event";
+export { QuestHandLog, type QuestHandLogRow } from "./quest-hand-log";
+export { QuestProgress, type QuestProgressRow } from "./quest-progress";

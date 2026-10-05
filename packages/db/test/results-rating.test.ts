@@ -136,7 +136,11 @@ describe(
       assert.equal(Number(count?.count), 0, "the table is gone after a rollback");
       assert.deepEqual(
         (await orm.migrator.getPending()).map((migration) => migration.name),
-        ["Migration20260921030429_results_rating", "Migration20261004120000_wallet_event"],
+        [
+          "Migration20260921030429_results_rating",
+          "Migration20261004120000_wallet_event",
+          "Migration20261005120000_quests",
+        ],
         "the migrations are pending again",
       );
     });

@@ -16,13 +16,25 @@ import { ResultsRating } from "./entities/index";
 import { getOrm } from "./orm";
 
 export {
+  QuestHandLog,
+  QuestProgress,
   ResultsRating,
   WALLET_EVENT_STATUSES,
   WalletEvent,
+  type QuestHandLogRow,
+  type QuestProgressRow,
   type WalletEventRow,
   type WalletEventStatus,
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
+export {
+  questProgress,
+  recordQuestHand,
+  streakDates,
+  type QuestProgressEntry,
+  type QuestProgressMap,
+  type QuestProgressRecord,
+} from "./quests";
 export {
   hasWelcomeEvent,
   openWalletEvent,
