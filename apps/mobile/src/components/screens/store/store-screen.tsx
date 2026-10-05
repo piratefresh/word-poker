@@ -2,7 +2,7 @@
  * store-screen.tsx — the coin store (STO-346): the Wallet's balance and the packs that top it up.
  *
  * Reached from Home only while `EXPO_PUBLIC_COIN_STORE` is on. The balance shows on every platform;
- * packs sell only in a mobile build with RevenueCat's key (`revenuecatAvailable`), and a buy button
+ * packs sell only where the platform's RevenueCat key is set (`revenuecatAvailable`), and a buy button
  * waits until RevenueCat is logged in as this player, since the purchase credits that Wallet.
  */
 
@@ -99,7 +99,7 @@ export function StoreScreen() {
                 ) : null}
               </Column>
 
-              {user && !user.emailVerified ? (
+              {user && !user.emailVerified && store.balance.status === "ready" && !store.balance.welcomed ? (
                 <Column spacing={spacing.sm} testID="store-verify" {...fullWidth(styles.card)}>
                   <Text textStyle={bodyText}>
                     {`Verify your email to claim ${formatCoins(WELCOME_GRANT)} coins`}
