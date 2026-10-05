@@ -254,7 +254,7 @@ interface PrivateView {
 
 /** The hero's own move, held until the authoritative broadcast reconciles it away (server wins). */
 type Pending =
-  | { kind: "betting"; pill: OptimisticPill; viewId: string }
+  | { kind: "betting"; pill: OptimisticPill; viewId: string; wagerAmount?: number }
   | { kind: "confirm"; viewId: string };
 
 /** One turn, one identity: the HUD re-anchors its countdown when this changes. */
@@ -425,13 +425,20 @@ export function useOnlineGame({
   const dispatchBetting = useCallback(
     (action: OnlineBettingAction, pill: OptimisticPill) => {
       room.send(GAME_MESSAGES.betting, action);
-      if (viewIdRef.current !== null) setPending({ kind: "betting", pill, viewId: viewIdRef.current });
+      if (viewIdRef.current !== null) {
+        setPending({
+          kind: "betting",
+          pill,
+          viewId: viewIdRef.current,
+          ...(action.type === "bet" || action.type === "raise" ? { wagerAmount: action.amount } : {}),
+        });
+      }
     },
     [room],
   );
 
   const bet = useCallback(
-    (amount: number) => dispatchBetting({ type: "bet", amount }, "raise"),
+    (amount: number) => dispatchBetting({ type: "bet", amount }, "bet"),
     [dispatchBetting],
   );
   const raiseTo = useCallback(
@@ -491,6 +498,7 @@ export function useOnlineGame({
   }, [heroDraft, priv, room, view]);
 
   const pendingPill = pending?.kind === "betting" ? pending.pill : null;
+  const pendingWagerAmount = pending?.kind === "betting" ? pending.wagerAmount : undefined;
   const pendingConfirm = pending?.kind === "confirm";
 
   /** One gesture, one id: sent now, and kept until the room answers it. */
@@ -563,8 +571,8 @@ export function useOnlineGame({
     () =>
       perspective === null
         ? null
-        : heroView(perspective, { draft: heroDraft, refusal, pendingPill, pendingConfirm }),
-    [heroDraft, pendingConfirm, pendingPill, perspective, refusal],
+        : heroView(perspective, { draft: heroDraft, refusal, pendingPill, pendingWagerAmount, pendingConfirm }),
+    [heroDraft, pendingConfirm, pendingPill, pendingWagerAmount, perspective, refusal],
   );
   const game = hero?.game ?? null;
 

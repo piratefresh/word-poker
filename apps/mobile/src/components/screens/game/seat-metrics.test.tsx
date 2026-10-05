@@ -203,6 +203,18 @@ describe("the rendered seat", () => {
     expect(plain.queryByTestId(`seat-power-tag-${hero.id}`)).toBeNull();
   });
 
+  test.each(["bet", "raise"] as const)("prints the %s round total in the status pill", async (status) => {
+    const view = await renderSeat(380, { ...hero, status, bet: 1200, powerTag: "WILD" });
+    const label = status === "raise" ? "RAISE TO $1,200" : "BET $1,200";
+    expect(view.getByText(label)).toBeTruthy();
+    expect(view.getByTestId(`seat-power-tag-${hero.id}`)).toHaveTextContent("WILD");
+  });
+
+  test("keeps bare action labels when no wager amount is available", async () => {
+    const view = await renderSeat(380, { ...hero, status: "raise" });
+    expect(view.getByText("RAISE")).toBeTruthy();
+  });
+
   test.each([380, 640, 960, 1280])(
     "centres a side seat's avatar on its anchor at a %i-point felt",
     async (tableWidth) => {

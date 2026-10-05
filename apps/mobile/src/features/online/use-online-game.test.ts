@@ -391,6 +391,51 @@ describe("useOnlineGame", () => {
     expect(handle.current.game?.betting.canCheck).toBe(false);
   });
 
+  test.each(["bet", "raise"] as const)("shows the pending %s amount and reconciles with the broadcast", async (action) => {
+    const originalAmount = action === "raise" ? 100 : 0;
+    const room = makeRoom(HERO, liveState({
+      seats: new Map([
+        [HERO, seat(HERO, 0, { committedThisRound: originalAmount })],
+        [OPPONENT, seat(OPPONENT, 1)],
+      ]),
+    }));
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+
+    await act(async () => action === "bet" ? handle.current.bet(600) : handle.current.raiseTo(600));
+    expect(handle.current.game?.players[0]).toMatchObject({ status: action, bet: 600 });
+    expect(handle.current.game?.players[1]?.bet).toBeUndefined();
+
+    await act(async () => room.emitState(liveState({
+      toActSeat: 1,
+      seats: new Map([
+        [HERO, seat(HERO, 0, { committedThisRound: 600, committedThisHand: 600, actedThisRound: true })],
+        [OPPONENT, seat(OPPONENT, 1)],
+      ]),
+      betting: { active: true, currentBet: 600, minRaise: 600, bigBlind: 100 },
+    })));
+    expect(handle.current.game?.players[0]).toMatchObject({ status: "waiting", bet: 600 });
+
+    await act(async () => room.emitState(liveState({ handCount: 2 })));
+    expect(handle.current.game?.players[0]?.bet).toBeUndefined();
+  });
+
+  test("restores the previous commitment when a pending raise is rejected", async () => {
+    const room = makeRoom(HERO, liveState({
+      seats: new Map([
+        [HERO, seat(HERO, 0, { committedThisRound: 100 })],
+        [OPPONENT, seat(OPPONENT, 1)],
+      ]),
+    }));
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState()));
+    await act(async () => handle.current.raiseTo(600));
+    expect(handle.current.game?.players[0]).toMatchObject({ status: "raise", bet: 600 });
+
+    await act(async () => room.emit(GAME_EVENTS.rejected, { action: "betting", reason: "not-your-turn" }));
+    expect(handle.current.game?.players[0]).toMatchObject({ status: "your-turn", bet: 100 });
+  });
+
   test("reconciles to the server and re-arms the row when the broadcast moves", async () => {
     const room = makeRoom(HERO, liveState());
     const handle = await mount(room);

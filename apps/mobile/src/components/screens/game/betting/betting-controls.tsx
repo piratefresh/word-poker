@@ -67,6 +67,7 @@ export function BettingControls({
         <GameButton
           disabled={!canFold}
           label="FOLD"
+          horizontalPadding={8}
           onPress={onFold}
           compact={tight}
           scale={scale}
@@ -76,7 +77,7 @@ export function BettingControls({
         />
         {/* Check and the wager are coach targets of their own, so a lesson can point at the one
             press it asks for; the target takes the button's share of the row. */}
-        <CoachTarget id="check" style={styles.callAction}>
+        <CoachTarget id="check" style={[styles.callAction, { minWidth: 48 * scale }]}>
           <GameButton
             disabled={!canCheckOrCall}
             amount={
@@ -85,6 +86,7 @@ export function BettingControls({
                 : undefined
             }
             label={state.primary === "call" ? "CALL" : "CHECK"}
+            horizontalPadding={8}
             onPress={onCheckOrCall}
             compact={tight}
             scale={scale}
@@ -94,11 +96,12 @@ export function BettingControls({
             testID="action-check-call"
           />
         </CoachTarget>
-        <CoachTarget id="wager" style={styles.wideAction}>
+        <CoachTarget id="wager" style={[styles.wideAction, { minWidth: 48 * scale }]}>
           <GameButton
             disabled={!canWager}
             amount={formatCompactAmount(amount)}
             label={wagerLabel}
+            horizontalPadding={8}
             onPress={onWager}
             compact={tight}
             scale={scale}
@@ -111,6 +114,7 @@ export function BettingControls({
           // ALL IN is an action, not an amount: the stack is already on the felt and the
           // confirm sheet still names what it commits.
           label="ALL IN"
+          horizontalPadding={8}
           onPress={() => setAllInOpen(true)}
           compact={tight}
           scale={scale}
@@ -141,9 +145,9 @@ const styles = StyleSheet.create({
   actionRowTight: { gap: 4 },
   actionRow: { flexDirection: "row", gap: 6, paddingTop: 4 },
   /** A control that shares the row's width with its neighbours. */
-  action: { flex: 1 },
-  /** Call and all in sit a little wider than fold; raise gets the most room (≈62/68/78/68). */
+  action: { flex: 0.75 },
+  /** Keep the label-only actions narrower; call and raise also have amounts to fit. */
   callAction: { flex: 1.1 },
   wideAction: { flex: 1.25 },
-  allInAction: { flex: 1.1 },
+  allInAction: { flex: 0.85 },
 });

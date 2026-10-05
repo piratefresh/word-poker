@@ -53,6 +53,8 @@ export interface GameButtonProps {
   scale?: number;
   /** The small-screen size: 44 tall (still a full touch target) with a 10-point label. */
   compact?: boolean;
+  /** Space on each side of the face's content, before screen scaling. */
+  horizontalPadding?: number;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   accessibilityLabel?: string;
@@ -124,6 +126,7 @@ export function GameButton({
   disabled = false,
   scale = 1,
   compact = false,
+  horizontalPadding = 12,
   style,
   testID,
   accessibilityLabel,
@@ -164,7 +167,7 @@ export function GameButton({
             style={[
               styles.face,
               { borderColor: material.edge },
-              scale !== 1 && { paddingHorizontal: 12 * scale },
+              { paddingHorizontal: horizontalPadding * scale },
               sunk ? styles.faceSunk : styles.faceUp,
             ]}
           >

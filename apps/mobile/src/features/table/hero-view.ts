@@ -137,7 +137,7 @@ export interface HeroPerspective {
 }
 
 /** The pill the felt wears for a move the server has not echoed yet. */
-export type OptimisticPill = "fold" | "check" | "call" | "raise" | "all-in";
+export type OptimisticPill = "fold" | "check" | "call" | "bet" | "raise" | "all-in";
 
 /** What only the device knows: the draft it is building, and any move still on the wire. */
 export interface HeroLocal {
@@ -145,6 +145,8 @@ export interface HeroLocal {
   refusal: WordRejectionReason | null;
   /** A betting move made but not yet echoed; offline never has one. */
   pendingPill: OptimisticPill | null;
+  /** The submitted bet or raise-to round total while that wager is awaiting the server. */
+  pendingWagerAmount?: number;
   /** A confirm made but not yet echoed; offline never has one. */
   pendingConfirm: boolean;
 }
@@ -370,6 +372,9 @@ function player(
   if (index === blinds.smallBlind) roles.push("small-blind");
   if (index === blinds.bigBlind) roles.push("big-blind");
   const power = p.powerTags?.get(index);
+  const bet = isHero && (local.pendingPill === "bet" || local.pendingPill === "raise")
+    ? local.pendingWagerAmount ?? seat.committedRound
+    : seat.committedRound;
 
   return {
     id: seat.id,
@@ -381,8 +386,8 @@ function player(
     // The button and the two blinds ride on position (§5): the dealer marker rotates with the
     // button, and heads-up one seat holds both.
     ...(roles.length === 0 ? {} : { roles }),
-    // What the seat has committed this round, drawn as the chip beside it.
-    ...(seat.committedRound > 0 ? { bet: seat.committedRound } : {}),
+    // The round total, predicted for a pending wager until the server echoes it.
+    ...(bet > 0 ? { bet } : {}),
     // A power used on this street, by the catalog's tag: the result stays private (§44).
     ...(power === undefined ? {} : { powerTag: POWER_UPS[power].tag }),
     // The hero wears its just-made move the instant it is tapped; every other seat, and the hero

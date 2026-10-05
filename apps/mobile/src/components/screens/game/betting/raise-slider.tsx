@@ -74,27 +74,34 @@ export function RaiseSlider({
         onResponderGrant={fromEvent}
         onResponderMove={fromEvent}
         onStartShouldSetResponder={() => !disabled}
-        style={[styles.slider, scale !== 1 && { height: 3 * scale }]}
+        style={[styles.touchArea, scale !== 1 && { height: 36 * scale }]}
       >
+        {/* The touch area is the tall hit target; pointerEvents none keeps locationX measured on
+            it (same width as the track), not on the fill or thumb. */}
         <View
-          style={[
-            styles.sliderFill,
-            scale !== 1 && { height: 3 * scale },
-            { width: `${progress * 100}%` },
-          ]}
-        />
-        <View
-          style={[
-            styles.sliderThumb,
-            scale !== 1 && {
-              height: 14 * scale,
-              marginLeft: -7 * scale,
-              marginTop: -8.5 * scale,
-              width: 14 * scale,
-            },
-            { left: `${progress * 100}%` },
-          ]}
-        />
+          pointerEvents="none"
+          style={[styles.slider, scale !== 1 && { height: 3 * scale }]}
+        >
+          <View
+            style={[
+              styles.sliderFill,
+              scale !== 1 && { height: 3 * scale },
+              { width: `${progress * 100}%` },
+            ]}
+          />
+          <View
+            style={[
+              styles.sliderThumb,
+              scale !== 1 && {
+                height: 20 * scale,
+                marginLeft: -10 * scale,
+                marginTop: -11.5 * scale,
+                width: 20 * scale,
+              },
+              { left: `${progress * 100}%` },
+            ]}
+          />
+        </View>
       </View>
       <Text
         style={[
@@ -119,10 +126,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 1.2,
   },
+  touchArea: { flex: 1, height: 36, justifyContent: "center" },
   slider: {
     backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 2,
-    flex: 1,
     height: 3,
     position: "relative",
   },
@@ -132,11 +139,11 @@ const styles = StyleSheet.create({
     borderColor: colors.onGold,
     borderRadius: radius.pill,
     borderWidth: 2,
-    height: 14,
-    marginLeft: -7,
-    marginTop: -8.5,
+    height: 20,
+    marginLeft: -10,
+    marginTop: -11.5,
     position: "absolute",
-    width: 14,
+    width: 20,
   },
   raiseAmount: {
     color: colors.gold,

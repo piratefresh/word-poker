@@ -12,6 +12,7 @@ import {
   layout,
   palette,
 } from "@/constants/theme";
+import { formatAmount } from "@/lib/format";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
 import { SeatBeam } from "./seat-beam";
@@ -208,6 +209,10 @@ export function PlayerSeat({
       : colors.success;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
+  const statusLabel =
+    seat.bet !== undefined && seat.bet > 0 && (seat.status === "bet" || seat.status === "raise")
+      ? `${seat.status === "raise" ? "RAISE TO" : "BET"} ${formatAmount(seat.bet)}`
+      : STATUS_LABEL[seat.status];
   const content = (
     <>
       <View style={styles.avatarWrap}>
@@ -260,17 +265,21 @@ export function PlayerSeat({
               style={[
                 styles.statusPill,
                 scaled.statusPill,
+                styles.actionPill,
                 lit && { backgroundColor: statusColor, borderColor: statusColor },
               ]}
             >
               <Text
+                accessibilityLabel={statusLabel}
+                adjustsFontSizeToFit
+                numberOfLines={1}
                 style={[
                   styles.statusText,
                   scaled.statusText,
                   lit && styles.statusTextLit,
                 ]}
               >
-                {STATUS_LABEL[seat.status]}
+                {statusLabel}
               </Text>
             </View>
             {/* §44: a power used on this street rides beside the street's action. */}
@@ -383,7 +392,8 @@ const styles = StyleSheet.create({
   },
   statusText: { color: palette.green500, fontFamily: fonts.monoBold },
   statusTextLit: { color: colors.onGold },
-  statusRow: { alignItems: "center", flexDirection: "row" },
+  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%" },
+  actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
   powerTagText: { color: colors.goldHi },
