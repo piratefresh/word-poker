@@ -469,6 +469,9 @@ importers:
       '@wordpoker/db':
         specifier: workspace:*
         version: link:../db
+      '@wordpoker/game-rules':
+        specifier: workspace:*
+        version: link:../game-rules
     devDependencies:
       '@types/node':
         specifier: ^24.13.4
