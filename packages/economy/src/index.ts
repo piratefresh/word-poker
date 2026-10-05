@@ -31,4 +31,12 @@ export {
   type WalletDeps,
   type WalletStore,
 } from "./wallet";
+export {
+  claimQuestHand,
+  creditDailyStreak,
+  payCompletedQuests,
+  streakLength,
+  type QuestStore,
+  type RewardsDeps,
+} from "./rewards";
 export { CURRENCY_EVENT_TYPE, parseCurrencyEvent, type ParsedWebhook } from "./webhook";

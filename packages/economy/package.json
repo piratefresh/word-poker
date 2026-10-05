@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@wordpoker/contracts": "workspace:*",
-    "@wordpoker/db": "workspace:*"
+    "@wordpoker/db": "workspace:*",
+    "@wordpoker/game-rules": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.4",
