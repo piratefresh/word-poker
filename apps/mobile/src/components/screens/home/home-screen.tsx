@@ -30,7 +30,6 @@ import {
   spacing,
 } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
-import { fullWidth } from "@/lib/full-width";
 
 type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store";
 
@@ -115,6 +114,8 @@ const STORE_MODE: Mode = {
   description: "Top up your Wallet",
 };
 
+const CARD_PADDING = spacing.lg;
+
 const titleText = {
   color: colors.textBright,
   fontFamily: fonts.serifBold,
@@ -138,10 +139,10 @@ const signedInText = {
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
   const [pending, setPending] = useState<ModeKey | null>(null);
-  // The width a card gives its content: the screen less its gutters and the card's own padding.
-  // The variants are sized from their content (see below), so they are handed it outright.
-  const cardContentWidth =
-    useWindowDimensions().width - spacing.gutter * 2 - spacing.lg * 2;
+  // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
+  // card shrinks to its own content, so the column's width is handed down as a number.
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = windowWidth - spacing.gutter * 2;
 
   // Modes with a route navigate; the rest don't exist yet, so selecting one
   // just marks intent for now.
@@ -159,7 +160,7 @@ export function HomeScreen() {
         <Column
           alignment="start"
           spacing={spacing.md}
-          {...fullWidth(styles.screen)}
+          style={{ ...styles.screen, width: windowWidth }}
         >
           <Text textStyle={titleText}>Choose how to play</Text>
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
@@ -178,17 +179,15 @@ export function HomeScreen() {
                 label={mode.label}
                 onSelect={() => handleSelect(mode)}
                 tone={mode.tone}
+                width={contentWidth}
               >
                 {variants ? (
-                  // Sized from its content: without `matchContents` a native host takes its
-                  // parent's size, and a card that wraps its content gives it no height (the
-                  // pair never drew on Android).
                   <RNHostView matchContents>
                     <ModeVariants
                       disabled={disabled}
                       onSelect={(variant) => handleSelect(mode, variant.href)}
                       variants={variants}
-                      width={cardContentWidth}
+                      width={contentWidth - CARD_PADDING * 2}
                     />
                   </RNHostView>
                 ) : null}
@@ -198,8 +197,8 @@ export function HomeScreen() {
 
           <Spacer size={spacing.lg} />
 
-          <Column spacing={spacing.md} {...fullWidth(styles.footer)}>
-            <Row alignment="center" {...fullWidth()}>
+          <Column spacing={spacing.md} style={{ ...styles.footer, width: contentWidth }}>
+            <Row alignment="center" style={{ width: contentWidth - spacing.lg * 2 }}>
               <Text textStyle={signedInText}>Signed in as</Text>
               <Spacer flexible />
               <Text textStyle={signedInText}>
@@ -229,13 +228,11 @@ const styles = {
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.gutter,
     paddingTop: spacing.huge,
-    width: "100%" as const,
   },
   footer: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    width: "100%" as const,
   },
 };
