@@ -10,6 +10,7 @@
     "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm --filter @wordpoker/mobile start",
     "dev:server": "pnpm --filter @wordpoker/server start",
+    "build": "pnpm --filter @wordpoker/server build",
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",
     "smoke:online:wild": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Wild",
     "smoke:online:four": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online-four.ps1",
