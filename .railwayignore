@@ -1,0 +1,16 @@
+# `railway up` uploads the working tree; the web + API build needs none of this.
+# Listed explicitly rather than trusted to .gitignore: Railway uploaded these anyway.
+node_modules/
+.expo/
+dist/
+build/
+.omp/
+.env
+.env.*
+*.p8
+packages/3d/
+apps/mobile/assets/images/*.zip
+*.blend
+*.blend1
+android/
+docs/inspiration/

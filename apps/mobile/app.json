@@ -25,7 +25,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "server",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -53,6 +53,7 @@
       "eas": {
         "projectId": "3e279b47-6c06-47a9-ac2b-6bcd49f37df8"
       }
-    }
+    },
+    "owner": "word-poker"
   }
 }
