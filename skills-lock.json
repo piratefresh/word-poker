@@ -7,6 +7,13 @@
       "skillPath": "SKILL.md",
       "computedHash": "a988c4601d5397ee96925cf382e50e2a8874a80f299a6a9a7f5f7691e0f77d18"
     },
+    "connect-recommend": {
+      "source": "docs.stripe.com",
+      "sourceUrl": "https://docs.stripe.com",
+      "sourceType": "well-known",
+      "computedHash": "182d73a20408fd1248d23553d65975966d55724bdb3abbf0de291988a470dce3",
+      "wellKnownDigest": "sha256:b6882c49ba1f45b0652aa18680986080994c01dc95ed556d4cc4f911568b395f"
+    },
     "eas-app-stores": {
       "source": "expo/skills",
       "sourceType": "github",
@@ -42,6 +49,20 @@
       "sourceType": "github",
       "skillPath": "skills/motion-design/SKILL.md",
       "computedHash": "4f16f46c81f25a2a25b7a4720b7ea001e65f384b31b5b7f4b455fef87fbc9016"
+    },
+    "stripe-docs": {
+      "source": "docs.stripe.com",
+      "sourceUrl": "https://docs.stripe.com",
+      "sourceType": "well-known",
+      "computedHash": "ee4a51d34f11386fe6c9f991d5b2d32da69c851124a78a01403412bcf87e73d7",
+      "wellKnownDigest": "sha256:354fb04e9c979223bfecabc994fff41c8da5b5ea155684f1b4ade3a6fed07bac"
+    },
+    "upgrade-stripe": {
+      "source": "docs.stripe.com",
+      "sourceUrl": "https://docs.stripe.com",
+      "sourceType": "well-known",
+      "computedHash": "fb0a8dfac5c0bca380655e0f4de2e187757bd262b7391f64548445d07cc75b12",
+      "wellKnownDigest": "sha256:fb7689c3bff61d5ca214fcd575a13dbe067a1ff43053681a2221209874c8dff5"
     }
   }
 }
