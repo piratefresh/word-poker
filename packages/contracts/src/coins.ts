@@ -14,7 +14,7 @@ export const COIN_PACK_IDS = ["coins_small", "coins_medium", "coins_large"] as c
 
 export type CoinPackId = (typeof COIN_PACK_IDS)[number];
 
-/** What a wallet_event records; `quest`/`streak` are reserved for QUESTS_LOGIN_STREAK_PLAN.md. */
+/** What a wallet_event records; `quest`/`streak` pay the rewards in `quests.ts` (STO-525). */
 export const WALLET_EVENT_KINDS = [
   "welcome",
   "purchase",

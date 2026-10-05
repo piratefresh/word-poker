@@ -64,6 +64,19 @@ export {
   type WalletResponse,
 } from "./coins";
 export { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "./dictionaries";
+export {
+  QUEST_IDS,
+  STREAK_REWARDS,
+  isQuestClaimResponse,
+  isQuestHandClaim,
+  isQuestId,
+  isQuestStateResponse,
+  type QuestClaimResponse,
+  type QuestHandClaim,
+  type QuestHandFacts,
+  type QuestId,
+  type QuestStateResponse,
+} from "./quests";
 export type {
   ChoiceTile,
   LetterMultiplier,
