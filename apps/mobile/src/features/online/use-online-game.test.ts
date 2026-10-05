@@ -175,7 +175,7 @@ describe("useOnlineGame", () => {
       seat: seatIndex,
       score: 0,
       place,
-      decidedBy: "score",
+      decidedBy: "final-score",
       compared: 0,
       hasCompared: false,
       word: "",
@@ -216,7 +216,14 @@ describe("useOnlineGame", () => {
     expect(results?.seed).toBeNull();
     expect(results?.pot).toBe(250);
     expect(results?.seats.map((seat) => seat.playerId)).toEqual([HERO, OPPONENT]);
-    expect(results?.seats[0]).toMatchObject({ word: "GO", total: 3, base: 3, takesPot: true, isYou: true });
+    expect(results?.seats[0]).toMatchObject({
+      word: "GO",
+      total: 3,
+      base: 3,
+      takesPot: true,
+      isYou: true,
+      decidedBy: "final-score",
+    });
     expect(results?.seats[0]?.tiles.map((tile) => tile.id)).toEqual(["t-g", "t-o"]);
     expect(results?.seats[1]).toMatchObject({ word: null, reason: "not-a-word", takesPot: false });
 

@@ -53,6 +53,7 @@ export function seatFixture(overrides: Partial<ResultsSeat> & { name: string }):
     place: 1,
     takesPot: false,
     reason: null,
+    decidedBy: "final-score",
     ...overrides,
   };
 }

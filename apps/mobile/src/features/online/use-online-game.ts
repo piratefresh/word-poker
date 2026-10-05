@@ -44,6 +44,7 @@ import type {
   PrivateWordCheckState,
   RoomPhase,
   RoundPhase,
+  ShowdownDecider,
   Tile,
   TilePlay,
   WordCheckResult,
@@ -54,6 +55,7 @@ import {
   GAME_EVENTS,
   GAME_MESSAGES,
   ROUND_PHASES,
+  SHOWDOWN_DECIDERS,
   WAITING_PHASE,
   isGameRejectionEvent,
   isPowerUpId,
@@ -198,6 +200,8 @@ interface ResultStandingView {
   place: number;
   word: string;
   reason: WordRejectionReason | null;
+  /** What §21's ladder decided this seat's place by. */
+  decidedBy: ShowdownDecider;
   /** The reveal, as the room priced it with `playedWord`: tiles in word order and §7's parts. */
   tiles: readonly Tile[];
   base: number;
@@ -586,6 +590,7 @@ export function useOnlineGame({
           score: standing.score,
           word: standing.word === "" ? null : standing.word,
           reason: standing.reason,
+          decidedBy: standing.decidedBy,
           played:
             standing.tiles.length === 0
               ? null
@@ -920,8 +925,12 @@ function decodeWordSlot(value: unknown): WordSlotView {
   };
 }
 
+/** The schema's own default ("") only ever shows up before a showdown has run at all. */
+const FALLBACK_DECIDER: ShowdownDecider = "final-score";
+
 function decodeStanding(value: unknown): ResultStandingView {
   const record = isRecord(value) ? value : {};
+  const decidedBy = stringOf(record.decidedBy);
   return {
     playerId: stringOf(record.playerId),
     seat: numberOf(record.seat),
@@ -930,6 +939,9 @@ function decodeStanding(value: unknown): ResultStandingView {
     word: stringOf(record.word),
     // The schema spells "no reason" as an empty string; the reasons themselves are the engine's.
     reason: stringOf(record.reason) === "" ? null : (stringOf(record.reason) as WordRejectionReason),
+    decidedBy: (SHOWDOWN_DECIDERS as readonly string[]).includes(decidedBy)
+      ? (decidedBy as ShowdownDecider)
+      : FALLBACK_DECIDER,
     tiles: iterate(record.tiles).map(decodeTile),
     base: numberOf(record.base),
     mult: numberOf(record.mult),

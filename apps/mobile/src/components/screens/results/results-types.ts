@@ -12,7 +12,7 @@
  * (STO-379 decision 12).
  */
 
-import type { PlayerId, Tile, WordRejectionReason } from "@wordpoker/contracts";
+import type { PlayerId, ShowdownDecider, Tile, WordRejectionReason } from "@wordpoker/contracts";
 
 /** One seat as the results draw it: who it is, what it played, and what that was worth. */
 export interface ResultsSeat {
@@ -48,6 +48,8 @@ export interface ResultsSeat {
   readonly takesPot: boolean;
   /** §11's reason the seat scored nothing, or `null` when its word stood. */
   readonly reason: WordRejectionReason | null;
+  /** What §21's ladder decided this seat's place by, or `null` for the fold-out's one card. */
+  readonly decidedBy: ShowdownDecider | null;
 }
 
 /** The headline's pieces: the two spans of the sentence, and the line under the pot. */

@@ -16,7 +16,7 @@
  * room has already run `playedWord` on the server; the offline adapter runs it here.
  */
 
-import type { PlayerId, Tile, WordRejectionReason } from "@wordpoker/contracts";
+import type { PlayerId, ShowdownDecider, Tile, WordRejectionReason } from "@wordpoker/contracts";
 import { handSeed, playedWord, type OfflineState, type PlayedWord } from "@wordpoker/game-rules";
 
 import type { GamePlayer } from "@/components/screens/game/game-types";
@@ -36,6 +36,8 @@ export interface SettledStanding {
   readonly reason: WordRejectionReason | null;
   /** §7's breakdown and the tiles played, or `null` when no word stood. */
   readonly played: PlayedWord | null;
+  /** What §21's ladder decided this seat's place by. */
+  readonly decidedBy: ShowdownDecider;
 }
 
 /** A paid-out hand, whichever table settled it: what the results screen is built from. */
@@ -91,6 +93,7 @@ export function buildResultsSnapshot({
         word: standing.word,
         reason: standing.reason,
         played: playedWord(state, standing.seat),
+        decidedBy: standing.decidedBy,
       })),
     },
     players,
@@ -144,6 +147,7 @@ function seatResult(
     // The top place is what the pot paid: a split pot is several seats sharing it (§21.3, §25).
     takesPot: standing.place === 1,
     reason: standing.reason,
+    decidedBy: standing.decidedBy,
   };
 }
 
@@ -164,6 +168,7 @@ function foldOutResult(winner: PlayerId, players: readonly (GamePlayer | null)[]
     place: 1,
     takesPot: true,
     reason: null,
+    decidedBy: null,
   };
 }
 

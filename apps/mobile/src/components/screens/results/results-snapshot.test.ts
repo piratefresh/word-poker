@@ -129,6 +129,7 @@ describe("buildResultsSnapshot", () => {
       expect(seat.takesPot).toBe(standing?.place === 1);
       expect(seat.base + seat.mult + seat.rack).toBe(seat.total);
       expect(seat.reason).toBe(standing?.reason);
+      expect(seat.decidedBy).toBe(standing?.decidedBy);
     }
   });
 
@@ -208,6 +209,7 @@ describe("buildResultsSnapshot", () => {
     expect(snapshot.seats[0]?.tiles).toEqual([]);
     expect(snapshot.seats[0]?.total).toBe(0);
     expect(snapshot.seats[0]?.takesPot).toBe(true);
+    expect(snapshot.seats[0]?.decidedBy).toBeNull();
 
     expect(snapshot.table).toEqual({ players: 4, folded: 3 });
     expect(snapshot.headline.lead).toBe("Ellis takes");
