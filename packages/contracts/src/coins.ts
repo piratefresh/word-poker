@@ -34,6 +34,8 @@ export const WELCOME_GRANT = 5000;
 /** `GET /api/wallet`: the signed-in player's balance. */
 export interface WalletResponse {
   readonly coins: number;
+  /** The welcome grant has been opened for this player, so there is nothing left to claim. */
+  readonly welcomed: boolean;
 }
 
 /** One pack the store can sell: its store product id and the coins RevenueCat grants for it. */
@@ -61,7 +63,8 @@ function isCoinCount(value: unknown): value is number {
 
 export function isWalletResponse(value: unknown): value is WalletResponse {
   if (typeof value !== "object" || value === null) return false;
-  return isCoinCount((value as Record<string, unknown>).coins);
+  const candidate = value as Record<string, unknown>;
+  return isCoinCount(candidate.coins) && typeof candidate.welcomed === "boolean";
 }
 
 function isCoinCatalogPack(value: unknown): value is CoinCatalogPack {

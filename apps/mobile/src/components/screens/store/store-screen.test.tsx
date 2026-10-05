@@ -74,7 +74,7 @@ beforeEach(() => {
   signedIn();
   available.mockReturnValue(true);
   ready.mockReturnValue(true);
-  wallet.mockResolvedValue(5000);
+  wallet.mockResolvedValue({ coins: 5000, welcomed: true });
   catalog.mockResolvedValue({
     packs: [
       { productId: "coins_small", coins: 2000 },
@@ -110,6 +110,7 @@ test("asks a signed-out player to sign in", async () => {
 
 test("asks an unverified player to verify, and resends the mail", async () => {
   signedIn(false);
+  wallet.mockResolvedValue({ coins: 0, welcomed: false });
   jest.mocked(authClient.sendVerificationEmail).mockResolvedValue({ data: { status: true }, error: null } as never);
 
   const view = await render(<StoreScreen />);
@@ -117,6 +118,15 @@ test("asks an unverified player to verify, and resends the mail", async () => {
   await waitFor(() => expect(view.getByTestId("store-verify")).toBeTruthy());
   await press(view, "store-verify-resend");
   expect(authClient.sendVerificationEmail).toHaveBeenCalledWith({ email: "ada@example.com", callbackURL: "/" });
+});
+
+test("offers no welcome to an unverified player who already has it", async () => {
+  signedIn(false);
+
+  const view = await render(<StoreScreen />);
+
+  await waitFor(() => expect(textOf(view, "wallet-coins")).toBe("5,000 COINS"));
+  expect(view.queryByTestId("store-verify")).toBeNull();
 });
 
 test("lists packs with the catalog's amounts and hides one without a grant", async () => {
@@ -142,7 +152,7 @@ test("buys a pack, then re-reads the balance and says what landed", async () => 
   const view = await render(<StoreScreen />);
   await waitFor(() => expect(view.getByTestId("store-buy-coins_small")).toBeTruthy());
   await waitFor(() => expect(textOf(view, "wallet-coins")).toBe("5,000 COINS"));
-  wallet.mockResolvedValue(7000);
+  wallet.mockResolvedValue({ coins: 7000, welcomed: true });
 
   await press(view, "store-buy-coins_small");
 

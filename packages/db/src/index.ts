@@ -24,6 +24,7 @@ export {
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
 export {
+  hasWelcomeEvent,
   openWalletEvent,
   pendingWalletEvents,
   recordReportedEvent,

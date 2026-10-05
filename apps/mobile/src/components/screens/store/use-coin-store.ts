@@ -20,7 +20,7 @@ export const BALANCE_RETRY_MS = 1500;
 
 export type BalanceState =
   | { readonly status: "loading" }
-  | { readonly status: "ready"; readonly coins: number }
+  | { readonly status: "ready"; readonly coins: number; readonly welcomed: boolean }
   | { readonly status: "signed-out" }
   | { readonly status: "error"; readonly message: string };
 
@@ -66,7 +66,7 @@ export function useCoinStore(userId: string | undefined): CoinStore {
     let current = true;
 
     fetchWallet()
-      .then((coins) => current && setBalance({ status: "ready", coins }))
+      .then((wallet) => current && setBalance({ status: "ready", ...wallet }))
       .catch((error: unknown) => {
         if (!current) return;
         setBalance(
@@ -105,11 +105,11 @@ export function useCoinStore(userId: string | undefined): CoinStore {
 
         for (let attempt = 0; attempt < BALANCE_RETRIES; attempt += 1) {
           if (attempt > 0) await sleep(BALANCE_RETRY_MS);
-          const coins = await fetchWallet().catch(() => null);
-          if (coins === null) continue;
-          setBalance({ status: "ready", coins });
-          if (before === null || coins > before) {
-            setNotice({ kind: "added", coins: before === null ? row.coins : coins - before });
+          const wallet = await fetchWallet().catch(() => null);
+          if (wallet === null) continue;
+          setBalance({ status: "ready", ...wallet });
+          if (before === null || wallet.coins > before) {
+            setNotice({ kind: "added", coins: before === null ? row.coins : wallet.coins - before });
             return;
           }
         }

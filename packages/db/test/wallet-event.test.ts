@@ -14,6 +14,7 @@ import type { MikroORM } from "@mikro-orm/postgresql";
 import { Client } from "pg";
 
 import {
+  hasWelcomeEvent,
   openWalletEvent,
   pendingWalletEvents,
   recordReportedEvent,
@@ -50,7 +51,12 @@ describe(
     it("opens one welcome per user and nothing for the second", async () => {
       const userId = `user-${randomUUID()}`;
 
+      assert.equal(await hasWelcomeEvent(userId, { orm }), false);
+      await openWalletEvent({ userId, kind: "purchase", amount: 2000 }, { orm });
+      assert.equal(await hasWelcomeEvent(userId, { orm }), false, "another kind is not a welcome");
+
       const first = await openWalletEvent({ userId, kind: "welcome", amount: 5000 }, { orm });
+      assert.equal(await hasWelcomeEvent(userId, { orm }), true);
       const second = await openWalletEvent({ userId, kind: "welcome", amount: 5000 }, { orm });
 
       assert.ok(first, "the first welcome opens a row");

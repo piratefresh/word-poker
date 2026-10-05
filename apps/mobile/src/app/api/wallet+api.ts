@@ -7,6 +7,7 @@
  */
 
 import type { WalletResponse } from "@wordpoker/contracts";
+import { hasWelcomeEvent } from "@wordpoker/db";
 import { getCoinBalance, retryPending } from "@wordpoker/economy";
 
 import { auth } from "@/auth/server/auth";
@@ -18,7 +19,7 @@ function json(body: unknown, status: number): Response {
   });
 }
 
-/** `200 { coins }`, `401` without a session, `502` when RevenueCat cannot be read. */
+/** `200 { coins, welcomed }`, `401` without a session, `502` when RevenueCat cannot be read. */
 export async function GET(request: Request): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in to see your coins." }, 401);
@@ -33,7 +34,8 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const body: WalletResponse = { coins: await getCoinBalance(userId) };
+    const [coins, welcomed] = await Promise.all([getCoinBalance(userId), hasWelcomeEvent(userId)]);
+    const body: WalletResponse = { coins, welcomed };
 
     return json(body, 200);
   } catch (error) {

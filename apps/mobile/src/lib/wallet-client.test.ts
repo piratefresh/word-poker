@@ -22,9 +22,9 @@ beforeEach(() => {
 
 describe("fetchWallet", () => {
   test("sends the stored session cookie and reads the coins", async () => {
-    fetchMock.mockResolvedValue(reply(200, { coins: 5000 }));
+    fetchMock.mockResolvedValue(reply(200, { coins: 5000, welcomed: true }));
 
-    await expect(fetchWallet()).resolves.toBe(5000);
+    await expect(fetchWallet()).resolves.toEqual({ coins: 5000, welcomed: true });
     expect(fetchMock).toHaveBeenCalledWith("http://api.test/api/wallet", {
       credentials: "omit",
       headers: { cookie: "better-auth.session=abc" },

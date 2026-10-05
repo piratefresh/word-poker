@@ -140,6 +140,17 @@ export async function pendingWalletEvents(
   return rows.map(toRecord);
 }
 
+/** Whether a player's welcome grant has been opened, in any status: a pending one is retried. */
+export async function hasWelcomeEvent(userId: string, options: DbOptions = {}): Promise<boolean> {
+  const db = await connection(options);
+  const rows = await db.execute<{ id: string }[]>(
+    `select "id" from "wallet_event" where "user_id" = ? and "kind" = 'welcome' limit 1`,
+    [userId],
+  );
+
+  return rows.length > 0;
+}
+
 /**
  * Logs a change RevenueCat made itself (a purchase or a refund), as `applied`. Resolves `false`
  * when the webhook event was already recorded — RevenueCat redelivers until it sees a 200.

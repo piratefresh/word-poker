@@ -7,7 +7,7 @@
  * sends its own cookie with `credentials: "include"`.
  */
 
-import { isCoinCatalog, isWalletResponse, type CoinCatalog } from "@wordpoker/contracts";
+import { isCoinCatalog, isWalletResponse, type CoinCatalog, type WalletResponse } from "@wordpoker/contracts";
 import { Platform } from "react-native";
 
 import { apiBaseURL } from "@/lib/api-base-url";
@@ -40,8 +40,8 @@ async function failure(response: Response): Promise<Error> {
   return new Error(`The coin store could not be reached (HTTP ${response.status}).`);
 }
 
-/** The signed-in player's coins. Rejects with `WalletAuthError` on a 401. */
-export async function fetchWallet(): Promise<number> {
+/** The signed-in player's coins, and whether their welcome is claimed. Rejects with `WalletAuthError` on a 401. */
+export async function fetchWallet(): Promise<WalletResponse> {
   const response = await fetch(`${apiBaseURL}/api/wallet`, sessionInit());
   if (response.status === 401) throw new WalletAuthError();
   if (!response.ok) throw await failure(response);
@@ -49,7 +49,7 @@ export async function fetchWallet(): Promise<number> {
   const body: unknown = await response.json();
   if (!isWalletResponse(body)) throw new Error("The coin store sent a balance it could not read.");
 
-  return body.coins;
+  return body;
 }
 
 /** The packs the store sells, each with the coins RevenueCat grants for it. */

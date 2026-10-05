@@ -47,12 +47,21 @@ describe("coin vocabulary", () => {
 
 describe("isWalletResponse", () => {
   it("accepts a whole, non-negative balance", () => {
-    assert.ok(isWalletResponse({ coins: 0 }));
-    assert.ok(isWalletResponse({ coins: 12_000 }));
+    assert.ok(isWalletResponse({ coins: 0, welcomed: false }));
+    assert.ok(isWalletResponse({ coins: 12_000, welcomed: true }));
   });
 
   it("refuses anything else", () => {
-    for (const value of [null, {}, { coins: -1 }, { coins: 1.5 }, { coins: "5000" }, 5000]) {
+    for (const value of [
+      null,
+      {},
+      { coins: 5000 },
+      { coins: 5000, welcomed: "yes" },
+      { coins: -1, welcomed: true },
+      { coins: 1.5, welcomed: true },
+      { coins: "5000", welcomed: true },
+      5000,
+    ]) {
       assert.ok(!isWalletResponse(value), JSON.stringify(value));
     }
   });
