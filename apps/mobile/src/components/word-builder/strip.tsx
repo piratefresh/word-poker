@@ -365,9 +365,16 @@ export function TileStrip({
   onReorder,
   onPick,
   flip = null,
+  places = 0,
 }: {
   /** The tiles in the seat's order. */
   strip: readonly StripEntry[];
+  /**
+   * How many places the row lays out, when the hand may grow into them: the tiles take the first
+   * ones and the rest are drawn as dashed slots, at the step a full row would have, so a tile
+   * dealt later lands where its slot was. 0 lays out the tiles alone.
+   */
+  places?: number;
   /** The face the word plays each tile it holds, by tile id; absent for the tiles it does not. */
   held: ReadonlyMap<string, string | undefined>;
   /** True while §19's window is open and a tap may play a tile. */
@@ -440,7 +447,11 @@ export function TileStrip({
   );
 
   const rack = rackFor(useWindowDimensions());
-  const step = stepFor(data.length, room, rack);
+  // A hand never holds more than the places (§7's seven), but cap the empties at 0 rather than
+  // trust it: a negative count would draw nothing and shift every step.
+  const laidOut = Math.max(places, data.length);
+  const empty = laidOut - data.length;
+  const step = stepFor(laidOut, room, rack);
 
   return (
     <View
@@ -457,9 +468,18 @@ export function TileStrip({
       <View
         style={[
           styles.stripContent,
-          { height: rack.height, width: rowWidth(data.length, step, rack) },
+          { height: rack.height, width: rowWidth(laidOut, step, rack) },
         ]}
       >
+        {Array.from({ length: empty }, (_, index) => (
+          <EmptyPlace
+            key={`empty-${data.length + index}`}
+            left={(data.length + index) * step}
+            rack={rack}
+            step={step}
+            testID={`word-builder-place-${data.length + index}`}
+          />
+        ))}
         {sortable && !picking ? (
           /*
             The strip seeds its places once, from the order it is first handed, so the live
@@ -508,6 +528,44 @@ export function TileStrip({
         )}
       </View>
     </View>
+  );
+}
+
+/**
+ * A place no tile has been dealt to yet: a dashed outline the size of a tile, in the row at the
+ * step a full hand would sit at. A slot is not a drop target — the drag runs over the tiles only —
+ * so it takes no touch.
+ */
+function EmptyPlace({
+  left,
+  rack,
+  step,
+  testID,
+}: {
+  left: number;
+  rack: RackGeometry;
+  step: number;
+  testID: string;
+}): JSX.Element {
+  const tile = scaleTileMetrics(rack.size, rack.scale);
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={[
+        styles.emptyPlace,
+        {
+          borderRadius: tile.radius,
+          // A hand squeezed past a tile's width lays its places closer than a tile; the outline
+          // gives up the same room rather than draw over its neighbour.
+          height: tile.height,
+          left,
+          width: Math.min(rack.itemWidth, step - 2),
+        },
+      ]}
+      testID={testID}
+    />
   );
 }
 

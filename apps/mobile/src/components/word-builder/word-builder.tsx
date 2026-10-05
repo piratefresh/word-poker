@@ -6,6 +6,7 @@ import type {
   WordScore,
 } from "@wordpoker/contracts";
 import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
+import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "@wordpoker/game-rules";
 import type { JSX, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { AccessibilityInfo, Platform, Text, View } from "react-native";
@@ -290,19 +291,31 @@ export function WordHand(): JSX.Element {
   const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip } =
     useWordBuilderScope();
 
+  // The tray wraps the strip and never sizes it: the places and their step are the strip's own.
+  // The tray's seven places are the seven tiles a seat can play (§7); the ones not dealt yet
+  // draw as dashed slots, so a hand a street short of the river reads as one still filling.
   return (
-    <TileStrip
-      flip={swapFlip}
-      held={held}
-      live={live}
-      onPick={pickTile}
-      onReorder={reorder}
-      onToggle={toggle}
-      sortable={sortable}
-      strip={strip}
-    />
+    <View style={styles.trayLip} testID="word-builder-tray">
+      <View style={styles.trayFace}>
+        <Text style={styles.trayLabel}>WORD BUILDER</Text>
+        <TileStrip
+          flip={swapFlip}
+          held={held}
+          live={live}
+          onPick={pickTile}
+          onReorder={reorder}
+          onToggle={toggle}
+          places={WORD_PLACES}
+          sortable={sortable}
+          strip={strip}
+        />
+      </View>
+    </View>
   );
 }
+
+/** The tiles a seat can play: its private tiles and the whole board (§7). */
+const WORD_PLACES = PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;
 
 /**
  * The draft as the seat reads it, for the line above the rack: the letters the strip spells,
@@ -392,10 +405,12 @@ export function WordCheckButton(): JSX.Element | null {
   return (
     <GameButton
       disabled={!canCheck}
-      label={`CHECK ${remaining}/${WORD_CHECKS_PER_HAND}`}
+      label="CHECK WORD"
+      labelAccent={`${remaining}/${WORD_CHECKS_PER_HAND}`}
       onPress={handleCheck}
       style={{ height: 32 }}
       testID="word-check-button"
+      variant="green"
     />
   );
 }

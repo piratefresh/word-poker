@@ -116,6 +116,46 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.small,
     lineHeight: 19,
   },
+  // The cream tray the strip sits in (STO-538), built like the buttons: a face standing on a
+  // darker lip. Colours are sampled off the tabletop reference.
+  trayLip: {
+    alignSelf: "stretch",
+    backgroundColor: "#d9b983",
+    borderRadius: radius.lg,
+    boxShadow: [
+      { blurRadius: 6, color: "rgba(38,18,0,0.35)", offsetX: 0, offsetY: 3 },
+    ],
+    marginHorizontal: spacing.sm,
+  },
+  // The strip's row keeps a band under the tiles for a choice tile's face chips, so the face
+  // takes no bottom padding of its own: the band is the room.
+  trayFace: {
+    backgroundColor: "#f6e0ba",
+    borderColor: "#fbeed0",
+    borderRadius: radius.lg,
+    borderWidth: border.hairline,
+    marginBottom: 4,
+    paddingBottom: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+  },
+  trayLabel: {
+    color: "#4a3018",
+    fontFamily: fonts.arcade,
+    fontSize: fontSize.caption,
+    letterSpacing: 0.6,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xxs,
+  },
+  // A place no tile has been dealt to: a dashed outline the size of a tile.
+  emptyPlace: {
+    backgroundColor: "rgba(150,100,40,0.1)",
+    borderColor: "#bf9a68",
+    borderStyle: "dashed",
+    borderWidth: 1.25,
+    position: "absolute",
+    top: 0,
+  },
   // The rack's slot: the row of places is centred in it, and it is measured (see `TileStrip`)
   // so the places know how much room they have to spread into.
   strip: { alignItems: "center" },

@@ -1,5 +1,4 @@
-import { hashTileId } from "../game/tile-texture/generate";
-import { INSERT_COUNT, generateChip } from "./generate";
+import { INSERT_COUNT, generateChip, hashTileId } from "./generate";
 
 describe("generateChip", () => {
   it("wears the same chip the same way for the same seed and size", () => {
