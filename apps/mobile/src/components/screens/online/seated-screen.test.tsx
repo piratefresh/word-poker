@@ -57,6 +57,12 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ roomId: mockRoomId }),
 }));
 
+// This suite never reaches the felt that needs it (above), but it is still in the module graph:
+// the real module pulls in Better Auth's client, which Jest cannot parse.
+jest.mock("@/lib/quests-provider", () => ({
+  useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
+}));
+
 /**
  * `@expo/ui` draws through the platform's own toolkit: a text is a native adapter view whose
  * content arrives as the `text` prop, so the screen's copy is read from there — the same way

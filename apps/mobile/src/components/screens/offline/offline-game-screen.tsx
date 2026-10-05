@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -38,6 +38,8 @@ import {
 import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/features/offline/offline-seed";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
+import { resultsFacts } from "@/lib/quest-facts";
+import { useQuests } from "@/lib/quests-provider";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -139,6 +141,18 @@ function OfflineTable({
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
   // The HUD's "How to play": a tour of the felt's own controls, over the hand in progress.
   const help = useCoachTour("helper", HELPER_TOUR);
+
+  // One quest claim per hand (STO-525), the moment its results land: the ref is the guard
+  // against the results overlay re-rendering the same hand more than once.
+  const { reportHand } = useQuests();
+  const reportedHand = useRef<number | null>(null);
+  useEffect(() => {
+    if (results === null || reportedHand.current === results.hand) return;
+    reportedHand.current = results.hand;
+    reportHand(
+      resultsFacts(results, { wildTable: powerUps === "choose3", heroUsedPower: powers?.held?.used === true }),
+    );
+  }, [powers?.held?.used, powerUps, reportHand, results]);
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.

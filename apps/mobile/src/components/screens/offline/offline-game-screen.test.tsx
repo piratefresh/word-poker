@@ -51,6 +51,14 @@ jest.mock("react-native-reanimated", () => ({
   useReducedMotion: () => false,
 }));
 
+// The provider is its own surface with its own tests; this screen only has to call
+// `reportHand` once per settled hand, and the real module pulls in Better Auth's client, which
+// Jest cannot parse.
+const mockReportHand = jest.fn();
+jest.mock("@/lib/quests-provider", () => ({
+  useQuests: () => ({ reportHand: mockReportHand, lastCompletions: [] }),
+}));
+
 /**
  * The seed the URL pins, and the hero's own two tiles under it: `mockSeedParam` below is what
  * the screen reads, so this is the hand every test but the unpinned one plays. A table the URL
@@ -214,6 +222,7 @@ describe("<OfflineGameScreen />", () => {
     mockDictionary = testDictionary([HERO_WORD]);
     mockSeedParam = String(SEED);
     mockPowerParam = undefined;
+    mockReportHand.mockReset();
   });
 
   afterEach(() => {
@@ -376,6 +385,12 @@ describe("<OfflineGameScreen />", () => {
     // Every seat is counted: the table's shape, and how many of them played a word (§20).
     expect(view.getByTestId("results-summary")).toHaveTextContent(
       "4 PLAYERS · 0 FOLDS · 1 WORD PLAYED",
+    );
+
+    // The hand's quest facts are reported exactly once, off this Classic table's own hero word.
+    expect(mockReportHand).toHaveBeenCalledTimes(1);
+    expect(mockReportHand).toHaveBeenCalledWith(
+      expect.objectContaining({ revealed: true, heroWord: HERO_WORD, wildTable: false, heroUsedPower: false }),
     );
 
     // The entrance's one hand-off to React lands a tick after the surface mounts — on a suite

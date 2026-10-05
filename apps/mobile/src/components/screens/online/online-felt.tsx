@@ -22,7 +22,7 @@
  * rack's flip — fed by the adapter's `PowerView`, so none of them learns which table it is at.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
@@ -58,6 +58,8 @@ import {
   useRoomConnection,
   type RoomConnectionLike,
 } from "@/features/online/use-room-connection";
+import { resultsFacts } from "@/lib/quest-facts";
+import { useQuests } from "@/lib/quests-provider";
 
 export function OnlineFelt({
   room,
@@ -96,6 +98,16 @@ export function OnlineFelt({
   // deals again, so a dismissed hand must not reopen on the next patch.
   const [dismissed, setDismissed] = useState<number | null>(null);
   const connection = useRoomConnection(room);
+
+  // One quest claim per hand (STO-525): `powers` is non-null only at a Wild table (`use-online-game.ts`),
+  // so it doubles as the wild-table flag without a room message of its own.
+  const { reportHand } = useQuests();
+  const reportedHand = useRef<number | null>(null);
+  useEffect(() => {
+    if (results === null || reportedHand.current === results.hand) return;
+    reportedHand.current = results.hand;
+    reportHand(resultsFacts(results, { wildTable: powers !== null, heroUsedPower: powers?.held?.used === true }));
+  }, [powers, reportHand, results]);
 
   const reconnecting = connection === "reconnecting";
 
