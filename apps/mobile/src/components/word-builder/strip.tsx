@@ -733,6 +733,7 @@ function TileContent({
     return held ? `${spoken}, in your word, tap to take it back` : `${spoken}, tap to play it`;
   };
   const tileProps = {
+    chosenFace,
     dimmed: picking ? pick === "off" : live && !held,
     interactive: picking ? pick === "target" : live,
     onPress: () => {

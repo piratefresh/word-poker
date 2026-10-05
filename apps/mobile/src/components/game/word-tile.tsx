@@ -64,6 +64,8 @@ export interface TileProps {
   scale?: number;
   ownership?: TileOwnership;
   selected?: boolean;
+  /** The letter a selected choice tile is playing, used to highlight its point value. */
+  chosenFace?: string;
   dimmed?: boolean;
   disabled?: boolean;
   interactive?: boolean;
@@ -210,6 +212,7 @@ export function Tile({
   scale = 1,
   ownership = "neutral",
   selected = false,
+  chosenFace,
   dimmed = false,
   disabled = false,
   interactive = false,
@@ -582,7 +585,12 @@ export function Tile({
               </Text>
               {second === null ? null : (
                 <>
-                  <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>/</Text>
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={[styles.slash, { fontSize: metrics.alternateSize }]}
+                  >
+                    /
+                  </Text>
                   <Text
                     maxFontSizeMultiplier={1.2}
                     style={[styles.letter, { fontSize: metrics.alternateSize }]}
@@ -603,7 +611,29 @@ export function Tile({
                 },
               ]}
             >
-              {facePoints(tile).join("/")}
+              {"alternativeLetter" in tile ? (
+                <>
+                  <Text
+                    style={{
+                      color: selected && chosenFace === tile.letter
+                        ? colors.goldHi
+                        : styles.points.color,
+                    }}
+                  >
+                    {tile.points}
+                  </Text>
+                  /
+                  <Text
+                    style={{
+                      color: selected && chosenFace === tile.alternativeLetter
+                        ? colors.goldHi
+                        : styles.points.color,
+                    }}
+                  >
+                    {tile.alternativePoints}
+                  </Text>
+                </>
+              ) : tile.points}
             </Text>
           </FaceFill>
         </Animated.View>
@@ -708,8 +738,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
   },
   slash: {
-    color: "rgba(43,24,16,0.5)",
-    fontFamily: fonts.serifBold,
+    color: colors.onTile,
+    fontFamily: fonts.sansBlack,
     marginHorizontal: 1,
   },
   points: {

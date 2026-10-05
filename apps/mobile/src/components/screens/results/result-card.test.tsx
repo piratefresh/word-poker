@@ -148,6 +148,25 @@ describe("<ResultCard />", () => {
     ]);
   });
 
+  test("draws a choice tile as the face it played, its two faces settled under it (§10)", async () => {
+    const played = snapshotFixture().seats[0];
+    const seat: ResultsSeat = {
+      ...played,
+      word: "E" + (played.word ?? "").slice(1),
+      tiles: [
+        { id: "AE-9", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1 },
+        ...played.tiles.slice(1),
+      ],
+    };
+    const view = await render(<ResultCard seat={seat} />);
+    const hidden = { includeHiddenElements: true };
+    const prefix = `result-card-${seat.playerId}-tile-0`;
+
+    expect(view.getByTestId(`${prefix}-face-A`, hidden)).toBeOnTheScreen();
+    expect(view.getByTestId(`${prefix}-face-E`, hidden)).toBeOnTheScreen();
+    expect(within(view.getByTestId(prefix, hidden)).queryByText("A", hidden)).toBeNull();
+  });
+
   test("draws §12's longest word, seven letters out of seven tiles", async () => {
     const seat = longWordSnapshot.seats[0];
     const view = await render(<ResultCard seat={seat} />);

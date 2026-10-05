@@ -28,6 +28,7 @@ import Animated, {
 import { isSwappedTileId } from "@wordpoker/game-rules";
 
 import { Tile } from "@/components/game/word-tile";
+import { styles as builderStyles } from "@/components/word-builder/styles";
 import {
   border,
   colors,
@@ -206,6 +207,9 @@ export function ResultCard({
             motion={motion}
             testID={`result-card-${seat.playerId}-tile-${index}`}
             tile={tile}
+            // Each tile covers the one letter it played, so the word's letter at its index is
+            // the face a choice tile played (§10).
+            face={seat.word?.[index]}
           />
         ))}
       </View>
@@ -257,11 +261,14 @@ function ResultTile({
   index,
   motion,
   testID,
+  face,
 }: {
   tile: ResultsSeat["tiles"][number];
   index: number;
   motion?: ResultCardMotion;
   testID: string;
+  /** The letter the word played this tile for. */
+  face?: string;
 }): ReactElement {
   const enter = useAnimatedStyle(() => {
     if (motion === undefined || !motion.winner) return { transform: [{ scale: 1 }] };
@@ -273,8 +280,21 @@ function ResultTile({
     return { transform: [{ scale: interpolate(progress, [0, 0.7, 1], TILE_SCALE) }] };
   });
 
+  // A choice tile shows the one face it played, with the strip's face chips under it, settled:
+  // both letters printed on the tile read as both played.
+  const choice = "alternativeLetter" in tile && face !== undefined ? tile : null;
+  const shown =
+    choice === null
+      ? tile
+      : {
+          id: choice.id,
+          letter: face as string,
+          points: face === choice.letter ? choice.points : choice.alternativePoints,
+          multiplier: choice.multiplier,
+        };
+
   return (
-    <Animated.View style={enter}>
+    <Animated.View style={[builderStyles.entry, enter]}>
       <Tile
         animation="none"
         // §44: a tile a power handed the seat shows the table its ⚡, and nothing it replaced.
@@ -282,8 +302,26 @@ function ResultTile({
         side="front"
         size="small"
         testID={testID}
-        tile={tile}
+        tile={shown}
       />
+      {choice === null ? null : (
+        <View style={builderStyles.faces}>
+          {[choice.letter, choice.alternativeLetter].map((letter) => (
+            <View
+              key={letter}
+              style={[
+                builderStyles.chip,
+                letter === face ? builderStyles.chipChosen : builderStyles.chipSpent,
+              ]}
+              testID={`${testID}-face-${letter}`}
+            >
+              <Text allowFontScaling style={builderStyles.chipFace}>
+                {letter}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </Animated.View>
   );
 }
