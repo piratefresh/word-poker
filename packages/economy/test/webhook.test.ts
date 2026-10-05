@@ -38,16 +38,23 @@ describe("parseCurrencyEvent", () => {
     });
   });
 
-  it("reads a negative in-app adjustment as a refund, and an admin one as an adjustment", () => {
+  it("reads a negative in-app adjustment as a refund, and a dashboard one as an adjustment", () => {
     const refund = parseCurrencyEvent(
       currencyEvent({ adjustments: [{ amount: -2000, currency: { code: "COIN" } }] }),
     );
     assert.equal(refund?.record?.kind, "refund");
     assert.equal(refund?.record?.amount, -2000);
 
-    const admin = parseCurrencyEvent(currencyEvent({ source: "admin_api", product_id: undefined }));
-    assert.equal(admin?.record?.kind, "adjustment");
-    assert.equal(admin?.record?.productId, null);
+    const dashboard = parseCurrencyEvent(currencyEvent({ source: "dashboard", product_id: undefined }));
+    assert.equal(dashboard?.record?.kind, "adjustment");
+    assert.equal(dashboard?.record?.productId, null);
+  });
+
+  it("records nothing for a change our own server sent", () => {
+    assert.deepEqual(parseCurrencyEvent(currencyEvent({ source: "admin_api", product_id: undefined })), {
+      type: "VIRTUAL_CURRENCY_TRANSACTION",
+      record: null,
+    });
   });
 
   it("ignores other currencies and records nothing when COIN did not move", () => {

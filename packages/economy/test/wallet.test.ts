@@ -88,6 +88,13 @@ describe("applyWalletChange", () => {
     assert.equal(d.store.rows[0]?.status, "failed");
   });
 
+  it("settles failed when RevenueCat refuses the idempotency key", async () => {
+    const d = deps([rcError(409, "idempotency_error")]);
+
+    assert.deepEqual(await applyWalletChange("u1", "adjustment", 1, {}, d), { applied: false, reason: "rejected" });
+    assert.deepEqual([d.store.rows[0]?.status, d.store.rows[0]?.lastError], ["failed", "http_409_idempotency_error"]);
+  });
+
   it("leaves the row pending with a short code on a 5xx, a 429 or a network failure", async () => {
     const limited = { ...rcError(429, "rate_limit_error"), headers: { "Retry-After": "60" } };
     const d = deps([rcError(503, "server_error"), limited, "network"]);

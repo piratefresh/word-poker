@@ -50,10 +50,14 @@ export type WalletChangeResult =
   | { readonly applied: true; readonly balance: number }
   /**
    * `already_recorded`: a unique index held the row (a second welcome). `insufficient_coins`:
-   * RevenueCat refused the spend and the row is `failed`. `pending`: RevenueCat could not be
+   * RevenueCat refused the spend and the row is `failed`. `rejected`: RevenueCat refused the row's
+   * idempotency key (never retryable), and the row is `failed`. `pending`: RevenueCat could not be
    * reached or is not configured, and the row waits for a retry.
    */
-  | { readonly applied: false; readonly reason: "already_recorded" | "insufficient_coins" | "pending" };
+  | {
+      readonly applied: false;
+      readonly reason: "already_recorded" | "insufficient_coins" | "rejected" | "pending";
+    };
 
 export interface WalletChangeExtras {
   readonly productId?: string;
@@ -86,6 +90,11 @@ async function send(row: WalletEventRecord, deps: WalletDeps): Promise<WalletCha
       await store.settleWalletEvent(row.id, { status: "failed", lastError: errorCode(error) });
 
       return { applied: false, reason: "insufficient_coins" };
+    }
+    if (error instanceof RevenueCatError && error.type === "idempotency_error") {
+      await store.settleWalletEvent(row.id, { status: "failed", lastError: errorCode(error) });
+
+      return { applied: false, reason: "rejected" };
     }
 
     await store.settleWalletEvent(row.id, { status: "pending", lastError: errorCode(error) });

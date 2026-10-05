@@ -4,6 +4,9 @@
  * Only `VIRTUAL_CURRENCY_TRANSACTION` is recorded: it is the event that says a purchase credited
  * coins, or a refund took them back. Any other event is read only far enough to answer 200.
  *
+ * An `admin_api` event is a change our own server sent, already logged under its own kind by
+ * `applyWalletChange`, so it is not recorded twice. A dashboard adjustment is still recorded.
+ *
  * One event becomes at most one wallet_event row, since the row's `rc_event_id` is unique: the
  * event's `COIN` adjustments are summed (RevenueCat keys adjustments by currency, so in practice
  * there is one).
@@ -55,7 +58,7 @@ export function parseCurrencyEvent(body: unknown): ParsedWebhook | null {
   if (typeof event.app_user_id !== "string" || event.app_user_id.length === 0) return null;
 
   const amount = coinAmount(event.adjustments);
-  if (amount === null) return { type: event.type, record: null };
+  if (amount === null || event.source === "admin_api") return { type: event.type, record: null };
 
   return {
     type: event.type,
