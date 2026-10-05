@@ -9,7 +9,7 @@ const GAME_SERVER_PORT = 2567;
  * that bundles the app. In development we reach it at the same host the device already
  * uses for the dev server — `hostUri` is that host as the device sees it, which keeps
  * physical devices working — just swapped to the game port. Production builds point
- * `EXPO_PUBLIC_GAME_URL` at the deployed server. Mirrors src/lib/auth-client.ts.
+ * `EXPO_PUBLIC_GAME_URL` at the deployed server. Mirrors src/auth/client/auth-client.ts.
  */
 function devGameURL(): string {
   const host = Constants.expoConfig?.hostUri?.split(":")[0];

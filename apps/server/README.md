@@ -48,8 +48,8 @@ Two rooms are registered in `src/app.config.ts`, under the names `packages/contr
   list again. Seat counts ride the listing (`clients` / `maxClients`), so nothing has to be
   published twice.
 
-The desktop client of that wire lives in `apps/mobile`: `src/lib/use-lobby.ts` folds the
-messages into rows, and `src/lib/room-session.ts` creates and joins tables by id.
+The desktop client of that wire lives in `apps/mobile`: `src/features/online/use-lobby.ts` folds the
+messages into rows, and `src/features/online/room-session.ts` creates and joins tables by id.
 
 ### Authoritative hands
 

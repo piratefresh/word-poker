@@ -9,7 +9,7 @@ import {
 
 import { duration } from "@/constants/theme";
 
-import { testDictionary } from "./dictionary-fixtures";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
 import { useTutorialGame, type TutorialGame } from "./use-tutorial-game";
 
 // The HUD's loop gate asks the router whether its screen is on top; see use-offline-game.test.ts.
@@ -129,10 +129,17 @@ describe("useTutorialGame (STO-507)", () => {
     await playUntilCard(result); // lesson-flop, once Jay has bet
     expect(result.current.game.phase).toBe("flop");
     await press(() => result.current.setDraft(BROWN));
-    await nextUntil(result, "lesson-raise");
+    await nextUntil(result, "lesson-raise-amount");
+    // The slider stops at the coached raise, and standing on it hands the card to RAISE.
+    expect(result.current.game.betting.maxRaise).toBe(60);
+    await press(() => result.current.changeRaise(60));
+    expect(result.current.coach?.steps[result.current.coach.index]?.id).toBe("lesson-raise");
+    expect(result.current.game.betting.maxRaise).toBe(60);
     await press(() => result.current.wager(60));
     await playUntilCard(result); // lesson-turn
     expect(result.current.game.phase).toBe("turn");
+    // Past the raise the slider spans the stack again.
+    expect(result.current.game.betting.maxRaise).toBeGreaterThan(60);
     await press(() => result.current.primary());
     await playUntilCard(result); // lesson-river
     await press(() => result.current.primary());

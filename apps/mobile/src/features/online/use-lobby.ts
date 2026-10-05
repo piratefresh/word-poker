@@ -16,7 +16,7 @@ import type { Room } from "@colyseus/sdk";
 import { LOBBY_ROOM_NAME, roomSummaryFromListing, type RoomSummary } from "@wordpoker/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { gameClient } from "@/lib/game-client";
+import { gameClient } from "./game-client";
 
 export type LobbyStatus =
   /** Nothing has arrived yet — not a lobby with no tables in it. */

@@ -74,7 +74,7 @@ env var wins and loses its trailing slash; web uses `window.location.origin`; na
 `hostUri`; native no-hostUri falls back to localhost; and a roomId with reserved characters is
 `encodeURIComponent`-encoded into the `room` param.
 
-### 4. `apps/mobile/src/lib/game-client.ts` — LAN web clients reach the game server
+### 4. `apps/mobile/src/features/online/game-client.ts` — LAN web clients reach the game server
 
 Today a web client without `EXPO_PUBLIC_GAME_URL` falls back to `ws://localhost:2567`, which is
 the friend's own machine when they open the invite over the LAN. In `devGameURL()`, before the

@@ -35,9 +35,9 @@ import {
   spacing,
   type,
 } from "@/constants/theme";
-import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/lib/offline-seed";
-import { useDictionary } from "@/lib/use-dictionary";
-import { useOfflineGame } from "@/lib/use-offline-game";
+import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/features/offline/offline-seed";
+import { useDictionary } from "@/features/table/use-dictionary";
+import { useOfflineGame } from "@/features/offline/use-offline-game";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -172,18 +172,20 @@ function OfflineTable({
       <CoachProvider style={styles.table} tour={help.tour}>
         <GameScreen
           bettingLeading={
+            powers === null ? null : (
+              <PowerHeldChip
+                active={power.targeting.stage !== "idle"}
+                held={powers.held}
+                onPress={power.toggle}
+              />
+            )
+          }
+          rackActions={
             <>
               <WordShuffleButton />
-              {powers === null ? null : (
-                <PowerHeldChip
-                  active={power.targeting.stage !== "idle"}
-                  held={powers.held}
-                  onPress={power.toggle}
-                />
-              )}
+              <WordCheckButton />
             </>
           }
-          bettingSlider={<WordCheckButton />}
           game={game}
           onAllIn={allIn}
           // The wager slider names its own action, and `wager` dispatches the one it names: BET

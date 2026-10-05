@@ -7,7 +7,7 @@
  * offline (AGENTS.md — never a second builder). It reads two streams from the room: the public
  * broadcast schema every seat shares, and the `privateState` message that carries this seat's
  * own rack and draft, and decodes both into a `HeroPerspective` — the Hero View
- * (`@/lib/hero-view`), shared with the offline adapter, maps that into the felt's
+ * (`@/features/table/hero-view`), shared with the offline adapter, maps that into the felt's
  * `GameScreenState` and the builder's `WordDraft`.
  *
  * Authority is the server's, never this file's: the room owns every mutation and the state it
@@ -73,8 +73,8 @@ import {
   isUnbuildable,
   type HeroPerspective,
   type OptimisticPill,
-} from "@/lib/hero-view";
-import type { PowerView } from "@/lib/power-view";
+} from "@/features/table/hero-view";
+import type { PowerView } from "@/features/table/power-view";
 
 /** The felt draws 4–6 seats; a smaller table still shows as a four-seat felt with empty places. */
 const MIN_FELT_SEATS = 4;

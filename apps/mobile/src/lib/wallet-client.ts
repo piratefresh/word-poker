@@ -11,7 +11,7 @@ import { isCoinCatalog, isWalletResponse, type CoinCatalog } from "@wordpoker/co
 import { Platform } from "react-native";
 
 import { apiBaseURL } from "@/lib/api-base-url";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 
 /** The route answered 401: no session, or an expired one. */
 export class WalletAuthError extends Error {

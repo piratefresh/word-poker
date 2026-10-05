@@ -2,7 +2,8 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
-import { testDictionary } from "@/lib/dictionary-fixtures";
+import { LESSON_TOUR } from "@/components/onboarding/tours";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
 
 import { TutorialScreen } from "./tutorial-screen";
 
@@ -21,7 +22,7 @@ jest.mock("react-native-reanimated", () => ({
 }));
 
 let mockDictionary: Dictionary | null = testDictionary(["BROWN", "GONER"]);
-jest.mock("@/lib/use-dictionary", () => ({
+jest.mock("@/features/table/use-dictionary", () => ({
   useDictionary: () => mockDictionary,
 }));
 
@@ -50,7 +51,7 @@ describe("<TutorialScreen />", () => {
     expect(view.getByTestId("action-check-call")).toBeTruthy();
     expect(view.getByTestId("word-builder-strip")).toBeTruthy();
     expect(view.getByText("Your seat")).toBeTruthy();
-    expect(view.getByTestId("coach-count")).toHaveTextContent("1/9");
+    expect(view.getByTestId("coach-count")).toHaveTextContent(`1/${LESSON_TOUR.length}`);
   });
 
   it("swaps the lesson's card for the felt's How to play, and back", async () => {

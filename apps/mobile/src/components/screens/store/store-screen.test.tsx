@@ -5,7 +5,7 @@
 
 import { act, render, waitFor, type RenderResult } from "@testing-library/react-native";
 
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 import type { CoinPackage } from "@/lib/coin-offering";
 import { fetchCoinOffering, purchaseCoinPack, revenuecatAvailable } from "@/lib/revenuecat";
 import { useRevenueCatReady } from "@/lib/use-revenuecat";
@@ -14,7 +14,7 @@ import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-cli
 import { StoreScreen } from "./store-screen";
 
 jest.mock("expo-router", () => ({ router: { back: jest.fn() } }));
-jest.mock("@/lib/auth-client", () => ({
+jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: jest.fn(), sendVerificationEmail: jest.fn() },
 }));
 jest.mock("@/lib/revenuecat", () => ({

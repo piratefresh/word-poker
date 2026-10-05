@@ -28,7 +28,7 @@ import {
   spacing,
 } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
-import { beatProgress } from "@/lib/use-results-entrance";
+import { beatProgress } from "./use-results-entrance";
 
 import { ResultsPot } from "./results-pot";
 import type { ResultsSnapshot } from "./results-types";

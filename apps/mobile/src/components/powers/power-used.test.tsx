@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react-native";
 import { AccessibilityInfo } from "react-native";
 
-import type { PowerUsedNotice } from "@/lib/power-view";
+import type { PowerUsedNotice } from "@/features/table/power-view";
 
 import { POWER_USED_BEATS, POWER_USED_MOTION, PowerUsedCard } from "./power-used";
 

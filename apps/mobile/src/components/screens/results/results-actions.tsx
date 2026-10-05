@@ -30,7 +30,7 @@ import {
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
-import { beatProgress } from "@/lib/use-results-entrance";
+import { beatProgress } from "./use-results-entrance";
 
 export interface ResultsActionsProps {
   /** The entrance's shared clock: the row fades in on its own beat of it. */

@@ -4,7 +4,7 @@
  *
  * The connection comes from the environment, first hit wins:
  *   1. `DATABASE_URL` — the name `packages/db/.env.example` and `apps/mobile/.env` both set.
- *   2. The five `DATABASE_*` names `apps/mobile/src/lib/auth.ts` builds its own pool from.
+ *   2. The five `DATABASE_*` names `apps/mobile/src/auth/server/auth.ts` builds its own pool from.
  *   3. The `DB_*` names this package's scaffold started from.
  *
  * Importing this file never throws: an unconfigured process still has to be able to read the

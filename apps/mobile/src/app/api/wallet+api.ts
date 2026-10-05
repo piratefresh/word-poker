@@ -9,7 +9,7 @@
 import type { WalletResponse } from "@wordpoker/contracts";
 import { getCoinBalance, retryPending } from "@wordpoker/economy";
 
-import { auth } from "@/lib/auth";
+import { auth } from "@/auth/server/auth";
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

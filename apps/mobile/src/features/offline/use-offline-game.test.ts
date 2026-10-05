@@ -19,7 +19,7 @@ import {
 import { duration } from "@/constants/theme";
 import type { GamePlayer } from "@/components/screens/game/game-types";
 
-import { testDictionary } from "./dictionary-fixtures";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
 import { useOfflineGame, type OfflineGame } from "./use-offline-game";
 
 // The adapter reaches the HUD for the phase numbers, and the HUD's loop gate asks the router

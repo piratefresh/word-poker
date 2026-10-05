@@ -7,7 +7,7 @@ import { POWER_UPS, type PowerUpId, type Tile as TileData } from "@wordpoker/con
 import { useCompactControls, useScreenScale } from "@/components/screens/game/screen-scale";
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, glow, palette, radius, spacing } from "@/constants/theme";
-import type { PowerView } from "@/lib/power-view";
+import type { PowerView } from "@/features/table/power-view";
 import { webTestID } from "@/lib/web-id";
 
 import { POWER_CARD_ASPECT, PowerCard, PowerCardMini, powerCardLabel } from "./power-card";

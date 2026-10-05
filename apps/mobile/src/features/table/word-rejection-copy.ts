@@ -5,7 +5,7 @@
  * here rather than a blank line on screen. None of the copy is the wire string — `too-long`
  * names a branch in the engine, not something to hand a player.
  *
- * It lives in `lib/` rather than beside one of its readers because two surfaces say the same
+ * It lives in the shared table module rather than beside one of its readers because two surfaces say the same
  * sentence: the word builder's line while the seat is still shaping its word (§11's own moment),
  * and the results card's word slot for a seat that reached the reveal with nothing. One table,
  * because two copies of one sentence drift apart without a test noticing.

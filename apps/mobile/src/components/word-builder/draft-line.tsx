@@ -7,7 +7,7 @@ import type { JSX } from "react";
 import { Text, View } from "react-native";
 
 import { useCompactControls } from "@/components/screens/game/screen-scale";
-import { WORD_REJECTION_COPY } from "@/lib/word-rejection-copy";
+import { WORD_REJECTION_COPY } from "@/features/table/word-rejection-copy";
 
 import { styles } from "./styles";
 

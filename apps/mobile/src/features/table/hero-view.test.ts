@@ -1,6 +1,6 @@
 import { POWER_DRAW_MS, WORD_CHECKS_PER_HAND, type LetterTile, type Tile } from "@wordpoker/contracts";
 
-import { testDictionary } from "./dictionary-fixtures";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
 import {
   feltControls,
   heroView,

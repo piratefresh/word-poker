@@ -85,7 +85,7 @@ Export both from `packages/game-rules/src/index.ts` (`export { chooseBotPower, d
 
 Reuse `powerUsedBy`, `noteSeatAction`, `powerViewOf` and `perspectiveOf` without exposing bot-private state. The hero's `pickPower`/`usePower` dispatch paths stay as they are. No CPU use or betting beat waits for a public card to clear; the card queue is a presentation timer, while the engine's activation deadlines continue running.
 
-### 4. Adapter tests (apps/mobile/src/lib/use-offline-game.test.ts, wild describe at 803–1007)
+### 4. Adapter tests (apps/mobile/src/features/offline/use-offline-game.test.ts, wild describe at 803–1007)
 
 - "opens the hero's draw… holds the table": retain the status/pot/control assertions and assert the draw remains open and no policy pick occurs after two beats without a hero pick.
 - "keeps the hero's pick and puts pre-flop's first seat on the clock": after `pick()`, assert the draw remains open for the first two bot beats and closes on the third, then assert Mira is thinking with a fresh turn budget. Betting begins on a subsequent beat.
@@ -118,10 +118,10 @@ Start by probing seed 20260919 with the shipped dictionary and the new real pick
 
 - `packages/game-rules/src/bot/bot-power.ts` (new) — `chooseBotPower`, `decideBotPowerUse`; the only new production module.
 - `packages/game-rules/src/table/offline.ts` — `openPowerDraw` (~400), `HandPowers` (156–167), `StartHandOptions.powerUps` (267–272), `nextHand` (1142).
-- `apps/mobile/src/lib/use-offline-game.ts` — `nextCpuMove` (714–739), beat-effect deps (356), `openTable`/`BOT_IDS` (84–87, 694–703).
+- `apps/mobile/src/features/offline/use-offline-game.ts` — `nextCpuMove` (714–739), beat-effect deps (356), `openTable`/`BOT_IDS` (84–87, 694–703).
 - `packages/game-rules/test/offline.test.ts` — §44 describes (724–1169): `wildHand`/`holding` helpers and the named tests.
 - `packages/game-rules/test/bot.test.ts` — policy determinism, information access, preference and timed-legality cases.
-- `apps/mobile/src/lib/use-offline-game.test.ts` — wild describe plus pick trace, partial timeout, separate use/bet/confirm beats and projection privacy.
+- `apps/mobile/src/features/offline/use-offline-game.test.ts` — wild describe plus pick trace, partial timeout, separate use/bet/confirm beats and projection privacy.
 - `apps/mobile/src/components/screens/offline/offline-game-screen.test.tsx` — queued hero-card integration and swap reveal.
 - `.maestro/offline-wild-hand.yaml` and `.maestro/offline-wild-power.yaml` — re-probed Wild path and scoped notice waits.
 

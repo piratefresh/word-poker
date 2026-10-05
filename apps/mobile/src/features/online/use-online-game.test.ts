@@ -7,7 +7,7 @@ import {
   type Tile,
 } from "@wordpoker/contracts";
 
-import { testDictionary } from "./dictionary-fixtures";
+import { testDictionary } from "@/test-support/dictionary-fixtures";
 import { useOnlineGame, type GameRoomLike, type OnlineGame } from "./use-online-game";
 
 // The HUD barrel reaches the motion loop gate, which imports expo-router — a navigation package

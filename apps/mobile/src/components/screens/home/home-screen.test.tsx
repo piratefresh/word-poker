@@ -8,7 +8,7 @@ import { render } from "@testing-library/react-native";
 import { HomeScreen } from "./home-screen";
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
-jest.mock("@/lib/auth-client", () => ({
+jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: () => ({ data: { user: { email: "ada@example.com" } } }), signOut: jest.fn() },
 }));
 

@@ -53,11 +53,11 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { useOnlineGame, type GameRoomLike } from "@/lib/use-online-game";
+import { useOnlineGame, type GameRoomLike } from "@/features/online/use-online-game";
 import {
   useRoomConnection,
   type RoomConnectionLike,
-} from "@/lib/use-room-connection";
+} from "@/features/online/use-room-connection";
 
 export function OnlineFelt({
   room,
@@ -136,16 +136,13 @@ export function OnlineFelt({
         <View style={styles.table}>
           <GameScreen
             bettingLeading={
-              <>
-                <WordShuffleButton />
-                {powers === null ? null : (
-                  <PowerHeldChip
-                    active={power.targeting.stage !== "idle"}
-                    held={powers.held}
-                    onPress={power.toggle}
-                  />
-                )}
-              </>
+              powers === null ? null : (
+                <PowerHeldChip
+                  active={power.targeting.stage !== "idle"}
+                  held={powers.held}
+                  onPress={power.toggle}
+                />
+              )
             }
             overFelt={
               powers === null ? null : (
@@ -161,7 +158,12 @@ export function OnlineFelt({
                 </>
               )
             }
-            bettingSlider={<WordCheckButton />}
+            rackActions={
+              <>
+                <WordShuffleButton />
+                <WordCheckButton />
+              </>
+            }
             game={game}
             onAllIn={allIn}
             onBack={onLeave}

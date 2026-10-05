@@ -1,4 +1,3 @@
-import { router, type Href } from "expo-router";
 import {
   Button,
   Column,
@@ -10,12 +9,18 @@ import {
   Text,
   type UniversalTextStyle,
 } from "@expo/ui";
+import { router, type Href } from "expo-router";
 import { useState } from "react";
+import { useWindowDimensions } from "react-native";
 
 import {
   ModeCard,
   type ModeCardProps,
 } from "@/components/screens/home/components/mode-card";
+import {
+  ModeVariants,
+  type ModeVariant,
+} from "@/components/screens/home/components/mode-variants";
 import {
   colors,
   fonts,
@@ -24,11 +29,7 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import {
-  ModeVariants,
-  type ModeVariant,
-} from "@/components/screens/home/components/mode-variants";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 import { fullWidth } from "@/lib/full-width";
 
 type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store";
@@ -137,6 +138,10 @@ const signedInText = {
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
   const [pending, setPending] = useState<ModeKey | null>(null);
+  // The width a card gives its content: the screen less its gutters and the card's own padding.
+  // The variants are sized from their content (see below), so they are handed it outright.
+  const cardContentWidth =
+    useWindowDimensions().width - spacing.gutter * 2 - spacing.lg * 2;
 
   // Modes with a route navigate; the rest don't exist yet, so selecting one
   // just marks intent for now.
@@ -151,7 +156,11 @@ export function HomeScreen() {
   return (
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
-        <Column alignment="start" spacing={spacing.md} {...fullWidth(styles.screen)}>
+        <Column
+          alignment="start"
+          spacing={spacing.md}
+          {...fullWidth(styles.screen)}
+        >
           <Text textStyle={titleText}>Choose how to play</Text>
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
@@ -171,11 +180,15 @@ export function HomeScreen() {
                 tone={mode.tone}
               >
                 {variants ? (
-                  <RNHostView>
+                  // Sized from its content: without `matchContents` a native host takes its
+                  // parent's size, and a card that wraps its content gives it no height (the
+                  // pair never drew on Android).
+                  <RNHostView matchContents>
                     <ModeVariants
                       disabled={disabled}
                       onSelect={(variant) => handleSelect(mode, variant.href)}
                       variants={variants}
+                      width={cardContentWidth}
                     />
                   </RNHostView>
                 ) : null}

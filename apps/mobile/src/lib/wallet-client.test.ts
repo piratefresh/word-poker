@@ -3,11 +3,11 @@
  * become typed failures, and a body the contracts cannot read is a failure rather than a number.
  */
 
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-client";
 
 jest.mock("@/lib/api-base-url", () => ({ apiBaseURL: "http://api.test" }));
-jest.mock("@/lib/auth-client", () => ({ authClient: { getCookie: jest.fn(() => "better-auth.session=abc") } }));
+jest.mock("@/auth/client/auth-client", () => ({ authClient: { getCookie: jest.fn(() => "better-auth.session=abc") } }));
 
 const fetchMock = jest.fn();
 

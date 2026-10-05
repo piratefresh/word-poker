@@ -2,7 +2,7 @@ import { act, fireEvent, render, type RenderResult } from "@testing-library/reac
 
 import { WAITING_PHASE, blindsFor, type RoomPhase } from "@wordpoker/contracts";
 
-import type { RoomSessionView, TableSnapshot } from "@/lib/room-session";
+import type { RoomSessionView, TableSnapshot } from "@/features/online/room-session";
 
 import { SeatedScreen } from "./seated-screen";
 
@@ -34,7 +34,7 @@ const mockDismissTo = jest.fn();
 
 // `useActiveRoomId` is the seat the session holds — the session's `seated` room, or none. The
 // screen asks it before joining, so a test seated at the routed room must not see a join.
-jest.mock("@/lib/room-session", () => ({
+jest.mock("@/features/online/room-session", () => ({
   joinTable: (roomId: string) => mockJoinTable(roomId),
   leaveTable: () => mockLeaveTable(),
   useRoomSession: () => mockSession,
@@ -48,7 +48,7 @@ jest.mock("@/lib/room-session", () => ({
 
 // The dictionary loads through a dynamic import Jest cannot run, and this suite never reaches
 // the felt that needs it: the seat lifecycle holds the table's card, dictionary or not.
-jest.mock("@/lib/use-dictionary", () => ({ useDictionary: () => null }));
+jest.mock("@/features/table/use-dictionary", () => ({ useDictionary: () => null }));
 
 // expo-router reaches a navigation package Jest cannot parse. The screen reads the room it was
 // routed to, and its two ways out both `dismissTo` the lobby it was pushed from.

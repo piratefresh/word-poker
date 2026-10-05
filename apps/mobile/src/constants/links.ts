@@ -1,6 +1,6 @@
 /**
  * Deep links into the native app. The scheme has to match `expo.scheme` in
- * `app.json` and `expoClient({ scheme })` in `src/lib/auth-client.ts`.
+ * `app.json` and `expoClient({ scheme })` in `src/auth/client/auth-client.ts`.
  */
 
 /** Where a reset link sends the app. Better Auth appends `?token=…`. */

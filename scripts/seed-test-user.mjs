@@ -1,7 +1,7 @@
 /**
  * Seed (or repair) the shared E2E test user in the app's Postgres database.
  *
- * The auth tables are owned by Better Auth (see apps/mobile/src/lib/auth.ts); this
+ * The auth tables are owned by Better Auth (see apps/mobile/src/auth/server/auth.ts); this
  * script writes the same rows its email/password provider would, hashing with
  * Better Auth's own `hashPassword` so the app verifies the password unchanged.
  * Rerunning is safe and is the way to reset a forgotten test password: an

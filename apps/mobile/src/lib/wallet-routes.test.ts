@@ -10,9 +10,9 @@ import { coinCatalog, getCoinBalance, retryPending } from "@wordpoker/economy";
 import { POST as webhook } from "@/app/api/revenuecat-webhook+api";
 import { GET as catalog } from "@/app/api/store-catalog+api";
 import { GET as wallet } from "@/app/api/wallet+api";
-import { auth } from "@/lib/auth";
+import { auth } from "@/auth/server/auth";
 
-jest.mock("@/lib/auth", () => ({ auth: { api: { getSession: jest.fn() } } }));
+jest.mock("@/auth/server/auth", () => ({ auth: { api: { getSession: jest.fn() } } }));
 jest.mock("@wordpoker/db", () => ({ recordReportedEvent: jest.fn() }));
 jest.mock("@wordpoker/economy", () => ({
   parseCurrencyEvent: jest.requireActual("@wordpoker/economy").parseCurrencyEvent,

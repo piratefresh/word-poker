@@ -18,7 +18,7 @@
  * has to remember to announce its own chips. The felt's layer over the table reports a flight
  * back when it lands, and that report is the only thing that prunes it.
  *
- * The mapping itself is the Hero View's (`@/lib/hero-view`), shared with the online adapter:
+ * The mapping itself is the Hero View's (`@/features/table/hero-view`), shared with the online adapter:
  * this file only decodes the engine's state into a `HeroPerspective` and dispatches the moves.
  *
  * No server, no socket, no import from either: the screen this feeds has to work with the
@@ -62,9 +62,9 @@ import type { ResultsSnapshot } from "@/components/screens/results/results-types
 import { isSupportedSeatCount, type SeatCount } from "@/components/table";
 import type { WordDraft } from "@/components/word-builder";
 import { colors, duration, palette } from "@/constants/theme";
-import { feltControls, heroView, isUnbuildable, type HeroPerspective } from "@/lib/hero-view";
-import { randomSeed } from "@/lib/offline-seed";
-import type { PowerView } from "@/lib/power-view";
+import { feltControls, heroView, isUnbuildable, type HeroPerspective } from "@/features/table/hero-view";
+import { randomSeed } from "./offline-seed";
+import type { PowerView } from "@/features/table/power-view";
 
 /** The hero always sits in this seat; the bots fill the rest. */
 const HERO_ID: PlayerId = "hero";
@@ -211,7 +211,7 @@ export function useOfflineGame({
    * The seed the whole session replays from: this hand, and every hand after it, since the
    * engine derives each next hand's seed from the one before (`game-rules`). The caller picks
    * it — `/offline` draws a fresh one per table, or takes the one the URL pins
-   * (`@/lib/offline-seed`) — because the same seed anywhere has to be the same hand
+   * (`@/features/offline/offline-seed`) — because the same seed anywhere has to be the same hand
    * everywhere.
    */
   seed: number;

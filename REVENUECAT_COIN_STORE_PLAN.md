@@ -1,235 +1,346 @@
-# RevenueCat coin store + persistent wallet
+# RevenueCat coin store + Wallet on RevenueCat Virtual Currency
+
+Tracking: **STO-346** (Wallet top-up via RevenueCat) under the **STO-444** economy epic. The API host this
+feature needs in production is **STO-520**.
 
 ## Context
 
-The game has no real-money monetization and no persistent balance. The ask: wire RevenueCat into `apps/mobile` so coin purchases credit a server-side coin balance (Postgres via `@wordpoker/db`), as the foundation the quests/login-streak feature (`QUESTS_LOGIN_STREAK_PLAN.md`, **not yet implemented** — no quests/wallet code exists) builds on. On the "Pro plan + PlanetScale" question: yes to Pro, but a RevenueCat webhook needs a public **HTTPS endpoint** for the app's API routes — PlanetScale only hosts the database, and the app's API (Better Auth + routes) runs on the dev server today with no deployed host in the repo. So this plan ships **both** paths with one crediting pipeline:
+The rules give every player a **Wallet** of Coins (`docs/rules/balances-and-tables.md` §1): it pays table
+buy-ins, re-buys and top-ups, and takes a Table Stack back when the player leaves. Nothing persists a balance
+today, the game server has no player identity yet (`GameRoom.ts`: "no `onAuth`/identity until Epic B"), and
+nothing in the app spends coins.
 
-- **REST reconcile (pull)** — after a purchase (and on wallet open), the server calls RevenueCat `GET /v1/subscribers/{userId}` with the secret API key and credits every uncredited transaction. Works on any plan, credits instantly, recovers missed purchases. Active from day one.
-- **Webhook (push)** — a route that verifies RevenueCat's auth header and then runs the *same* reconcile for that user. It never credits from webhook payload fields directly, so reconcile-pull and webhook-push can never double-credit one purchase (they would if each parsed its own ids — REST `non_subscriptions[].id` and webhook `transaction_id` are not guaranteed to be the same string). Live the moment a public host + Pro plan webhook config exist; testable today by curl.
+This plan sells coin packs through RevenueCat and makes **RevenueCat Virtual Currency (currency `COIN`) the
+Wallet's source of truth**. A purchase credits itself (each product grants its coins in the RevenueCat
+dashboard); our backend makes every other change — the welcome grant now, buy-ins and cash-outs later —
+through RevenueCat's Developer API v2, and logs each one in a small `wallet_event` table. The store ships
+behind a flag that stays off until table buy-ins spend the Wallet.
 
-3 consumable packs, custom store screen in the app's design system. Purchases run on iOS/Android native builds; the web build renders the store as a disabled listing (RevenueCat web purchases require RevenueCat Billing/Stripe — out of scope). Wallet schema is exactly what `QUESTS_LOGIN_STREAK_PLAN.md` Step 3 specifies for `player_wallet`/`wallet_entry` (plus purchase dedupe columns), so that plan's wallet parts become already-done.
+## Decisions
+
+Settled in review (2026-10-04); each is the reason for a step below.
+
+| Topic | Decision |
+|---|---|
+| Balance | RevenueCat Virtual Currency `COIN` holds it. No balance table of our own. |
+| Server-side RevenueCat calls | A new server-only package, `packages/economy` (thin `fetch` client for API v2 + wallet operations). RevenueCat ships no official Node SDK, and the in-app SDK cannot add or remove currency. |
+| Ledger shape | Built for the whole economy: event kinds include `buy_in`/`cash_out`/`refund`; spends go through RevenueCat, which refuses to overdraw (HTTP 422). The Colyseus side is a later story. |
+| Audit log | `wallet_event` table: every change our server makes, plus every purchase/refund RevenueCat reports through its webhook. |
+| Welcome grant | **5,000 coins**, paid when the player **verifies their email** (Better Auth `afterEmailVerification`), once per user. No public grant endpoint. |
+| Existing accounts | One-off, rerunnable backfill grants every existing account, verified or not (verification never existed before this). |
+| Packs | Three consumables, `coins_small` / `coins_medium` / `coins_large` at ~$0.99 / $4.99 / $9.99 granting **2,000 / 12,000 / 30,000** (rising coins-per-dollar). Amounts are dashboard data, not code. |
+| Pack display data | Coin amounts come from RevenueCat's `product_grants` through our catalog endpoint; labels and badges from Offering metadata; price from `priceString`; "Best Value" computed from coins per price. A pack without a grant is hidden. Store-side product names stay neutral ("Small Coin Pack"). |
+| Reading the balance | `GET /api/wallet` on every platform (web runs online play and every Maestro smoke). |
+| Sandbox | Free sandbox purchases for testers only: RevenueCat sandbox access set to **"Allowed App User IDs only"**. |
+| Refunds | RevenueCat's built-in behaviour: a refunded pack removes its coins, floored at 0 (Google partial refunds remove nothing). Logged, not otherwise acted on. |
+| Retries | A `pending` event is retried on that player's next `GET /api/wallet` (reusing its id as the `Idempotency-Key`). A game-server drainer arrives with buy-ins/cash-outs. |
+| Purchase webhook | Built and curl-tested here; pointed at from the RevenueCat dashboard (paid plan) once a public host exists. |
+| Release | Home's Coin Store entry is behind `EXPO_PUBLIC_COIN_STORE`, off until table buy-ins debit the Wallet (Epic B identity + STO-471). |
+| Android package | `com.wordpoker.wordpoker` (what the APK and both native Maestro flows use). |
 
 ## Approach
 
-Order builds a dependency tree; each step leaves the workspace typechecking with its own tests passing.
+Each step leaves the workspace typechecking with its own tests passing.
 
-### Step 0 — Linear ticket
+### Step 0 — Tracking
 
-File the story in Linear project **Word Poker Native** (team Story Time) via the Linear MCP tools, epic **Native workspace foundation** (STO-260): one story, checklist items for wallet ledger, RevenueCat SDK, store UI, webhook route.
+- Work against **STO-346** (already a child of STO-444); no new story.
+- The production API host is **STO-520**: Expo API routes need `web.output: "server"` and a host (today
+  `apps/mobile/app.json` exports `"static"`, so no `+api` route ships), and that host is also what production
+  sign-in, the catalog and the webhook URL wait on.
 
 ### Step 1 — Coin vocabulary in `packages/contracts`
 
-New `packages/contracts/src/coins.ts` (no equivalent exists):
+New `packages/contracts/src/coins.ts`, exported from `src/index.ts` in the style of the `rooms` block:
 
 ```ts
-export const WALLET_SOURCES = ["quest", "streak", "grant", "purchase"] as const;
-export type WalletSource = (typeof WALLET_SOURCES)[number];
-
-export interface CoinPack { readonly productId: string; readonly coins: number; readonly label: string; }
-export const COIN_PACKS: readonly CoinPack[] = [
-  { productId: "coins_small",  coins: 500,  label: "Pocket" },
-  { productId: "coins_medium", coins: 3000, label: "Pouch"  },
-  { productId: "coins_large",  coins: 7500, label: "Chest"  },
-];
+export const COIN_CURRENCY = "COIN";
 export const COIN_PACK_IDS = ["coins_small", "coins_medium", "coins_large"] as const;
-/** Coins granted for a store product id, or null when the id is not a coin pack. */
-export function coinsForProduct(productId: string): number | null;
+export type CoinPackId = (typeof COIN_PACK_IDS)[number];
+
+/** What a wallet_event records; `quest`/`streak` are reserved for QUESTS_LOGIN_STREAK_PLAN.md. */
+export const WALLET_EVENT_KINDS = [
+  "welcome", "purchase", "refund", "adjustment", "buy_in", "cash_out", "quest", "streak",
+] as const;
+export type WalletEventKind = (typeof WALLET_EVENT_KINDS)[number];
+
+export const WELCOME_GRANT = 5000;
+
+export interface WalletResponse { readonly coins: number; }
+export interface CoinCatalog { readonly packs: readonly { readonly productId: string; readonly coins: number }[]; }
 ```
 
-`WALLET_SOURCES` is the literal list `QUESTS_LOGIN_STREAK_PLAN.md` reserves (`quest`/`streak`/`grant`/`purchase`) — when that plan lands it imports this const instead of declaring `QUEST_WALLET_SOURCES` a second time. Export everything from `packages/contracts/src/index.ts` (same style as the `rooms` block). Product ids must match the RevenueCat dashboard / App Store Connect / Play Console SKUs exactly (see Dashboard setup below).
+Plus `isWalletResponse` / `isCoinCatalog` validators in the existing validator style. No coin amounts per
+pack live here — the dashboard owns them.
 
-Tests `packages/contracts/test/coins.test.ts` (mirror existing validator tests): unique product ids, `coins > 0`, `coinsForProduct` hit/miss, `WALLET_SOURCES` exact literals.
+Tests `packages/contracts/test/coins.test.ts`: unique pack ids, exact kind literals, validators accept/refuse.
 
-### Step 2 — Wallet ledger in `packages/db`
+### Step 2 — `wallet_event` in `packages/db`
 
-**Entities** — new `packages/db/src/entities/wallet.ts` (copy the `defineEntity` style of `entities/results-rating.ts`, including the header comment conventions):
+Entity `packages/db/src/entities/wallet-event.ts` (`defineEntity`, header-comment style of
+`results-rating.ts`), re-exported from `entities/index.ts` so `mikro-orm.config.ts` and the migrator see it.
 
-```ts
-export const PlayerWallet = defineEntity({
-  name: "PlayerWallet", tableName: "player_wallet",
-  properties: () => ({
-    userId: p.text().primary(),                       // Better Auth user id
-    coins: p.integer().default(0),
-    updatedAt: p.datetime().onCreate(() => new Date()).onUpdate(() => new Date()),
-  }),
-});
-
-export const WalletEntry = defineEntity({
-  name: "WalletEntry", tableName: "wallet_entry",
-  properties: () => ({
-    id: p.uuid().primary().defaultRaw("gen_random_uuid()").onCreate(() => randomUUID()),
-    createdAt: p.datetime().onCreate(() => new Date()),
-    userId: p.text(),
-    amount: p.integer(),          // signed; purchases positive, future spends negative
-    source: p.text(),             // one of contracts' WALLET_SOURCES; routes validate, column is the backstop
-    questId: p.text().nullable(),
-    productId: p.text().nullable(),   // RevenueCat product id when source === "purchase"
-    purchaseId: p.text().nullable(),  // RevenueCat non-subscription purchase id — the dedupe key
-  }),
-});
-```
-
-Register both in `packages/db/src/entities/index.ts` **and** in `packages/db/mikro-orm.config.ts`'s `entities: [...]` array (the config imports entity classes directly — an entity missing there does not exist to the migrator).
-
-**Migration** — hand-written `packages/db/src/migrations/Migration<timestamp>_wallet.ts` (pattern of `Migration20260921030429_results_rating.ts`), registered in `src/migrations/index.ts`:
+Hand-written `src/migrations/Migration<timestamp>_wallet_event.ts`, registered in `src/migrations/index.ts`:
 
 ```sql
-create table "player_wallet" (
-  "user_id" text primary key,
-  "coins" integer not null default 0,
-  "updated_at" timestamptz not null default now()
-);
-create table "wallet_entry" (
-  "id" uuid primary key default gen_random_uuid(),
+create table "wallet_event" (
+  "id" uuid primary key default gen_random_uuid(),   -- also the Idempotency-Key for our own RevenueCat calls
   "created_at" timestamptz not null default now(),
-  "user_id" text not null,
-  "amount" integer not null,
-  "source" text not null,
-  "quest_id" text null,
+  "updated_at" timestamptz not null default now(),
+  "user_id" text not null,                             -- Better Auth user id = RevenueCat app user id
+  "kind" text not null,                                -- contracts' WALLET_EVENT_KINDS
+  "amount" integer not null,                           -- signed
+  "status" text not null,                              -- pending | applied | failed
+  "attempts" integer not null default 0,
+  "last_error" text null,                              -- short code, never a response body
+  "balance_after" integer null,                        -- the balance RevenueCat returned
   "product_id" text null,
-  "purchase_id" text null
+  "ref" text null,                                     -- room/session for buy-in/cash-out, quest id
+  "rc_event_id" text null,                             -- webhook event id
+  "rc_transaction_id" text null                        -- virtual_currency_transaction_id
 );
-create unique index "wallet_entry_user_purchase_unique"
-  on "wallet_entry" ("user_id", "purchase_id") where "purchase_id" is not null;
-create index "wallet_entry_user_created_idx" on "wallet_entry" ("user_id", "created_at");
-down(): drop table "wallet_entry"; drop table "player_wallet";
+create unique index "wallet_event_welcome_once" on "wallet_event" ("user_id") where "kind" = 'welcome';
+create unique index "wallet_event_rc_event_unique" on "wallet_event" ("rc_event_id") where "rc_event_id" is not null;
+create index "wallet_event_user_created_idx" on "wallet_event" ("user_id", "created_at");
+create index "wallet_event_pending_idx" on "wallet_event" ("user_id") where "status" = 'pending';
 ```
 
-The partial unique index is the idempotency guard: crediting the same RevenueCat purchase twice cannot insert twice, whatever path reported it.
+Service `src/wallet-event.ts`, exported from `src/index.ts`, with the `saveResultsRating` optional-`orm`
+pattern:
 
-**Service** — new `packages/db/src/wallet-service.ts`, exported from `src/index.ts` (follows the `saveResultsRating` optional-orm pattern so tests can point at their own database). The db package stays dependency-free: coin amounts are resolved by the caller (the route, from `@wordpoker/contracts`), the service only stores and dedupes.
+- `openWalletEvent({ userId, kind, amount, productId?, ref? })` → the row, or `null` when a unique index
+  already holds it (`insert … on conflict do nothing returning *` — never catch a unique violation inside a
+  transaction; Postgres aborts the transaction).
+- `settleWalletEvent(id, { status, balanceAfter?, lastError? })` — bumps `attempts`.
+- `pendingWalletEvents(userId)` — oldest first.
+- `recordReportedEvent({ userId, kind, amount, productId, rcEventId, rcTransactionId })` — webhook rows,
+  inserted `applied`; `false` when `rc_event_id` was already recorded.
 
-```ts
-export interface WalletCredit {
-  readonly source: string; readonly amount: number;
-  readonly questId?: string; readonly productId?: string; readonly purchaseId?: string;
-}
-export interface PurchaseToCredit { readonly id: string; readonly productId: string; readonly coins: number; }
+Tests `packages/db/test/wallet-event.test.ts` mirror `results-rating.test.ts` (self-provisioned database,
+skipped without `TEST_DATABASE_URL ?? DATABASE_URL`): a second `welcome` for one user returns `null`; a
+repeated `rc_event_id` records once; pending rows come back in order; settle updates status, attempts and
+balance.
 
-/** Current balance; 0 for a user with no row. Creates nothing. */
-export async function getWalletBalance(userId: string, options?: { orm?: MikroORM }): Promise<number>;
+### Step 3 — `packages/economy` (new, server-only)
 
-/**
- * One transaction: insert the wallet_entry first — a unique violation on
- * (user_id, purchase_id) means already credited → return { credited: false } with the
- * current balance and change nothing. Otherwise upsert the wallet row
- * (`insert ... on conflict ("user_id") do update set coins = player_wallet.coins + N,
- * updated_at = now()`) and return the new balance.
- */
-export async function creditWallet(
-  userId: string, credit: WalletCredit, options?: { orm?: MikroORM },
-): Promise<{ coins: number; credited: boolean }>;
+`@wordpoker/economy`: `"type": "module"`, `exports: { ".": "./src/index.ts" }`, `node --import tsx --test`
+like `packages/db`, depends on `@wordpoker/db` and `@wordpoker/contracts`. Imported only by API routes and
+`apps/server`, never by client code (the secret key lives here). Add it to AGENTS.md's workspace-architecture
+list, and add `economy` to `scripts/check-boundaries.mjs`'s forbidden `@wordpoker/(mobile|server|db)` pattern
+so `game-rules`/`contracts` can never reach it.
 
-/** Credits every not-yet-credited purchase in ONE transaction; skips unknown product ids (coins <= 0). */
-export async function reconcilePurchases(
-  userId: string, purchases: readonly PurchaseToCredit[], options?: { orm?: MikroORM },
-): Promise<{ coins: number; creditedCoins: number; credited: readonly { purchaseId: string; productId: string; coins: number }[] }>;
+- `src/revenuecat.ts` — the v2 client, `Authorization: Bearer ${REVENUECAT_SECRET_API_KEY}`, base
+  `https://api.revenuecat.com/v2/projects/${REVENUECAT_PROJECT_ID}`:
+  - `getCoinBalance(userId)` → `GET /customers/{id}/virtual_currencies`, the `COIN` item's `balance`
+    (0 when absent).
+  - `adjustCoins(userId, amount, idempotencyKey)` → `POST /customers/{id}/virtual_currencies/transactions`
+    with `{ "adjustments": { "COIN": amount } }` and `Idempotency-Key`. Returns the new balance; a 422
+    `unprocessable_entity_error` is a typed `InsufficientCoinsError`; a 429 honours `Retry-After` once.
+  - `listCoinGrants()` → the `COIN` currency's `product_grants` joined with the project's products'
+    `store_identifier` → `{ storeProductId, coins }[]`.
+  - Missing env → `EconomyNotConfiguredError`. Non-2xx → `RevenueCatError` with the status only.
+- `src/wallet.ts` — the one path for every change our server makes:
+  - `applyWalletChange(userId, kind, amount, extras)`: `openWalletEvent` (pending) → `adjustCoins` with the
+    row id as `Idempotency-Key` → settle `applied` with `balance_after`, `failed` on a 422, or leave
+    `pending` with `last_error` on a network/5xx/429 failure. Returns `{ applied, balance }`; a `null` open
+    (already granted) returns `{ applied: false }`.
+  - `grantWelcome(userId)` = `applyWalletChange(userId, "welcome", WELCOME_GRANT)`.
+  - `retryPending(userId)`: re-sends each pending row with its own id as the key.
+- `src/catalog.ts` — `coinCatalog()`: `listCoinGrants()` filtered to `COIN_PACK_IDS`, cached in-process for
+  10 minutes.
+- `src/webhook.ts` — `parseCurrencyEvent(body)`: accepts `{ api_version, event: { type, id, app_user_id,
+  adjustments[], source, product_id, virtual_currency_transaction_id } }` (extra fields ignored), returns
+  one record per `COIN` adjustment. Kind: `purchase` for a positive in-app purchase, `refund` for a negative
+  one, `adjustment` for anything else.
+
+Tests `packages/economy/test/*.test.ts` with a stubbed `fetch`: request shapes and headers; 422 →
+`InsufficientCoinsError`; a 5xx leaves the row pending and `retryPending` settles it with the same key; the
+welcome grant runs once; catalog joins and filters; webhook parsing of purchase, refund and garbage bodies.
+At implementation, confirm whether a deposit to a customer RevenueCat has never seen succeeds; if it 404s,
+create the customer first (`POST /customers`).
+
+### Step 4 — Email verification and the welcome grant
+
+Nobody can verify an email today: `apps/mobile/src/auth/server/auth.ts` configures password resets but no
+`emailVerification`.
+
+- `auth.ts`: add `emailVerification: { sendOnSignUp: true, sendVerificationEmail, afterEmailVerification }`
+  (Better Auth 1.7.4's `init-options.d.mts`). `sendVerificationEmail` mails `verifyEmailEmail({ name,
+  buttonUrl: url })`, a new template beside `passwordResetEmail` in `src/auth/server/email.ts` ("Confirm your email
+  to claim your 5,000 welcome coins"), with the same dev-only console line the reset flow prints.
+  `afterEmailVerification(user)` calls `grantWelcome(user.id)` and logs (never throws) on failure — the row
+  stays `pending` for Step 5's retry.
+- Sign-up passes a `callbackURL` that lands on Home — `EMAIL_VERIFIED_DEEP_LINK` (`wordpoker://`) beside
+  `RESET_PASSWORD_DEEP_LINK` in `src/constants/links.ts`, chosen per platform the way
+  `password-reset-screen.tsx` chooses `redirectTo`.
+- Signing in stays possible before verifying; only the grant waits.
+- Backfill `packages/economy/scripts/backfill-welcome.ts`: every row of Better Auth's `"user"` table →
+  `grantWelcome` (the welcome index makes reruns no-ops). Run with
+  `pnpm --filter @wordpoker/economy exec tsx --env-file=../../apps/mobile/.env scripts/backfill-welcome.ts`.
+
+Tests: `auth.ts`'s verification callback is exercised through a mocked `@wordpoker/economy` (a thrown grant
+does not fail verification); the template renders its link.
+
+### Step 5 — API routes (`apps/mobile/src/app/api/`)
+
+Conventions of `results-rating+api.ts`: `json`/`refuse` helpers, short sentences, exception text logged and
+never sent. Session via `auth.api.getSession({ headers: request.headers })` (check against Better Auth 1.7.4's
+types).
+
+- `wallet+api.ts` — `GET`: 401 without a session; otherwise `retryPending(userId)` (errors swallowed and
+  logged), then `{ coins: await getCoinBalance(userId) }`; RevenueCat unreachable or unconfigured → 502
+  "The coin store could not be reached."
+- `store-catalog+api.ts` — `GET`: `coinCatalog()` as a `CoinCatalog`; 502 as above. No session needed (not
+  user data).
+- `revenuecat-webhook+api.ts` — `POST`:
+  - `REVENUECAT_WEBHOOK_AUTH` unset → 503.
+  - The `Authorization` header (RevenueCat sends the dashboard's "Authorization header value" there) compared
+    with `crypto.timingSafeEqual` over SHA-256 digests of both sides → 401 on mismatch or absence.
+  - Body that is not a webhook → 400.
+  - `VIRTUAL_CURRENCY_TRANSACTION` → `recordReportedEvent` per `COIN` adjustment → 200. A database failure
+    → 500, so RevenueCat retries.
+  - Any other event type → 200, no-op.
+
+Route tests colocated like `src/lib/results-rating-route.test.ts`, mocking `@/auth/server/auth`
+(`{ auth: { api: { getSession: jest.fn() } } }`), `@wordpoker/economy` and `@wordpoker/db`: wallet
+401/200/502 and retry-before-read; catalog 200/502; webhook 503/401/400, purchase recorded, duplicate
+event recorded once, unrelated type no-op, 500 on store failure.
+
+### Step 6 — RevenueCat SDK and client plumbing (`apps/mobile`)
+
+- `pnpm --filter @wordpoker/mobile add react-native-purchases` (10.x; Virtual Currency needs ≥ 9.1.0). No
+  `react-native-purchases-ui`. Purchases need a development build; Expo Go gets the SDK's preview mode.
+- `src/lib/revenuecat.ts` — the only module that imports the SDK:
+  - `revenuecatAvailable()`: iOS/Android with the platform key set.
+  - `configureRevenueCat()`: idempotent; `EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY` /
+    `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY`.
+  - `fetchCoinOffering()`: the current Offering's packages and its runtime-validated metadata
+    `{ packs: { [productId]: { label?, badge? } } }`.
+  - `purchaseCoinPack(pkg)`: `"purchased" | "cancelled"`.
+  - On web or without keys, each throws `StoreUnavailableError`.
+- `src/lib/use-revenuecat.ts` — `useRevenueCatIdentity(userId)`, called once in `RootLayout` beside
+  `authClient.useSession()`: configure once, `Purchases.logIn(userId)` when an id appears,
+  `Purchases.logOut()` when it goes. Exposes `ready` so buy buttons stay disabled until `logIn` resolves.
+  The E2E bypass build has no session, so it does nothing.
+- `src/lib/wallet-client.ts` — like `results-rating.ts` (`apiBaseURL`, typed failures, the server's
+  `{ error }` surfaced): `fetchWallet()` and `fetchCoinCatalog()`. Authenticated per Better Auth's Expo docs:
+  on native, `authClient.getCookie()` as a `cookie` header with `credentials: "omit"`; on web,
+  `credentials: "include"`. 401 → `WalletAuthError`.
+- `jest-setup.js`: mock `react-native-purchases` (`configure`, `logIn`, `logOut`, `getOfferings`,
+  `purchasePackage`). It matches the `react-native*` `transformIgnorePatterns` allowlist.
+
+### Step 7 — Store screen behind the flag
+
+- `src/components/screens/store/store-screen.tsx` + route `src/app/store.tsx`, styled like `mode-card.tsx`
+  with theme tokens.
+- **States**:
+  - **Unavailable** (web, or no keys): the caption "Coin packs are available in the mobile app."
+    (`store-unavailable`). The balance still shows.
+  - **Signed out** (`WalletAuthError`): "Sign in to top up." (`store-signed-out`).
+  - **Unverified**: "Verify your email to claim 5,000 coins" with a Resend button
+    (`authClient.sendVerificationEmail`) (`store-verify`).
+  - **Ready**: the balance (`wallet-coins`, "<N> COINS") and one row per pack (`store-pack-<productId>`).
+- **Packs**: the Offering's packages joined with the catalog. A package with no catalog entry is hidden and
+  logged. Each row shows its label/badge from metadata, "+12,000", `priceString`, and a buy button
+  (`store-buy-<productId>`). "Best Value" goes on the highest coins/price.
+- **Buy**: disable the row while buying; `"cancelled"` restores quietly; `"purchased"` refetches
+  `fetchWallet()`, retrying briefly until the balance rises, then flashes "+N COINS ADDED". An error shows
+  inline and keeps the balance.
+- Home: add `"store"` to `ModeKey` and its `MODES` entry only when `EXPO_PUBLIC_COIN_STORE === "1"`.
+- `store-screen.test.tsx` (mocks `@/lib/revenuecat` and `@/lib/wallet-client`): unavailable, signed-out and
+  unverified states; packs render with catalog amounts; a pack missing from the catalog is hidden; buy →
+  purchase then refetch; cancel → no refetch. Home test: no store card without the flag.
+
+### Step 8 — Android config
+
+- Local config plugin `apps/mobile/plugins/launch-mode.ts` (`withAndroidManifest` from
+  `@expo/config-plugins`, shipped with `expo`) sets the main activity's `android:launchMode` to `singleTop`.
+  The generated manifest carries `singleTask` today (`android/app/src/main/AndroidManifest.xml`), which
+  cancels Google Play purchases that verify in another app. Register it in `apps/mobile/app.json`; verify after
+  `npx expo prebuild -p android`.
+- Revert the uncommitted `android.package: "com.piratefresh.wordpoker"` block in the root `app.json`;
+  `com.wordpoker.wordpoker` stays the id on both platforms.
+
+### Step 9 — Environment and dashboard (manual prerequisites)
+
+Commented placeholders in `apps/mobile/.env` (server-side names are never `EXPO_PUBLIC_`):
+
+```
+# EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=   (public SDK key, appl_…)
+# EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY=  (public SDK key, goog_…)
+# EXPO_PUBLIC_COIN_STORE=                 (1 shows Home's Coin Store entry; off until buy-ins spend the Wallet)
+# REVENUECAT_PROJECT_ID=                  (v2 API project id)
+# REVENUECAT_SECRET_API_KEY=              (v2 secret key — server only)
+# REVENUECAT_WEBHOOK_AUTH=                (the webhook's Authorization header value)
 ```
 
-Raw upsert SQL runs through the forked entity manager's connection (`em.getConnection().execute(sql\`...\`)`); the entry insert and wallet upsert share one `em.transaction()`. Concurrency: two simultaneous reconciles race only on the entry insert — the loser hits the unique index and reads `credited: false`.
+RevenueCat dashboard:
+1. One project, with an App Store app and a Google Play app, both `com.wordpoker.wordpoker`.
+2. Confirm the plan includes Virtual Currency (the docs don't say). The webhook needs the paid plan.
+3. Virtual Currency `COIN`.
+4. Three consumable products `coins_small` / `coins_medium` / `coins_large`, with store names "Small/Medium/
+   Large Coin Pack". Their product grants are 2,000 / 12,000 / 30,000 `COIN`.
+5. A current Offering holding the three packages, with metadata `{ "packs": { "coins_large": { "badge":
+   "Best Value" } } }` (labels optional).
+6. Sandbox access: **Allowed App User IDs only**, listing the team's and the E2E user's Better Auth ids.
+7. A v2 secret key with read & write on Customer Purchases Configuration and Customer Configuration, plus
+   read on project configuration (products, virtual currencies).
+8. When the host exists: a webhook to `https://<api-origin>/api/revenuecat-webhook` carrying
+   `REVENUECAT_WEBHOOK_AUTH`.
 
-Tests `packages/db/test/wallet.test.ts` mirror `results-rating.test.ts` (self-provisioning `wordpoker_test_<random>` database from `TEST_DATABASE_URL ?? DATABASE_URL`, skipped with a message when unset, torn down in `after`). Cases: balance 0 for unknown user; credit creates wallet row + audit entry; crediting the same `purchaseId` twice → second returns `credited: false`, balance unchanged; reconcile with mixed known/unknown product ids credits only knowns once; balance always equals the sum of entries; `questId`/`productId` land in the audit row.
-
-### Step 3 — RevenueCat REST client (server-side, mobile app)
-
-New `apps/mobile/src/lib/revenuecat-server.ts` (no equivalent exists; server-only — imported exclusively by API routes, so the secret never enters a client bundle):
-
-```ts
-export interface RevenueCatPurchase { readonly id: string; readonly productId: string; }
-/** Throws Error("RevenueCat is not configured") without REVENUECAT_SECRET_API_KEY. */
-export async function fetchSubscriberPurchases(userId: string): Promise<readonly RevenueCatPurchase[]>;
-```
-
-`GET https://api.revenuecat.com/v1/subscribers/{encodeURIComponent(userId)}` with `Authorization: Bearer ${process.env.REVENUECAT_SECRET_API_KEY}` (v1 secret key; the endpoint returns 200/201 and creates the subscriber if missing — treat any 2xx as success). Reads `subscriber.non_subscriptions` (a `Record<productId, { id, ... }[]>`) and flattens to `{ id, productId }`. Non-2xx or unparseable body → typed error the routes turn into 502.
-
-### Step 4 — API routes (mobile)
-
-All three follow `src/app/api/results-rating+api.ts` conventions: `json(body, status)` / `refuse(message)` helpers, never leak exception text, no store details in errors.
-
-- **`src/app/api/wallet+api.ts` — GET**: authenticate with the server Better Auth instance from `src/lib/auth.ts`: `const session = await auth.api.getSession({ headers: request.headers })` (verify the exact 1.7 call against `node_modules/better-auth` types and the Better Auth session docs at implementation; the docs show `auth.api.<action>({ headers })` as the server pattern). No session → `401 {"error":"Sign in to see your coin balance."}`. Otherwise `{ coins: await getWalletBalance(session.user.id) }`.
-- **`src/lib/wallet-reconcile.ts`** — shared pipeline used by both the client-facing route and the webhook, so there is exactly one crediting path: `reconcileUserWallet(userId)` = `fetchSubscriberPurchases(userId)` → drop ids where `coinsForProduct(productId) == null` → `reconcilePurchases(userId, ...)` → `{ coins, creditedCoins }`.
-- **`src/app/api/wallet-reconcile+api.ts` — POST**: session as above (401 without); runs `reconcileUserWallet`; a RevenueCat fetch/config error → `502 {"error":"The coin store could not be reached."}`; success → `{ coins, creditedCoins }`.
-- **`src/app/api/revenuecat-webhook+api.ts` — POST**: reads the `x-auth` request header and compares it to `REVENUECAT_SECRET`-style env `REVENUECAT_WEBHOOK_AUTH` with `crypto.timingSafeEqual` (pad/hash both sides to equal length first; plain equality on a secret header is timing-observable). Missing env → `503`; mismatch/absent header → `401`. Body must shape-check as `{ api_version: string, event: { type: string, app_user_id: string } }` (unknown extra fields ignored — RevenueCat adds fields without versioning); bad shape → `400`. If `event.type` is one of `INITIAL_PURCHASE`, `NON_RENEWING_PURCHASE`, `TEST` (consumables surface as `NON_RENEWING_PURCHASE` on iOS and `INITIAL_PURCHASE` on Google Play; `TEST` covers the dashboard's test button) → `await reconcileUserWallet(event.app_user_id)` and return `200 {"ok":true, creditedCoins}`; a pipeline failure → `500` so RevenueCat retries (5 retries, 5–80 min backoff). Every other event type → `200 {"ok":true}` no-op.
-
-Route tests, colocated like `src/lib/results-rating-route.test.ts` (which stubs `@wordpoker/db` wholesale): mock `@/lib/auth` (`{ auth: { api: { getSession: jest.fn() } } }` — importing the real module would demand live `DATABASE_*` env), mock `@wordpoker/db` and `@/lib/revenuecat-server`. Cases: wallet GET 401/200; reconcile POST 401 / 200 with credited sums / 502 on RC failure; webhook 401 wrong auth / 503 unconfigured / 200 no-op for `EXPIRATION` / 200 + pipeline called for `NON_RENEWING_PURCHASE` / 500 when the pipeline throws / 400 on garbage body.
-
-### Step 5 — RevenueCat SDK + client plumbing (mobile)
-
-- **Install**: `pnpm --filter @wordpoker/mobile add react-native-purchases` (latest 10.x, currently 10.9.0; min RN 0.73, works with RN 0.86/Expo 57 — pure autolink, no config plugin, and it imports safely on web where calls are stubs). Do NOT add `react-native-purchases-ui` (paywall templates) — custom screen. Note: IAP requires a development/custom dev client; Expo Go gets the SDK's JS-level Preview API Mode automatically.
-- **`src/lib/revenuecat.ts`** — the one module that imports the SDK:
-  ```ts
-  export function revenuecatAvailable(): boolean;  // Platform.OS ios|android AND the platform key is set
-  export function configureRevenueCat(): void;     // idempotent module-level guard; ios → EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY, android → EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
-  export interface CoinPackOffer { readonly productId: string; readonly label: string; readonly coins: number; readonly price: string; }
-  export async function fetchCoinPacks(): Promise<readonly CoinPackOffer[]>;  // Purchases.getProducts([...COIN_PACK_IDS], Purchases.PRODUCT_CATEGORY.NON_SUBSCRIPTION); price from product.priceString
-  export async function purchaseCoinPack(productId: string): Promise<"purchased" | "cancelled">;  // purchaseStoreProduct; catch → e.userCancelled ? "cancelled" : throw
-  ```
-  Web or missing keys → wrappers throw a typed `StoreUnavailableError`; the screen gates on `revenuecatAvailable()` and never calls further.
-- **`src/lib/use-revenuecat.ts`** — `useRevenueCatIdentity(userId: string | undefined)`: effect calls `configureRevenueCat()` once and `Purchases.logIn(userId)` whenever a non-empty id appears (safe to repeat; RevenueCat returns `created:false` for the same id). This pins RevenueCat's `app_user_id` to the Better Auth user id, which is what webhook `app_user_id` and the REST lookup key both rely on. Called once from `RootLayout` in `apps/mobile/src/app/_layout.tsx` next to the existing `authClient.useSession()` (`useRevenueCatIdentity(session?.user?.id)`); E2E bypass builds have no session, so it no-ops.
-- **`src/lib/wallet-client.ts`** — mirrors `results-rating.ts` conventions (`apiBaseURL`, typed failures, server's `{ error }` surfaced):
-  ```ts
-  export async function fetchWallet(): Promise<number>;                                            // GET /api/wallet
-  export async function reconcileWallet(): Promise<{ coins: number; creditedCoins: number }>;      // POST /api/wallet/reconcile
-  ```
-  Authenticated fetch per Better Auth's Expo docs: on native, `const cookie = await authClient.getCookie()` and send `headers: { cookie }` with `credentials: "omit"` (the manual header and `"include"` interfere); on web, plain fetch with `credentials: "include"` (same origin as auth). 401 → typed `WalletAuthError`.
-- **Jest**: add to `apps/mobile/jest-setup.js`: `jest.mock("react-native-purchases", () => ({ default: { configure: jest.fn(), logIn: jest.fn(async () => ({ created: false })), getProducts: jest.fn(async () => []), purchaseStoreProduct: jest.fn(async () => ({ customerInfo: {} })) }, PRODUCT_CATEGORY: { NON_SUBSCRIPTION: "NON_SUBSCRIPTION" } }))`. The package matches the existing `transformIgnorePatterns` allowlist (`react-native*`), so ESM is transformed.
-
-### Step 6 — Store UI
-
-- **Screen** `apps/mobile/src/components/screens/store/store-screen.tsx` + route `apps/mobile/src/app/store.tsx` (kebab routes: `offline`, `sign-in`). Style follows `mode-card.tsx` / theme tokens (`colors.gold` accents, `fonts.mono` labels) — no `@expo/ui` restrictions beyond what home already uses. States:
-  - **Unavailable** (web build, or native without keys): the three `COIN_PACKS` listed without prices, buy buttons absent, caption "Coin packs are available in the mobile app." (`testID="store-unavailable"`). This is also the E2E-build state — nothing may crash.
-  - **Signed out** (`WalletAuthError` from `fetchWallet`): "Sign in to top up." (`testID="store-signed-out"`).
-  - **Ready**: balance row (`testID="wallet-coins"`, "<N> COINS"), one row per offer (`testID="store-pack-<productId>"`) with label, coins ("+3,000"), localized `price`, buy button (`testID="store-buy-<productId>"`).
-  - Buy flow: disable the row while `purchaseCoinPack(productId)` runs → `"cancelled"` restores quietly; `"purchased"` → `reconcileWallet()` → update balance and flash "+<coins> COINS ADDED"; thrown error → inline error row, keep the balance. `fetchCoinPacks()` failure → error state with retry.
-  - Loads `fetchWallet()` + `fetchCoinPacks()` on mount; re-runs `reconcileWallet()` on mount too (catches purchases the server never heard about).
-- **Home entry** in `apps/mobile/src/components/screens/home/home-screen.tsx`: extend `ModeKey` with `"store"` and insert after the offline entry: `{ key: "store", href: "/store", glyph: "🪙", label: "Coin Store", description: "Top up your coin balance" }`.
-- **Test** `store-screen.test.tsx` (mock `@/lib/revenuecat` and `@/lib/wallet-client`): renders the three packs; unavailable caption when `revenuecatAvailable()` is false; buy → purchase then reconcile called, balance updates; cancelled → no reconcile; signed-out state on `WalletAuthError`.
-
-### Step 7 — Native config: Android launchMode
-
-RevenueCat requires the purchasing Activity's `launchMode` to be `standard`/`singleTop` (Google Play may verify payment in another app; `singleTask` cancels the purchase), and Expo's Android template sets `singleTask`. Add local config plugin `apps/mobile/plugins/launch-mode.ts` using `withAndroidManifest` from `@expo/config-plugins` (a devDependency-free import — it ships with `expo`) to set the main activity's `android:launchMode` to `singleTop`, and register `"./plugins/launch-mode"` in `apps/mobile/app.json`'s `plugins` array. `singleTop` keeps deep-link behavior (the template default was chosen for notifications, and `singleTop` is what Expo's own fyis recommend for re-launch cases). Verify after `npx expo prebuild -p android` that the generated manifest carries it; if a future template already emits `singleTop`, delete the plugin then.
-
-### Step 8 — Environment + RevenueCat dashboard (manual prerequisites)
-
-Env names added to `apps/mobile/.env` as commented placeholders (values arrive when the dashboard exists; server-side names are never `EXPO_PUBLIC_`):
-
-```
-# EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=    (public SDK key, appl_…)
-# EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY=    (public SDK key, goog_…)
-# REVENUECAT_SECRET_API_KEY=               (v1 secret key — API routes only, never bundled)
-# REVENUECAT_WEBHOOK_AUTH=                 (shared secret RevenueCat sends as the webhook authorization header)
-```
-
-Dashboard checklist (revenuecat.com, free tier is enough for reconcile; Pro unlocks the webhook): create project → add App Store app (`com.wordpoker.wordpoker`) and Google Play app → create 3 consumable products with ids exactly `coins_small` / `coins_medium` / `coins_large` (store-side prices ~$0.99 / $4.99 / $9.99; the app reads prices from the store) → copy the public per-platform SDK keys and one v1 secret API key. On Pro: add a Webhooks integration, set its authorization header value to `REVENUECAT_WEBHOOK_AUTH`, point it at `https://<deployed-api-origin>/api/revenuecat-webhook` when that origin exists. Store products must also exist in App Store Connect / Play Console before production; RevenueCat's Test Store covers development without them.
+Store products must also exist in App Store Connect / Play Console before production; RevenueCat's Test
+Store covers development.
 
 ## Critical files & anchors
 
-- `packages/db/src/entities/results-rating.ts` + `packages/db/test/results-rating.test.ts` — the entity + self-provisioning test patterns Step 2 copies.
-- `packages/db/mikro-orm.config.ts` — `entities: [...]` array where the two new entities must be registered (easy to miss).
-- `apps/mobile/src/app/api/results-rating+api.ts` + `apps/mobile/src/lib/results-rating.ts` + `src/lib/results-rating-route.test.ts` — route, client and route-test conventions Steps 3–5 copy.
-- `apps/mobile/src/lib/auth.ts` / `auth-client.ts` — the server `auth` instance for `getSession`, and `authClient.getCookie()` for the authenticated wallet fetch (Better Auth Expo docs pattern).
-- `apps/mobile/src/components/screens/home/home-screen.tsx` — `ModeKey` union + `MODES` array where the store entry lands.
+- `apps/mobile/src/auth/server/auth.ts` (Better Auth config, `sendResetPassword` as the mail pattern),
+  `src/auth/server/email.ts` (`passwordResetEmail`), `src/constants/links.ts`,
+  `src/components/screens/auth/password-reset-screen.tsx` (`redirectTo` per platform).
+- `packages/db/src/entities/results-rating.ts`, `src/index.ts`, `test/results-rating.test.ts` — entity,
+  optional-orm service and self-provisioning test patterns.
+- `apps/mobile/src/app/api/results-rating+api.ts`, `src/components/screens/results/results-rating.ts`,
+  `src/lib/results-rating-route.test.ts` — route, client and route-test conventions.
+- `apps/mobile/src/components/screens/home/home-screen.tsx` — `ModeKey` and `MODES`.
+- `node_modules/@better-auth/core/dist/types/init-options.d.mts` — `emailVerification` options.
 
 ## Verification
 
-Prereqs: local Postgres or the PlanetScale `DATABASE_URL` (as the db suite already uses), seeded E2E user (`node --env-file=apps/mobile/.env scripts/seed-test-user.mjs`).
+Prereqs: Postgres via the db suite's env, the seeded E2E user
+(`node --env-file=apps/mobile/.env scripts/seed-test-user.mjs`), and a RevenueCat project per Step 9 for
+steps 5–7.
 
-1. `pnpm --filter @wordpoker/contracts test` — coin catalog invariants.
-2. `pnpm --filter @wordpoker/db db:migrate && pnpm --filter @wordpoker/db test` — wallet ledger against a real (self-provisioned) database, incl. purchase-id idempotence.
-3. `pnpm --filter @wordpoker/mobile typecheck && pnpm --filter @wordpoker/mobile test` — route contracts (401/400/500/502 paths), store screen states, buy flow.
-4. Local end-to-end of the routes: `pnpm --filter @wordpoker/mobile web`, then from a shell — sign in as the E2E user (`POST /api/auth/sign-in/email` on `http://localhost:8081` with the seeded JSON credentials, capture the session cookie) → `GET /api/wallet` with that cookie → `{"coins":0}`; without the cookie → 401. With `REVENUECAT_SECRET_API_KEY` set (any valid key), `POST /api/wallet/reconcile` → `{"coins":0,"creditedCoins":0}` (RevenueCat creates the subscriber empty on first lookup). `POST /api/revenuecat-webhook` with header `x-auth: <REVENUECAT_WEBHOOK_AUTH>` and body `{"api_version":"1.0","event":{"type":"TEST","app_user_id":"<e2e-user-id>"}}` → `200 {"ok":true,...}`; with a wrong `x-auth` → 401.
-5. Web UI: in a browser on the dev server — home shows the "Coin Store" card; the store screen lists the three packs in the unavailable state with the mobile-only caption. Re-run `.maestro/offline-hand.yaml` unchanged to prove the new home card broke no selectors.
-6. Native sandbox purchase (the real-money proof; needs the Step 8 dashboard setup): `eas build --platform android --profile development` (or ios-simulator profile), install on device/emulator, sign in, open Coin Store → packs show store prices → buy `coins_small` in sandbox → balance jumps by 500; buy again → +500 again (two `wallet_entry` rows, two distinct purchase ids); kill the app right after a purchase and reopen the store → mount-time reconcile credits it.
+1. `pnpm --filter @wordpoker/contracts test`.
+2. `pnpm --filter @wordpoker/db db:migrate && pnpm --filter @wordpoker/db test` — welcome-once and
+   event-dedupe indexes against a real database.
+3. `pnpm --filter @wordpoker/economy test` — client shapes, retry with the same key, webhook parsing.
+4. `pnpm --filter @wordpoker/mobile typecheck && pnpm --filter @wordpoker/mobile test`.
+5. Routes on the dev server (`pnpm --filter @wordpoker/mobile web`):
+   - Sign in as the E2E user (`POST /api/auth/sign-in/email`) and keep the cookie.
+   - Run the backfill; `GET /api/wallet` → `{"coins":5000}`. Rerun it: still 5,000, one welcome row.
+   - Without the cookie → 401.
+   - `GET /api/store-catalog` → three packs with the dashboard's amounts.
+   - `POST /api/revenuecat-webhook` with the right `Authorization` and a sample `VIRTUAL_CURRENCY_TRANSACTION`
+     → 200 and one `purchase` row. Repeat it: still one row. With a wrong header → 401.
+6. Sign up a fresh account on web → the verification mail (or dev console line) → open the link → Home, and
+   `GET /api/wallet` shows 5,000.
+7. Web UI with `EXPO_PUBLIC_COIN_STORE=1`: Home shows Coin Store; the store shows the balance and the
+   mobile-only caption. Without the flag, no card; `.maestro/offline-hand.yaml` passes unchanged.
+8. Native sandbox (development build, allowlisted account): packs show store prices; buy `coins_small` →
+   balance +2,000 and a `purchase` row once the webhook is live. A non-allowlisted account's sandbox buy
+   grants nothing.
 
 ## Assumptions & contingencies
 
-- **Catalog**: amounts {500, 3000, 7500} for {$0.99, $4.99, $9.99}; "coins" is the display name (matches the quests plan). Prices live in the stores; amounts live in `contracts` — retuning is data-only.
-- **Sandbox counts**: reconcile credits `is_sandbox` purchases too, so dev builds work against the dev backend; tightening (env-gated) is a later hardening step, not this plan.
-- **Deployment**: production native builds already require `EXPO_PUBLIC_AUTH_URL` to point at a deployed API host (Better Auth's requirement); the wallet routes and webhook ride the same host — no new deployment work here, but the webhook stays URL-less until that host exists.
-- **If `auth.api.getSession({ headers })` differs in Better Auth 1.7**: follow `node_modules/better-auth`'s own types over the docs snippet.
-- **If `authClient.getCookie()` is absent/different in `@better-auth/expo` 1.7**: check the installed package's exports; the documented fallback is reading the SecureStore cookie directly with the client's `storagePrefix`.
-- **If `react-native-purchases@10` misbehaves with Expo 57** (build or runtime): drop to the latest 9.x — the APIs used (`configure`, `logIn`, `getProducts`, `purchaseStoreProduct`) are identical.
-- **If Google Play sandbox still cancels purchases after the launchMode plugin**: confirm the generated `AndroidManifest.xml` actually carries `singleTop` before anything else — the plugin is the only moving part.
-- **If REST `non_subscriptions[].id` and webhook `transaction_id` turn out to differ** for the same purchase: irrelevant by construction — only the REST id is ever stored; the webhook just triggers a pull.
-- **If `getProducts` returns nothing on a fresh dev build**: the products must exist in the RevenueCat dashboard with matching ids and the app must be attached to a store app (or Test Store) — dashboard problem, not code; the screen's error state covers it.
-- **Quests plan overlap**: `QUESTS_LOGIN_STREAK_PLAN.md` Step 3's `PlayerWallet`/`WalletEntry`/`creditWallet` are superseded by this plan's ledger (same tables, plus `product_id`/`purchase_id`); its quest/streak tables and `QUEST_WALLET_SOURCES` should import `WALLET_SOURCES` from contracts when that plan runs.
+- **Grant-on-verify failure**: if RevenueCat is down when the link is opened, the welcome row stays
+  `pending` and the player's next `GET /api/wallet` applies it.
+- **Idempotency-Key retention** is undocumented. If RevenueCat expires keys quickly, a retry must first
+  compare the balance against the row before re-sending — check with RevenueCat support before buy-ins
+  depend on it.
+- **Purchase latency**: RevenueCat credits a purchase server-side. If the balance hasn't risen by the time
+  the store stops retrying, it says "Coins are on their way" rather than an error.
+- **`react-native-purchases@10` problems with Expo 57**: drop to the latest 9.x (≥ 9.1.0 for Virtual Currency).
+- **Google Play still cancels after the plugin**: check the generated manifest carries `singleTop` first.
+- **Quests**: `QUESTS_LOGIN_STREAK_PLAN.md` Step 3's own wallet tables are superseded. Its rewards become
+  `applyWalletChange(userId, "quest" | "streak", …)` and it imports `WALLET_EVENT_KINDS`.
+- **Later stories, not this plan**: Colyseus identity and buy-in/cash-out through `applyWalletChange`; a
+  game-server drainer for pending rows; the production host and webhook URL; web purchases.

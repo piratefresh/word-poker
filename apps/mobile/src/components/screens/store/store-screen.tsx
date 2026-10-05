@@ -22,7 +22,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/client/auth-client";
 import { fullWidth } from "@/lib/full-width";
 
 import type { CoinPackRow } from "./coin-packs";
