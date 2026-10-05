@@ -32,7 +32,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 
 import { duration, palette } from "@/constants/theme";
 
-import { CoachCard, type CoachKind } from "./coach-card";
+import { CoachCard, type CoachKind, type CoachMedia } from "./coach-card";
 import { placeCoachCard, type CoachSide, type Rect, type Size } from "./placement";
 
 /** One step of a tour. */
@@ -49,6 +49,8 @@ export interface CoachStep {
   side?: CoachSide;
   /** `next` shows Next; `action` waits for the player to do what the step teaches. */
   advance: "next" | "action";
+  /** A short looping clip of the move the step teaches, drawn above its copy. */
+  media?: CoachMedia;
 }
 
 /** The tour on screen, or `null` for none. */
@@ -172,10 +174,12 @@ export function CoachProvider({
       >
         {children}
         {tour !== null && step !== undefined ? (
-          <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          <View pointerEvents="box-none" style={styles.overlay}>
             {rect !== null && container !== null ? <Shade container={container} rect={rect} /> : null}
-            <Animated.View
-              entering={FadeIn.duration(duration.base)}
+            {/* Measured hidden, then placed. The fade is on a view of its own, mounted once the
+                card is placed: on Android an entering animation on the view that carries the
+                hidden opacity fades it to that 0 and keeps it there. */}
+            <View
               key={step.id}
               onLayout={(event) => setCardHeight(event.nativeEvent.layout.height)}
               style={[
@@ -185,29 +189,35 @@ export function CoachProvider({
                   : { left: placement.left, top: placement.top, width: placement.width },
               ]}
             >
-              <CoachCard
-                advance={step.advance}
-                body={step.body}
-                index={tour.index}
-                kind={tour.kind}
-                title={step.title}
-                total={tour.steps.length}
-                {...(step.icon === undefined ? {} : { icon: step.icon })}
-                {...(tour.onNext === undefined ? {} : { onNext: tour.onNext })}
-                {...(tour.onPrevious === undefined ? {} : { onPrevious: tour.onPrevious })}
-                {...(tour.onClose === undefined ? {} : { onClose: tour.onClose })}
-              />
-              {placement?.arrowX != null && placement.side !== null ? (
-                <View
-                  pointerEvents="none"
-                  style={[
-                    styles.arrow,
-                    { left: placement.arrowX - ARROW / 2 },
-                    placement.side === "top" ? styles.arrowBelow : styles.arrowAbove,
-                  ]}
+              <Animated.View
+                entering={FadeIn.duration(duration.base)}
+                key={placement === null ? "measuring" : "placed"}
+              >
+                <CoachCard
+                  advance={step.advance}
+                  body={step.body}
+                  index={tour.index}
+                  kind={tour.kind}
+                  title={step.title}
+                  total={tour.steps.length}
+                  {...(step.icon === undefined ? {} : { icon: step.icon })}
+                  {...(step.media === undefined ? {} : { media: step.media })}
+                  {...(tour.onNext === undefined ? {} : { onNext: tour.onNext })}
+                  {...(tour.onPrevious === undefined ? {} : { onPrevious: tour.onPrevious })}
+                  {...(tour.onClose === undefined ? {} : { onClose: tour.onClose })}
                 />
-              ) : null}
-            </Animated.View>
+                {placement?.arrowX != null && placement.side !== null ? (
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.arrow,
+                      { left: placement.arrowX - ARROW / 2 },
+                      placement.side === "top" ? styles.arrowBelow : styles.arrowAbove,
+                    ]}
+                  />
+                ) : null}
+              </Animated.View>
+            </View>
           </View>
         ) : null}
       </View>
@@ -278,6 +288,13 @@ function Shade({ container, rect }: { container: Size; rect: Rect }): ReactEleme
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  // Android elevation can lift the felt's buttons and tiles above a later sibling. Raise the
+  // whole overlay so the shade and card draw together and Next receives the overlapping tap.
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    elevation: 100,
+    zIndex: 100,
   },
   card: {
     position: "absolute",

@@ -74,7 +74,7 @@ export interface WordDraft {
  * the letters and what §7 makes them worth, which is all a seat needs while it is choosing.
  *
  * The controls belong to the table, not to this component: the shuffle is a button of the
- * felt's action row (`WordShuffleButton`) and the confirm is that row's own check, which locks
+ * row under the rack (`WordShuffleButton`) and the confirm is the action row's check, which locks
  * the draft in while §19's window is open. So the builder draws the draft and reports the
  * edits, and a mode decides which of its controls spends them.
  *
@@ -358,8 +358,8 @@ export function WordPreview(): JSX.Element | null {
 }
 
 /**
- * The explicit dictionary lookup, for the felt's bet row (`GameScreen`'s `bettingSlider` prop):
- * it sits beside the slider, and draws nothing in a mode without a check path.
+ * The explicit dictionary lookup, for the row under the rack (`GameScreen`'s `rackActions` prop):
+ * it sits beside the shuffle, and draws nothing in a mode without a check path.
  */
 export function WordCheckButton(): JSX.Element | null {
   const { draft, wordCheck, onCheckWord } = useWordBuilderScope();

@@ -1,4 +1,3 @@
-import { router, type Href } from "expo-router";
 import {
   Button,
   Column,
@@ -10,12 +9,18 @@ import {
   Text,
   type UniversalTextStyle,
 } from "@expo/ui";
+import { router, type Href } from "expo-router";
 import { useState } from "react";
+import { useWindowDimensions } from "react-native";
 
 import {
   ModeCard,
   type ModeCardProps,
 } from "@/components/screens/home/components/mode-card";
+import {
+  ModeVariants,
+  type ModeVariant,
+} from "@/components/screens/home/components/mode-variants";
 import {
   colors,
   fonts,
@@ -24,14 +29,17 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import {
-  ModeVariants,
-  type ModeVariant,
-} from "@/components/screens/home/components/mode-variants";
-import { authClient } from "@/lib/auth-client";
-import { fullWidth } from "@/lib/full-width";
+import { authClient } from "@/auth/client/auth-client";
 
-type ModeKey = "tutorial" | "online" | "offline" | "leaderboard";
+type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store";
+
+/**
+ * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
+ * `EXPO_PUBLIC_*` name at build time; reading it here rather than at module load lets a test set it.
+ */
+function coinStoreEnabled(): boolean {
+  return process.env.EXPO_PUBLIC_COIN_STORE === "1";
+}
 
 type Variant = ModeVariant & { href: Href };
 
@@ -98,6 +106,16 @@ const MODES: Mode[] = [
   },
 ];
 
+const STORE_MODE: Mode = {
+  key: "store",
+  href: "/store",
+  glyph: "🪙",
+  label: "Coin Store",
+  description: "Top up your Wallet",
+};
+
+const CARD_PADDING = spacing.lg;
+
 const titleText = {
   color: colors.textBright,
   fontFamily: fonts.serifBold,
@@ -121,6 +139,10 @@ const signedInText = {
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
   const [pending, setPending] = useState<ModeKey | null>(null);
+  // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
+  // card shrinks to its own content, so the column's width is handed down as a number.
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = windowWidth - spacing.gutter * 2;
 
   // Modes with a route navigate; the rest don't exist yet, so selecting one
   // just marks intent for now.
@@ -135,12 +157,16 @@ export function HomeScreen() {
   return (
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
-        <Column alignment="start" spacing={spacing.md} {...fullWidth(styles.screen)}>
+        <Column
+          alignment="start"
+          spacing={spacing.md}
+          style={{ ...styles.screen, width: windowWidth }}
+        >
           <Text textStyle={titleText}>Choose how to play</Text>
           <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
           <Spacer size={spacing.sm} />
 
-          {MODES.map((mode) => {
+          {(coinStoreEnabled() ? [...MODES, STORE_MODE] : MODES).map((mode) => {
             const disabled = pending !== null && pending !== mode.key;
             const { variants } = mode;
             return (
@@ -153,13 +179,15 @@ export function HomeScreen() {
                 label={mode.label}
                 onSelect={() => handleSelect(mode)}
                 tone={mode.tone}
+                width={contentWidth}
               >
                 {variants ? (
-                  <RNHostView>
+                  <RNHostView matchContents>
                     <ModeVariants
                       disabled={disabled}
                       onSelect={(variant) => handleSelect(mode, variant.href)}
                       variants={variants}
+                      width={contentWidth - CARD_PADDING * 2}
                     />
                   </RNHostView>
                 ) : null}
@@ -169,8 +197,8 @@ export function HomeScreen() {
 
           <Spacer size={spacing.lg} />
 
-          <Column spacing={spacing.md} {...fullWidth(styles.footer)}>
-            <Row alignment="center" {...fullWidth()}>
+          <Column spacing={spacing.md} style={{ ...styles.footer, width: contentWidth }}>
+            <Row alignment="center" style={{ width: contentWidth - spacing.lg * 2 }}>
               <Text textStyle={signedInText}>Signed in as</Text>
               <Spacer flexible />
               <Text textStyle={signedInText}>
@@ -200,13 +228,11 @@ const styles = {
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.gutter,
     paddingTop: spacing.huge,
-    width: "100%" as const,
   },
   footer: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    width: "100%" as const,
   },
 };

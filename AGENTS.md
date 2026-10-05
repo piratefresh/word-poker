@@ -29,12 +29,13 @@ shared hook first.
 sortable strip of tiles and goes in the felt's rack slot (`GameScreen`'s `rack` prop), and
 `WordPreview` is the draft as one line of text directly above it — it draws nothing until the
 strip spells something. The builder carries no buttons of its own: the shuffle is
-`WordShuffleButton`, placed in the felt's action row (`GameScreen`'s `bettingLeading` prop) beside
-fold, check and the bet, and the confirm is that row's check — §19's window is what turns it from
+`WordShuffleButton`, placed with `WordCheckButton` in a row under the rack (`GameScreen`'s
+`rackActions` prop), so the word's controls sit with its tiles and the betting rows keep their
+width; the confirm is the action row's check — §19's window is what turns it from
 the tap that walks the round into the tap that locks the word in. `WordBuilder` owns the draft the
 two share; a mode's adapter hands it a `WordDraft` — plays, word, score, reason, confirmed,
 `open`, `confirmable` — and gets the seat's edits back as one `onDraft(plays)` call
-(`apps/mobile/src/lib/use-offline-game.ts` is the offline adapter). Never write a second builder:
+(`apps/mobile/src/features/offline/use-offline-game.ts` is the offline adapter). Never write a second builder:
 the engine judges the draft, the builder only draws it and reports it.
 
 The word is built the whole hand, in parallel with the betting, not only at the river: `open` is
@@ -78,8 +79,8 @@ table: nobody is on the clock, so no bot beat runs until the hero picks or `POWE
 out. A power used on a street rides beside that street's action in `seatActions`, and the power
 UI reads the adapter's `powers` (`PowerView`, `lib/power-view.ts`) — the shape the online adapter
 will fill too. Whether a power can be used is the engine's `canUsePower`, never the felt's.
-Using it runs through `components/powers`: `PowerHeldChip` sits in the action row beside the
-shuffle, `usePowerTargeting` holds chip → tile → confirm (and drops to idle the moment the power
+Using it runs through `components/powers`: `PowerHeldChip` sits at the action row's start
+(`bettingLeading`), `usePowerTargeting` holds chip → tile → confirm (and drops to idle the moment the power
 stops being usable), and while the seat chooses, `WordBuilder`'s `onPickTile` turns the strip's
 taps on private tiles into picks. The swap flips in place through `swapFlip`, whose `revealed`
 is the seam the "power used" card holds it on.
@@ -200,6 +201,7 @@ cd apps/mobile
 eas build --platform android --profile e2e-test    # or --platform ios
 eas build:run --platform android --latest          # installs it on a booted emulator/device
 maestro test --platform android .maestro/native/offline-hand.yaml
+# On a Mac with an iOS Simulator, use --platform ios for both build:run and maestro test.
 ```
 
 Android wants a booted emulator or an adb-visible device; `--platform ios` needs a Mac with a
@@ -207,11 +209,11 @@ Simulator. The flow takes the action row by testID (`action-check-call`, `action
 nameplates print CHECK and CALL as seat status too, so a text selector there is ambiguous — and
 everything else by the string a component prints, matched whole and case-sensitively, unlike the web.
 
-EAS Workflows can run these flows on its own emulator and simulator — a `maestro` job with
-`flow_path: .maestro/native` behind the `e2e-test` profile, as the Expo E2E example shows — but that
-job type and the workers it needs (`linux-*-nested-virtualization` for Android, `macos-*` for iOS)
-require a paid Expo plan on this account (September 2026), so no workflow file is checked in. Add
-one when that changes; trigger it from an `e2e` label on a pull request, or by hand.
+EAS Workflows runs the iOS offline hand from `apps/mobile/.eas/workflows/e2e-ios.yml`. It builds
+with `e2e-test`, then runs `.maestro/native/offline-hand.yaml` on an iOS simulator. Trigger it
+manually from `apps/mobile` with `eas workflow:run .eas/workflows/e2e-ios.yml`, or add the `e2e`
+label to a pull request. EAS Workflows and its Maestro job require an Expo plan that includes
+those services.
 
 ## Online device smoke
 
@@ -276,6 +278,12 @@ them — it lives in a shared package so client and server can never disagree on
   action/command types, server→client event and state shapes, shared enums (e.g.
   `ROUND_PHASES`), and their validators. `apps/server` and `apps/mobile` both import this
   to type the socket boundary.
+- **`packages/economy`** — server-only Wallet operations (STO-346): the RevenueCat
+  Developer API v2 client (the Wallet's balance is RevenueCat Virtual Currency `COIN`),
+  `applyWalletChange`/`grantWelcome`/`retryPending` over `packages/db`'s `wallet_event`
+  log, the coin catalog, and webhook parsing. It holds the secret key, so only
+  `apps/mobile`'s API routes (and the server-only `src/auth/server/auth.ts`) and `apps/server` may
+  import it — `pnpm check:boundaries` refuses it anywhere else.
 
 Authority model: the **server is the source of truth** — it owns all mutation, runs
 `game-rules` to advance state and reject illegal actions. The **client imports the same

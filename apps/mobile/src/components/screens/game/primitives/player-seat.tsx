@@ -14,7 +14,7 @@ import {
 } from "@/constants/theme";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
-import { SeatBeam } from "../seat-beam";
+import { SeatBeam } from "./seat-beam";
 import {
   betChipOffset,
   seatDirection,

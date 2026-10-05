@@ -3,21 +3,20 @@ import { StyleSheet } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 import { GameButton } from "@/components/ui/game-button";
-import { useCompactControls } from "@/components/screens/game/screen-scale";
 import { colors } from "@/constants/theme";
 
 import { haptic } from "./haptics";
 import { useWordBuilderScope } from "./word-builder";
 
 /**
- * The shuffle, as the felt's action row draws it: a small round icon button at the row's
- * start, beside fold, check and the bet. One tap rearranges the tiles the word does not
- * hold, among the places they sit — the draft the seat has built is not something a
+ * The shuffle, as the felt draws it under the rack (`GameScreen`'s `rackActions`): a small
+ * icon button beside the word check, so the word's controls sit with the tiles they act on
+ * and the betting rows keep their width. One tap rearranges the tiles the word does
+ * not hold, among the places they sit — the draft the seat has built is not something a
  * shuffle should undo, and the seat's own order is otherwise the word's order.
  */
 export function WordShuffleButton(): JSX.Element {
   const { canShuffle, shuffle } = useWordBuilderScope();
-  const compact = useCompactControls();
 
   return (
     <GameButton
@@ -27,8 +26,7 @@ export function WordShuffleButton(): JSX.Element {
         haptic("settle");
         shuffle();
       }}
-      compact={compact}
-      style={compact ? shuffleStyles.compact : shuffleStyles.button}
+      style={shuffleStyles.button}
       testID="word-builder-shuffle"
     >
       <ShuffleGlyph />
@@ -65,8 +63,7 @@ function ShuffleGlyph(): JSX.Element {
   );
 }
 
-// Square, and the same height as the action buttons beside it: the row reads as one control strip.
+// The word check's height, so the rack's two word controls read as a pair.
 const shuffleStyles = StyleSheet.create({
-  button: { width: 48 },
-  compact: { width: 44 },
+  button: { height: 32, minWidth: 40, width: 40 },
 });

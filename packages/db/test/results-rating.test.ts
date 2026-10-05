@@ -14,68 +14,19 @@
  */
 
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 
-import { MikroORM } from "@mikro-orm/postgresql";
+import type { MikroORM } from "@mikro-orm/postgresql";
 import { Client } from "pg";
 
-import config from "../mikro-orm.config";
 import { ResultsRating } from "../src/entities/index";
 import { saveResultsRating } from "../src/index";
-
-const serverUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+import { createRunTarget, openRunOrm, serverUrl, type RunTarget } from "./run-target";
 
 if (!serverUrl) {
   console.log(
     "results-rating: skipped — neither TEST_DATABASE_URL nor DATABASE_URL is set, so there is no server to create a run-scoped database on",
   );
-}
-
-/** Where this run's tables live; `schema` is set only on the fallback path. */
-interface RunTarget {
-  readonly url: string;
-  readonly schema?: string;
-  drop(client: Client): Promise<void>;
-}
-
-/** The same URL pointed at another database, so nothing this run does can reach the real one. */
-function withDatabase(url: string, database: string): string {
-  const parsed = new URL(url);
-  parsed.pathname = `/${database}`;
-
-  return parsed.toString();
-}
-
-async function createRunTarget(client: Client): Promise<RunTarget> {
-  const database = `wordpoker_test_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-
-  try {
-    await client.query(`create database "${database}"`);
-
-    return {
-      url: withDatabase(serverUrl!, database),
-      drop: async (admin) => {
-        // `force` closes any connection this run left behind; the ORM is closed first, so this is
-        // belt and braces rather than the mechanism (it needs a server new enough to have it).
-        await admin.query(`drop database if exists "${database}" with (force)`);
-      },
-    };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    console.log(`results-rating: create database refused (${reason}); using a run-scoped schema`);
-
-    const schema = `wordpoker_test_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-    await client.query(`create schema "${schema}"`);
-
-    return {
-      url: serverUrl!,
-      schema,
-      drop: async (admin) => {
-        await admin.query(`drop schema if exists "${schema}" cascade`);
-      },
-    };
-  }
 }
 
 describe(
@@ -90,21 +41,8 @@ describe(
       admin = new Client({ connectionString: serverUrl });
       await admin.connect();
 
-      target = await createRunTarget(admin);
-
-      // The package's own config, with only its connection swapped for the run-scoped one: the
-      // entity list, the migration path and its glob are exactly what `db:migrate` uses, so this
-      // test fails if any of them stops discovering the migration.
-      orm = await MikroORM.init({
-        ...config,
-        clientUrl: target.url,
-        driverOptions: {
-          // pg parses the URL itself, so `sslmode` keeps its meaning; `options` is what pins the
-          // fallback schema, and it is absent on the database path.
-          connectionString: target.url,
-          ...(target.schema ? { options: `-c search_path=${target.schema}` } : {}),
-        },
-      });
+      target = await createRunTarget(admin, "results-rating");
+      orm = await openRunOrm(target);
 
       await orm.migrator.up();
     });
@@ -186,7 +124,8 @@ describe(
     });
 
     it("reverts the table on the migration's down path", async () => {
-      await orm.migrator.down();
+      // Every migration, not just the last: later tables sit on top of this one.
+      await orm.migrator.down({ to: 0 });
 
       const [count] = await orm.em.getConnection().execute<{ count: string }[]>(
         `select count(*) as count
@@ -197,8 +136,8 @@ describe(
       assert.equal(Number(count?.count), 0, "the table is gone after a rollback");
       assert.deepEqual(
         (await orm.migrator.getPending()).map((migration) => migration.name),
-        ["Migration20260921030429_results_rating"],
-        "the migration is pending again",
+        ["Migration20260921030429_results_rating", "Migration20261004120000_wallet_event"],
+        "the migrations are pending again",
       );
     });
   },

@@ -84,5 +84,5 @@ _Avoid_: power phase (it is a window, not a phase), roll.
 
 ## The felt
 
-**Hero View**: the table as one seat sees it — its rack, its turn, its draft — mapped to what the felt draws and the word builder reads; both the offline and online adapters decode into it (`apps/mobile/src/lib/hero-view.ts`).
+**Hero View**: the table as one seat sees it — its rack, its turn, its draft — mapped to what the felt draws and the word builder reads; both the offline and online adapters decode into it (`apps/mobile/src/features/table/hero-view.ts`).
 _Avoid_: player view, client state.

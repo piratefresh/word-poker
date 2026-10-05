@@ -1,9 +1,9 @@
-import { auth } from "@/lib/auth";
-import { normalizePasswordResetRequest } from "@/lib/auth-request";
+import { auth } from "@/auth/server/auth";
+import { normalizePasswordResetRequest } from "@/auth/server/auth-request";
 import {
   deepLinkInterstitial,
   webResetPasswordPage,
-} from "@/lib/reset-password-web";
+} from "@/auth/server/reset-password-web";
 
 /** Phones (and tablets) run the native app; everything else is treated as desktop. */
 const MOBILE_UA = /android|iphone|ipad|ipod|mobile/i;

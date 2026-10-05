@@ -3,7 +3,7 @@ import { AccessibilityInfo } from "react-native";
 
 import { POWER_DRAW_MS, type PowerUpId } from "@wordpoker/contracts";
 
-import type { PowerView } from "@/lib/power-view";
+import type { PowerView } from "@/features/table/power-view";
 
 import { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION, PowerDrawReveal } from "./power-draw-reveal";
 

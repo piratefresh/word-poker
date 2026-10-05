@@ -13,6 +13,7 @@ nodeLinker: hoisted
 #   msgpackr-extract   node-gyp-build-optional-packages     (the server's msgpackr)
 #   unrs-resolver      node postinstall.js                  (eslint's resolver)
 allowBuilds:
+  '@sentry/cli': true
   esbuild: true
   msgpackr-extract: true
   unrs-resolver: true

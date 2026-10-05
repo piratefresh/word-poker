@@ -48,6 +48,21 @@ export {
   type PowerUpSettings,
   type PowerUpWindow,
 } from "./powers";
+export {
+  COIN_CURRENCY,
+  COIN_PACK_IDS,
+  WALLET_EVENT_KINDS,
+  WELCOME_GRANT,
+  isCoinCatalog,
+  isCoinPackId,
+  isWalletEventKind,
+  isWalletResponse,
+  type CoinCatalog,
+  type CoinCatalogPack,
+  type CoinPackId,
+  type WalletEventKind,
+  type WalletResponse,
+} from "./coins";
 export { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "./dictionaries";
 export type {
   ChoiceTile,

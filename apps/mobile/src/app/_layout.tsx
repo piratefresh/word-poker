@@ -1,25 +1,61 @@
-import { Inter_400Regular, Inter_500Medium, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
-import { JetBrainsMono_400Regular, JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono';
-import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
-import { NotoSerif_400Regular, NotoSerif_700Bold, NotoSerif_700Bold_Italic } from '@expo-google-fonts/noto-serif';
-import { useFonts } from 'expo-font';
-import * as Linking from 'expo-linking';
-import { DarkTheme, router, Stack, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from "@expo-google-fonts/inter";
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_600SemiBold,
+} from "@expo-google-fonts/jetbrains-mono";
+import { LilitaOne_400Regular } from "@expo-google-fonts/lilita-one";
+import {
+  NotoSerif_400Regular,
+  NotoSerif_700Bold,
+  NotoSerif_700Bold_Italic,
+} from "@expo-google-fonts/noto-serif";
+import * as Sentry from "@sentry/react-native";
+import { useFonts } from "expo-font";
+import * as Linking from "expo-linking";
+import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { StyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { authClient } from '@/lib/auth-client';
+import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { authClient } from "@/auth/client/auth-client";
+import { E2E_AUTH_BYPASS } from "@/lib/e2e";
 import {
   destinationFromURL,
   rememberDestination,
   takeDestination,
   type Destination,
-} from '@/lib/pending-destination';
-import { leaveTable } from '@/lib/room-session';
-import { E2E_AUTH_BYPASS } from '@/lib/e2e';
+} from "@/lib/pending-destination";
+import { leaveTable } from "@/features/online/room-session";
+import { useRevenueCatIdentity } from "@/lib/use-revenuecat";
+
+Sentry.init({
+  dsn: "https://275e0d7eaac4989bad2cdca3b110a5c0@o4512200430125056.ingest.us.sentry.io/4512200442904576",
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [
+    Sentry.mobileReplayIntegration(),
+    Sentry.feedbackIntegration(),
+  ],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,8 +66,10 @@ SplashScreen.preventAutoHideAsync();
  */
 const styles = StyleSheet.create({ root: { flex: 1 } });
 
-export default function RootLayout() {
+export function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
+  // Purchases credit the signed-in player's Wallet, so RevenueCat follows the session (STO-346).
+  useRevenueCatIdentity(session?.user.id);
 
   // E2E builds have no auth server and no account: the guard takes their word for it instead
   // of holding the table behind a session nothing can start (`src/lib/e2e.ts`).
@@ -94,12 +132,19 @@ export default function RootLayout() {
  * (`pending-destination`) until there is a session to land it with. Nothing is navigated to that
  * the guard would immediately throw away.
  */
-function DeepLinks({ session, children }: { session: boolean; children: ReactNode }) {
+function DeepLinks({
+  session,
+  children,
+}: {
+  session: boolean;
+  children: ReactNode;
+}) {
   // The launch URL is the app's own; only the first run may read it, or a later session change
   // would re-follow the link the device was already started with.
   const launchRead = useRef(false);
   const initialConsumed = useRef(false);
-  const [initialDestination, setInitialDestination] = useState<Destination | null>(null);
+  const [initialDestination, setInitialDestination] =
+    useState<Destination | null>(null);
 
   useEffect(() => {
     if (!launchRead.current) {
@@ -113,7 +158,7 @@ function DeepLinks({ session, children }: { session: boolean; children: ReactNod
   }, []);
 
   useEffect(() => {
-    const arriving = Linking.addEventListener('url', ({ url }) => {
+    const arriving = Linking.addEventListener("url", ({ url }) => {
       const destination = destinationFromURL(url);
       if (!destination) return;
       if (session) {
@@ -145,3 +190,5 @@ function DeepLinks({ session, children }: { session: boolean; children: ReactNod
 
   return children;
 }
+
+export default Sentry.wrap(RootLayout);

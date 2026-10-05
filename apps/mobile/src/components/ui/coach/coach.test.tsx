@@ -20,6 +20,24 @@ describe("CoachCard", () => {
     expect(screen.getByText("1 of 12")).toBeTruthy();
   });
 
+  it("draws a step's clip above its copy, and none for a step without one", async () => {
+    const view = await render(
+      <CoachCard
+        advance="action"
+        body="Spell it."
+        index={0}
+        kind="coach"
+        media={{ source: 1, aspectRatio: 2, label: "Spelling a word" }}
+        title="Spell"
+        total={3}
+      />,
+    );
+    expect(screen.getByLabelText("Spelling a word")).toBeTruthy();
+
+    await view.rerender(<CoachCard advance="action" body="Spell it." index={0} kind="coach" title="Spell" total={3} />);
+    expect(screen.queryByTestId("coach-media")).toBeNull();
+  });
+
   it("withholds Next on a step that waits for the player's action", async () => {
     await render(
       <CoachCard advance="action" body="Tap CALL." index={2} kind="coach" onNext={jest.fn()} title="Call" total={9} />,

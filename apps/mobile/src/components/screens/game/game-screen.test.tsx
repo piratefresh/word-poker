@@ -218,6 +218,38 @@ test("leaves a disabled control inert", async () => {
   expect(view.queryByTestId("all-in-sheet")).toBeNull();
 });
 
+test("holds every action in the row while a lesson locks it, and keeps the mode's own control", async () => {
+  const onFold = jest.fn();
+  const onCheckOrCall = jest.fn();
+  const onRaise = jest.fn();
+  const onAllIn = jest.fn();
+  const onLeading = jest.fn();
+  const { Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
+  const view = await renderScreen({
+    actionsLocked: true,
+    bettingLeading: (
+      <Pressable onPress={onLeading} testID="mode-control">
+        <Text>MINE</Text>
+      </Pressable>
+    ),
+    onAllIn,
+    onCheckOrCall,
+    onFold,
+    onRaise,
+  });
+
+  for (const id of ["action-fold", "action-check-call", "action-wager", "all-in-button"]) {
+    await fireEvent.press(view.getByTestId(id));
+  }
+  await fireEvent.press(view.getByTestId("mode-control"));
+
+  expect(onFold).not.toHaveBeenCalled();
+  expect(onCheckOrCall).not.toHaveBeenCalled();
+  expect(onRaise).not.toHaveBeenCalled();
+  expect(view.queryByTestId("all-in-sheet")).toBeNull();
+  expect(onLeading).toHaveBeenCalledTimes(1);
+});
+
 test("draws each side pot under the main pot, and none when the hand has one pot", async () => {
   const view = await renderScreen();
 

@@ -63,7 +63,7 @@ export const TUTORIAL_RAISE_TO = 60;
  * The largest raise-to the lesson accepts. Anything up to it leaves Jay chips to check the turn
  * and the river with; more would put the hand all in and skip the streets the lesson teaches on.
  */
-const TUTORIAL_MAX_RAISE_TO = 200;
+export const TUTORIAL_MAX_RAISE_TO = 200;
 
 /** What the hero is coached to do at a checkpoint. */
 export type TutorialHeroMove =

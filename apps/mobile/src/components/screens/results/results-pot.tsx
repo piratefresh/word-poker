@@ -40,7 +40,7 @@ import Animated, {
 
 import { colors, fonts, resultsEntrance, spacing } from "@/constants/theme";
 import { formatAmount } from "@/lib/format";
-import { beatProgress } from "@/lib/use-results-entrance";
+import { beatProgress } from "./use-results-entrance";
 
 /**
  * What the count-up layer receives. reanimated writes the counted string onto the input, and

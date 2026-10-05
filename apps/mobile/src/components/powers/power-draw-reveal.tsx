@@ -20,7 +20,7 @@ import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import type { PowerUpId } from "@wordpoker/contracts";
 
 import { colors, fonts, palette } from "@/constants/theme";
-import type { PowerView } from "@/lib/power-view";
+import type { PowerView } from "@/features/table/power-view";
 import { webTestID } from "@/lib/web-id";
 
 import { POWER_CARD_ASPECT } from "./power-card";

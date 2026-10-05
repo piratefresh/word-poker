@@ -25,8 +25,21 @@ describe("coach tours", () => {
     }
     // Every move the hero is coached to make has a step that waits for it.
     const heroMoves = TUTORIAL_SCRIPT.filter((step) => step.actor === "hero").map((step) => step.id);
-    const waited = LESSON_TOUR.filter((step) => step.advance === "action").map((step) => step.checkpoint);
+    const waited = LESSON_TOUR.filter((step) => step.advance === "action" && step.prep === undefined).map(
+      (step) => step.checkpoint,
+    );
     expect(waited).toEqual(heroMoves);
+  });
+
+  it("hands every set-up step off to the press that waits on the same move", () => {
+    LESSON_TOUR.forEach((step, index) => {
+      if (step.prep === undefined) return;
+      expect(step.advance).toBe("action");
+      const press = LESSON_TOUR[index + 1];
+      expect(press?.prep).toBeUndefined();
+      expect(press?.advance).toBe("action");
+      expect(press?.checkpoint).toBe(step.checkpoint);
+    });
   });
 
   it("coaches the word the scripted hand is built around", () => {

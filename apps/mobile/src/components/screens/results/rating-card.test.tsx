@@ -7,13 +7,13 @@
 
 import { fireEvent, render, waitFor, type RenderResult } from "@testing-library/react-native";
 
-import { RATING_NOTE_MAX, RATING_TAGS, sendResultsRating } from "@/lib/results-rating";
+import { RATING_NOTE_MAX, RATING_TAGS, sendResultsRating } from "./results-rating";
 
 import { RatingCard } from "./rating-card";
 
-jest.mock("@/lib/results-rating", () => ({
+jest.mock("./results-rating", () => ({
   ...jest.requireActual<{ sendResultsRating: typeof sendResultsRating }>(
-    "@/lib/results-rating",
+    "./results-rating",
   ),
   sendResultsRating: jest.fn(),
 }));

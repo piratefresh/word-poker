@@ -16,6 +16,7 @@
     "db:migrate": "node --import tsx src/cli/migrate.ts"
   },
   "dependencies": {
+    "@wordpoker/contracts": "workspace:*",
     "@better-auth/expo": "^1.7.4",
     "@mikro-orm/core": "^7.2.0",
     "@mikro-orm/migrations": "^7.2.0",

@@ -43,9 +43,9 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { authClient } from "@/lib/auth-client";
-import { joinTable, useActiveRoomId } from "@/lib/room-session";
-import { useLobby } from "@/lib/use-lobby";
+import { authClient } from "@/auth/client/auth-client";
+import { joinTable, useActiveRoomId } from "@/features/online/room-session";
+import { useLobby } from "@/features/online/use-lobby";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
 import { ParlorBackground } from "./parlor-background";
