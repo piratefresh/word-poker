@@ -33,6 +33,7 @@ import {
   type Destination,
 } from "@/lib/pending-destination";
 import { leaveTable } from "@/features/online/room-session";
+import { QuestsProvider } from "@/lib/quests-provider";
 import { useRevenueCatIdentity } from "@/lib/use-revenuecat";
 
 Sentry.init({
@@ -99,24 +100,26 @@ export function RootLayout() {
     <DeepLinks session={!!session}>
       <GestureHandlerRootView style={styles.root}>
         <ThemeProvider value={DarkTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Protected guard={!authed}>
-              <Stack.Screen name="sign-in" />
-              <Stack.Screen name="sign-up" />
-              <Stack.Screen name="forgot-password" />
-            </Stack.Protected>
-            <Stack.Protected guard={authed}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="tutorial" />
-              <Stack.Screen name="offline" />
-              <Stack.Screen name="online" />
-              <Stack.Screen name="online/[roomId]" />
-            </Stack.Protected>
-            {/* Outside the guards: the emailed reset link may land while a stale
-                session is still on the device, and the reset has to win. */}
-            <Stack.Screen name="reset-password" />
-          </Stack>
-          <AnimatedSplashOverlay />
+          <QuestsProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Protected guard={!authed}>
+                <Stack.Screen name="sign-in" />
+                <Stack.Screen name="sign-up" />
+                <Stack.Screen name="forgot-password" />
+              </Stack.Protected>
+              <Stack.Protected guard={authed}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="tutorial" />
+                <Stack.Screen name="offline" />
+                <Stack.Screen name="online" />
+                <Stack.Screen name="online/[roomId]" />
+              </Stack.Protected>
+              {/* Outside the guards: the emailed reset link may land while a stale
+                  session is still on the device, and the reset has to win. */}
+              <Stack.Screen name="reset-password" />
+            </Stack>
+            <AnimatedSplashOverlay />
+          </QuestsProvider>
         </ThemeProvider>
       </GestureHandlerRootView>
     </DeepLinks>

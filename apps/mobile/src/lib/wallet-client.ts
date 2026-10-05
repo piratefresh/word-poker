@@ -7,7 +7,17 @@
  * sends its own cookie with `credentials: "include"`.
  */
 
-import { isCoinCatalog, isWalletResponse, type CoinCatalog, type WalletResponse } from "@wordpoker/contracts";
+import {
+  isCoinCatalog,
+  isQuestClaimResponse,
+  isQuestStateResponse,
+  isWalletResponse,
+  type CoinCatalog,
+  type QuestClaimResponse,
+  type QuestHandClaim,
+  type QuestStateResponse,
+  type WalletResponse,
+} from "@wordpoker/contracts";
 import { Platform } from "react-native";
 
 import { apiBaseURL } from "@/lib/api-base-url";
@@ -18,6 +28,14 @@ export class WalletAuthError extends Error {
   constructor() {
     super("Sign in to top up.");
     this.name = "WalletAuthError";
+  }
+}
+
+/** The route answered 403: signed in, but the player has not verified their email yet. */
+export class WalletUnverifiedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WalletUnverifiedError";
   }
 }
 
@@ -59,6 +77,47 @@ export async function fetchCoinCatalog(): Promise<CoinCatalog> {
 
   const body: unknown = await response.json();
   if (!isCoinCatalog(body)) throw new Error("The coin store sent a catalog it could not read.");
+
+  return body;
+}
+
+/** The server's own sentence for a 403 (quests needs a verified email), else a generic one. */
+async function questFailure(response: Response): Promise<Error> {
+  if (response.status === 403) {
+    const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+    return new WalletUnverifiedError(
+      typeof body?.error === "string" && body.error.length > 0 ? body.error : "Verify your email to earn coins.",
+    );
+  }
+
+  return failure(response);
+}
+
+/** The signed-in player's streak and quest progress. Rejects with `WalletAuthError`/`WalletUnverifiedError`. */
+export async function fetchQuestState(): Promise<QuestStateResponse> {
+  const response = await fetch(`${apiBaseURL}/api/quests`, sessionInit());
+  if (response.status === 401) throw new WalletAuthError();
+  if (!response.ok) throw await questFailure(response);
+
+  const body: unknown = await response.json();
+  if (!isQuestStateResponse(body)) throw new Error("Quests sent a state it could not read.");
+
+  return body;
+}
+
+/** Reports one settled hand's quest facts, once per `handToken` — a retry is safe. */
+export async function sendQuestHandClaim(claim: QuestHandClaim): Promise<QuestClaimResponse> {
+  const response = await fetch(`${apiBaseURL}/api/quests`, {
+    ...sessionInit(),
+    method: "POST",
+    headers: { ...sessionInit().headers, "content-type": "application/json" },
+    body: JSON.stringify(claim),
+  });
+  if (response.status === 401) throw new WalletAuthError();
+  if (!response.ok) throw await questFailure(response);
+
+  const body: unknown = await response.json();
+  if (!isQuestClaimResponse(body)) throw new Error("The claim's result could not be read.");
 
   return body;
 }

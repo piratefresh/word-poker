@@ -4,7 +4,14 @@
  */
 
 import { authClient } from "@/auth/client/auth-client";
-import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-client";
+import {
+  fetchCoinCatalog,
+  fetchQuestState,
+  fetchWallet,
+  sendQuestHandClaim,
+  WalletAuthError,
+  WalletUnverifiedError,
+} from "@/lib/wallet-client";
 
 jest.mock("@/lib/api-base-url", () => ({ apiBaseURL: "http://api.test" }));
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { getCookie: jest.fn(() => "better-auth.session=abc") } }));
@@ -65,5 +72,63 @@ describe("fetchCoinCatalog", () => {
     fetchMock.mockResolvedValue(reply(200, { packs: [{ productId: "coins_small" }] }));
 
     await expect(fetchCoinCatalog()).rejects.toThrow("could not read");
+  });
+});
+
+describe("fetchQuestState", () => {
+  test("reads the streak and quest progress", async () => {
+    const state = { streak: { current: 1, creditedToday: 50 }, quests: [{ id: "pot-500", progress: 1, done: true }] };
+    fetchMock.mockResolvedValue(reply(200, state));
+
+    await expect(fetchQuestState()).resolves.toEqual(state);
+    expect(fetchMock).toHaveBeenCalledWith("http://api.test/api/quests", {
+      credentials: "omit",
+      headers: { cookie: "better-auth.session=abc" },
+    });
+  });
+
+  test("rejects with WalletAuthError on a 401", async () => {
+    fetchMock.mockResolvedValue(reply(401, { error: "Sign in to see your quests." }));
+
+    await expect(fetchQuestState()).rejects.toBeInstanceOf(WalletAuthError);
+  });
+
+  test("rejects with WalletUnverifiedError on a 403", async () => {
+    fetchMock.mockResolvedValue(reply(403, { error: "Verify your email to earn coins." }));
+
+    const error = await fetchQuestState().catch((caught) => caught);
+    expect(error).toBeInstanceOf(WalletUnverifiedError);
+    expect(error.message).toBe("Verify your email to earn coins.");
+  });
+});
+
+describe("sendQuestHandClaim", () => {
+  const CLAIM = {
+    handToken: "token-1",
+    facts: {
+      revealed: true,
+      heroWon: true,
+      heroWord: "CAT",
+      heroScore: 12,
+      heroDecidedBy: "final-score" as const,
+      pot: 300,
+      wildTable: false,
+      heroUsedPower: false,
+    },
+  };
+
+  test("posts the claim and reads what it completed", async () => {
+    fetchMock.mockResolvedValue(reply(200, { completed: ["win-word-3"], duplicate: false }));
+
+    await expect(sendQuestHandClaim(CLAIM)).resolves.toEqual({ completed: ["win-word-3"], duplicate: false });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://api.test/api/quests");
+    expect(init).toMatchObject({ method: "POST", body: JSON.stringify(CLAIM) });
+  });
+
+  test("rejects with WalletAuthError on a 401", async () => {
+    fetchMock.mockResolvedValue(reply(401, { error: "Sign in to earn coins." }));
+
+    await expect(sendQuestHandClaim(CLAIM)).rejects.toBeInstanceOf(WalletAuthError);
   });
 });
