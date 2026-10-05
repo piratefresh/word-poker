@@ -6,6 +6,8 @@ This guide applies to the whole pnpm monorepo. Follow AGENTS.md, CONTEXT.md, the
 
 - Keep each file focused on one responsibility. Split files that mix UI, state coordination, domain rules, data access, or unrelated helpers. Prefer several named files over one large component or utility file. File length is a prompt to review cohesion, not a hard limit.
 - Extract a component when it has its own behavior, state, accessibility contract, or reusable visual role. Keep tiny markup near its parent when extraction would make the flow harder to follow. Colocate a feature's components, hooks, styles, and tests.
+- Mode features (offline, online, tutorial) do not import each other's internals: what the modes share lives in features/table/ (hero-view, power-view) or lower, in lib/ or components/. The one layering on purpose is tutorial, which runs on the offline adapter (useOfflineGame).
+- Prefer composition (children, slots) over a growing list of boolean or variant props; when a component keeps sprouting flags, split it.
 - Give modules small public surfaces. Use named exports and package index.ts files for public APIs; keep implementation details private. Expo Router route files may use their required default export and should stay thin.
 - Put shared game behavior in packages/game-rules and wire types in packages/contracts. Do not copy rules into mobile or server. The server owns authoritative state; the client may use shared rules for previews.
 - Use domain names from CONTEXT.md, docs/FINAL_RULES.md, and the contracts. Comments should explain a non-obvious invariant or trade-off and point to the canonical rule when useful. Avoid repeating long documentation in source comments.
@@ -23,7 +25,7 @@ This guide applies to the whole pnpm monorepo. Follow AGENTS.md, CONTEXT.md, the
 - Design for iOS and Android first, while keeping web usable. Check the [versioned Expo SDK 57 reference](https://docs.expo.dev/versions/v57.0.0/) for APIs and platform support before changing Expo code.
 - Prefer @expo/ui when it supports the component and target platform. Otherwise use an Expo or React Native component; write custom UI when the product needs behavior those components cannot supply. Keep platform-specific code behind a small adapter or platform file.
 - Use Expo Router for navigation. Keep routes as composition and wiring; move substantial screen behavior into focused components or hooks. Keep presentation components independent of room transport and engine details.
-- Use react-native-reanimated-dnd for drag and drop, with a tap path for accessibility and tests. The word builder strip's documented pan implementation is the sole current exception; see AGENTS.md before changing it.
+- Use react-native-reanimated-dnd for drag and drop, with a tap path for accessibility and tests. The word builder strip's documented pan implementation is the sole current exception; see apps/mobile/src/components/word-builder/AGENTS.md before changing it.
 - Give interactive controls accessible labels and states, and verify behavior on affected platforms.
 
 ## State and effects
@@ -35,5 +37,5 @@ This guide applies to the whole pnpm monorepo. Follow AGENTS.md, CONTEXT.md, the
 ## Tests and changes
 
 - Test meaningful behavior and edge cases, especially game rules, contract boundaries, and interaction flows. Keep mobile tests beside their subject; follow each other package's existing test/ layout and runner.
-- Update docs/rules/, packages/game-rules, and packages/contracts together when gameplay behavior changes. Add a Maestro flow for a material end-to-end interaction when unit tests cannot cover it — web flows at `.maestro/`, device flows beside `eas.json` under `apps/mobile/.maestro/native/` (see AGENTS.md).
+- Update docs/rules/, packages/game-rules, and packages/contracts together when gameplay behavior changes. Add a Maestro flow for a material end-to-end interaction when unit tests cannot cover it — web flows at `.maestro/`, device flows beside `eas.json` under `apps/mobile/.maestro/native/` (see docs/agents/e2e.md).
 - Run relevant package tests and typechecks for changed code. Use pnpm --filter @wordpoker/mobile lint for mobile edits and pnpm check:boundaries for cross-package changes. These are the checks currently available; a repo-wide formatter and lint command have not yet been configured.

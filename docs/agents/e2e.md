@@ -1,0 +1,143 @@
+# End-to-end testing
+
+Maestro flows (web and native), the online smokes, and the shared E2E user.
+
+## End-to-end (web)
+
+UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
+
+```bash
+pnpm --filter @wordpoker/mobile web                 # in one terminal
+maestro test --platform web .maestro/offline-hand.yaml
+```
+
+Headed is the default (`--headless` hides the browser; headless also takes `--screen-size`). Keep a Chrome
+whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
+it needs.
+
+A flow names a control by `id:`, and on the web that id is the element's *test id* wherever the component
+has one — `webTestID` (`apps/mobile/src/lib/web-id.ts`) keeps the DOM element's own `id` in step with
+`testID`, because Maestro reads the DOM id before the aria-label and the label would otherwise hide the
+test id from the web (its injected `maestro-web.js` falls back to `data-testid` last). Labels are for the
+elements that carry no test id at all. A control prints its label and its amount as separate text nodes,
+so `text:` never sees "CALL $60" in one piece: reach the amount through the control —
+`containsDescendants: [{ text: "\\$60" }]` — and match text whole (Maestro's text matcher is anchored),
+remembering the felt prints "BLINDS $10 / $20" under the pot.
+
+Run the online multiplayer smoke (STO-409) from one Windows terminal at the repository root:
+
+```powershell
+pnpm smoke:online
+```
+
+The runner starts Colyseus with deterministic seeds enabled, starts Expo web on port 8081, waits for
+both servers, creates a fresh seed-409 opponent, and passes its room ID to the headed Maestro flow.
+It stops its server and opponent process trees on completion, failure, or Ctrl-C. Logs stay in the
+temporary directory printed at startup. Existing processes listening on ports 2567 and 8081 are terminated before starting.
+The smoke server runs without file watching, and background stdin is redirected to an empty file.
+Maestro must be on PATH or installed at ~/.maestro/bin/maestro.bat; keep Chrome and chromedriver
+on matching versions. The existing mobile/server env files and seeded E2E user are still required
+(see below). This runner is local and Windows-only.
+
+The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
+signs in when needed, builds PUB, checks the results overlay, and leaves the table.
+
+The Wild variant (STO-500) is the same runner with power-ups on:
+
+```powershell
+pnpm smoke:online:wild            # headed; add -Headless for --headless --screen-size 1280x1000
+```
+
+It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 527 and runs `.maestro/online-wild-hand.yaml`.
+The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds OX
+with the new tile. The opponent keeps its first offer and never uses it. It logs the public use it
+hears, and it logs `LEAK:` if a swapped tile reaches it before the reveal. The runner fails on
+either. After changing the deal, the catalog or the letter stream, re-probe with
+`pnpm --filter @wordpoker/server exec tsx scripts/probe-wild-smoke.ts <firstSeed> <lastSeed>`.
+
+The four-browser smoke (STO-483) has every seat played by a real browser, each driven by its own
+Maestro process:
+
+```powershell
+pnpm smoke:online:four            # headed; add -Headless for --headless --screen-size 1280x1000
+```
+
+It plays one seeded session. Hand 1 has a raise, a fold, a re-raise, calls, a flop bet and three
+words at showdown. In hand 2 a short stack shoves into a side pot, loses and busts. In hand 3 the
+busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
+up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
+seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
+seed, payout delay, turn clock, and `powerUps` — §40's Classic/Wild, validated like a create's own), which the server merges under a create's own options, and only
+behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
+(`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
+the runner starts the next one only then, so join order is seat order. The script lives in
+`apps/server/scripts/four-seat-scenario.ts`. A mocha case replays it over four sockets, and the
+flows in `.maestro/four-seat/` tap it out. After changing the script or the deal, re-probe with
+`pnpm --filter @wordpoker/server exec tsx scripts/probe-four-seat.ts <firstSeed> <lastSeed>`,
+then update the seed (scenario, runner) and the taps (seat flows, seat-1.yaml's header).
+
+### E2E test user
+
+Flows behind the auth guard sign in as the shared E2E user `e2e@wordpoker.dev`, seeded straight into
+Postgres (Better Auth's own hash) by an idempotent script — rerun it whenever the password stops working;
+it resets the password and keeps the user's id:
+
+```bash
+node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
+```
+
+`.maestro/sign-in.yaml` signs in as that user through the real sign-in screen (safe to rerun: it signs out
+an existing session first, and always ends past the guard on the home screen). A headed run keeps the
+session in Maestro's Chrome profile; a headless run starts on a fresh profile every time, so flows that
+need a session compose the sign-in conditionally — `offline-hand.yaml` shows the pattern. Non-UI agents
+don't need the browser at all: `POST /api/auth/sign-in/email` with the same JSON credentials returns the
+session cookie.
+
+The password is the default in that seed script, and it is deliberately not written here: this file is
+injected into every session's system prompt, and omp's secret obfuscator (`.omp/secrets.yml`, enabled by
+`.omp/config.yml`) leaves static prompt text alone. Take it from `.maestro/sign-in.yaml` — a read is
+provider-visible text, so a session sees a `$$…$$` placeholder where the password sits, and a tool
+argument carrying that placeholder is restored locally before it runs.
+
+## End-to-end (native)
+
+The same offline hand also runs as a device flow: `apps/mobile/.maestro/native/offline-hand.yaml`
+(`appId:`, a `wordpoker://offline?seed=…` deep link instead of a URL, and the ids and labels a
+device's accessibility tree exposes). It sits beside `eas.json` because that is the working directory
+an EAS workflow job gets — a job's paths resolve from there, not from the repository root.
+
+The build under test is eas.json's `e2e-test` profile: an .apk for Android, a simulator .app for
+iOS, and `EXPO_PUBLIC_E2E_AUTH_BYPASS=1`. The table lives behind the sign-in guard and a device has
+no auth server to reach, so that flag makes the guard take the seat as signed in
+(`apps/mobile/src/lib/e2e.ts`). Never set it outside that profile — a build with it boots past the
+guard. Nothing else is missing on a device: the dictionary ships in the bundle, the bots run
+in-process, and the seed is the whole of the table's randomness.
+
+```bash
+cd apps/mobile
+eas build --platform android --profile e2e-test    # or --platform ios
+eas build:run --platform android --latest          # installs it on a booted emulator/device
+maestro test --platform android .maestro/native/offline-hand.yaml
+# On a Mac with an iOS Simulator, use --platform ios for both build:run and maestro test.
+```
+
+Android wants a booted emulator or an adb-visible device; `--platform ios` needs a Mac with a
+Simulator. The flow takes the action row by testID (`action-check-call`, `action-wager`) — the felt's
+nameplates print CHECK and CALL as seat status too, so a text selector there is ambiguous — and
+everything else by the string a component prints, matched whole and case-sensitively, unlike the web.
+
+EAS Workflows runs the iOS offline hand from `apps/mobile/.eas/workflows/e2e-ios.yml`. It builds
+with `e2e-test`, then runs `.maestro/native/offline-hand.yaml` on an iOS simulator. Trigger it
+manually from `apps/mobile` with `eas workflow:run .eas/workflows/e2e-ios.yml`, or add the `e2e`
+label to a pull request. EAS Workflows and its Maestro job require an Expo plan that includes
+those services.
+
+### Online device smoke
+
+apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with the e2e-test app build and a ROOM_ID deep link. The auth bypass only skips sign-in. The device still needs a Colyseus server started with WORDPOKER_DETERMINISTIC_SEED=1, reachable through EXPO_PUBLIC_GAME_URL, and a separate smoke-opponent.ts process. Run the flow from apps/mobile and pass the room id printed by the opponent:
+
+    eas build --platform android --profile e2e-test
+    maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
+
+Set EXPO_PUBLIC_GAME_URL at build time to an address the device can reach; localhost on the device is not the development machine. Keep this device flow manual and out of CI until its server and opponent are provisioned.
+

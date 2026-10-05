@@ -1,3 +1,68 @@
+# Project overview
+
+Word Poker is Texas Hold'em played with letter tiles: seats bet through
+`preflop → flop → turn → river → payout` while building a word from their private tiles and the
+community tiles, and the best-scoring word wins the pot. Modes: offline (CPU bots, in-process),
+online (Colyseus rooms, Classic or Wild power-ups), and a tutorial. Coins live in a RevenueCat-backed
+Wallet. Rules: [`docs/FINAL_RULES.md`](docs/FINAL_RULES.md). Product: [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md).
+
+# Before writing any code
+
+Stop at the first rung that holds:
+
+1. **Does this need to be built at all?** (YAGNI)
+2. **Does it already exist in this codebase?** Reuse the helper, util, or pattern that's already here — don't re-write it.
+3. **Does the standard library already do this?** Use it.
+4. **Does a native platform feature cover it?** Use it.
+5. **Does an already-installed dependency solve it?** Use it.
+
+Deletion over addition. Boring over clever. Fewest files possible.
+Question complex requests: "Do you actually need X, or does Y cover it?"
+
+# Setup commands
+
+```bash
+pnpm install
+pnpm start                                   # Expo dev server (mobile)
+pnpm --filter @wordpoker/mobile web          # Expo web
+pnpm dev:server                              # Colyseus (not `pnpm server` — reserved name)
+pnpm typecheck                               # every workspace
+pnpm check:boundaries                        # import-boundary rules (e.g. economy)
+pnpm --filter @wordpoker/mobile test         # jest
+pnpm --filter @wordpoker/mobile lint         # expo lint
+pnpm --filter @wordpoker/server test         # mocha
+pnpm --filter @wordpoker/game-rules test     # node --test (same for contracts, db, economy)
+```
+
+Edits to an Expo `+api.ts` route need a dev-server restart.
+
+# Project structure
+
+```
+apps/
+├── mobile/src/          # Expo app
+│   ├── app/             # expo-router routes (+ app/api/* server routes)
+│   ├── auth/            # Better Auth client/ and server/
+│   ├── components/      # UI: word-builder/, screens/game/, powers/, chip/, table/, ui/ …
+│   ├── features/        # mode adapters: offline/, online/, table/, tutorial/
+│   ├── lib/             # small shared helpers (format, wallet client, web-id, e2e …)
+│   ├── motion/          # animation clocks/gates
+│   └── constants/       # theme, links
+└── server/              # Colyseus rooms; schema classes stay here
+packages/
+├── game-rules/          # pure deterministic engine
+├── contracts/           # wire types + validators
+├── db/                  # Postgres schema + wallet_event log
+├── economy/             # server-only Wallet ops
+└── 3d/                  # 3D/splat assets (not code)
+```
+
+Naming follows [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md): kebab-case files (PascalCase server classes
+where already established), PascalCase components and types, camelCase values, UPPER_SNAKE_CASE fixed
+constants, `use-*.ts` hooks; mobile tests sit beside their subject as `*.test.ts`, other packages use their `test/` folder. Platform forks use
+`.web.tsx` / `.android.ts` suffixes rather than runtime branches. Game logic never lives in an app —
+see *Workspace architecture* below.
+
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
@@ -14,215 +79,13 @@ gestures or a custom DnD layer on top of Reanimated. The app mounts `GestureHand
 (`apps/mobile/src/app/_layout.tsx`); wrap the surface that drags in the library's `DropProvider`, make the
 sources `Draggable` and the targets `Droppable`, and keep a tap path for accessibility and tests.
 
-**One documented exception: the word builder's sortable strip** (`word-builder/strip.tsx`). The kit's
-horizontal `Sortable` is the only thing that animates the other tiles out of a dragged tile's way, but it
-arms its drag with a 200ms long-press that is not configurable — on the web, with a pointer, a tile reads as
-one that will not move. So the strip drives its own pan (Reanimated + gesture-handler, the same ground the kit
-sits on): it arms on `DRAG_ACTIVATE_PX` of travel, like dnd-kit's pointer sensor, and slides the rest of the
-tiles aside as the dragged one crosses their places. This is the *only* place a pan is hand-rolled; everything
-else still goes through the library. Do not spread this pattern — if a second surface needs it, lift it into a
-shared hook first.
+The word builder's sortable strip is the one exception; see `apps/mobile/src/components/word-builder/AGENTS.md`.
 
-# Word builder
+# Area guides (read when you work there)
 
-`apps/mobile/src/components/word-builder/` is the one builder for every mode: `WordHand` is the
-sortable strip of tiles and goes in the felt's rack slot (`GameScreen`'s `rack` prop), and
-`WordPreview` is the draft as one line of text directly above it — it draws nothing until the
-strip spells something. The builder carries no buttons of its own: the shuffle is
-`WordShuffleButton`, placed with `WordCheckButton` in a row under the rack (`GameScreen`'s
-`rackActions` prop), so the word's controls sit with its tiles and the betting rows keep their
-width; the confirm is the action row's check — §19's window is what turns it from
-the tap that walks the round into the tap that locks the word in. `WordBuilder` owns the draft the
-two share; a mode's adapter hands it a `WordDraft` — plays, word, score, reason, confirmed,
-`open`, `confirmable` — and gets the seat's edits back as one `onDraft(plays)` call
-(`apps/mobile/src/features/offline/use-offline-game.ts` is the offline adapter). Never write a second builder:
-the engine judges the draft, the builder only draws it and reports it.
-
-The word is built the whole hand, in parallel with the betting, not only at the river: `open` is
-true while the seat may still play and sort tiles, and `confirmable` is the narrower gate that
-§19's word window opens for locking the word in. The offline adapter holds the seat's draft
-locally across every street and judges it against `game-rules` for the live preview, then hands
-the confirmed submission to the engine.
-
-The tiles are sorted where they lie: a tap toggles a tile in or out of the word *without moving
-it*, a drag reorders it through the strip, and the word is the selected tiles read left to right —
-the word's order *is* the strip's order, and there is no second row of played tiles. Shuffle
-rearranges only the tiles the word does not hold. The seat's order is the one source of truth: the
-strip re-seeds its layout from that order (see `strip.tsx`), so an external edit — a tap, a fresh
-tile dealt — is never fought by a private copy of the list. A tile ignores a press for
-`DRAG_SETTLE_MS` after a drop, because the pan does not cancel the tile's own press on the web —
-the pointer never leaves the tile, since the tile travels with it.
-
-The rack is a straight row of `TILE_METRICS`'s `medium` tile, grown by the window's `screenScale`
-(`screens/game/screen-scale.ts`; exactly 1 below a 600-point shorter side, then growing with it up to
-a cap, `rackFor` in `strip.tsx`) — the one factor the banner, HUD buttons, community tiles and action
-row grow by too, with the play column bounded by `stageMaxWidth` — and the places spread into the room
-the felt gives them — up to a tile and `MAX_GAP` — closing in on each other (the gap first, then
-some of the tile) when that room is narrower than the row, so a hand of seven stays on screen and
-stays tappable. The strip's places and its drag are measured in that tile, so the two cannot
-drift apart.
-
-# Offline table
-
-The CPU plays one action per beat, not the whole round at once: `use-offline-game.ts` resolves a
-single seat's move per `duration.cpuBeat`, each its own commit, so the chips a bot sends, its
-nameplate and the pot are on the felt before the next seat moves. Never fold the bots back into
-the transition that triggered them (`settleBots`-style) — a whole street played inside the hero's
-tap is exactly the unreadable jump the beat exists to prevent, and it is also what made the CPU
-pass block the frame (STO-371). A seat's last action is printed on its nameplate for the street
-it was taken on (`seatActions` in the adapter); the engine stores what a seat committed, not the
-gesture that committed it, so CHECK, CALL, BET and RAISE have nowhere else to come from. Tests
-that own the table's clock advance it `duration.cpuBeat` at a time.
-
-At a Wild table (`/offline?powers=wild`, §44) the Power Draw opens on every deal and holds the
-table: nobody is on the clock, so no bot beat runs until the hero picks or `POWER_DRAW_MS` runs
-out. A power used on a street rides beside that street's action in `seatActions`, and the power
-UI reads the adapter's `powers` (`PowerView`, `lib/power-view.ts`) — the shape the online adapter
-will fill too. Whether a power can be used is the engine's `canUsePower`, never the felt's.
-Using it runs through `components/powers`: `PowerHeldChip` sits at the action row's start
-(`bettingLeading`), `usePowerTargeting` holds chip → tile → confirm (and drops to idle the moment the power
-stops being usable), and while the seat chooses, `WordBuilder`'s `onPickTile` turns the strip's
-taps on private tiles into picks. The swap flips in place through `swapFlip`, whose `revealed`
-is the seam the "power used" card holds it on.
-
-# End-to-end (web)
-
-UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
-
-```bash
-pnpm --filter @wordpoker/mobile web                 # in one terminal
-maestro test --platform web .maestro/offline-hand.yaml
-```
-
-Headed is the default (`--headless` hides the browser; headless also takes `--screen-size`). Keep a Chrome
-whose version matches the `chromedriver` on `PATH`. Each flow's header documents its own selectors and what
-it needs.
-
-A flow names a control by `id:`, and on the web that id is the element's *test id* wherever the component
-has one — `webTestID` (`apps/mobile/src/lib/web-id.ts`) keeps the DOM element's own `id` in step with
-`testID`, because Maestro reads the DOM id before the aria-label and the label would otherwise hide the
-test id from the web (its injected `maestro-web.js` falls back to `data-testid` last). Labels are for the
-elements that carry no test id at all. A control prints its label and its amount as separate text nodes,
-so `text:` never sees "CALL $60" in one piece: reach the amount through the control —
-`containsDescendants: [{ text: "\\$60" }]` — and match text whole (Maestro's text matcher is anchored),
-remembering the felt prints "BLINDS $10 / $20" under the pot.
-
-Run the online multiplayer smoke (STO-409) from one Windows terminal at the repository root:
-
-```powershell
-pnpm smoke:online
-```
-
-The runner starts Colyseus with deterministic seeds enabled, starts Expo web on port 8081, waits for
-both servers, creates a fresh seed-409 opponent, and passes its room ID to the headed Maestro flow.
-It stops its server and opponent process trees on completion, failure, or Ctrl-C. Logs stay in the
-temporary directory printed at startup. Existing processes listening on ports 2567 and 8081 are terminated before starting.
-The smoke server runs without file watching, and background stdin is redirected to an empty file.
-Maestro must be on PATH or installed at ~/.maestro/bin/maestro.bat; keep Chrome and chromedriver
-on matching versions. The existing mobile/server env files and seeded E2E user are still required
-(see below). This runner is local and Windows-only.
-
-The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
-signs in when needed, builds PUB, checks the results overlay, and leaves the table.
-
-The Wild variant (STO-500) is the same runner with power-ups on:
-
-```powershell
-pnpm smoke:online:wild            # headed; add -Headless for --headless --screen-size 1280x1000
-```
-
-It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 527 and runs `.maestro/online-wild-hand.yaml`.
-The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds OX
-with the new tile. The opponent keeps its first offer and never uses it. It logs the public use it
-hears, and it logs `LEAK:` if a swapped tile reaches it before the reveal. The runner fails on
-either. After changing the deal, the catalog or the letter stream, re-probe with
-`pnpm --filter @wordpoker/server exec tsx scripts/probe-wild-smoke.ts <firstSeed> <lastSeed>`.
-
-The four-browser smoke (STO-483) has every seat played by a real browser, each driven by its own
-Maestro process:
-
-```powershell
-pnpm smoke:online:four            # headed; add -Headless for --headless --screen-size 1280x1000
-```
-
-It plays one seeded session. Hand 1 has a raise, a fold, a re-raise, calls, a flop bet and three
-words at showdown. In hand 2 a short stack shoves into a side pot, loses and busts. In hand 3 the
-busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
-up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
-seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
-seed, payout delay, turn clock, and `powerUps` — §40's Classic/Wild, validated like a create's own), which the server merges under a create's own options, and only
-behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
-(`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
-the runner starts the next one only then, so join order is seat order. The script lives in
-`apps/server/scripts/four-seat-scenario.ts`. A mocha case replays it over four sockets, and the
-flows in `.maestro/four-seat/` tap it out. After changing the script or the deal, re-probe with
-`pnpm --filter @wordpoker/server exec tsx scripts/probe-four-seat.ts <firstSeed> <lastSeed>`,
-then update the seed (scenario, runner) and the taps (seat flows, seat-1.yaml's header).
-
-## E2E test user
-
-Flows behind the auth guard sign in as the shared E2E user `e2e@wordpoker.dev`, seeded straight into
-Postgres (Better Auth's own hash) by an idempotent script — rerun it whenever the password stops working;
-it resets the password and keeps the user's id:
-
-```bash
-node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
-```
-
-`.maestro/sign-in.yaml` signs in as that user through the real sign-in screen (safe to rerun: it signs out
-an existing session first, and always ends past the guard on the home screen). A headed run keeps the
-session in Maestro's Chrome profile; a headless run starts on a fresh profile every time, so flows that
-need a session compose the sign-in conditionally — `offline-hand.yaml` shows the pattern. Non-UI agents
-don't need the browser at all: `POST /api/auth/sign-in/email` with the same JSON credentials returns the
-session cookie.
-
-The password is the default in that seed script, and it is deliberately not written here: this file is
-injected into every session's system prompt, and omp's secret obfuscator (`.omp/secrets.yml`, enabled by
-`.omp/config.yml`) leaves static prompt text alone. Take it from `.maestro/sign-in.yaml` — a read is
-provider-visible text, so a session sees a `$$…$$` placeholder where the password sits, and a tool
-argument carrying that placeholder is restored locally before it runs.
-
-# End-to-end (native)
-
-The same offline hand also runs as a device flow: `apps/mobile/.maestro/native/offline-hand.yaml`
-(`appId:`, a `wordpoker://offline?seed=…` deep link instead of a URL, and the ids and labels a
-device's accessibility tree exposes). It sits beside `eas.json` because that is the working directory
-an EAS workflow job gets — a job's paths resolve from there, not from the repository root.
-
-The build under test is eas.json's `e2e-test` profile: an .apk for Android, a simulator .app for
-iOS, and `EXPO_PUBLIC_E2E_AUTH_BYPASS=1`. The table lives behind the sign-in guard and a device has
-no auth server to reach, so that flag makes the guard take the seat as signed in
-(`apps/mobile/src/lib/e2e.ts`). Never set it outside that profile — a build with it boots past the
-guard. Nothing else is missing on a device: the dictionary ships in the bundle, the bots run
-in-process, and the seed is the whole of the table's randomness.
-
-```bash
-cd apps/mobile
-eas build --platform android --profile e2e-test    # or --platform ios
-eas build:run --platform android --latest          # installs it on a booted emulator/device
-maestro test --platform android .maestro/native/offline-hand.yaml
-# On a Mac with an iOS Simulator, use --platform ios for both build:run and maestro test.
-```
-
-Android wants a booted emulator or an adb-visible device; `--platform ios` needs a Mac with a
-Simulator. The flow takes the action row by testID (`action-check-call`, `action-wager`) — the felt's
-nameplates print CHECK and CALL as seat status too, so a text selector there is ambiguous — and
-everything else by the string a component prints, matched whole and case-sensitively, unlike the web.
-
-EAS Workflows runs the iOS offline hand from `apps/mobile/.eas/workflows/e2e-ios.yml`. It builds
-with `e2e-test`, then runs `.maestro/native/offline-hand.yaml` on an iOS simulator. Trigger it
-manually from `apps/mobile` with `eas workflow:run .eas/workflows/e2e-ios.yml`, or add the `e2e`
-label to a pull request. EAS Workflows and its Maestro job require an Expo plan that includes
-those services.
-
-## Online device smoke
-
-apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with the e2e-test app build and a ROOM_ID deep link. The auth bypass only skips sign-in. The device still needs a Colyseus server started with WORDPOKER_DETERMINISTIC_SEED=1, reachable through EXPO_PUBLIC_GAME_URL, and a separate smoke-opponent.ts process. Run the flow from apps/mobile and pass the room id printed by the opponent:
-
-    eas build --platform android --profile e2e-test
-    maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
-
-Set EXPO_PUBLIC_GAME_URL at build time to an address the device can reach; localhost on the device is not the development machine. Keep this device flow manual and out of CI until its server and opponent are provisioned.
+- **Word builder** (rack, strip, preview, the hand-rolled pan): `apps/mobile/src/components/word-builder/AGENTS.md`
+- **Offline table** (CPU beat, seat actions, Wild power draw): `apps/mobile/src/features/offline/AGENTS.md`
+- **End-to-end** (Maestro web/native, `pnpm smoke:online*`, the E2E user): `docs/agents/e2e.md`
 
 # Game rules spec
 
