@@ -30,7 +30,14 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { border, colors, fonts, opacity, palette, radius } from "@/constants/theme";
+import {
+  border,
+  colors,
+  fonts,
+  opacity,
+  palette,
+  radius,
+} from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
 export type GameButtonVariant = "gold" | "dark" | "danger" | "blue";
@@ -62,7 +69,7 @@ export interface GameButtonProps {
 }
 
 /** How far the face stands off its lip, and how far a press sinks it. */
-const LIP = 3;
+const LIP = 5;
 const PRESS_DEPTH = 2;
 /** How far inside the face's edge the slab's inner frame is drawn. */
 const FRAME_INSET = 3;
@@ -161,7 +168,7 @@ export function GameButton({
       style={[
         styles.button,
         { backgroundColor: material.lip },
-        scale !== 1 && { height: 48 * scale, minWidth: 48 * scale },
+        scale !== 1 && { height: 50 * scale, minWidth: 48 * scale },
         compact && styles.buttonCompact,
         disabled && styles.disabled,
         style,
@@ -177,7 +184,13 @@ export function GameButton({
           <View
             style={[
               styles.face,
-              { borderColor: material.edge },
+              {
+                borderColor: material.edge,
+                // The bevel: a bright rim along the top, a soft shade pooling at the foot.
+                boxShadow: sunk
+                  ? `inset 0px 3px 5px ${material.bevel}`
+                  : `inset 0px 2px 0px ${material.highlight}, inset 0px -4px 5px ${material.bevel}`,
+              },
               { paddingHorizontal: horizontalPadding * scale },
               sunk ? styles.faceSunk : styles.faceUp,
             ]}
@@ -191,7 +204,9 @@ export function GameButton({
             />
             <LinearGradient
               colors={[
-                hovered && !disabled ? brighten(material.sheen) : material.sheen,
+                hovered && !disabled
+                  ? brighten(material.sheen)
+                  : material.sheen,
                 "rgba(255,255,255,0)",
               ]}
               end={{ x: 0.5, y: 1 }}
@@ -218,7 +233,9 @@ export function GameButton({
                   styles.frame,
                   {
                     borderColor:
-                      hovered && !disabled ? brighten(material.frame) : material.frame,
+                      hovered && !disabled
+                        ? brighten(material.frame)
+                        : material.frame,
                   },
                   scale !== 1 && { margin: FRAME_INSET * scale },
                 ]}
@@ -226,7 +243,12 @@ export function GameButton({
             )}
             {/* The content has a view of its own so it stacks above the layers: on the web a
                 bare svg icon is unpositioned and would paint under them. */}
-            <View style={[styles.content, amount !== undefined && styles.contentStacked]}>
+            <View
+              style={[
+                styles.content,
+                amount !== undefined && styles.contentStacked,
+              ]}
+            >
               {children}
               {amount === undefined ? null : (
                 <Text
@@ -234,7 +256,10 @@ export function GameButton({
                   style={[
                     styles.amount,
                     scale !== 1 && { fontSize: 16 * scale },
-                    { color: material.ink, textShadowColor: material.inkShadow },
+                    {
+                      color: material.ink,
+                      textShadowColor: material.inkShadow,
+                    },
                   ]}
                 >
                   {amount}
@@ -251,7 +276,10 @@ export function GameButton({
                       fontSize: (amount === undefined ? 11 : 10) * scale,
                       letterSpacing: 1.2 * scale,
                     },
-                    { color: material.ink, textShadowColor: material.inkShadow },
+                    {
+                      color: material.ink,
+                      textShadowColor: material.inkShadow,
+                    },
                   ]}
                 >
                   {label}
@@ -267,21 +295,25 @@ export function GameButton({
 
 /** Doubles an rgba colour's alpha — the hover's lift of the sheen. */
 function brighten(rgba: string): string {
-  return rgba.replace(/[\d.]+\)$/, (alpha) => `${Math.min(1, parseFloat(alpha) * 2)})`);
+  return rgba.replace(
+    /[\d.]+\)$/,
+    (alpha) => `${Math.min(1, parseFloat(alpha) * 2)})`,
+  );
 }
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: radius.sm + 2,
-    height: 48,
+    borderRadius: radius.md,
+    boxShadow: "0px 3px 5px rgba(0,0,0,0.45)",
+    height: 50,
     minWidth: 48,
   },
-  buttonCompact: { height: 44, minWidth: 44 },
+  buttonCompact: { height: 46, minWidth: 44 },
   labelCompact: { fontSize: 10 },
   disabled: { opacity: opacity.disabled },
   face: {
     alignItems: "center",
-    borderRadius: radius.sm + 2,
+    borderRadius: radius.md,
     borderWidth: border.hairline,
     flex: 1,
     justifyContent: "center",
