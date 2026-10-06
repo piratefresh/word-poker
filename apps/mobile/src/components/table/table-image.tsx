@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 
-import { useBackdropStyle } from "../screens/game/backdrop/backdrop-style";
+import { isRoomBackdrop, useBackdropStyle } from "../screens/game/backdrop/backdrop-style";
 
 /**
  * The painted parlor table (wood rail, gold bands, slate stones, felt), scaled as one picture: it
@@ -79,7 +79,7 @@ export interface TableImageProps {
 /** The painted table for a table top `width` points wide. Decoration only; never takes a touch. */
 export function TableImage({ width, style }: TableImageProps) {
   const backdrop = useBackdropStyle();
-  if (backdrop === "tavern" || backdrop === "planet") return null;
+  if (isRoomBackdrop(backdrop)) return null;
   const water = backdrop === "water";
   const scale = width / TOP.width;
   if (water) {

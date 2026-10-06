@@ -11,6 +11,7 @@ import { AnimatedMeshGradient } from "@/components/table/mesh-gradiant";
 import type { IAnimatedMeshGradient } from "@/components/table/mesh-gradiant/types";
 
 import {
+  isRoomBackdrop,
   useBackdropStyle,
   useBackdropUrgency,
   type BackdropStyle,
@@ -101,7 +102,7 @@ export interface TableBackdropProps {
 export function TableBackdrop({ look }: TableBackdropProps) {
   const chosen = useBackdropStyle();
   const style = look ?? chosen;
-  if (style === "tavern" || style === "planet") return <SceneBackdrop look={style} />;
+  if (isRoomBackdrop(style)) return <SceneBackdrop look={style} />;
   const tiled = TILED_LOOKS[style];
   return (
     <>

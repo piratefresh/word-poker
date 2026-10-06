@@ -25,6 +25,7 @@ import {
   TableBackdrop,
   useBackdropStyle,
 } from "./backdrop";
+import { isRoomBackdrop } from "./backdrop/backdrop-style";
 import { BettingControls, bettingRowStyle, useRaiseAmount } from "./betting";
 import type { GamePlayer, GameScreenState } from "./game-types";
 import {
@@ -149,7 +150,7 @@ function GameScreenBody({
   const { height } = window;
   const stageWidth = stageMaxWidth(window);
   const backdrop = useBackdropStyle();
-  const roomSeating = backdrop === "tavern" || backdrop === "planet";
+  const roomSeating = isRoomBackdrop(backdrop);
   const chromeWidth = tableMaxWidth(window) ?? window.width;
   const tableWidth = roomSeating ? undefined : tableMaxWidth(window);
   const shadeFeather = 28 * useScreenScale();

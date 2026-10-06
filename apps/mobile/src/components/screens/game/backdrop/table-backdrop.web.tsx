@@ -2,7 +2,7 @@ import { WithSkiaWeb } from "@shopify/react-native-skia/lib/module/web";
 import type { ComponentType } from "react";
 
 import type { TableBackdropProps } from "./mesh-backdrop";
-import { useBackdropStyle } from "./backdrop-style";
+import { isRoomBackdrop, useBackdropStyle } from "./backdrop-style";
 import { SceneBackdrop } from "./scene-backdrop";
 
 export type { TableBackdropProps } from "./mesh-backdrop";
@@ -19,7 +19,7 @@ export function TableBackdrop(props: TableBackdropProps) {
   const chosen = useBackdropStyle();
   // Static artwork can show immediately without waiting for CanvasKit.
   const look = props.look ?? chosen;
-  if (look === "tavern" || look === "planet") return <SceneBackdrop look={look} />;
+  if (isRoomBackdrop(look)) return <SceneBackdrop look={look} />;
   return (
     <WithSkiaWeb
       componentProps={props}

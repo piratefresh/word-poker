@@ -4,8 +4,15 @@ import { createContext, useContext, useSyncExternalStore } from "react";
  * Which backdrop the table draws: a mesh look — the painted emerald felt or the original gold
  * ember — a tiled picture, or a full-room scene with its own table.
  */
-export const BACKDROP_STYLES = ["emerald", "ember", "wood", "fire", "water", "tavern", "planet"] as const;
+export const BACKDROP_STYLES = ["emerald", "ember", "wood", "fire", "water", "tavern", "planet", "tabletop"] as const;
 export type BackdropStyle = (typeof BACKDROP_STYLES)[number];
+
+/** Room artwork supplies the playing surface, so it needs room seating and no oval painting. */
+export function isRoomBackdrop(
+  style: BackdropStyle,
+): style is "tavern" | "planet" | "tabletop" {
+  return style === "tavern" || style === "planet" || style === "tabletop";
+}
 
 /** The gear's picker names each look by these. */
 export const BACKDROP_LABEL: Record<BackdropStyle, string> = {
@@ -16,6 +23,7 @@ export const BACKDROP_LABEL: Record<BackdropStyle, string> = {
   water: "Water room",
   tavern: "Tavern",
   planet: "Planet",
+  tabletop: "Tabletop",
 };
 
 // A module-level store rather than props: on the web the backdrop mounts lazily behind
