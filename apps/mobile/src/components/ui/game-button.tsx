@@ -189,7 +189,7 @@ export function GameButton({
                 // The bevel: a bright rim along the top, a soft shade pooling at the foot.
                 boxShadow: sunk
                   ? `inset 0px 3px 5px ${material.bevel}`
-                  : `inset 0px 2px 0px ${material.highlight}, inset 0px -4px 5px ${material.bevel}`,
+                  : `inset 0px 3px 0px ${material.highlight}, inset 0px 0px 4px 1px ${material.highlight}, inset 0px -5px 6px ${material.bevel}`,
               },
               { paddingHorizontal: horizontalPadding * scale },
               sunk ? styles.faceSunk : styles.faceUp,
@@ -203,12 +203,7 @@ export function GameButton({
               style={StyleSheet.absoluteFill}
             />
             <LinearGradient
-              colors={[
-                hovered && !disabled
-                  ? brighten(material.sheen)
-                  : material.sheen,
-                "rgba(255,255,255,0)",
-              ]}
+              colors={[brighten(material.sheen), "rgba(255,255,255,0)"]}
               end={{ x: 0.5, y: 1 }}
               pointerEvents="none"
               start={{ x: 0.5, y: 0 }}
@@ -314,7 +309,7 @@ const styles = StyleSheet.create({
   face: {
     alignItems: "center",
     borderRadius: radius.md,
-    borderWidth: border.hairline,
+    borderWidth: 2,
     flex: 1,
     justifyContent: "center",
     overflow: "hidden",
@@ -336,7 +331,7 @@ const styles = StyleSheet.create({
   /** Pressed, the face sinks: the band closes and the whole face — label too — moves down. */
   faceSunk: { marginBottom: LIP - PRESS_DEPTH, marginTop: PRESS_DEPTH },
   sheen: {
-    height: "50%",
+    height: "55%",
     left: 0,
     position: "absolute",
     right: 0,
