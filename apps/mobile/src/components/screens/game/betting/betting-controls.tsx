@@ -50,89 +50,91 @@ export function BettingControls({
   const canAllIn = !locked && state.canAllIn;
   return (
     <View style={[styles.betting, tight && styles.bettingTight]}>
-      <View style={[styles.panel, tight && styles.panelTight]}>
-        <RaiseSlider
-          amount={amount}
-          disabled={!canWager}
-          label={wagerLabel}
-          onAmountChange={onAmountChange}
-          state={state}
-        >
-          <GameButton
-            disabled={!canAllIn}
-            // ALL IN is an action, not an amount: the stack is already on the felt and the
-            // confirm sheet still names what it commits.
-            label="ALL IN"
-            horizontalPadding={8}
-            onPress={() => setAllInOpen(true)}
-            compact
-            scale={scale}
-            style={styles.allIn}
-            testID="all-in-button"
-            variant="gold"
-          />
-        </RaiseSlider>
-        <CoachTarget
-          id="actions"
-          style={[styles.actionRow, tight && styles.actionRowTight]}
-        >
-          {/* The row's controls carry ids as well as labels: the felt's nameplates print
+      <View style={styles.panelLip}>
+        <View style={[styles.panel, tight && styles.panelTight]}>
+          <RaiseSlider
+            amount={amount}
+            disabled={!canWager}
+            label={wagerLabel}
+            onAmountChange={onAmountChange}
+            state={state}
+          >
+            <GameButton
+              disabled={!canAllIn}
+              // ALL IN is an action, not an amount: the stack is already on the felt and the
+              // confirm sheet still names what it commits.
+              label="ALL IN"
+              horizontalPadding={8}
+              onPress={() => setAllInOpen(true)}
+              compact
+              scale={scale}
+              style={styles.allIn}
+              testID="all-in-button"
+              variant="gold"
+            />
+          </RaiseSlider>
+          <CoachTarget
+            id="actions"
+            style={[styles.actionRow, tight && styles.actionRowTight]}
+          >
+            {/* The row's controls carry ids as well as labels: the felt's nameplates print
             CHECK, CALL and FOLD as seat status too, so a device flow that matched the
             row by text alone could land on a seat instead of a control (see
             .maestro/native/offline-hand.yaml). */}
-          <GameButton
-            disabled={!canFold}
-            label="FOLD"
-            horizontalPadding={8}
-            onPress={onFold}
-            compact={tight}
-            scale={scale}
-            style={styles.action}
-            testID="action-fold"
-            variant="danger"
-          />
-          {/* Check and the wager are coach targets of their own, so a lesson can point at the one
+            <GameButton
+              disabled={!canFold}
+              label="FOLD"
+              horizontalPadding={8}
+              onPress={onFold}
+              compact={tight}
+              scale={scale}
+              style={styles.action}
+              testID="action-fold"
+              variant="danger"
+            />
+            {/* Check and the wager are coach targets of their own, so a lesson can point at the one
             press it asks for; the target takes the button's share of the row. */}
-          <CoachTarget
-            id="check"
-            style={[styles.callAction, { minWidth: 48 * scale }]}
-          >
-            <GameButton
-              disabled={!canCheckOrCall}
-              amount={
-                state.primary === "call"
-                  ? formatCompactAmount(state.callAmount ?? 0)
-                  : undefined
-              }
-              label={state.primary === "call" ? "CALL" : "CHECK"}
-              horizontalPadding={8}
-              onPress={onCheckOrCall}
-              compact={tight}
-              scale={scale}
-              variant="blue"
-              // The one control the row arms for two actions, so a test cannot name it by its label:
-              // the felt's nameplates print CHECK and CALL as seat status too, and a text selector
-              // lands on whichever the tree puts first.
-              testID="action-check-call"
-            />
+            <CoachTarget
+              id="check"
+              style={[styles.callAction, { minWidth: 48 * scale }]}
+            >
+              <GameButton
+                disabled={!canCheckOrCall}
+                amount={
+                  state.primary === "call"
+                    ? formatCompactAmount(state.callAmount ?? 0)
+                    : undefined
+                }
+                label={state.primary === "call" ? "CALL" : "CHECK"}
+                horizontalPadding={8}
+                onPress={onCheckOrCall}
+                compact={tight}
+                scale={scale}
+                variant="blue"
+                // The one control the row arms for two actions, so a test cannot name it by its label:
+                // the felt's nameplates print CHECK and CALL as seat status too, and a text selector
+                // lands on whichever the tree puts first.
+                testID="action-check-call"
+              />
+            </CoachTarget>
+            <CoachTarget
+              id="wager"
+              style={[styles.wideAction, { minWidth: 48 * scale }]}
+            >
+              <GameButton
+                disabled={!canWager}
+                amount={formatCompactAmount(amount)}
+                label={wagerLabel}
+                horizontalPadding={8}
+                onPress={onWager}
+                compact={tight}
+                scale={scale}
+                testID="action-wager"
+                variant="gold"
+              />
+            </CoachTarget>
           </CoachTarget>
-          <CoachTarget
-            id="wager"
-            style={[styles.wideAction, { minWidth: 48 * scale }]}
-          >
-            <GameButton
-              disabled={!canWager}
-              amount={formatCompactAmount(amount)}
-              label={wagerLabel}
-              horizontalPadding={8}
-              onPress={onWager}
-              compact={tight}
-              scale={scale}
-              testID="action-wager"
-              variant="gold"
-            />
-          </CoachTarget>
-        </CoachTarget>
+        </View>
       </View>
       <AllInSheet
         amount={state.allInAmount}
@@ -153,21 +155,33 @@ export const bettingRowStyle = {
   paddingHorizontal: 18,
 } as const;
 
-/** The cream panel the raise row and the actions sit on. */
+/**
+ * The cream panel is a slab: a darker tan lip under the face (its thickness), a drop shadow, and
+ * on the face a bright inner top edge with a soft shade along the foot.
+ */
+const panelLipStyle = {
+  backgroundColor: "#a5834f",
+  borderRadius: 18,
+  boxShadow: "0px 5px 10px rgba(30,14,0,0.55)",
+  paddingBottom: 5,
+} as const;
 const panelStyle = {
   backgroundColor: palette.cream200,
-  borderColor: "rgba(60,36,12,0.45)",
-  borderRadius: 14,
-  borderWidth: 2,
+  borderColor: "#8c6a38",
+  borderRadius: 16,
+  borderWidth: 1.5,
+  boxShadow:
+    "inset 0px 2px 0px rgba(255,255,255,0.75), inset 0px -4px 6px rgba(120,84,30,0.28)",
   paddingHorizontal: 10,
-  paddingVertical: 6,
+  paddingVertical: 8,
 } as const;
 
 const styles = StyleSheet.create({
   betting: bettingRowStyle,
+  panelLip: panelLipStyle,
   panel: panelStyle,
   bettingTight: { paddingHorizontal: 12 },
-  panelTight: { borderWidth: 1, paddingVertical: 3 },
+  panelTight: { paddingVertical: 4 },
   actionRowTight: { gap: 4 },
   actionRow: { flexDirection: "row", gap: 6, paddingTop: 4 },
   /** A control that shares the row's width with its neighbours. */

@@ -86,12 +86,12 @@ export function RaiseSlider({
             it (same width as the track), not on the fill or thumb. */}
         <View
           pointerEvents="none"
-          style={[styles.slider, scale !== 1 && { height: 3 * scale }]}
+          style={[styles.slider, scale !== 1 && { height: 6 * scale }]}
         >
           <View
             style={[
               styles.sliderFill,
-              scale !== 1 && { height: 3 * scale },
+              scale !== 1 && { height: 6 * scale },
               { width: `${progress * 100}%` },
             ]}
           />
@@ -99,10 +99,10 @@ export function RaiseSlider({
             style={[
               styles.sliderThumb,
               scale !== 1 && {
-                height: 20 * scale,
-                marginLeft: -10 * scale,
-                marginTop: -11.5 * scale,
-                width: 20 * scale,
+                height: 24 * scale,
+                marginLeft: -12 * scale,
+                marginTop: -9 * scale,
+                width: 24 * scale,
               },
               { left: `${progress * 100}%` },
             ]}
@@ -140,28 +140,39 @@ const styles = StyleSheet.create({
   },
   touchArea: { flex: 1, height: 36, justifyContent: "center" },
   slider: {
-    backgroundColor: "rgba(60,36,12,0.22)",
-    borderRadius: 2,
-    height: 3,
+    backgroundColor: "rgba(60,36,12,0.5)",
+    borderRadius: 4,
+    boxShadow:
+      "inset 0px 1px 2px rgba(0,0,0,0.6), 0px 1px 0px rgba(255,255,255,0.6)",
+    height: 6,
     position: "relative",
   },
-  sliderFill: { backgroundColor: colors.gold, borderRadius: 2, height: 3 },
+  sliderFill: {
+    backgroundColor: colors.gold,
+    borderRadius: 4,
+    boxShadow: "inset 0px 1px 0px rgba(255,248,220,0.8)",
+    height: 6,
+  },
   sliderThumb: {
     backgroundColor: colors.gold,
-    borderColor: colors.onGold,
+    borderColor: "#8a5a0c",
     borderRadius: radius.pill,
     borderWidth: 2,
-    height: 20,
-    marginLeft: -10,
-    marginTop: -11.5,
+    boxShadow:
+      "0px 2px 3px rgba(40,20,0,0.55), inset 0px 2px 0px rgba(255,248,220,0.8)",
+    height: 24,
+    marginLeft: -12,
+    marginTop: -9,
     position: "absolute",
-    width: 20,
+    width: 24,
   },
   amountBox: {
     backgroundColor: palette.cream100,
-    borderColor: "rgba(60,36,12,0.35)",
+    borderColor: "rgba(60,36,12,0.4)",
     borderRadius: radius.sm,
     borderWidth: 1,
+    boxShadow:
+      "inset 0px 2px 3px rgba(80,50,10,0.3), 0px 1px 0px rgba(255,255,255,0.7)",
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
