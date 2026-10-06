@@ -146,9 +146,13 @@ function GameScreenBody({
   const backdrop = useBackdropStyle();
   const roomSeating = isRoomBackdrop(backdrop);
   const tabletop = backdrop === "tabletop";
+  // Landscape is the tabletop room's: the table fills the screen and the builder and the betting
+  // panel stand in side columns over its lower corners, leaving the pot and hero between them.
+  const landscape = tabletop && window.width > window.height;
+  const scale = useScreenScale();
   const chromeWidth = tableMaxWidth(window) ?? window.width;
   const tableWidth = roomSeating ? undefined : tableMaxWidth(window);
-  const shadeFeather = 28 * useScreenScale();
+  const shadeFeather = 28 * scale;
   const [barHeight, setBarHeight] = useState(0);
   const compact = height - insets.top - insets.bottom < 690;
   const tight = useCompactControls();
@@ -170,6 +174,49 @@ function GameScreenBody({
   const commitWager = game.betting.canBet ? onBet : onRaise;
   const seating = tableSeating(game.seatCount, tabletop);
 
+  const rackBlock = (
+    <>
+      <BestWord
+        payout={game.phase === "payout"}
+        score={game.bestScore}
+        word={game.bestWord}
+      />
+      <CoachTarget id="rack">
+        {rack ?? (
+          <PlayerRack
+            community={game.community}
+            privateTiles={game.privateTiles}
+          />
+        )}
+        {rackActions == null || waiting ? null : (
+          <View style={styles.rackActions}>{rackActions}</View>
+        )}
+      </CoachTarget>
+    </>
+  );
+  const bettingBlock = (
+    <View
+      onLayout={(event: LayoutChangeEvent) =>
+        setBarHeight(event.nativeEvent.layout.height)
+      }
+    >
+      {waiting ? (
+        <View style={styles.waiting}>{waiting.controls}</View>
+      ) : (
+        <BettingControls
+          amount={raiseAmount}
+          locked={actionsLocked}
+          onAllIn={onAllIn}
+          onAmountChange={changeRaise}
+          onCheckOrCall={onCheckOrCall}
+          onFold={onFold}
+          onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
+          state={game.betting}
+        />
+      )}
+    </View>
+  );
+
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
       <BackdropUrgencyProvider
@@ -180,7 +227,7 @@ function GameScreenBody({
       {/* The painted shadow the action bar sits on: full screen width so it has no side edges,
           running to the bottom of the screen under the home-indicator inset, and it fades out
           `shadeFeather` above the bar. Under the content layer, and it takes no touches. */}
-      {barHeight > 0 ? (
+      {barHeight > 0 && !landscape ? (
         <View
           pointerEvents="none"
           style={[
@@ -198,8 +245,10 @@ function GameScreenBody({
         style={[
           styles.content,
           {
-            maxWidth: stageWidth,
+            maxWidth: landscape ? undefined : stageWidth,
             paddingBottom: insets.bottom,
+            paddingLeft: landscape ? insets.left : 0,
+            paddingRight: landscape ? insets.right : 0,
             paddingTop: insets.top + hudHeight,
           },
         ]}
@@ -213,7 +262,8 @@ function GameScreenBody({
           id="table"
           style={[
             styles.tableRegion,
-            compact && styles.tableRegionCompact,
+            landscape && styles.tableRegionLandscape,
+            !landscape && compact && styles.tableRegionCompact,
             !roomSeating && tight && tableWidth === undefined && styles.tableRegionTight,
             tableWidth !== undefined && {
               alignSelf: "center",
@@ -257,42 +307,31 @@ function GameScreenBody({
           />
           {overFelt}
         </CoachTarget>
-        <BestWord
-          payout={game.phase === "payout"}
-          score={game.bestScore}
-          word={game.bestWord}
-        />
-        <CoachTarget id="rack">
-          {rack ?? (
-            <PlayerRack
-              community={game.community}
-              privateTiles={game.privateTiles}
-            />
-          )}
-          {rackActions == null || waiting ? null : (
-            <View style={styles.rackActions}>{rackActions}</View>
-          )}
-        </CoachTarget>
-        <View
-          onLayout={(event: LayoutChangeEvent) =>
-            setBarHeight(event.nativeEvent.layout.height)
-          }
-        >
-          {waiting ? (
-            <View style={styles.waiting}>{waiting.controls}</View>
-          ) : (
-            <BettingControls
-              amount={raiseAmount}
-              locked={actionsLocked}
-              onAllIn={onAllIn}
-              onAmountChange={changeRaise}
-              onCheckOrCall={onCheckOrCall}
-              onFold={onFold}
-              onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
-              state={game.betting}
-            />
-          )}
-        </View>
+        {landscape ? (
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.bottomBand,
+              {
+                bottom: insets.bottom,
+                left: insets.left,
+                right: insets.right,
+              },
+            ]}
+          >
+            <View style={[styles.sideColumn, { width: 400 * scale }]}>
+              {rackBlock}
+            </View>
+            <View style={[styles.sideColumn, { width: 400 * scale }]}>
+              {bettingBlock}
+            </View>
+          </View>
+        ) : (
+          <>
+            {rackBlock}
+            {bettingBlock}
+          </>
+        )}
       </View>
       <Hud
         balance={BALANCE_UNAVAILABLE}
@@ -352,6 +391,15 @@ const styles = StyleSheet.create({
   content: { alignSelf: "center", flex: 1, width: "100%", zIndex: 1 },
   barShade: { bottom: 0, left: 0, position: "absolute", right: 0 },
   tableRegion: { flex: 1, minHeight: 272 },
+  // Landscape: the room runs under the whole screen and the side columns sit over its corners.
+  tableRegionLandscape: { minHeight: 0 },
+  bottomBand: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    position: "absolute",
+  },
+  sideColumn: { maxWidth: "36%" },
   tableRegionCompact: { minHeight: 234 },
   // A small phone: the felt is narrower than the screen, so the height it keeps goes to the word.
   tableRegionTight: { alignSelf: "center", width: "86%" },

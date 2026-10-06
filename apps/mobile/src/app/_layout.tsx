@@ -1,3 +1,4 @@
+import { Fredoka_600SemiBold, Fredoka_700Bold } from "@expo-google-fonts/fredoka";
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -14,6 +15,7 @@ import {
   NotoSerif_700Bold,
   NotoSerif_700Bold_Italic,
 } from "@expo-google-fonts/noto-serif";
+import { RobotoSlab_800ExtraBold } from "@expo-google-fonts/roboto-slab";
 import * as Sentry from "@sentry/react-native";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
@@ -79,6 +81,9 @@ export function RootLayout() {
   // The design system asks for these families by name (`fonts.*`), so they have to
   // be registered before the first frame paints.
   const [fontsLoaded] = useFonts({
+    Fredoka_600SemiBold,
+    Fredoka_700Bold,
+    RobotoSlab_800ExtraBold,
     Inter_400Regular,
     Inter_500Medium,
     Inter_700Bold,

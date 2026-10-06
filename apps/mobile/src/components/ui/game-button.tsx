@@ -319,8 +319,8 @@ const styles = StyleSheet.create({
   /** An amount over its action: the number leads, the label sits under it. */
   contentStacked: { flexDirection: "column", gap: 0 },
   amount: {
-    fontFamily: fonts.monoBold,
-    fontSize: 16,
+    fontFamily: fonts.uiMedium,
+    fontSize: 18,
     textAlign: "center",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
@@ -360,9 +360,9 @@ const styles = StyleSheet.create({
     right: 0,
   },
   label: {
-    fontFamily: fonts.sansBold,
-    fontSize: 11,
-    letterSpacing: 1.2,
+    fontFamily: fonts.ui,
+    fontSize: 12,
+    letterSpacing: 1,
     textAlign: "center",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,

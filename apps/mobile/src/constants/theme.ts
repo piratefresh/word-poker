@@ -229,7 +229,7 @@ export const border = {
 export const monoFamily =
   "JetBrains Mono,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace";
 
-/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono,lilita-one}. */
+/** Load with @expo-google-fonts/{inter,noto-serif,jetbrains-mono,lilita-one,fredoka,roboto-slab}. */
 export const fonts = {
   sans: Platform.select({
     ios: "Inter_400Regular",
@@ -250,6 +250,11 @@ export const fonts = {
   monoBold: "JetBrainsMono_600SemiBold",
   /** The chunky arcade face of the HUD's clock digits. */
   arcade: "LilitaOne_400Regular",
+  /** The game UI's chunky rounded face: buttons, values, labels. */
+  ui: "Fredoka_700Bold",
+  uiMedium: "Fredoka_600SemiBold",
+  /** Wooden-sign slab for panel headings. */
+  slab: "RobotoSlab_800ExtraBold",
 } as const;
 
 export const fontSize = {

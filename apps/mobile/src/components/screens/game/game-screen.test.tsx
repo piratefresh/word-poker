@@ -1,6 +1,8 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
+import { Dimensions, Text } from "react-native";
 
 import { FOUR_PLAYER_FLOP_FIXTURE } from "./game-fixtures";
+import { setBackdropStyle } from "./backdrop/backdrop-style";
 import { GameScreen, type GameScreenProps } from "./game-screen";
 
 // `useSafeAreaInsets` throws without a provider, and the shipped provider needs native
@@ -265,4 +267,26 @@ test("draws each side pot under the main pot, and none when the hand has one pot
 
   expect(view.getByTestId("side-pot-0")).toHaveTextContent("SIDE POT $500");
   expect(view.getByTestId("side-pot-1")).toHaveTextContent("SIDE POT $250");
+});
+
+describe("landscape tabletop", () => {
+  const original = Dimensions.get("window");
+  afterEach(() => {
+    Dimensions.set({ window: original, screen: original });
+    setBackdropStyle("emerald");
+  });
+
+  // Phone landscape is the tight case: every control the tutorial points at has to still be drawn.
+  test("keeps the table, rack and every betting control on a phone on its side", async () => {
+    const window = { ...original, width: 800, height: 390 };
+    Dimensions.set({ window, screen: window });
+    setBackdropStyle("tabletop");
+    const view = await renderScreen({ rackActions: <Text>RACK ACTIONS</Text> });
+
+    expect(view.getByTestId("poker-table")).toBeOnTheScreen();
+    expect(view.getByText("RACK ACTIONS")).toBeOnTheScreen();
+    for (const id of ["action-fold", "action-check-call", "action-wager", "all-in-button"]) {
+      expect(view.getByTestId(id)).toBeOnTheScreen();
+    }
+  });
 });

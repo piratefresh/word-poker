@@ -44,80 +44,85 @@ export function RaiseSlider({
   };
   return (
     <CoachTarget id="raise" style={styles.raiseRow}>
-      <Text style={[styles.raiseLabel, scale !== 1 && { fontSize: 9 * scale }]}>
+      <Text
+        style={[styles.raiseLabel, scale !== 1 && { fontSize: 12 * scale }]}
+      >
         {label === "BET" ? label : `${label} TO`}
       </Text>
-      <View
-        accessibilityActions={[
-          { name: "increment", label: "Increase raise" },
-          { name: "decrement", label: "Decrease raise" },
-        ]}
-        accessibilityLabel="Raise amount"
-        accessibilityRole="adjustable"
-        accessibilityValue={{
-          min: state.minRaise,
-          max: state.maxRaise,
-          now: amount,
-          text: `$${amount}`,
-        }}
-        onAccessibilityAction={(event) =>
-          !disabled &&
-          onAmountChange(
-            amount +
-              (event.nativeEvent.actionName === "increment"
-                ? state.raiseStep
-                : -state.raiseStep),
-          )
-        }
-        onLayout={(event: LayoutChangeEvent) =>
-          setTrackWidth(event.nativeEvent.layout.width)
-        }
-        onMoveShouldSetResponder={() => !disabled}
-        onResponderGrant={fromEvent}
-        onResponderMove={fromEvent}
-        onStartShouldSetResponder={() => !disabled}
-        style={[
-          styles.touchArea,
-          tight && { height: 28 },
-          scale !== 1 && { height: 36 * scale },
-        ]}
-      >
-        {/* The touch area is the tall hit target; pointerEvents none keeps locationX measured on
-            it (same width as the track), not on the fill or thumb. */}
+      <View style={styles.trackRow}>
         <View
-          pointerEvents="none"
-          style={[styles.slider, scale !== 1 && { height: 6 * scale }]}
-        >
-          <View
-            style={[
-              styles.sliderFill,
-              scale !== 1 && { height: 6 * scale },
-              { width: `${progress * 100}%` },
-            ]}
-          />
-          <View
-            style={[
-              styles.sliderThumb,
-              scale !== 1 && {
-                height: 24 * scale,
-                marginLeft: -12 * scale,
-                marginTop: -9 * scale,
-                width: 24 * scale,
-              },
-              { left: `${progress * 100}%` },
-            ]}
-          />
-        </View>
-      </View>
-      <View style={styles.amountBox}>
-        <Text
-          style={[
-            styles.raiseAmount,
-            scale !== 1 && { fontSize: 13 * scale, minWidth: 40 * scale },
+          accessibilityActions={[
+            { name: "increment", label: "Increase raise" },
+            { name: "decrement", label: "Decrease raise" },
           ]}
-        >{`${amount.toLocaleString()}`}</Text>
+          accessibilityLabel="Raise amount"
+          accessibilityRole="adjustable"
+          accessibilityValue={{
+            min: state.minRaise,
+            max: state.maxRaise,
+            now: amount,
+            text: `$${amount}`,
+          }}
+          onAccessibilityAction={(event) =>
+            !disabled &&
+            onAmountChange(
+              amount +
+                (event.nativeEvent.actionName === "increment"
+                  ? state.raiseStep
+                  : -state.raiseStep),
+            )
+          }
+          onLayout={(event: LayoutChangeEvent) =>
+            setTrackWidth(event.nativeEvent.layout.width)
+          }
+          onMoveShouldSetResponder={() => !disabled}
+          onResponderGrant={fromEvent}
+          onResponderMove={fromEvent}
+          onStartShouldSetResponder={() => !disabled}
+          style={[
+            styles.touchArea,
+            { marginHorizontal: 12 * scale }, // room for the thumb's overhang
+            tight && { height: 28 },
+            scale !== 1 && { height: 36 * scale },
+          ]}
+        >
+          {/* The touch area is the tall hit target; pointerEvents none keeps locationX measured on
+            it (same width as the track), not on the fill or thumb. */}
+          <View
+            pointerEvents="none"
+            style={[styles.slider, scale !== 1 && { height: 10 * scale }]}
+          >
+            <View
+              style={[
+                styles.sliderFill,
+                scale !== 1 && { height: 10 * scale },
+                { width: `${progress * 100}%` },
+              ]}
+            />
+            <View
+              style={[
+                styles.sliderThumb,
+                scale !== 1 && {
+                  height: 24 * scale,
+                  marginLeft: -12 * scale,
+                  marginTop: -10 * scale,
+                  width: 24 * scale,
+                },
+                { left: `${progress * 100}%` },
+              ]}
+            />
+          </View>
+        </View>
+        <View style={styles.amountBox}>
+          <Text
+            style={[
+              styles.raiseAmount,
+              scale !== 1 && { fontSize: 13 * scale, minWidth: 40 * scale },
+            ]}
+          >{`${amount.toLocaleString()}`}</Text>
+        </View>
+        {children}
       </View>
-      {children}
     </CoachTarget>
   );
 }
@@ -126,7 +131,8 @@ export function RaiseSlider({
 const WOOD_INK = "#3c240c";
 
 const styles = StyleSheet.create({
-  raiseRow: {
+  raiseRow: { gap: 2 },
+  trackRow: {
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
@@ -134,35 +140,39 @@ const styles = StyleSheet.create({
   },
   raiseLabel: {
     color: WOOD_INK,
-    fontFamily: fonts.arcade,
-    fontSize: 11,
-    letterSpacing: 0.6,
+    fontFamily: fonts.slab,
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textShadow: "0px 1px 0px rgba(255,255,255,0.7)",
   },
   touchArea: { flex: 1, height: 36, justifyContent: "center" },
   slider: {
-    backgroundColor: "rgba(60,36,12,0.5)",
-    borderRadius: 4,
+    backgroundColor: "rgba(60,36,12,0.55)",
+    borderColor: "#5a3a14",
+    borderRadius: 6,
+    borderWidth: 1.5,
     boxShadow:
-      "inset 0px 1px 2px rgba(0,0,0,0.6), 0px 1px 0px rgba(255,255,255,0.6)",
-    height: 6,
+      "inset 0px 2px 3px rgba(0,0,0,0.7), 0px 1.5px 0px rgba(255,255,255,0.75)",
+    height: 10,
     position: "relative",
   },
   sliderFill: {
     backgroundColor: colors.gold,
     borderRadius: 4,
-    boxShadow: "inset 0px 1px 0px rgba(255,248,220,0.8)",
-    height: 6,
+    boxShadow:
+      "inset 0px 1px 0px rgba(255,248,220,0.9), inset 0px -2px 0px rgba(138,90,12,0.45)",
+    height: 7,
   },
   sliderThumb: {
     backgroundColor: colors.gold,
-    borderColor: "#8a5a0c",
+    borderColor: "#6b430a",
     borderRadius: radius.pill,
-    borderWidth: 2,
+    borderWidth: 2.5,
     boxShadow:
-      "0px 2px 3px rgba(40,20,0,0.55), inset 0px 2px 0px rgba(255,248,220,0.8)",
+      "0px 3px 4px rgba(40,20,0,0.65), inset 0px 2px 0px rgba(255,248,220,0.8)",
     height: 24,
     marginLeft: -12,
-    marginTop: -9,
+    marginTop: -10,
     position: "absolute",
     width: 24,
   },
@@ -178,7 +188,7 @@ const styles = StyleSheet.create({
   },
   raiseAmount: {
     color: WOOD_INK,
-    fontFamily: fonts.monoBold,
+    fontFamily: fonts.uiMedium,
     fontSize: 13,
     minWidth: 40,
     textAlign: "right",
