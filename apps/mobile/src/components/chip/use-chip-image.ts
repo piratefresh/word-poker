@@ -3,7 +3,7 @@ import { PixelRatio } from "react-native";
 
 import type { ChipTone } from "@/constants/theme";
 
-import { skiaReady } from "../game/tile-texture/skia-ready";
+import { skiaReady } from "./skia-ready";
 import { generateChip } from "./generate";
 
 /**

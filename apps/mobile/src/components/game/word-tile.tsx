@@ -6,10 +6,8 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -36,16 +34,15 @@ import {
   colors,
   duration,
   easing as motionEasing,
-  elevation,
   fonts,
   gradients,
   opacity,
   palette,
+  tileMaterial,
 } from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
 import { TileChoiceBeam } from "./tile-choice-beam";
-import { useTileTexture } from "./tile-texture/use-tile-texture";
 
 /**
  * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
@@ -89,7 +86,10 @@ export interface TileProps {
 
 interface TileMetrics {
   width: number;
+  /** The whole tile, slab included: the box a place lays out, so the slab adds no height. */
   height: number;
+  /** The slab under the face — the tile's thickness, about 11% of its height. */
+  slab: number;
   radius: number;
   borderWidth: number;
   letterSize: number;
@@ -102,33 +102,36 @@ export const TILE_METRICS: Record<TileSize, TileMetrics> = {
   small: {
     width: 34,
     height: 40,
+    slab: 4,
     radius: 5,
     borderWidth: 1,
-    letterSize: 18,
-    alternateSize: 13,
-    pointSize: 8,
+    letterSize: 22,
+    alternateSize: 15,
+    pointSize: 9,
     badgeSize: 7,
     inset: 3,
   },
   medium: {
     width: 44,
     height: 52,
+    slab: 6,
     radius: 7,
     borderWidth: 1.25,
-    letterSize: 24,
-    alternateSize: 17,
-    pointSize: 10,
+    letterSize: 29,
+    alternateSize: 19,
+    pointSize: 11,
     badgeSize: 8,
     inset: 4,
   },
   large: {
     width: 58,
     height: 69,
+    slab: 8,
     radius: 9,
     borderWidth: 1.5,
-    letterSize: 32,
-    alternateSize: 22,
-    pointSize: 12,
+    letterSize: 38,
+    alternateSize: 25,
+    pointSize: 13,
     badgeSize: 10,
     inset: 5,
   },
@@ -145,13 +148,33 @@ export function scaleTileMetrics(size: TileSize, factor: number): TileMetrics {
   return scaled;
 }
 
+/**
+ * The contact shadow under a tile, in points of a medium tile (other sizes scale it). A lift adds
+ * the `lift*` amounts — selected is a lift of 1, a flip's midpoint another — so the shadow widens
+ * and fades as the tile rises off the table.
+ */
+const CONTACT_SHADOW = {
+  offsetY: 3,
+  blur: 4,
+  alpha: 0.55,
+  liftOffsetY: 3,
+  liftBlur: 6,
+  liftSpread: 1.5,
+  liftFade: 0.2,
+} as const;
+
+/** The letter and its points: Lilita One's heavy round face, against the reference's lettering. */
+const TILE_FONT = fonts.arcade;
+
 const FLIP_EASING = Easing.bezier(...motionEasing.flip);
 const DEAL_EASING = Easing.bezier(...motionEasing.deal);
 const FLIP_PERSPECTIVE = 900;
+// The reference rims every tile in dark brown; an owner's colour is kept, but a shade darker so
+// it reads as an edge and not a highlight.
 const OWNERSHIP_BORDER: Record<TileOwnership, string> = {
-  private: colors.gold,
-  community: "#76955f",
-  neutral: "rgba(120,80,20,0.34)",
+  private: "#b07a1c",
+  community: "#5d7a45",
+  neutral: "#7a4b27",
 };
 const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
   "double-letter": "2L",
@@ -227,7 +250,6 @@ export function Tile({
 }: TileProps) {
   const metrics = scaleTileMetrics(size, scale);
   const second = secondFace(tile);
-  const texture = useTileTexture(tile.id, metrics.width, metrics.height);
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -439,6 +461,40 @@ export function Tile({
       ],
     };
   });
+  // The shadow stays on the table while the tile lifts off it, so a lifted tile — selected, or
+  // mid-flip — casts a wider, fainter one. A dealing tile has none until it has landed.
+  const shadowUnit = metrics.height / TILE_METRICS.medium.height;
+  const contactMotion = useAnimatedStyle(() => {
+    const lift =
+      selectedProgress.get() +
+      (animation === "deal"
+        ? 0
+        : interpolate(rotation.get(), [0, 0.5, 1], [0, 1, 0]));
+    const landed =
+      animation === "deal"
+        ? interpolate(dealProgress.get(), [0, 0.58, 1], [0, 1, 1])
+        : 1;
+    return {
+      boxShadow: [
+        {
+          offsetX: 0,
+          offsetY: (CONTACT_SHADOW.offsetY + lift * CONTACT_SHADOW.liftOffsetY) * shadowUnit,
+          blurRadius: (CONTACT_SHADOW.blur + lift * CONTACT_SHADOW.liftBlur) * shadowUnit,
+          spreadDistance: lift * CONTACT_SHADOW.liftSpread * shadowUnit,
+          color: `rgba(38,18,0,${(CONTACT_SHADOW.alpha - lift * CONTACT_SHADOW.liftFade) * landed})`,
+        },
+      ],
+    };
+  });
+  // The slab is the tile's body, so it turns with the face: ivory under the front, crimson under
+  // the back. It flips colour as the tile goes edge-on, which is when neither face can be seen.
+  const slabMotion = useAnimatedStyle(() => {
+    const front = rotation.get() > 0.5;
+    return {
+      backgroundColor: front ? tileMaterial.slab : tileMaterial.back.slab,
+      borderColor: front ? tileMaterial.edge : tileMaterial.back.edge,
+    };
+  });
   const dealGlintMotion = useAnimatedStyle(() => ({
     opacity:
       animation === "deal"
@@ -502,22 +558,43 @@ export function Tile({
       id={webTestID(testID)}
       testID={testID}
     >
+      {/* The shadow is a sibling under the shell, not the shell's own: it stays on the table
+          while the shell lifts, and it is a view, so there is no canvas to cost a GL context. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.contact,
+          { borderRadius: metrics.radius },
+          contactMotion,
+        ]}
+      />
       <Animated.View
         style={[
           styles.shell,
-          {
-            borderColor: selected ? colors.goldHi : OWNERSHIP_BORDER[ownership],
-            borderRadius: metrics.radius,
-            borderWidth: selected
-              ? metrics.borderWidth + 1
-              : metrics.borderWidth,
-            height: metrics.height,
-            width: metrics.width,
-          },
-          selected && styles.selectedShell,
+          { height: metrics.height, width: metrics.width },
           shellMotion,
         ]}
       >
+        {/* The slab: the tile's thickness, one static view under the face. It is the whole tile's
+            size with rounded corners, so the face covers all of it but the foot. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.slab, { borderRadius: metrics.radius }, slabMotion]}
+        />
+        <View
+          style={[
+            styles.frame,
+            {
+              borderColor: selected ? colors.goldHi : OWNERSHIP_BORDER[ownership],
+              borderRadius: metrics.radius,
+              borderWidth: selected
+                ? metrics.borderWidth + 1
+                : metrics.borderWidth,
+              height: metrics.height - metrics.slab,
+            },
+            selected && styles.selectedShell,
+          ]}
+        >
         <Animated.View
           importantForAccessibility="no-hide-descendants"
           style={[
@@ -526,8 +603,7 @@ export function Tile({
             frontMotion,
           ]}
         >
-          {/* STO-479: the pixel-art face once Skia has painted it; the gradient until then. */}
-          <FaceFill texture={texture}>
+          <LinearGradient {...gradients.tile} style={styles.faceFill}>
             {second === null ? null : (
               // §10: a choice tile has to look special. The pair wears an accent strip no
               // single letter does, over the tile's own ownership border.
@@ -569,7 +645,13 @@ export function Tile({
                 </Text>
               </View>
             ) : null}
-            <View style={styles.letters}>
+            {/* A badge in the corner would sit on a wide letter's arm, so the letter steps down. */}
+            <View
+              style={[
+                styles.letters,
+                (multiplierLabel || powered) && { marginTop: Math.round(metrics.badgeSize * 0.5) },
+              ]}
+            >
               <Text
                 maxFontSizeMultiplier={1.2}
                 style={[
@@ -635,7 +717,7 @@ export function Tile({
                 </>
               ) : tile.points}
             </Text>
-          </FaceFill>
+          </LinearGradient>
         </Animated.View>
         <Animated.View
           importantForAccessibility="no-hide-descendants"
@@ -645,23 +727,21 @@ export function Tile({
             backMotion,
           ]}
         >
+          {/* Crimson, with a lighter line set just inside the edge and a lighter diamond in the
+              middle: the back is all views, with no monogram to read. */}
           <LinearGradient
-            colors={[palette.felt400, palette.felt700, palette.felt900]}
+            colors={tileMaterial.back.gradient}
             end={{ x: 0.85, y: 1 }}
             start={{ x: 0.1, y: 0 }}
             style={styles.backFill}
           >
-            <View style={styles.backInset}>
-              <View style={styles.backDiamond}>
-                <Text
-                  style={[
-                    styles.backMonogram,
-                    { fontSize: metrics.letterSize * 0.55 },
-                  ]}
-                >
-                  W
-                </Text>
-              </View>
+            <View
+              style={[
+                styles.backInset,
+                { borderRadius: Math.max(2, metrics.radius - 3) },
+              ]}
+            >
+              <View style={styles.backDiamond} />
             </View>
           </LinearGradient>
         </Animated.View>
@@ -675,32 +755,20 @@ export function Tile({
             ]}
           />
         ) : null}
+        </View>
       </Animated.View>
     </Pressable>
   );
 }
 
-/** The front face's ground: the painted texture under the letters, or the gradient fallback. */
-function FaceFill({ texture, children }: { texture: string | null; children: ReactNode }) {
-  if (texture === null) {
-    return (
-      <LinearGradient {...gradients.tile} style={styles.faceFill}>
-        <View style={styles.paperHighlight} />
-        {children}
-      </LinearGradient>
-    );
-  }
-  return (
-    <View style={styles.faceFill}>
-      <Image source={{ uri: texture }} style={styles.texture} />
-      {children}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   outer: { overflow: "visible" },
-  shell: { ...elevation.tile },
+  contact: { ...StyleSheet.absoluteFill },
+  shell: { overflow: "visible" },
+  // The dark rim shows only where the face does not cover the slab: its foot and corners.
+  slab: { ...StyleSheet.absoluteFill, borderWidth: border.hairline },
+  /** The face's frame: the ownership border, sitting above the slab it leaves the foot of. */
+  frame: { width: "100%" },
   face: {
     backfaceVisibility: "hidden",
     bottom: 0,
@@ -711,15 +779,6 @@ const styles = StyleSheet.create({
     top: 0,
   },
   faceFill: { alignItems: "center", flex: 1, justifyContent: "center" },
-  texture: { height: "100%", left: 0, position: "absolute", top: 0, width: "100%" },
-  paperHighlight: {
-    backgroundColor: "rgba(255,255,255,0.35)",
-    height: "38%",
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
   choiceAccent: {
     left: 0,
     overflow: "hidden",
@@ -733,18 +792,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   letter: {
-    color: colors.onTile,
-    fontFamily: fonts.sansBlack,
-    letterSpacing: -0.8,
+    color: tileMaterial.ink,
+    fontFamily: TILE_FONT,
   },
   slash: {
-    color: colors.onTile,
-    fontFamily: fonts.sansBlack,
+    color: "rgba(21,17,13,0.5)",
+    fontFamily: TILE_FONT,
     marginHorizontal: 1,
   },
   points: {
-    color: "#704511",
-    fontFamily: fonts.monoBold,
+    color: tileMaterial.ink,
+    fontFamily: TILE_FONT,
     position: "absolute",
   },
   poweredBadge: { position: "absolute" },
@@ -766,27 +824,16 @@ const styles = StyleSheet.create({
   backFill: { flex: 1, padding: 3 },
   backInset: {
     alignItems: "center",
-    borderColor: "rgba(231,199,90,0.58)",
-    borderRadius: 5,
+    borderColor: tileMaterial.back.inset,
     borderWidth: border.hairline,
     flex: 1,
     justifyContent: "center",
   },
   backDiamond: {
-    alignItems: "center",
     aspectRatio: 1,
-    backgroundColor: "rgba(212,165,74,0.13)",
-    borderColor: "rgba(247,223,122,0.52)",
-    borderWidth: border.hairline,
-    justifyContent: "center",
+    backgroundColor: tileMaterial.back.diamond,
     transform: [{ rotate: "45deg" }],
-    width: "48%",
-  },
-  backMonogram: {
-    color: colors.goldHi,
-    fontFamily: fonts.serifBold,
-    opacity: 0.9,
-    transform: [{ rotate: "-45deg" }],
+    width: "46%",
   },
   selectedShell: {
     shadowColor: colors.goldHi,

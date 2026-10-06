@@ -40,11 +40,16 @@ import {
 } from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
-export type GameButtonVariant = "gold" | "dark" | "danger" | "blue";
+export type GameButtonVariant = "gold" | "dark" | "danger" | "blue" | "green";
 
 export interface GameButtonProps {
   /** The printed label. Omit it for an icon button and pass the icon as `children`. */
   label?: string;
+  /**
+   * Printed after the label in the material's accent colour — the count in "CHECK WORD 5/5".
+   * A material without an accent prints it in the label's own ink.
+   */
+  labelAccent?: string;
   /** A figure printed large above the label (already formatted, e.g. "$1.2K"). */
   amount?: string;
   /** An icon (or anything else) drawn in place of the label. */
@@ -53,7 +58,7 @@ export interface GameButtonProps {
   /**
    * `gold` is the table's call to action (bet, raise, all in, confirm); `dark` is every other
    * control; `danger` is the dark button with a red edge — the one that gives something up;
-   * `blue` is the quiet answer (check, call).
+   * `blue` is the quiet answer (check, call); `green` is the word's check.
    */
   variant?: GameButtonVariant;
   disabled?: boolean;
@@ -86,6 +91,8 @@ interface Material {
   inkShadow: string;
   /** A hairline set a few points inside the edge: the slab's double frame. */
   frame?: string;
+  /** The ink of `labelAccent`. */
+  accent?: string;
 }
 
 const MATERIALS: Record<GameButtonVariant, Material> = {
@@ -133,10 +140,22 @@ const MATERIALS: Record<GameButtonVariant, Material> = {
     bevel: "rgba(12,33,71,0.45)",
     inkShadow: "rgba(0,0,0,0.6)",
   },
+  green: {
+    gradient: ["#3fae66", "#0b6b36", "#08592c"],
+    lip: "#013a17",
+    edge: "#2f9a5c",
+    ink: colors.textBright,
+    highlight: "rgba(215,255,230,0.5)",
+    sheen: "rgba(255,255,255,0.18)",
+    bevel: "rgba(1,58,23,0.45)",
+    inkShadow: "rgba(0,32,12,0.7)",
+    accent: "#f5d547",
+  },
 };
 
 export function GameButton({
   label,
+  labelAccent,
   amount,
   children,
   onPress,
@@ -278,6 +297,11 @@ export function GameButton({
                   ]}
                 >
                   {label}
+                  {labelAccent === undefined ? null : (
+                    <Text style={material.accent === undefined ? undefined : { color: material.accent }}>
+                      {` ${labelAccent}`}
+                    </Text>
+                  )}
                 </Text>
               )}
             </View>
