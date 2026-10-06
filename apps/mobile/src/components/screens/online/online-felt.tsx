@@ -147,15 +147,6 @@ export function OnlineFelt({
       >
         <View style={styles.table}>
           <GameScreen
-            bettingLeading={
-              powers === null ? null : (
-                <PowerHeldChip
-                  active={power.targeting.stage !== "idle"}
-                  held={powers.held}
-                  onPress={power.toggle}
-                />
-              )
-            }
             overFelt={
               powers === null ? null : (
                 <>
@@ -172,6 +163,13 @@ export function OnlineFelt({
             }
             rackActions={
               <>
+                {powers === null ? null : (
+                  <PowerHeldChip
+                    active={power.targeting.stage !== "idle"}
+                    held={powers.held}
+                    onPress={power.toggle}
+                  />
+                )}
                 <WordShuffleButton />
                 <WordCheckButton />
               </>

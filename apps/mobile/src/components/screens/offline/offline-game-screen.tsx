@@ -185,17 +185,15 @@ function OfflineTable({
     >
       <CoachProvider style={styles.table} tour={help.tour}>
         <GameScreen
-          bettingLeading={
-            powers === null ? null : (
-              <PowerHeldChip
-                active={power.targeting.stage !== "idle"}
-                held={powers.held}
-                onPress={power.toggle}
-              />
-            )
-          }
           rackActions={
             <>
+              {powers === null ? null : (
+                <PowerHeldChip
+                  active={power.targeting.stage !== "idle"}
+                  held={powers.held}
+                  onPress={power.toggle}
+                />
+              )}
               <WordShuffleButton />
               <WordCheckButton />
             </>

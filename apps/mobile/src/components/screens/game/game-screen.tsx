@@ -53,13 +53,8 @@ export interface GameScreenProps {
    */
   rack?: ReactNode;
   /**
-   * A mode's own control at the action row's start, beside fold, check and the bet: a Wild
-   * table's held power sits there.
-   */
-  bettingLeading?: ReactNode;
-  /**
    * A mode's own controls in a row right under the rack: the word builder's shuffle and word
-   * check, so the word's controls sit with the tiles they act on and the betting rows keep
+   * check, and a Wild table's held power, so the word's controls sit with the tiles they act on and the betting rows keep
    * their width. A table that has not dealt yet has no hand to act on, so draws none.
    */
   rackActions?: ReactNode;
@@ -125,7 +120,6 @@ export function GameScreen(props: GameScreenProps) {
 function GameScreenBody({
   game,
   rack,
-  bettingLeading,
   rackActions,
   overFelt,
   onBack,
@@ -289,7 +283,6 @@ function GameScreenBody({
           ) : (
             <BettingControls
               amount={raiseAmount}
-              leading={bettingLeading}
               locked={actionsLocked}
               onAllIn={onAllIn}
               onAmountChange={changeRaise}

@@ -14,7 +14,7 @@ import { POWER_CARD_ASPECT, PowerCard, PowerCardMini, powerCardLabel } from "./p
 import type { PowerTargeting } from "./use-power-targeting";
 
 /**
- * The power the hero holds this hand, in the felt's action row (`GameScreen`'s `bettingLeading`)
+ * The power the hero holds this hand, in the felt's action row (`GameScreen`'s `rackActions`)
  * beside the shuffle: the card the Power Draw kept, drawn small.
  *
  * Lit while the table would take the power — the hero's own betting turn, or §19's window before

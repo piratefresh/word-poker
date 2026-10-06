@@ -227,7 +227,7 @@ test("holds every action in the row while a lesson locks it, and keeps the mode'
   const { Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native");
   const view = await renderScreen({
     actionsLocked: true,
-    bettingLeading: (
+    rackActions: (
       <Pressable onPress={onLeading} testID="mode-control">
         <Text>MINE</Text>
       </Pressable>

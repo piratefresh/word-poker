@@ -33,7 +33,7 @@ import {
 import { border, colors, fonts, opacity, palette, radius } from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
-export type GameButtonVariant = "gold" | "dark" | "danger";
+export type GameButtonVariant = "gold" | "dark" | "danger" | "blue";
 
 export interface GameButtonProps {
   /** The printed label. Omit it for an icon button and pass the icon as `children`. */
@@ -45,7 +45,8 @@ export interface GameButtonProps {
   onPress?: () => void;
   /**
    * `gold` is the table's call to action (bet, raise, all in, confirm); `dark` is every other
-   * control; `danger` is the dark button with a red edge — the one that gives something up.
+   * control; `danger` is the dark button with a red edge — the one that gives something up;
+   * `blue` is the quiet answer (check, call).
    */
   variant?: GameButtonVariant;
   disabled?: boolean;
@@ -113,6 +114,16 @@ const MATERIALS: Record<GameButtonVariant, Material> = {
     highlight: "rgba(255,230,220,0.5)",
     sheen: "rgba(255,255,255,0.18)",
     bevel: "rgba(58,15,9,0.45)",
+    inkShadow: "rgba(0,0,0,0.6)",
+  },
+  blue: {
+    gradient: ["#7fb0ee", "#2f6bc4", "#1d4688"],
+    lip: "#0c2147",
+    edge: "#5b92dd",
+    ink: colors.textBright,
+    highlight: "rgba(220,235,255,0.5)",
+    sheen: "rgba(255,255,255,0.18)",
+    bevel: "rgba(12,33,71,0.45)",
     inkShadow: "rgba(0,0,0,0.6)",
   },
 };

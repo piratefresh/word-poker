@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,10 +8,10 @@ import {
 } from "react-native";
 
 import { CoachTarget } from "@/components/ui/coach";
-import { colors, fonts, radius } from "@/constants/theme";
+import { colors, fonts, palette, radius } from "@/constants/theme";
 
 import type { BettingState } from "../game-types";
-import { useScreenScale } from "../screen-scale";
+import { useCompactControls, useScreenScale } from "../screen-scale";
 
 /** The wager row's slider: its label, the track, and the amount. */
 export function RaiseSlider({
@@ -20,7 +20,10 @@ export function RaiseSlider({
   label,
   disabled,
   onAmountChange,
+  children,
 }: {
+  /** Drawn after the amount box: the panel's All In. */
+  children?: ReactNode;
   state: BettingState;
   amount: number;
   /** BET or RAISE — the action the wager button takes. */
@@ -29,6 +32,7 @@ export function RaiseSlider({
   onAmountChange: (amount: number) => void;
 }) {
   const scale = useScreenScale();
+  const tight = useCompactControls();
   const [trackWidth, setTrackWidth] = useState(1);
 
   const range = Math.max(1, state.maxRaise - state.minRaise);
@@ -40,10 +44,8 @@ export function RaiseSlider({
   };
   return (
     <CoachTarget id="raise" style={styles.raiseRow}>
-      <Text
-        style={[styles.raiseLabel, scale !== 1 && { fontSize: 9 * scale }]}
-      >
-        {label}
+      <Text style={[styles.raiseLabel, scale !== 1 && { fontSize: 9 * scale }]}>
+        {label === "BET" ? label : `${label} TO`}
       </Text>
       <View
         accessibilityActions={[
@@ -74,7 +76,11 @@ export function RaiseSlider({
         onResponderGrant={fromEvent}
         onResponderMove={fromEvent}
         onStartShouldSetResponder={() => !disabled}
-        style={[styles.touchArea, scale !== 1 && { height: 36 * scale }]}
+        style={[
+          styles.touchArea,
+          tight && { height: 28 },
+          scale !== 1 && { height: 36 * scale },
+        ]}
       >
         {/* The touch area is the tall hit target; pointerEvents none keeps locationX measured on
             it (same width as the track), not on the fill or thumb. */}
@@ -103,15 +109,21 @@ export function RaiseSlider({
           />
         </View>
       </View>
-      <Text
-        style={[
-          styles.raiseAmount,
-          scale !== 1 && { fontSize: 12 * scale, minWidth: 32 * scale },
-        ]}
-      >{`${amount.toLocaleString()}`}</Text>
+      <View style={styles.amountBox}>
+        <Text
+          style={[
+            styles.raiseAmount,
+            scale !== 1 && { fontSize: 13 * scale, minWidth: 40 * scale },
+          ]}
+        >{`${amount.toLocaleString()}`}</Text>
+      </View>
+      {children}
     </CoachTarget>
   );
 }
+
+/** Dark brown ink for the cream panel. */
+const WOOD_INK = "#3c240c";
 
 const styles = StyleSheet.create({
   raiseRow: {
@@ -121,14 +133,14 @@ const styles = StyleSheet.create({
     minHeight: 30,
   },
   raiseLabel: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: 9,
-    letterSpacing: 1.2,
+    color: WOOD_INK,
+    fontFamily: fonts.arcade,
+    fontSize: 11,
+    letterSpacing: 0.6,
   },
   touchArea: { flex: 1, height: 36, justifyContent: "center" },
   slider: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(60,36,12,0.22)",
     borderRadius: 2,
     height: 3,
     position: "relative",
@@ -145,11 +157,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 20,
   },
+  amountBox: {
+    backgroundColor: palette.cream100,
+    borderColor: "rgba(60,36,12,0.35)",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   raiseAmount: {
-    color: colors.gold,
+    color: WOOD_INK,
     fontFamily: fonts.monoBold,
-    fontSize: 12,
-    minWidth: 32,
+    fontSize: 13,
+    minWidth: 40,
     textAlign: "right",
   },
 });
