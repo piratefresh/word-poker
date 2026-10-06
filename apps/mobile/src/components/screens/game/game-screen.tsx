@@ -15,7 +15,7 @@ import {
   useHudChromeHeight,
   type BalanceView,
 } from "@/components/hud";
-import { ChipLayer, PokerTable } from "@/components/table";
+import { ChipLayer, PokerTable, useTableLayout } from "@/components/table";
 import { CoachTarget } from "@/components/ui/coach";
 
 import {
@@ -151,6 +151,7 @@ function GameScreenBody({
   const stageWidth = stageMaxWidth(window);
   const backdrop = useBackdropStyle();
   const roomSeating = isRoomBackdrop(backdrop);
+  const tabletop = backdrop === "tabletop";
   const chromeWidth = tableMaxWidth(window) ?? window.width;
   const tableWidth = roomSeating ? undefined : tableMaxWidth(window);
   const shadeFeather = 28 * useScreenScale();
@@ -173,7 +174,7 @@ function GameScreenBody({
   // press takes: `canBet` names it BET, and the same fact picks the engine action behind it. A
   // mode that armed the control for a bet is told it was a bet — nothing re-derives it.
   const commitWager = game.betting.canBet ? onBet : onRaise;
-  const seating = tableSeating(game.seatCount);
+  const seating = tableSeating(game.seatCount, tabletop);
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
@@ -209,9 +210,11 @@ function GameScreenBody({
           },
         ]}
       >
-        <CoachTarget id="community">
-          <CommunityStrip tiles={game.community} />
-        </CoachTarget>
+        {tabletop ? null : (
+          <CoachTarget id="community">
+            <CommunityStrip tiles={game.community} />
+          </CoachTarget>
+        )}
         <CoachTarget
           id="table"
           style={[
@@ -231,7 +234,10 @@ function GameScreenBody({
             hud={
               // The chips in flight go over the felt, inside the table's own layout provider: the
               // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
-              <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
+              <>
+                {tabletop ? <CommunityInTable tiles={game.community} /> : null}
+                <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
+              </>
             }
             // The table runs to the room's edges.
             chromeInset={0}
@@ -318,7 +324,37 @@ function GameScreenBody({
   );
 }
 
+const COMMUNITY_ROW_HEIGHT = 64;
+
+/**
+ * The tabletop's community row, centred on the layout's community anchor. It stays one view so
+ * the tutorial's `community` target has a box to highlight; the box has a real height because
+ * Android does not draw a child spilling out of a zero-size anchor (STO-516).
+ */
+function CommunityInTable({ tiles }: { tiles: GameScreenState["community"] }) {
+  const { layout, resolveContainer } = useTableLayout();
+  const center = resolveContainer({ x: 0.5, y: layout.config.communityY });
+  const height = COMMUNITY_ROW_HEIGHT * useScreenScale();
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[styles.communityInTable, { height, top: center.y - height / 2 }]}
+    >
+      <CoachTarget id="community">
+        <CommunityStrip inTable tiles={tiles} />
+      </CoachTarget>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  communityInTable: {
+    alignItems: "center",
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
   screen: { flex: 1 },
   content: { alignSelf: "center", flex: 1, width: "100%", zIndex: 1 },
   barShade: { bottom: 0, left: 0, position: "absolute", right: 0 },

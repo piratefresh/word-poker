@@ -550,7 +550,7 @@ test("refuses a seat count outside §5 before it spends a round trip", async () 
 
   expect(create).not.toHaveBeenCalled();
   expect(sentence(view, "create-table-seats-refusal")).toBe(
-    "Seats take a whole number from 2 to 6.",
+    "Seats take a whole number from 2 to 4.",
   );
 });
 
@@ -596,7 +596,7 @@ test("creates a Wild table when the form says so", async () => {
     expect(create).toHaveBeenCalledWith({
       name: "Wild night",
       buyIn: 500,
-      maxSeats: 6,
+      maxSeats: 4,
       powerUps: { deal: "choose3" },
     }),
   );

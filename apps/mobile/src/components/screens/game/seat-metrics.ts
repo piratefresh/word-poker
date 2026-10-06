@@ -197,7 +197,7 @@ export function playerSeatBounds(anchor: SeatAnchor, tableWidth: number, seatCou
 
 /** How a felt seats its players, as `PokerTable` props. */
 export interface TableSeating {
-  seatPlacement: "felt" | "rail";
+  seatPlacement: "felt" | "rail" | "room";
   layoutConfig: Partial<Omit<TableLayoutConfig, "seatCount">>;
 }
 
@@ -216,6 +216,43 @@ const RAIL_SEATING: TableSeating = {
  * hero and one seat beside it, not three), so it keeps its seats on the rail and the table fits
  * around them. Stable objects: the table recomputes its geometry when they change.
  */
-export function tableSeating(seatCount: number): TableSeating {
+export function tableSeating(seatCount: number, tabletop = false): TableSeating {
+  if (tabletop) return tabletopSeating(seatCount);
   return seatCount <= 4 ? FELT_SEATING : RAIL_SEATING;
+}
+
+/**
+ * The tabletop room: the hero at the bottom and every opponent along an arc across the top, so
+ * the community row and pot have the middle to themselves (the even ring would park a 4-seat
+ * table's opponents halfway down the sides, on top of the row).
+ */
+export function tabletopSeatAngles(seatCount: number): number[] {
+  const opponents = seatCount - 1;
+  const crowded = opponents > 3;
+  const arcStart = (crowded ? 1.1 : 1.3) * Math.PI;
+  const arcSpan = (crowded ? 0.8 : 0.4) * Math.PI;
+  return [
+    Math.PI / 2,
+    ...Array.from({ length: opponents }, (_, i) =>
+      opponents === 1 ? 1.5 * Math.PI : arcStart + (arcSpan * i) / (opponents - 1),
+    ),
+  ];
+}
+
+const TABLETOP_SEATING = new Map<number, TableSeating>();
+function tabletopSeating(seatCount: number): TableSeating {
+  let seating = TABLETOP_SEATING.get(seatCount);
+  if (!seating) {
+    seating = {
+      seatPlacement: "room",
+      layoutConfig: {
+        seatAngles: tabletopSeatAngles(seatCount),
+        seatRadius: { x: 1.6, y: 0.86 },
+        communityY: 0.44,
+        potY: 0.6,
+      },
+    };
+    TABLETOP_SEATING.set(seatCount, seating);
+  }
+  return seating;
 }

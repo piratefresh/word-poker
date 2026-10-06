@@ -393,7 +393,7 @@ describe("GameRoom", () => {
       const room = await colyseus.createRoom("game", {
         name: "Four Table",
         buyIn: FOUR_SEAT_BUY_IN,
-        maxSeats: 6,
+        maxSeats: 4,
         ...FOUR_SEAT_ROOM,
         payoutDelay: 50,
         tickMs: 5,
@@ -479,7 +479,7 @@ describe("GameRoom", () => {
     });
 
     it("deals a short table once every seat is ready, and not before", async () => {
-      const room = await colyseus.createRoom("game", { name: "Ready test", buyIn: 500, maxSeats: 6 });
+      const room = await colyseus.createRoom("game", { name: "Ready test", buyIn: 500, maxSeats: 4 });
       const first = await colyseus.connectTo(room);
       const second = await colyseus.connectTo(room);
       const third = await colyseus.connectTo(room);
@@ -502,7 +502,7 @@ describe("GameRoom", () => {
       assert.strictEqual(room.state.phase, WAITING_PHASE, "a seat can take its ready back");
 
       await readyUp(room, [first]);
-      assert.strictEqual(room.state.phase, "preflop", "three of six seats, all ready, is a table");
+      assert.strictEqual(room.state.phase, "preflop", "three of four seats, all ready, is a table");
       assert.strictEqual(room.state.seats.size, 3);
     });
 
@@ -918,7 +918,7 @@ describe("GameRoom", () => {
         return { seed, payoutDelay, turnDuration };
       };
       try {
-        const lobbyForm = await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 6 });
+        const lobbyForm = await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 4 });
         assert.deepStrictEqual(
           knobsOf(lobbyForm),
           { seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 },
@@ -928,7 +928,7 @@ describe("GameRoom", () => {
         const explicit = await colyseus.createRoom("game", {
           name: "Env knobs",
           buyIn: 500,
-          maxSeats: 6,
+          maxSeats: 4,
           seed: 7,
           payoutDelay: 50,
         });
@@ -939,7 +939,7 @@ describe("GameRoom", () => {
         );
 
         delete process.env.WORDPOKER_DETERMINISTIC_SEED;
-        const ungated = knobsOf(await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 6 }));
+        const ungated = knobsOf(await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 4 }));
         assert.notStrictEqual(ungated.turnDuration, 120_000, "without the gate the env is ignored");
         assert.notStrictEqual(ungated.payoutDelay, 20_000, "without the gate the env is ignored");
       } finally {
@@ -984,15 +984,15 @@ describe("GameRoom", () => {
       const room = await colyseus.createRoom("game", {
         name: "High Stakes",
         buyIn: 50_000,
-        maxSeats: 6,
+        maxSeats: 4,
       });
 
-      assert.strictEqual(room.maxClients, 6, "the seat cap is the room's own");
+      assert.strictEqual(room.maxClients, 4, "the seat cap is the room's own");
       assert.strictEqual(room.state.table.name, "High Stakes");
       assert.strictEqual(room.state.table.buyIn, 50_000);
       assert.strictEqual(room.state.table.smallBlind, 500, "ADR 0004: 1% of the buy-in");
       assert.strictEqual(room.state.table.bigBlind, 1_000, "ADR 0004: 2% of the buy-in");
-      assert.strictEqual(room.state.table.maxSeats, 6);
+      assert.strictEqual(room.state.table.maxSeats, 4);
     });
 
     it("publishes the config as the room's matchmaking metadata", async () => {
@@ -1042,7 +1042,7 @@ describe("GameRoom", () => {
       ["an over-long name", { name: "x".repeat(33), buyIn: 500, maxSeats: 2 }],
       ["a buy-in §2 does not offer", { name: "Table", buyIn: 1_234, maxSeats: 2 }],
       ["fewer than two seats", { name: "Table", buyIn: 500, maxSeats: 1 }],
-      ["more than six seats", { name: "Table", buyIn: 500, maxSeats: 7 }],
+      ["more than four seats", { name: "Table", buyIn: 500, maxSeats: 5 }],
       ["a fractional seat count", { name: "Table", buyIn: 500, maxSeats: 3.5 }],
       ["a deal mode no table runs", { name: "Table", buyIn: 500, maxSeats: 2, powerUps: { deal: "chaos" } }],
       ["no config at all", {}],
@@ -1058,7 +1058,7 @@ describe("GameRoom", () => {
     it("hands the client the sentence the config was refused with", async () => {
       await assert.rejects(
         colyseus.sdk.create("game", { name: "Table", buyIn: 500, maxSeats: 9 }),
-        (error: Error) => /whole number from 2 to 6/.test(error.message),
+        (error: Error) => /whole number from 2 to 4/.test(error.message),
       );
     });
   });

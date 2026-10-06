@@ -40,7 +40,7 @@ itself, the rules take the reading below. Each one is a decision; the ADR record
 | "Buy-In as Bet Cap": a tier's top buy-in caps what a player can bring, "even across rebuys or top-ups" | A table's Buy-In Cap limits the Wallet Coins a player moves onto that table in one table session. Winnings are not capped | §2, §27, [ADR 0007](adr/0007-buy-in-cap.md) |
 | Double Letter "favors high-value letters (5+ points)" | A tile whose best face is worth 5 or more rolls its Double Letter at a higher chance | §9 |
 | MONSTER quick example: "21 points" | 28 points — the spec's own step-by-step breakdown | §8 |
-| "4-6 players at table" (Setup) | A table seats 2 to 6: the spec's 4 is the recommended fill, and §5 spells out heads-up blinds and turn order for a table of two | §5, [ADR 0004](adr/0004-blinds.md) |
+| "4-6 players at table" (Setup) | A table seats 2 to 4 (the tabletop layout has no room for more), and §5 spells out heads-up blinds and turn order for a table of two | §5, [ADR 0004](adr/0004-blinds.md) |
 
 ## Not Yet in Code
 

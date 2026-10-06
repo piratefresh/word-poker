@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 
 import type { LetterTileData } from "../game-types";
 import { useScreenScale } from "../screen-scale";
+import { Tile } from "@/components/game";
 import { LabelBand } from "./label-band";
 import { communityDealDelayMs, EmptyTile, LetterTile } from "./letter-tile";
 
@@ -46,20 +47,28 @@ function rackStyles(tile: number) {
   });
 }
 
+/** What an undealt slot's face-down tile is drawn from; its letter is never shown. */
+const BACK_TILE: LetterTileData = { id: "undealt", letter: "A", points: 1 };
+
 export function CommunityStrip({
   tiles,
+  inTable = false,
 }: {
   tiles: readonly (LetterTileData | null)[];
+  /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
+  inTable?: boolean;
 }) {
   const scale = useScreenScale();
   const tileSize = COMMUNITY_TILE * scale;
   const rack = useMemo(() => rackStyles(tileSize), [tileSize]);
   const five = Array.from({ length: 5 }, (_, index) => tiles[index] ?? null);
   return (
-    <View style={styles.community}>
-      <LabelBand>
-        COMMUNITY {"·"} {five.filter(Boolean).length}/5
-      </LabelBand>
+    <View style={inTable ? undefined : styles.community}>
+      {inTable ? null : (
+        <LabelBand>
+          COMMUNITY {"·"} {five.filter(Boolean).length}/5
+        </LabelBand>
+      )}
       <View style={rack.rack}>
         {/* <Image
           contentFit="fill"
@@ -76,6 +85,15 @@ export function CommunityStrip({
                 scale={scale}
                 size={COMMUNITY_TILE}
                 tile={tile}
+              />
+            ) : inTable ? (
+              <Tile
+                key={`community-${index}`}
+                ownership="neutral"
+                scale={scale}
+                side="back"
+                size="medium"
+                tile={BACK_TILE}
               />
             ) : (
               <EmptyTile key={`community-${index}`} size={tileSize} />

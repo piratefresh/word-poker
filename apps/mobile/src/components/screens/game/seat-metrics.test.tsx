@@ -23,6 +23,7 @@ import {
   playerSeatBounds,
   seatDirection,
   seatMetrics,
+  tabletopSeatAngles,
 } from "./seat-metrics";
 
 /** Table regions from a phone up to a 1080p desktop window. */
@@ -273,4 +274,13 @@ describe("the rendered seat", () => {
     expect(seat.top).toBe(-avatarDiameter(960) / 2);
     expect(seat.left).toBe(-seat.width / 2);
   });
+});
+
+test.each([2, 4, 6, 9])("seats the hero at the bottom and %i-seat opponents across the top, left to right", (count) => {
+  const [hero, ...opponents] = tabletopSeatAngles(count);
+  expect(opponents).toHaveLength(count - 1);
+  expect(Math.sin(hero)).toBe(1);
+  for (const angle of opponents) expect(Math.sin(angle)).toBeLessThan(-0.3);
+  const xs = opponents.map(Math.cos);
+  expect([...xs].sort((a, b) => a - b)).toEqual(xs);
 });

@@ -79,7 +79,7 @@ configuration and not the code.
 The range's floor is 20 big blinds, so no one sits down too short to play a hand. The
 tournament and cash-game tiers of the product spec are [Formats](formats.md) §41–§42.
 
-Maximum players at every tier: 6.
+Maximum players at every tier: 4.
 
 ---
 
@@ -101,7 +101,7 @@ Each table card displays:
 
 Buy-In: 20,000 – 50,000 Coins
 Blinds: 500 / 1,000
-Players: 4/6
+Players: 4/4
 
 [ JOIN ]
 
@@ -162,7 +162,7 @@ The Wallet deduction and Table Stack creation must happen as one transaction. Th
 Each table supports:
 
 - Minimum recommended players: 4
-- Maximum players: 6
+- Maximum players: 4
 - One house-controlled dealer
 - Buy-ins inside the tier's range, up to the Buy-In Cap
 - A small blind and a big blind (below)
