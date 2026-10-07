@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -8,26 +9,24 @@ import {
 } from "react-native";
 
 import { CoachTarget } from "@/components/ui/coach";
-import { colors, fonts, palette, radius } from "@/constants/theme";
+import { fonts, palette, radius } from "@/constants/theme";
 
 import type { BettingState } from "../game-types";
 import { useCompactControls, useScreenScale } from "../screen-scale";
+import { formatCompactAmount } from "./format-amount";
 
-/** The wager row's slider: its label, the track, and the amount. */
+/** The wager slider. */
 export function RaiseSlider({
   state,
   amount,
-  label,
+  pot,
   disabled,
   onAmountChange,
-  children,
 }: {
-  /** Drawn after the amount box: the panel's All In. */
-  children?: ReactNode;
   state: BettingState;
   amount: number;
-  /** BET or RAISE — the action the wager button takes. */
-  label: string;
+  /** The chips currently in the pot, including this round's commitments. */
+  pot: number;
   disabled: boolean;
   onAmountChange: (amount: number) => void;
 }) {
@@ -37,6 +36,26 @@ export function RaiseSlider({
 
   const range = Math.max(1, state.maxRaise - state.minRaise);
   const progress = (amount - state.minRaise) / range;
+  const potAfterCall = pot + (state.callAmount ?? 0);
+  const wagerPhrase = state.wager === "bet" ? "bet" : "raise to";
+  const presets = POT_PRESETS.map((preset) => {
+    // Slider amounts are round totals (§22): add a fraction of the pot after calling to the
+    // current round total. In an unopened round, this reduces to a fraction of the pot.
+    const desired = state.currentBet + potAfterCall * preset.multiplier;
+    const available =
+      !disabled && desired >= state.minRaise && desired <= state.maxRaise;
+    const stepped = Math.round(desired / state.raiseStep) * state.raiseStep;
+    const presetAmount = Math.max(
+      state.minRaise,
+      Math.min(state.maxRaise, stepped),
+    );
+    return {
+      ...preset,
+      amount: presetAmount,
+      available,
+      selected: available && amount === presetAmount,
+    };
+  });
   const fromEvent = (event: GestureResponderEvent) => {
     onAmountChange(
       state.minRaise + (event.nativeEvent.locationX / trackWidth) * range,
@@ -44,11 +63,51 @@ export function RaiseSlider({
   };
   return (
     <CoachTarget id="raise" style={styles.raiseRow}>
-      <Text
-        style={[styles.raiseLabel, scale !== 1 && { fontSize: 12 * scale }]}
-      >
-        {label === "BET" ? label : `${label} TO`}
-      </Text>
+      <View style={[styles.presetRow, { marginHorizontal: 12 * scale }]}>
+        {presets.map((preset) => (
+          <Pressable
+            key={preset.label}
+            accessibilityLabel={[
+              preset.accessibilityLabel,
+              wagerPhrase,
+              formatCompactAmount(preset.amount),
+            ].join(" ")}
+            accessibilityRole="button"
+            accessibilityState={{ selected: preset.selected }}
+            disabled={!preset.available}
+            hitSlop={{ top: 7, bottom: 7, left: 5, right: 5 }}
+            onPress={() => onAmountChange(preset.amount)}
+            style={({ pressed }) => [
+              styles.presetButton,
+              preset.available && pressed && styles.presetButtonPressed,
+              !preset.available && styles.presetButtonDisabled,
+            ]}
+          >
+            <View
+              style={[
+                styles.flagBadge,
+                preset.selected && styles.flagBadgeSelected,
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.flagText,
+                  preset.selected && styles.flagTextSelected,
+                ]}
+              >
+                {preset.label}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.flagPole,
+                preset.selected && styles.flagPoleSelected,
+              ]}
+            />
+          </Pressable>
+        ))}
+      </View>
       <View style={styles.trackRow}>
         <View
           accessibilityActions={[
@@ -113,37 +172,54 @@ export function RaiseSlider({
             />
           </View>
         </View>
-        <View style={styles.amountBox}>
-          <Text
-            style={[
-              styles.raiseAmount,
-              scale !== 1 && { fontSize: 13 * scale, minWidth: 40 * scale },
-            ]}
-          >{`${amount.toLocaleString()}`}</Text>
-        </View>
-        {children}
       </View>
     </CoachTarget>
   );
 }
 
-/** Dark brown ink for the cream panel. */
-const WOOD_INK = "#3c240c";
+const POT_PRESETS = [
+  { label: "½ POT", accessibilityLabel: "Half pot", multiplier: 0.5 },
+  { label: "POT", accessibilityLabel: "Pot", multiplier: 1 },
+  { label: "2× POT", accessibilityLabel: "Two times pot", multiplier: 2 },
+] as const;
 
 const styles = StyleSheet.create({
-  raiseRow: { gap: 2 },
+  raiseRow: { flex: 1, minWidth: 0 },
+  presetRow: { flexDirection: "row", height: 30 },
+  presetButton: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  presetButtonPressed: { transform: [{ translateY: 1 }] },
+  presetButtonDisabled: { opacity: 0.38 },
+  flagBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(60,36,12,0.88)",
+    borderColor: palette.gold400,
+    borderRadius: 4,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  flagBadgeSelected: {
+    backgroundColor: palette.gold300,
+    borderColor: palette.gold100,
+  },
+  flagText: {
+    color: palette.cream100,
+    fontFamily: fonts.sansBlack,
+    fontSize: 9,
+    lineHeight: 10,
+  },
+  flagTextSelected: { color: "#3c240c" },
+  flagPole: { backgroundColor: palette.gold400, height: 4, width: 2 },
+  flagPoleSelected: { backgroundColor: palette.gold100 },
   trackRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    flex: 1,
     minHeight: 30,
-  },
-  raiseLabel: {
-    color: WOOD_INK,
-    fontFamily: fonts.slab,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    textShadow: "0px 1px 0px rgba(255,255,255,0.7)",
   },
   touchArea: { flex: 1, height: 36, justifyContent: "center" },
   slider: {
@@ -151,20 +227,19 @@ const styles = StyleSheet.create({
     borderColor: "#5a3a14",
     borderRadius: 6,
     borderWidth: 1.5,
-    boxShadow:
-      "inset 0px 2px 3px rgba(0,0,0,0.7), 0px 1.5px 0px rgba(255,255,255,0.75)",
+    boxShadow: "inset 0px 2px 3px rgba(0,0,0,0.7)",
     height: 10,
     position: "relative",
   },
   sliderFill: {
-    backgroundColor: colors.gold,
+    backgroundColor: "#ffc500",
     borderRadius: 4,
     boxShadow:
       "inset 0px 1px 0px rgba(255,248,220,0.9), inset 0px -2px 0px rgba(138,90,12,0.45)",
     height: 7,
   },
   sliderThumb: {
-    backgroundColor: colors.gold,
+    backgroundColor: "#ffc500",
     borderColor: "#6b430a",
     borderRadius: radius.pill,
     borderWidth: 2.5,
@@ -175,22 +250,5 @@ const styles = StyleSheet.create({
     marginTop: -10,
     position: "absolute",
     width: 24,
-  },
-  amountBox: {
-    backgroundColor: palette.cream100,
-    borderColor: "rgba(60,36,12,0.4)",
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    boxShadow:
-      "inset 0px 2px 3px rgba(80,50,10,0.3), 0px 1px 0px rgba(255,255,255,0.7)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  raiseAmount: {
-    color: WOOD_INK,
-    fontFamily: fonts.uiMedium,
-    fontSize: 13,
-    minWidth: 40,
-    textAlign: "right",
   },
 });

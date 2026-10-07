@@ -97,14 +97,14 @@ interface Material {
 
 const MATERIALS: Record<GameButtonVariant, Material> = {
   gold: {
-    gradient: [palette.gold100, palette.gold300, palette.gold500],
-    lip: "#4a3508",
-    edge: palette.gold200,
+    gradient: [palette.gold300, "#b8892a", "#6b4e12"],
+    lip: "#3d2a06",
+    edge: palette.gold400,
     ink: colors.onGold,
-    highlight: "rgba(255,248,220,0.7)",
-    sheen: "rgba(255,255,255,0.22)",
-    bevel: "rgba(74,53,8,0.45)",
-    inkShadow: "rgba(255,240,200,0.45)",
+    highlight: "rgba(255,244,205,0.4)",
+    sheen: "rgba(255,255,255,0.14)",
+    bevel: "rgba(61,42,6,0.5)",
+    inkShadow: "rgba(255,240,200,0.4)",
   },
   // The secondary: a charcoal slab, near flat, framed twice — a black edge and a pale hairline
   // just inside it — with the label set bright. It recedes beside the gold without going muddy.
@@ -121,24 +121,24 @@ const MATERIALS: Record<GameButtonVariant, Material> = {
   },
   // The control that gives something up: a struck red slab, same build as `gold`.
   danger: {
-    gradient: ["#e8897c", "#b23a2c", "#7a2018"],
-    lip: "#3a0f09",
-    edge: "#c9493a",
+    gradient: ["#c4573f", "#93251a", "#5e120b"],
+    lip: "#2e0a05",
+    edge: "#a03a28",
     ink: colors.textBright,
-    highlight: "rgba(255,230,220,0.5)",
-    sheen: "rgba(255,255,255,0.18)",
-    bevel: "rgba(58,15,9,0.45)",
-    inkShadow: "rgba(0,0,0,0.6)",
+    highlight: "rgba(255,220,210,0.3)",
+    sheen: "rgba(255,255,255,0.12)",
+    bevel: "rgba(46,10,5,0.5)",
+    inkShadow: "rgba(0,0,0,0.7)",
   },
   blue: {
-    gradient: ["#7fb0ee", "#2f6bc4", "#1d4688"],
-    lip: "#0c2147",
-    edge: "#5b92dd",
+    gradient: ["#4d7fbe", "#1e4689", "#12305f"],
+    lip: "#081733",
+    edge: "#36629e",
     ink: colors.textBright,
-    highlight: "rgba(220,235,255,0.5)",
-    sheen: "rgba(255,255,255,0.18)",
-    bevel: "rgba(12,33,71,0.45)",
-    inkShadow: "rgba(0,0,0,0.6)",
+    highlight: "rgba(210,230,255,0.3)",
+    sheen: "rgba(255,255,255,0.12)",
+    bevel: "rgba(8,23,51,0.5)",
+    inkShadow: "rgba(0,0,0,0.7)",
   },
   green: {
     gradient: ["#3fae66", "#0b6b36", "#08592c"],
@@ -222,7 +222,13 @@ export function GameButton({
               style={StyleSheet.absoluteFill}
             />
             <LinearGradient
-              colors={[brighten(material.sheen), "rgba(255,255,255,0)"]}
+              colors={[
+                // At rest the sheen is the material's own alpha; a hover lifts it.
+                hovered && !disabled
+                  ? brighten(material.sheen)
+                  : material.sheen,
+                "rgba(255,255,255,0)",
+              ]}
               end={{ x: 0.5, y: 1 }}
               pointerEvents="none"
               start={{ x: 0.5, y: 0 }}
@@ -269,7 +275,7 @@ export function GameButton({
                   numberOfLines={1}
                   style={[
                     styles.amount,
-                    scale !== 1 && { fontSize: 16 * scale },
+                    scale !== 1 && { fontSize: 17 * scale },
                     {
                       color: material.ink,
                       textShadowColor: material.inkShadow,
@@ -287,8 +293,8 @@ export function GameButton({
                     amount !== undefined && styles.labelSecondary,
                     compact && amount === undefined && styles.labelCompact,
                     scale !== 1 && {
-                      fontSize: (amount === undefined ? 11 : 10) * scale,
-                      letterSpacing: 1.2 * scale,
+                      fontSize: (amount === undefined ? 14 : 11) * scale,
+                      letterSpacing: 0.3 * scale,
                     },
                     {
                       color: material.ink,
@@ -328,7 +334,7 @@ const styles = StyleSheet.create({
     minWidth: 48,
   },
   buttonCompact: { height: 46, minWidth: 44 },
-  labelCompact: { fontSize: 10 },
+  labelCompact: { fontSize: 12 },
   disabled: { opacity: opacity.disabled },
   face: {
     alignItems: "center",
@@ -343,13 +349,13 @@ const styles = StyleSheet.create({
   /** An amount over its action: the number leads, the label sits under it. */
   contentStacked: { flexDirection: "column", gap: 0 },
   amount: {
-    fontFamily: fonts.uiMedium,
-    fontSize: 18,
+    fontFamily: fonts.sansBlack,
+    fontSize: 17,
     textAlign: "center",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
   },
-  labelSecondary: { fontSize: 10, letterSpacing: 1 },
+  labelSecondary: { fontSize: 11, letterSpacing: 0.3 },
   /** At rest the face stands on the lip; the lip shows as a dark band at its foot. */
   faceUp: { marginBottom: LIP },
   /** Pressed, the face sinks: the band closes and the whole face — label too — moves down. */
@@ -384,9 +390,9 @@ const styles = StyleSheet.create({
     right: 0,
   },
   label: {
-    fontFamily: fonts.ui,
-    fontSize: 12,
-    letterSpacing: 1,
+    fontFamily: fonts.sansBlack,
+    fontSize: 14,
+    letterSpacing: 0.3,
     textAlign: "center",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
