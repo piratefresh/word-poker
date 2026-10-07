@@ -7,8 +7,6 @@ import { Tile } from "@/components/game";
 import { LabelBand } from "./label-band";
 import { communityDealDelayMs, EmptyTile, LetterTile } from "./letter-tile";
 
-// Relative, not `@/assets`: Jest maps `@/` to `src/` only.
-const COMMUNITY_RACK = require("../../../../../assets/images/ui/community-rack-5.png");
 /** The rack picture, in its own pixels. */
 const RACK_IMAGE = { width: 2172, height: 724 };
 /** The painted frame's top and bottom (the rest of the picture is transparent margin). */
@@ -53,13 +51,17 @@ const BACK_TILE: LetterTileData = { id: "undealt", letter: "A", points: 1 };
 export function CommunityStrip({
   tiles,
   inTable = false,
+  scale: requestedScale,
 }: {
   tiles: readonly (LetterTileData | null)[];
   /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
   inTable?: boolean;
+  scale?: number;
 }) {
-  const scale = useScreenScale();
-  const tileSize = COMMUNITY_TILE * scale;
+  const screenScale = useScreenScale();
+  const scale = requestedScale ?? screenScale;
+  const tileWidth = inTable ? 58 : COMMUNITY_TILE;
+  const tileSize = tileWidth * scale;
   const rack = useMemo(() => rackStyles(tileSize), [tileSize]);
   const five = Array.from({ length: 5 }, (_, index) => tiles[index] ?? null);
   return (
@@ -69,21 +71,15 @@ export function CommunityStrip({
           COMMUNITY {"·"} {five.filter(Boolean).length}/5
         </LabelBand>
       )}
-      <View style={rack.rack}>
-        {/* <Image
-          contentFit="fill"
-          pointerEvents="none"
-          source={COMMUNITY_RACK}
-          style={rack.art}
-        /> */}
-        <View style={[styles.tileRow, rack.opening]}>
+      <View style={inTable ? undefined : rack.rack}>
+        <View style={[styles.tileRow, !inTable && rack.opening, { gap: 6 * scale }]}>
           {five.map((tile, index) =>
             tile ? (
               <LetterTile
                 dealDelayMs={communityDealDelayMs(index)}
                 key={`community-${index}`}
                 scale={scale}
-                size={COMMUNITY_TILE}
+                size={tileWidth}
                 tile={tile}
               />
             ) : inTable ? (
@@ -92,7 +88,7 @@ export function CommunityStrip({
                 ownership="neutral"
                 scale={scale}
                 side="back"
-                size="medium"
+                size="large"
                 tile={BACK_TILE}
               />
             ) : (

@@ -26,6 +26,7 @@ import {
   useBackdropStyle,
 } from "./backdrop";
 import { isRoomBackdrop } from "./backdrop/backdrop-style";
+import { CoinBowlGameContext } from "./backdrop/coin-bowl-motion";
 import { BettingControls, bettingRowStyle, useRaiseAmount } from "./betting";
 import type { GamePlayer, GameScreenState } from "./game-types";
 import {
@@ -41,7 +42,7 @@ import {
   useCompactControls,
   useScreenScale,
 } from "./screen-scale";
-import { playerSeatBounds, tableSeating } from "./seat-metrics";
+import { playerSeatBounds, tableSeating, tabletopSeatBounds } from "./seat-metrics";
 import { DEVICE_CLOCK_SAMPLE, heroTurnPhrase, useHandTurn } from "./turn";
 
 export interface GameScreenProps {
@@ -63,6 +64,8 @@ export interface GameScreenProps {
    * table's region and nothing past it, so the community above and the rack below stay in view.
    */
   overFelt?: ReactNode;
+  /** A short, presentation-only celebration above the table after a showdown. */
+  winOverlay?: ReactNode;
   onBack?: () => void;
   onHelp?: () => void;
   onSettings?: () => void;
@@ -122,6 +125,7 @@ function GameScreenBody({
   rack,
   rackActions,
   overFelt,
+  winOverlay,
   onBack,
   onHelp,
   onSettings,
@@ -150,12 +154,19 @@ function GameScreenBody({
   // panel stand in side columns over its lower corners, leaving the pot and hero between them.
   const landscape = tabletop && window.width > window.height;
   const scale = useScreenScale();
-  const chromeWidth = tableMaxWidth(window) ?? window.width;
+  const tight = useCompactControls();
+  const [controlsHeight, setControlsHeight] = useState(0);
+  const tableHeight = height - insets.top - insets.bottom - hudHeight - (landscape ? 0 : controlsHeight);
+  // Short phones need extra clearance for the deeper two-slot tabletop rack.
+  const roomChromeWidth = Math.max(tight ? 220 : 240, tableHeight * (400 / (tight ? 540 : 470)));
+  const chromeWidth = tabletop
+    ? Math.min(tableMaxWidth(window) ?? window.width, roomChromeWidth)
+    : tableMaxWidth(window) ?? window.width;
+  const tabletopScale = Math.min(1.8, chromeWidth / 400);
   const tableWidth = roomSeating ? undefined : tableMaxWidth(window);
   const shadeFeather = 28 * scale;
   const [barHeight, setBarHeight] = useState(0);
   const compact = height - insets.top - insets.bottom < 690;
-  const tight = useCompactControls();
   const [raiseAmount, changeRaise] = useRaiseAmount(
     game.betting,
     onRaiseAmountChange,
@@ -196,6 +207,7 @@ function GameScreenBody({
   );
   const bettingBlock = (
     <View
+      style={rackActions != null && !waiting && !landscape && styles.bettingCloser}
       onLayout={(event: LayoutChangeEvent) =>
         setBarHeight(event.nativeEvent.layout.height)
       }
@@ -211,6 +223,7 @@ function GameScreenBody({
           onCheckOrCall={onCheckOrCall}
           onFold={onFold}
           onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
+          pot={game.pot}
           state={game.betting}
         />
       )}
@@ -219,6 +232,8 @@ function GameScreenBody({
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
+      {/* The backdrop's coin bowl and the pot bowl both play the table's turns. */}
+      <CoinBowlGameContext.Provider value={game}>
       <BackdropUrgencyProvider
         value={waiting || view.paused ? 0 : view.elapsedFraction}
       >
@@ -279,7 +294,7 @@ function GameScreenBody({
               // The chips in flight go over the felt, inside the table's own layout provider: the
               // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
               <>
-                {tabletop ? <CommunityInTable tiles={game.community} /> : null}
+                {tabletop ? <CommunityInTable scale={tabletopScale} tiles={game.community} /> : null}
                 <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
               </>
             }
@@ -293,12 +308,15 @@ function GameScreenBody({
                 sidePots={game.sidePots}
                 blinds={game.blinds}
                 tableWidth={appearanceWidth ?? size.width}
+                tabletop={tabletop}
               />
             )}
-            renderSeat={(slot) => <PlayerSeat {...slot} onPress={onSeatPress} />}
+            renderSeat={(slot) => (
+              <PlayerSeat {...slot} dealt={!waiting} onPress={onSeatPress} tabletop={tabletop} />
+            )}
             // The seats scale with the felt and, at up to four, sit inside the table — avatars
             // on the felt, labels at most on the rail — so the table fills its room.
-            seatBounds={playerSeatBounds}
+            seatBounds={tabletop ? tabletopSeatBounds : playerSeatBounds}
             seatPlacement={roomSeating ? "room" : seating.seatPlacement}
             seatCount={game.seatCount}
             seats={game.players}
@@ -306,6 +324,7 @@ function GameScreenBody({
             testID="poker-table"
           />
           {overFelt}
+          {winOverlay}
         </CoachTarget>
         {landscape ? (
           <View
@@ -327,10 +346,10 @@ function GameScreenBody({
             </View>
           </View>
         ) : (
-          <>
+          <View onLayout={(event: LayoutChangeEvent) => setControlsHeight(event.nativeEvent.layout.height)}>
             {rackBlock}
             {bettingBlock}
-          </>
+          </View>
         )}
       </View>
       <Hud
@@ -352,28 +371,29 @@ function GameScreenBody({
           top={insets.top + hudHeight}
         />
       ) : null}
+      </CoinBowlGameContext.Provider>
     </LinearGradient>
   );
 }
 
-const COMMUNITY_ROW_HEIGHT = 64;
+const COMMUNITY_ROW_HEIGHT = 80;
 
 /**
  * The tabletop's community row, centred on the layout's community anchor. It stays one view so
  * the tutorial's `community` target has a box to highlight; the box has a real height because
  * Android does not draw a child spilling out of a zero-size anchor (STO-516).
  */
-function CommunityInTable({ tiles }: { tiles: GameScreenState["community"] }) {
+function CommunityInTable({ tiles, scale }: { tiles: GameScreenState["community"]; scale: number }) {
   const { layout, resolveContainer } = useTableLayout();
   const center = resolveContainer({ x: 0.5, y: layout.config.communityY });
-  const height = COMMUNITY_ROW_HEIGHT * useScreenScale();
+  const height = COMMUNITY_ROW_HEIGHT * scale;
   return (
     <View
       pointerEvents="box-none"
       style={[styles.communityInTable, { height, top: center.y - height / 2 }]}
     >
       <CoachTarget id="community">
-        <CommunityStrip inTable tiles={tiles} />
+        <CommunityStrip inTable scale={scale} tiles={tiles} />
       </CoachTarget>
     </View>
   );
@@ -405,11 +425,14 @@ const styles = StyleSheet.create({
   tableRegionTight: { alignSelf: "center", width: "86%" },
   table: { backgroundColor: "transparent", flex: 1 },
   waiting: bettingRowStyle,
+  bettingCloser: { marginTop: -6 },
   rackActions: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
-    paddingTop: 6,
+    paddingHorizontal: 22,
+    paddingTop: 4,
+    paddingBottom: 2,
   },
 });

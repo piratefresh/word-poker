@@ -47,7 +47,7 @@ afterEach(() => {
 test("shows one header, the HUD's own, and none of the header it replaced", async () => {
   const view = await renderScreen();
 
-  expect(view.getByText("PHASE 3 · THE FLOP")).toBeOnTheScreen();
+  expect(view.getByText("FLOP")).toBeOnTheScreen();
 
   // The replaced header had its own leave, help, and chat buttons. A second of any of
   // them is a screen with two headers.
@@ -103,7 +103,7 @@ test("keeps a seat's tap under the HUD", async () => {
 
   // Pressed on the name inside the seat, so the tap has to travel out through the seat
   // and the felt layers to reach the handler.
-  await fireEvent.press(view.getByText(/MAGNUS/));
+  await fireEvent.press(view.getByText("YOU"));
 
   expect(onSeatPress).toHaveBeenCalledWith(
     expect.objectContaining({ id: "magnus", isHero: true }),
@@ -273,7 +273,7 @@ describe("landscape tabletop", () => {
   const original = Dimensions.get("window");
   afterEach(() => {
     Dimensions.set({ window: original, screen: original });
-    setBackdropStyle("emerald");
+    setBackdropStyle("tabletop");
   });
 
   // Phone landscape is the tight case: every control the tutorial points at has to still be drawn.

@@ -4,7 +4,10 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import type { Tile as TileData } from "@wordpoker/contracts";
 
 import { Tile, type TileSize } from "@/components/game";
-import { TableBackdrop } from "@/components/screens/game/backdrop/table-backdrop";
+import { SceneBackdrop } from "@/components/screens/game/backdrop/scene-backdrop";
+import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
+import { PlayerSeat } from "@/components/screens/game/primitives";
+import { Pot } from "@/components/screens/game/primitives/pot";
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, spacing } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
@@ -50,12 +53,43 @@ export default function DevTabletopKit() {
 
   return (
     <View style={styles.page} testID="tabletop-kit">
-      <TableBackdrop look="wood" />
+      <SceneBackdrop look="tabletop" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.toggles}>
           <Toggle label="Flip backs" on={flipped} onPress={() => setFlipped((on) => !on)} />
           <Toggle label="Lift J" on={lifted} onPress={() => setLifted((on) => !on)} />
         </View>
+
+        {/* The real tabletop seat on the tests' fixture (STO-532): plate, rack and badge. */}
+        <Section title="player seat (tabletop · 400 room)">
+          <View style={styles.seats}>
+            {["ellis", "jay", "magnus"].map((id, index) => (
+              <View key={id} style={styles.seatWrap}>
+                <View style={styles.seatAnchor}>
+                  <PlayerSeat
+                    anchor={{ x: 0, y: 0, angle: Math.PI / 2, key: id, index }}
+                    appearanceWidth={400}
+                    dealt
+                    isDealer={index === 0}
+                    scale={1}
+                    seat={FOUR_PLAYER_FLOP_FIXTURE.players.find((p) => p?.id === id) ?? null}
+                    seatCount={4}
+                    size={{ width: 400, height: 400 }}
+                    tabletop
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </Section>
+
+        <Section title="dynamic pot chips">
+          <View style={styles.tiles}>
+            {[0, 20, 120, 137, 1000, 12000].map((amount) => (
+              <Pot key={amount} amount={amount} tabletop />
+            ))}
+          </View>
+        </Section>
 
         {SCALES.flatMap((scale) =>
           SIZES.map((size) => (
@@ -157,6 +191,10 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   toggles: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  seats: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, justifyContent: "center" },
+  seatWrap: { height: 200, width: 124 },
+  // A seat hangs from its avatar's centre: the anchor is the column's middle, half an avatar down.
+  seatAnchor: { left: 62, position: "absolute", top: 40 },
   toggle: {
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 999,
