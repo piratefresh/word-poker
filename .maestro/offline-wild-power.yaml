@@ -128,15 +128,15 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 6 · PAYOUT"
+        text: "PAYOUT"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PHASE 5 · THE RIVER|PHASE 6 · PAYOUT"
+          visible: "YOUR TURN|RIVER|PAYOUT"
           timeout: 70000
           optional: true
       - runFlow:
           when:
-            visible: "YOUR TURN|PHASE 5 · THE RIVER"
+            visible: "YOUR TURN|RIVER"
           commands:
             - tapOn:
                 id: "action-check-call"

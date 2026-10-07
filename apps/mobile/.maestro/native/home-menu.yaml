@@ -49,5 +49,5 @@ tags:
 - tapOn:
     id: "offline-normal"
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 90000

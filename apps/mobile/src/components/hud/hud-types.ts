@@ -10,15 +10,15 @@ import type { RoundPhase } from "@wordpoker/contracts";
 
 /** Phase wording as the table names it, not as the engine stores it. */
 export const PHASE_LABEL: Record<RoundPhase, string> = {
-  preflop: "PRE-FLOP",
-  flop: "THE FLOP",
-  turn: "THE TURN",
-  river: "THE RIVER",
+  preflop: "PREFLOP",
+  flop: "FLOP",
+  turn: "TURN",
+  river: "RIVER",
   payout: "PAYOUT",
 };
 
 /**
- * The ordinal the header stamp shows, e.g. the `4` in `PHASE 4 · THE TURN`.
+ * The ordinal the header stamp shows, e.g. the `4` in `TURN`.
  *
  * Pre-flop is 2, not 1: the design's flop screen reads `PHASE 3` and its turn screen
  * reads `PHASE 4`, which only agree if something precedes pre-flop. Named here so the

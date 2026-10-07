@@ -60,7 +60,7 @@ tags:
 
 # Hand 3 is dealt without it: the seat reads BUSTED, sees the hand start, and leaves the table.
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 60000
 - assertVisible:
     text: "BUSTED"

@@ -13,7 +13,7 @@ import { useLoopsEnabled, usePhaseClock } from "@/motion";
 import type { ToastQueue } from "./hud-toasts";
 import { HudToasts } from "./hud-toasts";
 import { hudBarHeight, HudTopBar } from "./hud-top-bar";
-import { BalanceView, PHASE_NUMBER } from "./hud-types";
+import { BalanceView } from "./hud-types";
 import type { TurnTimerView } from "./turn-clock";
 
 export interface HudProps {
@@ -104,8 +104,7 @@ export function Hud({
           onSettings={onSettings}
           phase={phase}
           // Derived rather than passed: the ordinal is a property of the phase, and two
-          // screens each deciding what number a phase is would eventually disagree.
-          phaseNumber={PHASE_NUMBER[phase]}
+          // screens each deciding what number a phase is would eventually disagree.
           reduceMotion={reduceMotion}
           stamp={stamp}
           tick={tick}

@@ -30,17 +30,17 @@ tags:
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 30000
 
 # Walk to the river. The row's check/call action has one stable device test id.
 - repeat:
     while:
       notVisible:
-        text: "PHASE 5 · THE RIVER"
+        text: "RIVER"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          visible: "YOUR TURN|RIVER"
           timeout: 40000
           optional: true
       - runFlow:
@@ -67,7 +67,7 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 6 · PAYOUT"
+        text: "PAYOUT"
     commands:
       - tapOn:
           id: "action-check-call"
