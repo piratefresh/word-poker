@@ -5,6 +5,10 @@ import { ArcadeDigits } from "@/components/hud/top-bar/arcade-digits";
 import { colors, fonts } from "@/constants/theme";
 
 import { seatMetrics } from "../seat-metrics";
+import { PotBowl } from "./pot-bowl";
+
+/** How far the pot's plate climbs over the bowl, at the phone size. */
+const PLATE_OVERLAP = 40;
 
 /** The pot's measures at the phone size, grown by the seats' factor on a larger table. */
 function potStyles(scale: number) {
@@ -33,6 +37,7 @@ export function Pot({
   sidePots = [],
   blinds,
   tableWidth,
+  tabletop = false,
 }: {
   amount: number;
   sidePots?: readonly number[];
@@ -40,14 +45,64 @@ export function Pot({
   blinds?: { smallBlind: number; bigBlind: number };
   /** The felt's width: the pot grows with the table by the seats' own factor. Phone size without it. */
   tableWidth?: number;
+  tabletop?: boolean;
 }) {
-  const scaled = usePotStyles(tableWidth ? seatMetrics(tableWidth).scale : 1);
+  const scale = tableWidth ? seatMetrics(tableWidth, tabletop).scale : 1;
+  const scaled = usePotStyles(scale);
   return (
-    <View pointerEvents="none" style={[styles.pot, scaled.pot]} testID="pot">
-      <Text style={[styles.potLabel, scaled.potLabel]}>POT</Text>
-      <ArcadeDigits style={scaled.potAmount}>
-        {`$${amount.toLocaleString()}`}
-      </ArcadeDigits>
+    // The plate rides up over the bowl's foot; the same height comes back as padding underneath,
+    // because the slot centres the block and a shorter block would drag the bowl down with it.
+    <View
+      pointerEvents="none"
+      style={[
+        styles.pot,
+        scaled.pot,
+        tabletop && { paddingBottom: PLATE_OVERLAP * scale },
+      ]}
+      testID="pot"
+    >
+      {tabletop ? <PotBowl amount={amount} scale={scale} /> : null}
+      <View
+        style={
+          tabletop
+            ? [
+                {
+                  borderRadius: 24 * scale,
+                  marginTop: -PLATE_OVERLAP * scale,
+                  minWidth: 74 * scale,
+                  paddingHorizontal: 12 * scale,
+                  paddingVertical: 2 * scale,
+                },
+              ]
+            : undefined
+        }
+      >
+        <Text
+          style={[
+            styles.potLabel,
+            scaled.potLabel,
+            tabletop && {
+              color: "#fff8e9",
+              fontFamily: fonts.arcade,
+              fontSize: 10 * scale,
+              lineHeight: 11 * scale,
+              letterSpacing: 0,
+            },
+          ]}
+        >
+          POT
+        </Text>
+        <ArcadeDigits
+          style={{
+            ...scaled.potAmount,
+            ...(tabletop
+              ? { fontSize: 26 * scale, lineHeight: 27 * scale }
+              : {}),
+          }}
+        >
+          {`$${amount.toLocaleString()}`}
+        </ArcadeDigits>
+      </View>
       {blinds ? (
         <Text
           style={[styles.blindsAmount, scaled.blindsAmount]}
@@ -74,6 +129,6 @@ const styles = StyleSheet.create({
   pot: { alignItems: "center" },
   potLabel: { color: colors.textDim, fontFamily: fonts.mono },
   /** §30's Blinds, quiet under the pot: table information, not a headline. */
-  blindsAmount: { color: colors.textDim, fontFamily: fonts.mono },
+  blindsAmount: { color: "#fff", fontFamily: fonts.mono },
   sidePotAmount: { color: colors.textDim, fontFamily: fonts.mono },
 });
