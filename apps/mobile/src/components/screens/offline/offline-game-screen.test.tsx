@@ -239,7 +239,7 @@ describe("<OfflineGameScreen />", () => {
     expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
     expect(view.getByText("YOUR TURN")).toBeOnTheScreen();
     // The badge only lands on the felt if the mapped state flags the hero's seat.
-    expect(view.getByText(/· YOU/)).toBeOnTheScreen();
+    expect(view.getByText(/^YOU$/)).toBeOnTheScreen();
 
     // The pinned hand posts 10 / 20 and then raises to 60, so the felt states a real call and a
     // real pot — the numbers the engine counted, not a placeholder row.

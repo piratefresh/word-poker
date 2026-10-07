@@ -19,6 +19,13 @@ const BASE_GAP = 6;
 /** The smallest avatar a seat draws, and the size every base measure below is drawn for. */
 export const MIN_AVATAR = 38;
 
+/**
+ * How far a stacked seat's plate is pulled up over the avatar's rim, as a share of its
+ * diameter: the plate tucks behind the avatar, and the label stack below it starts that much
+ * higher up (`labelDrop`).
+ */
+export const PLATE_OVER = 0.22;
+
 /** The seat at `MIN_AVATAR`, in points. Every one of them scales with the avatar. */
 const BASE = {
   /** The seat's column: the name truncates inside it. */
@@ -59,6 +66,15 @@ const BASE = {
   /** How far the turn beam's light spreads past the avatar's edge. */
   beamGlow: 7,
   highlightBleed: 8,
+  /** The opponent rack's wood box (STO-532), and how its parts sit: the plate tucks over
+   *  its top by `rackTuck`, the standing tiles' feet sit `rackFeet` above its bottom, and
+   *  the lip re-draws the bottom `rackLip` of it over those feet. Ratios follow the
+   *  approved gallery composition of the `opponent-rack-3` art. */
+  rackW: 75,
+  rackH: 28,
+  rackTuck: 2.4,
+  rackFeet: 4.3,
+  rackLip: 6,
 } as const;
 
 type BaseMetrics = { -readonly [K in keyof typeof BASE]: number };
@@ -138,22 +154,30 @@ export function betChipOffset(
   return { left: avatarLeft - m.chip - 4 * m.scale, top };
 }
 
-/** The label stack's height: name, status pill, stack. */
+/** The label stack's height at its fullest: the plate (its own border and padding around the
+ *  name and its coin row), the rack's wood under it, and the status badge under that. */
 export function labelBlock(m: SeatMetrics): number {
   return (
+    // The plate: `plate`'s border and `paddingVertical`, then its two lines.
+    m.scale * 4 +
     m.nameLine +
+    m.stackGap +
+    m.stackLine +
+    // The rack's wood, less the part the plate tucks over.
+    m.rackH -
+    m.rackTuck +
+    // The status badge.
     m.pillGap +
     m.pillBorder * 2 +
     m.pillPadY * 2 +
-    m.statusLine +
-    m.stackGap +
-    m.stackLine
+    m.statusLine
   );
 }
 
-/** How far the label stack reaches below the avatar's bottom edge, when it hangs under it. */
+/** How far the label stack reaches below the avatar's bottom edge, when it hangs under it: the
+ *  plate's top is pulled up over the avatar's rim by `PLATE_OVER`. */
 export function labelDrop(m: SeatMetrics): number {
-  return m.nameGap + labelBlock(m);
+  return labelBlock(m) - m.avatar * PLATE_OVER;
 }
 
 /**

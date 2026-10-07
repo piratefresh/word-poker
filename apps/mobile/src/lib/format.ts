@@ -24,6 +24,7 @@ export function formatAmount(amount: number): string {
   return `${sign}$${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
 
+
 /** Scale suffix for stacks that no longer fit a seat row. */
 const COMPACT_STEPS = [
   { limit: 1e12, suffix: "T" },

@@ -1,11 +1,11 @@
-import { INSERT_COUNT, generateChip, hashTileId } from "./generate";
+import { INSERT_COUNT, generateChip } from "./generate";
 
 describe("generateChip", () => {
   it("wears the same chip the same way for the same seed and size", () => {
-    const seed = hashTileId("chip-1");
+    const seed = 1;
     expect(generateChip(seed, 40, 0.9)).toEqual(generateChip(seed, 40, 0.9));
     expect(generateChip(seed, 40).scratches).not.toEqual(
-      generateChip(hashTileId("chip-2"), 40).scratches,
+      generateChip(2, 40).scratches,
     );
   });
 

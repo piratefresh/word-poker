@@ -1,5 +1,8 @@
 import { useMemo, type ReactNode } from "react";
+import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { RackTileBack } from "@/components/game";
 import { ChipSprite } from "@/components/chip/chip-sprite";
 import { chipToneForAmount } from "@/components/chip/chip-value";
 
@@ -12,16 +15,17 @@ import {
   layout,
   palette,
 } from "@/constants/theme";
+import { formatAmount } from "@/lib/format";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
 import { SeatBeam } from "./seat-beam";
 import {
   betChipOffset,
+  PLATE_OVER,
   seatDirection,
   seatMetrics,
   type SeatMetrics,
 } from "../seat-metrics";
-import { ArcadeLabelBand } from "./label-band";
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   waiting: "WAITING",
@@ -88,18 +92,29 @@ function seatStyles(m: SeatMetrics) {
       width: m.badge,
     },
     roleText: { fontSize: m.badgeText, lineHeight: m.badgeText * 1.2 },
-    playerName: {
-      fontSize: m.nameSize,
-      letterSpacing: m.nameTracking,
-      lineHeight: m.nameLine,
+    plate: {
+      borderRadius: m.pillRadius * 2,
+      borderWidth: m.scale,
+      gap: m.stackGap,
       marginTop: m.nameGap,
       maxWidth: m.width,
-      borderRadius: m.pillRadius,
-      paddingHorizontal: m.pillPadX * 0.75,
+      paddingHorizontal: m.pillPadX,
+      paddingVertical: m.scale,
+      zIndex: 1,
+    },
+    // Stacked seats pull the plate up over the avatar's rim, the approved tabletop look.
+    plateOver: { marginTop: -m.avatar * PLATE_OVER },
+    plateName: { fontSize: m.nameSize, lineHeight: m.nameLine },
+    stackRow: { gap: m.stackGap },
+    coin: {
+      borderRadius: m.stackSize / 2,
+      borderWidth: m.scale,
+      height: m.stackSize,
+      width: m.stackSize,
     },
     statusRow: { gap: m.badgeGap, marginTop: m.pillGap },
     statusPill: {
-      borderRadius: m.pillRadius,
+      borderRadius: 999,
       borderWidth: m.pillBorder,
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
@@ -110,12 +125,6 @@ function seatStyles(m: SeatMetrics) {
       lineHeight: m.statusLine,
     },
     stack: { fontSize: m.stackSize, lineHeight: m.stackLine },
-    // The band's own padding is sized for a caption; the stack's fade grows with its digits.
-    stackBand: {
-      marginTop: m.stackGap,
-      paddingHorizontal: m.stackSize * 1.4,
-      paddingVertical: m.scale,
-    },
     emptySeatLabel: {
       fontSize: m.statusSize,
       letterSpacing: m.emptyLabelTracking,
@@ -141,10 +150,12 @@ function useSeatStyles(tableWidth: number) {
 
 /**
  * A seat at the felt. The avatar is centred on the seat's anchor and scales with the table
- * (`seat-metrics.ts`), with its name, status and stack under it — or beside it, for the seats at
- * the top and bottom of the table (`seatDirection`). With `onPress` the whole seat is the
- * control; without it the seat is presentational — a seat that looks tappable but goes nowhere is
- * worse than one that never was.
+ * (`seat-metrics.ts`), with its nameplate, rack and status badge under it — or beside it, for
+ * the seats at the top and bottom of the table (`seatDirection`). An opponent dealt in keeps
+ * its two tiles standing in the rack (`dealt`, STO-532); the hero's tiles live in the word
+ * builder, and a folded or busted seat has none to show. With `onPress` the whole seat is the
+ * control; without it the seat is presentational — a seat that looks tappable but goes nowhere
+ * is worse than one that never was.
  */
 export function PlayerSeat({
   seat,
@@ -152,8 +163,9 @@ export function PlayerSeat({
   seatCount,
   size,
   appearanceWidth,
+  dealt = true,
   onPress,
-}: SeatSlot<GamePlayer> & { onPress?: (player: GamePlayer) => void }) {
+}: SeatSlot<GamePlayer> & { dealt?: boolean; onPress?: (player: GamePlayer) => void }) {
   const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width);
   const direction = seatDirection(anchor, seatCount);
   const beside = direction !== "stacked";
@@ -208,6 +220,13 @@ export function PlayerSeat({
       : colors.success;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
+  // The rack shows for a dealt-in opponent only: the hero's tiles sit in the word builder,
+  // and a folded or busted seat has handed them back.
+  const rack = dealt && !seat.isHero && !out;
+  const statusLabel =
+    seat.bet !== undefined && seat.bet > 0 && (seat.status === "bet" || seat.status === "raise")
+      ? `${seat.status === "raise" ? "RAISE TO" : "BET"} ${formatAmount(seat.bet)}`
+      : STATUS_LABEL[seat.status];
   const content = (
     <>
       <View style={styles.avatarWrap}>
@@ -246,31 +265,37 @@ export function PlayerSeat({
       </View>
       {labelColumn(
         <>
-          <Text
-            numberOfLines={1}
-            style={[styles.playerName, scaled.playerName, firstLabel]}
-          >
-            {seat.name.toUpperCase()}
-            {seat.isHero ? (
-              <Text style={styles.youLabel}> {"·"} YOU</Text>
-            ) : null}
-          </Text>
+          {/* The nameplate: over the avatar's lower rim when the labels stack under it. */}
+          <View style={[styles.plate, scaled.plate, firstLabel, !beside && scaled.plateOver]}>
+            <Text numberOfLines={1} style={[styles.plateName, scaled.plateName]}>
+              {seat.isHero ? "YOU" : seat.name.toUpperCase()}
+            </Text>
+            <View style={[styles.stackRow, scaled.stackRow]}>
+              <View style={[styles.coin, scaled.coin]} />
+              <Text style={[styles.stack, scaled.stack]}>{formatAmount(seat.stack).replace("$", "")}</Text>
+            </View>
+          </View>
+          {rack ? <RackLayers m={metrics} /> : null}
           <View style={[styles.statusRow, scaled.statusRow]}>
             <View
               style={[
                 styles.statusPill,
                 scaled.statusPill,
+                styles.actionPill,
                 lit && { backgroundColor: statusColor, borderColor: statusColor },
               ]}
             >
               <Text
+                accessibilityLabel={statusLabel}
+                adjustsFontSizeToFit
+                numberOfLines={1}
                 style={[
                   styles.statusText,
                   scaled.statusText,
                   lit && styles.statusTextLit,
                 ]}
               >
-                {STATUS_LABEL[seat.status]}
+                {statusLabel}
               </Text>
             </View>
             {/* §44: a power used on this street rides beside the street's action. */}
@@ -285,12 +310,6 @@ export function PlayerSeat({
               </View>
             ) : null}
           </View>
-          <ArcadeLabelBand
-            style={scaled.stackBand}
-            textStyle={scaled.stack}
-          >
-            {`$${seat.stack.toLocaleString()}`}
-          </ArcadeLabelBand>
         </>,
       )}
       {seat.bet ? (
@@ -334,6 +353,42 @@ export function PlayerSeat({
   );
 }
 
+/** The rack's art, shared by the wood and by the lip that re-draws over the tiles' feet. */
+const RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-3-tight.png");
+
+/**
+ * The opponent rack (STO-532) as three sibling layers of the label column — never one nested
+ * box, which the web's implicit stacking contexts would sink under the plate: the wood sits
+ * under the plate's edge, the standing tiles rise above it, and the lip re-draws the rack's
+ * bottom rail over their feet. The tiles and the lip are pinned to the column's bottom, one
+ * badge-height up from its end, so they track the badge however the plate is styled.
+ */
+function RackLayers({ m }: { m: SeatMetrics }) {
+  const badge = m.pillGap + m.pillPadY * 2 + m.pillBorder * 2 + m.statusLine;
+  return (
+    <>
+      <Image
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        contentFit="contain"
+        source={RACK_ART}
+        style={[styles.rackWood, { height: m.rackH, marginTop: -m.rackTuck, width: m.rackW }]}
+      />
+      <View style={[styles.rackTiles, { bottom: badge + m.rackFeet, gap: m.rackW / 38 }]}>
+        <RackTileBack width={(m.rackW * 64) / 190} />
+        <RackTileBack width={(m.rackW * 64) / 190} />
+      </View>
+      <View pointerEvents="none" style={[styles.rackLip, { bottom: badge, height: m.rackLip }]}>
+        <Image
+          contentFit="contain"
+          source={RACK_ART}
+          style={{ bottom: 0, height: m.rackH, position: "absolute", width: m.rackW }}
+        />
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   /** Placed by `seatStyles`: its top-left is pulled back so the avatar centres on the anchor. */
   seat: { alignItems: "center", position: "absolute" },
@@ -368,22 +423,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   roleText: { color: colors.onGold, fontFamily: fonts.monoBold },
-  // A seat's labels may ride the rail's wood and gold band as well as the felt: the name sits on
-  // a dark plate and the stack wears a dark halo, so both read on all three.
-  playerName: {
-    backgroundColor: "rgba(0,0,0,0.55)",
-    color: colors.textBright,
-    fontFamily: fonts.mono,
-    overflow: "hidden",
+  // The nameplate (STO-532): a dark plate with a gold-tinted rim — the reference's banner —
+  // carrying the name and, on a second line, a coin and the stack as a plain count.
+  plate: {
+    alignItems: "center",
+    backgroundColor: "#2b1d10",
+    borderColor: "rgba(214,178,102,0.5)",
   },
-  youLabel: { color: colors.gold },
+  plateName: { color: "#fff6e3", fontFamily: fonts.arcade },
+  stackRow: { alignItems: "center", flexDirection: "row", justifyContent: "center" },
+  coin: { backgroundColor: "#f2c14e", borderColor: "#8a5a16" },
+  stack: { color: "#fdf3d8", fontFamily: fonts.arcade },
   statusPill: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-    borderColor: "rgba(158,194,122,0.3)",
+    backgroundColor: "rgba(20,14,8,0.78)",
+    borderColor: "rgba(232,220,192,0.28)",
   },
-  statusText: { color: palette.green500, fontFamily: fonts.monoBold },
+  statusText: { color: palette.cream200, fontFamily: fonts.arcade },
   statusTextLit: { color: colors.onGold },
-  statusRow: { alignItems: "center", flexDirection: "row" },
+  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%" },
+  actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
   powerTagText: { color: colors.goldHi },
@@ -405,4 +463,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     paddingHorizontal: 2,
   },
+  // The rack's sibling z-order with the plate (zIndex 1): the wood ducks under its edge,
+  // the standing tiles and the lip rise above it.
+  rackWood: { zIndex: 0 },
+  rackTiles: { flexDirection: "row", position: "absolute", zIndex: 2 },
+  rackLip: { left: 0, overflow: "hidden", position: "absolute", right: 0, zIndex: 3 },
 });

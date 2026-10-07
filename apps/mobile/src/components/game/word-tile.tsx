@@ -161,9 +161,6 @@ const CONTACT_SHADOW = {
   liftFade: 0.2,
 } as const;
 
-/** The letter and its points: Lilita One's heavy round face, against the reference's lettering. */
-const TILE_FONT = fonts.arcade;
-
 const FLIP_EASING = Easing.bezier(...motionEasing.flip);
 const DEAL_EASING = Easing.bezier(...motionEasing.deal);
 const FLIP_PERSPECTIVE = 900;
@@ -763,16 +760,16 @@ const styles = StyleSheet.create({
   },
   letter: {
     color: tileMaterial.ink,
-    fontFamily: TILE_FONT,
+    fontFamily: fonts.arcade,
   },
   slash: {
     color: "rgba(21,17,13,0.5)",
-    fontFamily: TILE_FONT,
+    fontFamily: fonts.arcade,
     marginHorizontal: 1,
   },
   points: {
     color: tileMaterial.ink,
-    fontFamily: TILE_FONT,
+    fontFamily: fonts.arcade,
     position: "absolute",
   },
   poweredBadge: { position: "absolute" },

@@ -1,10 +1,13 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { Image } from "expo-image";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import type { Tile as TileData } from "@wordpoker/contracts";
 
 import { Tile, type TileSize } from "@/components/game";
-import { TableBackdrop } from "@/components/screens/game/backdrop/table-backdrop";
+import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
+import { PlayerSeat } from "@/components/screens/game/primitives";
+import { SceneBackdrop } from "@/components/screens/game/backdrop/scene-backdrop";
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, spacing } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
@@ -13,9 +16,10 @@ import { Stage } from "./dev-word-demo";
 
 /**
  * Development gallery for the code-drawn tabletop kit (STO-538): the letter tile in every state
- * and size, the real word builder in its tray, and the table's buttons, on the tiled wood that
- * stands in for the backdrop art — to hold against `ui/v2/tabletop-reference-*.png` at 390 × 844
- * and 1440 × 900. Renders nothing in a release build.
+ * and size, the seat's plate, badge and rack (STO-532), the real word builder in its tray, and
+ * the table's buttons, on the supplied tabletop artwork — to hold against
+ * `ui/v2/tabletop-reference-*.png` at 390 × 844 and 1440 × 900. Renders nothing in a release
+ * build.
  */
 const J: TileData = { id: "J-1", letter: "J", points: 8 };
 const A: TileData = { id: "A-1", letter: "A", points: 1 };
@@ -50,13 +54,43 @@ export default function DevTabletopKit() {
 
   return (
     <View style={styles.page} testID="tabletop-kit">
-      <TableBackdrop look="wood" />
+      <SceneBackdrop look="tabletop" />
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.artwork}>
+          <View accessibilityLabel="Flop, 28 seconds remaining" style={styles.phase}>
+            <Image source={require("../../assets/images/ui/v2/phase-frame-left-2-tight.png")} style={styles.phaseCapLeft} />
+            <Image contentFit="fill" source={require("../../assets/images/ui/v2/phase-frame-middle-2-tight.png")} style={styles.phaseMiddle} />
+            <Image source={require("../../assets/images/ui/v2/phase-frame-right-2-tight.png")} style={styles.phaseCapRight} />
+            <Text style={styles.phaseLabel}>FLOP | 0:28</Text>
+          </View>
+        </View>
         <View style={styles.toggles}>
           <Toggle label="Flip backs" on={flipped} onPress={() => setFlipped((on) => !on)} />
           <Toggle label="Lift J" on={lifted} onPress={() => setLifted((on) => !on)} />
         </View>
 
+
+        {/* The real seat on the same fixture the tests use (STO-532): plate, badge and rack. */}
+        <Section title="player seat (real · 640 felt)">
+          <View style={styles.realSeats}>
+            {["magnus", "ellis", "jay"].map((id) => {
+              const seat = FOUR_PLAYER_FLOP_FIXTURE.players.find((p) => p?.id === id);
+              return (
+                <View key={id} style={styles.realSeatWrap}>
+                  {seat ? (
+                    <PlayerSeat
+                      anchor={{ x: 0, y: 0, angle: Math.PI / 2 }}
+                      appearanceWidth={640}
+                      seat={seat}
+                      seatCount={4}
+                      size={{ width: 320, height: 170 }}
+                    />
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </Section>
         {SCALES.flatMap((scale) =>
           SIZES.map((size) => (
             <Section key={`${size}-${scale}`} title={`${size} · scale ${scale}`}>
@@ -146,6 +180,14 @@ function Coin() {
 }
 
 const styles = StyleSheet.create({
+  artwork: { alignItems: "center", gap: spacing.md },
+  phase: { flexDirection: "row", height: 64, width: 250, alignItems: "center", justifyContent: "center" },
+  phaseCapLeft: { height: 64, width: 77 },
+  phaseCapRight: { height: 64, width: 92 },
+  phaseMiddle: { height: 64, flex: 1 },
+  phaseLabel: { position: "absolute", color: "#ffe5a0", fontFamily: fonts.arcade, fontSize: 22 },
+  realSeats: { alignSelf: "center", gap: spacing.md },
+  realSeatWrap: { height: 170, paddingTop: 40, position: "relative" },
   page: { backgroundColor: colors.bg, flex: 1 },
   content: { alignItems: "stretch", gap: spacing.xl, padding: spacing.lg },
   section: { gap: spacing.sm },
