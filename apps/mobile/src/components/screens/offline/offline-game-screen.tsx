@@ -17,13 +17,14 @@ import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
+import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
+import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { CoachProvider, useCoachTour } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
 import {
   WordBuilder,
   WordCheckButton,
   WordHand,
-  WordPreview,
   WordShuffleButton,
 } from "@/components/word-builder";
 import {
@@ -134,6 +135,8 @@ function OfflineTable({
     newGame,
   } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps });
   const payout = game.phase === "payout";
+  const { active: celebratingWin, complete: finishWinCelebration } =
+    useSimpleWinCelebration(results);
   // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
   const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
   const choosing = power.targeting.stage === "picking";
@@ -185,20 +188,16 @@ function OfflineTable({
     >
       <CoachProvider style={styles.table} tour={help.tour}>
         <GameScreen
-          rackActions={
-            <>
-              {powers === null ? null : (
-                <PowerHeldChip
-                  active={power.targeting.stage !== "idle"}
-                  held={powers.held}
-                  onPress={power.toggle}
-                />
-              )}
-              <WordShuffleButton />
-              <WordCheckButton />
-            </>
-          }
           game={game}
+          winOverlay={
+            celebratingWin && results !== null ? (
+              <SimpleWinResultOverlay
+                key={results.hand}
+                onComplete={finishWinCelebration}
+                snapshot={results}
+              />
+            ) : null
+          }
           onAllIn={allIn}
           // The wager slider names its own action, and `wager` dispatches the one it names: BET
           // opens the round, RAISE answers it (§22).
@@ -228,8 +227,21 @@ function OfflineTable({
             // The draft reads above the rack it is built from: one line of text over the
             // strip, drawn by the builder and placed by the felt's own rack slot.
             <>
-              <WordPreview />
-              <WordHand />
+              <WordHand
+                actions={
+                  <>
+                    {powers === null ? null : (
+                      <PowerHeldChip
+                        active={power.targeting.stage !== "idle"}
+                        held={powers.held}
+                        onPress={power.toggle}
+                      />
+                    )}
+                    <WordShuffleButton />
+                    <WordCheckButton />
+                  </>
+                }
+              />
             </>
           }
         />
@@ -240,7 +252,7 @@ function OfflineTable({
         The session's last hand keeps its end-of-session sheet instead — a New game is the only
         useful thing left to say once the hero has busted (ADR 0002).
       */}
-      {payout && !sessionOver && results !== null ? (
+      {payout && !sessionOver && results !== null && !celebratingWin ? (
         <ResultsScreen onDeal={deal} onExit={leaveTable} snapshot={results} />
       ) : null}
       {sessionOver ? <SessionOver game={game} onNewGame={newGame} /> : null}

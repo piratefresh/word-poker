@@ -37,12 +37,13 @@ import {
 } from "@/components/powers";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
+import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
+import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { GameButton } from "@/components/ui/game-button";
 import {
   WordBuilder,
   WordCheckButton,
   WordHand,
-  WordPreview,
   WordShuffleButton,
 } from "@/components/word-builder";
 import {
@@ -97,6 +98,8 @@ export function OnlineFelt({
   // The hand whose results the seat has put away: the room keeps the payout on the felt until it
   // deals again, so a dismissed hand must not reopen on the next patch.
   const [dismissed, setDismissed] = useState<number | null>(null);
+  const { active: celebratingWin, complete: finishWinCelebration } =
+    useSimpleWinCelebration(results);
   const connection = useRoomConnection(room);
 
   // One quest claim per hand (STO-525): `powers` is non-null only at a Wild table (`use-online-game.ts`),
@@ -147,6 +150,15 @@ export function OnlineFelt({
       >
         <View style={styles.table}>
           <GameScreen
+            winOverlay={
+              celebratingWin && results !== null ? (
+                <SimpleWinResultOverlay
+                  key={results.hand}
+                  onComplete={finishWinCelebration}
+                  snapshot={results}
+                />
+              ) : null
+            }
             overFelt={
               powers === null ? null : (
                 <>
@@ -161,19 +173,6 @@ export function OnlineFelt({
                 </>
               )
             }
-            rackActions={
-              <>
-                {powers === null ? null : (
-                  <PowerHeldChip
-                    active={power.targeting.stage !== "idle"}
-                    held={powers.held}
-                    onPress={power.toggle}
-                  />
-                )}
-                <WordShuffleButton />
-                <WordCheckButton />
-              </>
-            }
             game={game}
             onAllIn={allIn}
             onBack={onLeave}
@@ -183,8 +182,21 @@ export function OnlineFelt({
             onRaise={wager}
             rack={
               <>
-                <WordPreview />
-                <WordHand />
+                <WordHand
+                  actions={
+                    <>
+                      {powers === null ? null : (
+                        <PowerHeldChip
+                          active={power.targeting.stage !== "idle"}
+                          held={powers.held}
+                          onPress={power.toggle}
+                        />
+                      )}
+                      <WordShuffleButton />
+                      <WordCheckButton />
+                    </>
+                  }
+                />
               </>
             }
           />
@@ -195,7 +207,7 @@ export function OnlineFelt({
   return (
     <View style={styles.root}>
       {body}
-      {results !== null && results.hand !== dismissed ? (
+      {results !== null && results.hand !== dismissed && !celebratingWin ? (
         <ResultsScreen
           onDeal={() => setDismissed(results.hand)}
           onExit={onLeave}

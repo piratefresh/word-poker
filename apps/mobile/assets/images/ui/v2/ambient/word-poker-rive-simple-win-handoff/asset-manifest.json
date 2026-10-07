@@ -1,0 +1,59 @@
+{
+  "package": "word-poker-rive-simple-win",
+  "purpose": "Layered, text-free PNGs for the first Word Poker winner overlay in Rive.",
+  "dynamic_content": [
+    "winning word letters",
+    "letter point values",
+    "winner label",
+    "final score",
+    "pot amount",
+    "avatar image"
+  ],
+  "assets": [
+    {
+      "file": "01-bg-sunburst.png",
+      "role": "large golden background burst behind result content",
+      "animate": "opacity + scale"
+    },
+    {
+      "file": "02-celebration-starburst.png",
+      "role": "foreground celebratory sparkle/star burst",
+      "animate": "scale + rotation + opacity"
+    },
+    {
+      "file": "03-letter-tile-blank.png",
+      "role": "duplicate 2-7 times and bind letter/value text in Rive",
+      "animate": "staggered pop/arc"
+    },
+    {
+      "file": "04-result-plaque-shell.png",
+      "role": "blank winner/score shell; put dynamic result text over it",
+      "animate": "overshoot scale"
+    },
+    {
+      "file": "05-winner-avatar-frame.png",
+      "role": "winner avatar mask/frame; runtime avatar goes inside",
+      "animate": "pop + halo pulse"
+    },
+    {
+      "file": "06-winner-crown.png",
+      "role": "optional crown above winner avatar",
+      "animate": "drop + settle"
+    },
+    {
+      "file": "07-pot-chip-pile.png",
+      "role": "pot visual",
+      "animate": "small bounce then payout handoff"
+    },
+    {
+      "file": "08-pot-label-blank.png",
+      "role": "optional blank pot/value nameplate",
+      "animate": "none or subtle scale"
+    },
+    {
+      "file": "09-winner-status-pill-blank.png",
+      "role": "blank winner status pill under avatar",
+      "animate": "pop"
+    }
+  ]
+}
