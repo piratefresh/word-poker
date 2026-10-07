@@ -4,6 +4,11 @@ const { getDefaultConfig } = require("expo/metro-config");
 const config = getDefaultConfig(__dirname);
 const defaultResolveRequest = config.resolver.resolveRequest;
 
+// Rive files are bundled as local assets by `useRiveFile(require(...))`.
+if (!config.resolver.assetExts.includes("riv")) {
+  config.resolver.assetExts.push("riv");
+}
+
 // @colyseus/sdk imports the Node `ws` package even when React Native's native
 // WebSocket implementation is the one that will be used at runtime.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
