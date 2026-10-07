@@ -65,6 +65,7 @@ export {
 } from "./coins";
 export { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "./dictionaries";
 export {
+  MAX_HERO_SCORE,
   QUEST_IDS,
   STREAK_REWARDS,
   isQuestClaimResponse,

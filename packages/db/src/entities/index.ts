@@ -14,3 +14,4 @@ export {
 } from "./wallet-event";
 export { QuestHandLog, type QuestHandLogRow } from "./quest-hand-log";
 export { QuestProgress, type QuestProgressRow } from "./quest-progress";
+export { PlayerProgress, type PlayerProgressRow } from "./player-progress";

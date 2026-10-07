@@ -16,11 +16,13 @@ import { ResultsRating } from "./entities/index";
 import { getOrm } from "./orm";
 
 export {
+  PlayerProgress,
   QuestHandLog,
   QuestProgress,
   ResultsRating,
   WALLET_EVENT_STATUSES,
   WalletEvent,
+  type PlayerProgressRow,
   type QuestHandLogRow,
   type QuestProgressRow,
   type WalletEventRow,
@@ -28,9 +30,12 @@ export {
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
 export {
+  playerProgress,
   questProgress,
   recordQuestHand,
+  setLevelPaid,
   streakDates,
+  type PlayerProgressRecord,
   type QuestProgressEntry,
   type QuestProgressMap,
   type QuestProgressRecord,

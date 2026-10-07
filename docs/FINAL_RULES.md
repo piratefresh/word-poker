@@ -12,7 +12,7 @@ keeps its number for life: new material is appended as a new number, never slott
 
 | File | Sections | Covers |
 | ---- | -------- | ------ |
-| [Balances, Buy-Ins & Joining](rules/balances-and-tables.md) | 1–5 | Wallet vs. Table Stack, stake tiers and the Buy-In Cap, table browser, joining flow, table setup, blinds & dealer |
+| [Balances, Buy-Ins & Joining](rules/balances-and-tables.md) | 1–5, 45 | Wallet vs. Table Stack, stake tiers and the Buy-In Cap, table browser, joining flow, table setup, blinds & dealer, account XP, levels & level-up coins |
 | [Letter Values, Scoring & Multipliers](rules/scoring.md) | 6–9 | Letter values, tile bag distribution, word score calculation, MONSTER example, multiplier tiles |
 | [Choice Tiles, Word Validation & Length](rules/tiles.md) | 10–12 | Two-letter choice tiles, word validation, word length |
 | [Hand Structure & Phases](rules/hand-flow.md) | 13–20 | Hand phases, blinds & the deal, betting rounds, flop/turn/river, word building, showdown |

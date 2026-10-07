@@ -18,14 +18,17 @@ import type { Migration } from "@mikro-orm/migrations";
 import { Migration20260921030429_results_rating } from "./Migration20260921030429_results_rating";
 import { Migration20261004120000_wallet_event } from "./Migration20261004120000_wallet_event";
 import { Migration20261005120000_quests } from "./Migration20261005120000_quests";
+import { Migration20261006120000_xp_levels } from "./Migration20261006120000_xp_levels";
 
 export { Migration20260921030429_results_rating } from "./Migration20260921030429_results_rating";
 export { Migration20261004120000_wallet_event } from "./Migration20261004120000_wallet_event";
 export { Migration20261005120000_quests } from "./Migration20261005120000_quests";
+export { Migration20261006120000_xp_levels } from "./Migration20261006120000_xp_levels";
 
 /** Every migration this package has, oldest first. */
 export const migrations: Constructor<Migration>[] = [
   Migration20260921030429_results_rating,
   Migration20261004120000_wallet_event,
   Migration20261005120000_quests,
+  Migration20261006120000_xp_levels,
 ];

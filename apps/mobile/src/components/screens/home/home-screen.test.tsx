@@ -13,9 +13,17 @@ jest.mock("@/auth/client/auth-client", () => ({
 }));
 
 const mockDismissStreakBanner = jest.fn();
+const mockDismissLevelUp = jest.fn();
 let mockStreakBanner: { day: number; reward: number } | null = null;
+let mockLevelUp: { level: number; reward: number } | null = null;
 jest.mock("@/lib/quests-provider", () => ({
-  useQuests: () => ({ streakBanner: mockStreakBanner, dismissStreakBanner: mockDismissStreakBanner }),
+  useQuests: () => ({
+    streakBanner: mockStreakBanner,
+    dismissStreakBanner: mockDismissStreakBanner,
+    levelUp: mockLevelUp,
+    dismissLevelUp: mockDismissLevelUp,
+    state: null,
+  }),
 }));
 
 /** Every sentence an `@expo/ui` text carries: the library keeps its string in a `text` prop. */
@@ -39,7 +47,9 @@ const saved = process.env.EXPO_PUBLIC_COIN_STORE;
 
 beforeEach(() => {
   mockStreakBanner = null;
+  mockLevelUp = null;
   mockDismissStreakBanner.mockReset();
+  mockDismissLevelUp.mockReset();
 });
 
 afterEach(() => {
@@ -79,4 +89,21 @@ test("shows the streak banner, and dismisses it on tap", async () => {
 
   fireEvent.press(getByTestId("quest-streak-banner"));
   expect(mockDismissStreakBanner).toHaveBeenCalledTimes(1);
+});
+
+test("shows the level-up banner, and dismisses it on tap", async () => {
+  mockLevelUp = { level: 3, reward: 350 };
+
+  const { getByTestId, toJSON } = await render(<HomeScreen />);
+  expect(libraryTexts(toJSON())).toContain("LEVEL 3 REACHED · +350 COINS");
+
+  fireEvent.press(getByTestId("level-up-banner"));
+  expect(mockDismissLevelUp).toHaveBeenCalledTimes(1);
+});
+
+test("shows no level strip without quest state", async () => {
+  const { queryByTestId } = await render(<HomeScreen />);
+
+  // The strip is RN content under an `RNHostView`; its own test file renders it directly.
+  expect(queryByTestId("level-strip")).toBeNull();
 });

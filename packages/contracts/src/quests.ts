@@ -50,6 +50,12 @@ export interface QuestHandFacts {
 /** Coins for day 1…7 of the streak; day 8 starts the cycle again. */
 export const STREAK_REWARDS = [50, 75, 100, 125, 150, 200, 300] as const;
 
+/**
+ * The largest word score a claim may report. Seven tiles of the best letters with multipliers
+ * land far below this; the bound keeps a hostile claim from moving the XP column (STO-543).
+ */
+export const MAX_HERO_SCORE = 999;
+
 /** POSTed once per settled hand. */
 export interface QuestHandClaim {
   readonly handToken: string;
@@ -63,6 +69,9 @@ export interface QuestStateResponse {
     /** The reward paid by this GET, or `null` when today was already credited. */
     readonly creditedToday: number | null;
   };
+  /** The player's XP total, and the level that total is filling (`levelForXp`). */
+  readonly xp: number;
+  readonly level: number;
   readonly quests: readonly { readonly id: QuestId; readonly progress: number; readonly done: boolean }[];
 }
 
@@ -70,6 +79,9 @@ export interface QuestStateResponse {
 export interface QuestClaimResponse {
   readonly completed: readonly QuestId[];
   readonly duplicate: boolean;
+  /** The player's XP total after this hand, and the level it reaches — a duplicate reports the current ones. */
+  readonly xp: number;
+  readonly level: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -89,7 +101,9 @@ function isQuestHandFacts(value: unknown): value is QuestHandFacts {
     typeof value.heroWon === "boolean" &&
     (value.heroWord === null || typeof value.heroWord === "string") &&
     typeof value.heroScore === "number" &&
-    Number.isFinite(value.heroScore) &&
+    Number.isInteger(value.heroScore) &&
+    value.heroScore >= 0 &&
+    value.heroScore <= MAX_HERO_SCORE &&
     isShowdownDeciderOrNull(value.heroDecidedBy) &&
     typeof value.pot === "number" &&
     Number.isFinite(value.pot) &&
@@ -118,6 +132,11 @@ function isQuestProgressEntry(value: unknown): value is QuestStateResponse["ques
   );
 }
 
+/** A whole, non-negative count — an XP total or a level as the routes report them. */
+function isXpCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 export function isQuestStateResponse(value: unknown): value is QuestStateResponse {
   if (!isRecord(value) || !isRecord(value.streak) || !Array.isArray(value.quests)) return false;
   const { streak } = value;
@@ -126,6 +145,9 @@ export function isQuestStateResponse(value: unknown): value is QuestStateRespons
     Number.isFinite(streak.current) &&
     (streak.creditedToday === null ||
       (typeof streak.creditedToday === "number" && Number.isFinite(streak.creditedToday))) &&
+    isXpCount(value.xp) &&
+    isXpCount(value.level) &&
+    value.level >= 1 &&
     value.quests.every(isQuestProgressEntry)
   );
 }
@@ -134,5 +156,5 @@ export function isQuestClaimResponse(value: unknown): value is QuestClaimRespons
   if (!isRecord(value) || !Array.isArray(value.completed) || typeof value.duplicate !== "boolean") {
     return false;
   }
-  return value.completed.every(isQuestId);
+  return isXpCount(value.xp) && isXpCount(value.level) && value.level >= 1 && value.completed.every(isQuestId);
 }

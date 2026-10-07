@@ -13,6 +13,8 @@ import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { useWindowDimensions } from "react-native";
 
+import { levelForXp } from "@wordpoker/game-rules";
+
 import {
   ModeCard,
   type ModeCardProps,
@@ -21,6 +23,7 @@ import {
   ModeVariants,
   type ModeVariant,
 } from "@/components/screens/home/components/mode-variants";
+import { LevelStrip } from "@/components/screens/home/level-strip";
 import {
   colors,
   fonts,
@@ -157,7 +160,8 @@ const bannerText = {
 
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
-  const { streakBanner, dismissStreakBanner } = useQuests();
+  const { streakBanner, dismissStreakBanner, state, levelUp, dismissLevelUp } = useQuests();
+  const standing = state ? levelForXp(state.xp) : null;
   const [pending, setPending] = useState<ModeKey | null>(null);
   // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
   // card shrinks to its own content, so the column's width is handed down as a number.
@@ -197,6 +201,30 @@ export function HomeScreen() {
                 {`DAY ${streakBanner.day} STREAK · +${formatCoins(streakBanner.reward)} COINS`}
               </Text>
             </Column>
+          ) : null}
+
+          {levelUp ? (
+            <Column
+              onPress={dismissLevelUp}
+              spacing={spacing.none}
+              testID="level-up-banner"
+              {...fullWidth(styles.banner)}
+            >
+              <Text textStyle={bannerText}>
+                {`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
+              </Text>
+            </Column>
+          ) : null}
+
+          {standing ? (
+            <RNHostView matchContents>
+              <LevelStrip
+                intoLevel={standing.intoLevel}
+                level={standing.level}
+                toNext={standing.toNext}
+                width={contentWidth}
+              />
+            </RNHostView>
           ) : null}
 
           {(coinStoreEnabled() ? [...MODES, QUESTS_MODE, STORE_MODE] : MODES).map((mode) => {

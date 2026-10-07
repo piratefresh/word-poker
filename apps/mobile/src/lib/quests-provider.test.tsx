@@ -16,7 +16,7 @@ const questState = jest.mocked(fetchQuestState);
 const wallet = jest.mocked(fetchWallet);
 const claim = jest.mocked(sendQuestHandClaim);
 
-const EMPTY_STATE = { streak: { current: 0, creditedToday: null }, quests: [] };
+const EMPTY_STATE = { streak: { current: 0, creditedToday: null }, xp: 0, level: 1, quests: [] };
 const FACTS = {
   revealed: true,
   heroWon: true,
@@ -90,7 +90,7 @@ describe("QuestsProvider", () => {
   });
 
   test("reportHand sends a claim and reconciles completions and the balance", async () => {
-    claim.mockResolvedValue({ completed: ["win-word-3"], duplicate: false });
+    claim.mockResolvedValue({ completed: ["win-word-3"], duplicate: false, xp: 37, level: 1 });
     wallet.mockResolvedValueOnce({ coins: 1000, welcomed: true }).mockResolvedValueOnce({ coins: 1075, welcomed: true });
     signedIn();
     const { result } = await hook();
@@ -101,6 +101,35 @@ describe("QuestsProvider", () => {
     await waitFor(() => expect(result.current.lastCompletions).toEqual(["win-word-3"]));
     expect(result.current.coins).toBe(1075);
     expect(claim).toHaveBeenCalledWith(expect.objectContaining({ facts: FACTS }));
+  });
+
+  test("a level-up claim patches the standing and fires the celebration once", async () => {
+    const state = (xp: number, level: number) => ({ streak: { current: 0, creditedToday: null }, xp, level, quests: [] });
+    // One reply per GET: the initial read, the refetch after each of the two claims.
+    questState
+      .mockResolvedValueOnce(state(90, 1))
+      .mockResolvedValueOnce(state(112, 2))
+      .mockResolvedValue(state(134, 2));
+    claim
+      .mockResolvedValueOnce({ completed: [], duplicate: false, xp: 112, level: 2 })
+      .mockResolvedValue({ completed: [], duplicate: false, xp: 134, level: 2 });
+    signedIn();
+    const { result } = await hook();
+    await waitFor(() => expect(result.current.state?.level).toBe(1));
+
+    await act(() => result.current.reportHand(FACTS));
+
+    await waitFor(() => expect(result.current.levelUp).toEqual({ level: 2, reward: 100 }));
+    expect(result.current.state?.xp).toBe(112);
+    expect(result.current.state?.level).toBe(2);
+
+    await act(() => result.current.reportHand(FACTS));
+
+    await waitFor(() => expect(result.current.state?.xp).toBe(134));
+    expect(result.current.levelUp).toEqual({ level: 2, reward: 100 });
+
+    await act(() => result.current.dismissLevelUp());
+    expect(result.current.levelUp).toBeNull();
   });
 
   test("reportHand is a no-op for a null facts (no hero seat)", async () => {
@@ -114,7 +143,7 @@ describe("QuestsProvider", () => {
   });
 
   test("a failed claim is queued and retried on the next reportHand", async () => {
-    claim.mockResolvedValue({ completed: [], duplicate: false });
+    claim.mockResolvedValue({ completed: [], duplicate: false, xp: 0, level: 1 });
     claim.mockRejectedValueOnce(new Error("network"));
     signedIn();
     const { result } = await hook();
