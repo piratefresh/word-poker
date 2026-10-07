@@ -1,7 +1,10 @@
+import { Image } from "expo-image";
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ChipSprite } from "@/components/chip/chip-sprite";
 import { chipToneForAmount } from "@/components/chip/chip-value";
+import { RackTileBack } from "@/components/game";
+import { ShadowBox } from "@/components/ui/shadow-box";
 
 import type { SeatSlot } from "@/components/table";
 import {
@@ -22,7 +25,16 @@ import {
   seatMetrics,
   type SeatMetrics,
 } from "../seat-metrics";
-import { ArcadeLabelBand } from "./label-band";
+
+// Relative, not `@/assets`: Jest maps `@/` to `src/` only.
+const RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-3-tight.png");
+const TABLETOP_RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-5.png");
+const PORTRAITS = [
+  require("../../../../../assets/images/ui/v2/avatar-you.png"),
+  require("../../../../../assets/images/ui/v2/avatar-river.png"),
+  require("../../../../../assets/images/ui/v2/avatar-buddy.png"),
+  require("../../../../../assets/images/ui/v2/avatar-sage.png"),
+];
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   waiting: "WAITING",
@@ -89,39 +101,44 @@ function seatStyles(m: SeatMetrics) {
       width: m.badge,
     },
     roleText: { fontSize: m.badgeText, lineHeight: m.badgeText * 1.2 },
+    plate: {
+      borderRadius: m.plateRadius,
+      borderWidth: m.scale,
+      marginTop: m.nameGap,
+      maxWidth: m.width,
+      paddingHorizontal: m.platePadX,
+      paddingVertical: m.platePadY,
+    },
     playerName: {
       fontSize: m.nameSize,
       letterSpacing: m.nameTracking,
       lineHeight: m.nameLine,
-      marginTop: m.nameGap,
-      maxWidth: m.width,
-      borderRadius: m.pillRadius,
-      paddingHorizontal: m.pillPadX * 0.75,
     },
-    statusRow: { gap: m.badgeGap, marginTop: m.pillGap },
+    stackRow: { gap: m.coin * 0.4 },
+    coin: {
+      borderRadius: m.coin / 2,
+      borderWidth: m.scale,
+      height: m.coin,
+      width: m.coin,
+    },
     statusPill: {
       borderRadius: m.pillRadius,
       borderWidth: m.pillBorder,
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
     },
+    statusRow: { marginTop: m.pillGap },
     statusText: {
       fontSize: m.statusSize,
       letterSpacing: m.statusTracking,
       lineHeight: m.statusLine,
     },
     stack: { fontSize: m.stackSize, lineHeight: m.stackLine },
-    // The band's own padding is sized for a caption; the stack's fade grows with its digits.
-    stackBand: {
-      marginTop: m.stackGap,
-      paddingHorizontal: m.stackSize * 1.4,
-      paddingVertical: m.scale,
-    },
     emptySeatLabel: {
       fontSize: m.statusSize,
       letterSpacing: m.emptyLabelTracking,
       lineHeight: m.statusLine,
-      marginTop: m.nameGap,
+      marginTop: m.pillGap,
     },
     betChip: {
       borderRadius: m.chip / 2,
@@ -133,11 +150,11 @@ function seatStyles(m: SeatMetrics) {
 }
 
 /** One set of seat styles per felt width: the table re-renders often, and resizes rarely. */
-function useSeatStyles(tableWidth: number) {
+function useSeatStyles(tableWidth: number, tabletop: boolean) {
   return useMemo(() => {
-    const metrics = seatMetrics(tableWidth);
+    const metrics = seatMetrics(tableWidth, tabletop);
     return { metrics, scaled: seatStyles(metrics) };
-  }, [tableWidth]);
+  }, [tableWidth, tabletop]);
 }
 
 /**
@@ -153,9 +170,17 @@ export function PlayerSeat({
   seatCount,
   size,
   appearanceWidth,
+  dealt = false,
+  tabletop = false,
   onPress,
-}: SeatSlot<GamePlayer> & { onPress?: (player: GamePlayer) => void }) {
-  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width);
+}: SeatSlot<GamePlayer> & {
+  /** The hand is dealt: an opponent still in it shows its two tiles face down in a rack. */
+  dealt?: boolean;
+  /** The tabletop room's larger seat (`seatMetrics`); its bounds are `tabletopSeatBounds`. */
+  tabletop?: boolean;
+  onPress?: (player: GamePlayer) => void;
+}) {
+  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width, tabletop);
   const direction = seatDirection(anchor, seatCount);
   const beside = direction !== "stacked";
   const frame = beside
@@ -202,11 +227,8 @@ export function PlayerSeat({
   const lit = active || winner;
   // The seat whose move it is — the hero's or any other — wears the beam while its turn runs.
   const turn = active || seat.status === "thinking";
-  const statusColor = winner
-    ? colors.goldHi
-    : active
-      ? colors.gold
-      : colors.success;
+  const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
+  const portrait = tabletop && seatCount <= 4 ? PORTRAITS[seat.isHero ? 0 : anchor.index] : undefined;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
   const statusLabel =
@@ -228,13 +250,16 @@ export function PlayerSeat({
               scaled.avatar,
               { backgroundColor: seat.color },
               lit && [scaled.avatarLit, { borderColor: statusColor }],
+              portrait !== undefined && styles.portraitAvatar,
               winner && glow(colors.goldHi, metrics.glow),
             ]}
             testID={`seat-avatar-${seat.id}`}
           >
-            <Text style={[styles.initials, scaled.initials]}>
-              {seat.initials}
-            </Text>
+            {portrait === undefined ? (
+              <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
+            ) : (
+              <Image accessible={false} contentFit="cover" source={portrait} style={StyleSheet.absoluteFill} />
+            )}
           </View>
         </SeatBeam>
         {seat.roles?.length ? (
@@ -251,15 +276,18 @@ export function PlayerSeat({
       </View>
       {labelColumn(
         <>
-          <Text
-            numberOfLines={1}
-            style={[styles.playerName, scaled.playerName, firstLabel]}
-          >
-            {seat.name.toUpperCase()}
-            {seat.isHero ? (
-              <Text style={styles.youLabel}> {"·"} YOU</Text>
-            ) : null}
-          </Text>
+          <View style={[styles.plate, scaled.plate, tabletop && { width: metrics.width - 10 * metrics.scale }, firstLabel]}>
+            <Text numberOfLines={1} style={[styles.playerName, scaled.playerName]}>
+              {seat.isHero ? "YOU" : seat.name.toUpperCase()}
+            </Text>
+            <View style={[styles.stackRow, scaled.stackRow]}>
+              <View style={[styles.coin, scaled.coin]} />
+              <Text numberOfLines={1} style={[styles.stack, scaled.stack]}>
+                {seat.stack.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+          {dealt && !seat.isHero && !out ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View style={[styles.statusRow, scaled.statusRow]}>
             <View
               style={[
@@ -294,12 +322,6 @@ export function PlayerSeat({
               </View>
             ) : null}
           </View>
-          <ArcadeLabelBand
-            style={scaled.stackBand}
-            textStyle={scaled.stack}
-          >
-            {`$${seat.stack.toLocaleString()}`}
-          </ArcadeLabelBand>
         </>,
       )}
       {seat.bet ? (
@@ -343,6 +365,47 @@ export function PlayerSeat({
   );
 }
 
+/**
+ * The opponent rack as three sibling layers of the label column — never one nested box, which
+ * the web's implicit stacking contexts would sink under the plate: the wood sits under the
+ * plate's edge, the standing tiles rise above it, and the lip re-draws the rack's bottom rail
+ * over their feet. The tiles and the lip are pinned to the column's bottom, one badge-height up
+ * from its end, so they track the badge however the plate is styled.
+ */
+function RackLayers({ m, tabletop }: { m: SeatMetrics; tabletop: boolean }) {
+  const badge = m.pillGap + m.pillPadY * 2 + m.pillBorder * 2 + m.statusLine;
+  const art = tabletop ? TABLETOP_RACK_ART : RACK_ART;
+  const tileWidth = m.rackW * (tabletop ? 0.4 : 64 / 190);
+  const tileHeight = tabletop ? tileWidth * 1.1 : undefined;
+  return (
+    <>
+      {/* The art is a transparent PNG, so the shadow it casts on the table comes from a rounded
+          box the size of the rack, not from the image. */}
+      <View
+        style={[
+          styles.rackWood,
+          { borderRadius: m.rackW * 0.07, height: m.rackH, marginTop: -m.rackTuck, width: m.rackW },
+        ]}
+      >
+        <ShadowBox radius={m.rackW * 0.07} shadows={[{ dy: 12, blur: 22, color: "rgba(30,14,0,0.85)" }]} />
+        <Image accessible={false} contentFit="contain" source={art} style={StyleSheet.absoluteFill} />
+      </View>
+      <View style={[styles.rackTiles, { bottom: badge + m.rackFeet, gap: m.rackW / 38 }]}>
+        <RackTileBack height={tileHeight} width={tileWidth} />
+        <RackTileBack height={tileHeight} width={tileWidth} />
+      </View>
+      <View pointerEvents="none" style={[styles.rackLip, { bottom: badge, height: m.rackLip }]}>
+        <Image
+          accessible={false}
+          contentFit="contain"
+          source={art}
+          style={{ bottom: 0, height: m.rackH, position: "absolute", width: m.rackW }}
+        />
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   /** Placed by `seatStyles`: its top-left is pulled back so the avatar centres on the anchor. */
   seat: { alignItems: "center", position: "absolute" },
@@ -368,6 +431,7 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   initials: { color: "#0c1410", fontFamily: fonts.sansBlack },
+  portraitAvatar: { borderColor: "#301507", overflow: "hidden" },
   /** The seat's markers, pinned to the avatar's corner and growing away from it: D, SB, BB. */
   roleRow: { flexDirection: "row", position: "absolute", zIndex: 2 },
   roleBadge: {
@@ -377,22 +441,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   roleText: { color: colors.onGold, fontFamily: fonts.monoBold },
-  // A seat's labels may ride the rail's wood and gold band as well as the felt: the name sits on
-  // a dark plate and the stack wears a dark halo, so both read on all three.
-  playerName: {
-    backgroundColor: "rgba(0,0,0,0.55)",
-    color: colors.textBright,
-    fontFamily: fonts.mono,
-    overflow: "hidden",
+  // The name, stack and status sit on dark wood, so they read on the desk, the felt and the rail.
+  plate: {
+    alignItems: "center",
+    backgroundColor: "#603014",
+    borderColor: "#d59750",
+    boxShadow: "inset 0 2px 2px #f1b667, inset 0 -3px 6px #351807, 0 3px 4px #30150780",
+    zIndex: 1,
   },
-  youLabel: { color: colors.gold },
+  playerName: { color: "#fff8e9", fontFamily: fonts.arcade },
+  stackRow: { alignItems: "center", flexDirection: "row" },
+  coin: { backgroundColor: "#FFC72C", borderColor: "#8A5A00", boxShadow: "inset 0 0 0 2px #ffe787" },
+  stack: { color: "#fff8e9", fontFamily: fonts.arcade },
+  // The rack's sibling z-order with the plate (zIndex 1): the wood ducks under its edge,
+  // the standing tiles and the lip rise above it.
+  rackWood: { zIndex: 0 },
+  rackTiles: { flexDirection: "row", position: "absolute", zIndex: 2 },
+  rackLip: { alignItems: "center", left: 0, overflow: "hidden", position: "absolute", right: 0, zIndex: 3 },
   statusPill: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-    borderColor: "rgba(158,194,122,0.3)",
+    backgroundColor: "#171412",
+    borderColor: "#e6d7c0",
+    boxShadow: "inset 0 1px 1px #ffffff18, inset 0 -2px 3px #00000080, 0 2px 3px #30150770",
   },
-  statusText: { color: palette.green500, fontFamily: fonts.monoBold },
+  statusText: { color: "#fff8e9", fontFamily: fonts.arcade },
   statusTextLit: { color: colors.onGold },
-  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%" },
+  // Above the rack's lip (zIndex 3), so the pill overlaps the rack's bottom rail.
+  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%", zIndex: 4, elevation: 4 },
   actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },

@@ -38,18 +38,30 @@ const BASE = {
   nameSize: 8,
   nameLine: 11,
   nameTracking: 0.8,
-  nameGap: 3,
+  /** The nameplate tucks up over the avatar's lower rim. */
+  nameGap: -8,
+  platePadX: 7,
+  platePadY: 2,
+  plateRadius: 5,
+  stackSize: 10,
+  stackLine: 13,
+  coin: 8,
+  /** The opponent rack's wood box (`opponent-rack-3-tight`): the plate tucks over its top by
+   *  `rackTuck`, the standing tiles' feet sit `rackFeet` above its bottom, and the lip re-draws
+   *  the bottom `rackLip` of it over those feet. Ratios from the approved STO-538 gallery. */
+  rackW: 75,
+  rackH: 28,
+  rackTuck: 2.4,
+  rackFeet: 4.3,
+  rackLip: 6,
   pillGap: 3,
-  pillPadX: 6,
-  pillPadY: 1,
-  pillRadius: 3,
+  pillPadX: 8,
+  pillPadY: 1.5,
+  pillRadius: 8,
   pillBorder: 1,
   statusSize: 7,
   statusLine: 9,
   statusTracking: 0.8,
-  stackSize: 12,
-  stackLine: 16,
-  stackGap: 2,
   chip: 30,
   chipBorder: 1.5,
   chipText: 10,
@@ -98,8 +110,53 @@ export function avatarDiameter(tableWidth: number): number {
   return Math.max(MIN_AVATAR, Math.round((tableWidth * REFERENCE_AVATAR) / REFERENCE_TABLE_WIDTH));
 }
 
-/** Every measure of a seat at a felt `tableWidth` wide. */
-export function seatMetrics(tableWidth: number): SeatMetrics {
+/**
+ * The tabletop room's seat, at a 400-point-wide room: the reference draws a big avatar and rack
+ * with readable nameplates, so these replace `BASE`'s avatar-led proportions.
+ */
+const TABLETOP = {
+  avatar: 84,
+  width: 104,
+  nameGap: -28,
+  badge: 20,
+  badgeText: 8,
+  nameSize: 12,
+  nameLine: 15,
+  platePadX: 10,
+  platePadY: 4,
+  plateRadius: 8,
+  stackSize: 14,
+  stackLine: 17,
+  coin: 12,
+  rackW: 104,
+  // The trimmed opponent-rack-5 artwork is 1280 by 723; its lower rail covers the tile feet.
+  rackH: 104 * (723 / 1280),
+  rackTuck: 104 * (2.4 / 75),
+  rackFeet: 104 * (152 / 1280),
+  rackLip: 104 * (176 / 1280),
+  pillPadX: 10,
+  pillPadY: 2,
+  // Negative: the status pill tucks against the rack's bottom rail instead of floating below it.
+  pillGap: -6,
+  statusSize: 10,
+  statusLine: 13,
+  statusTracking: 0.2,
+  chip: 24,
+} as const;
+const TABLETOP_ROOM_WIDTH = 400;
+/** How far a wide window grows the tabletop seat. */
+const TABLETOP_MAX_SCALE = 1.8;
+
+/** Every measure of a seat at a felt `tableWidth` wide — or, `tabletop`, in a room that wide. */
+export function seatMetrics(tableWidth: number, tabletop = false): SeatMetrics {
+  if (tabletop) {
+    const scale = Math.min(TABLETOP_MAX_SCALE, Math.max(0.6, tableWidth / TABLETOP_ROOM_WIDTH));
+    const scaled = {} as BaseMetrics;
+    for (const key of Object.keys(BASE) as (keyof typeof BASE)[]) {
+      scaled[key] = (key in TABLETOP ? TABLETOP[key as keyof typeof TABLETOP] : BASE[key]) * scale;
+    }
+    return { ...scaled, avatar: Math.round(TABLETOP.avatar * scale), scale };
+  }
   const avatar = avatarDiameter(tableWidth);
   const scale = avatar / MIN_AVATAR;
   const scaled = {} as BaseMetrics;
@@ -138,16 +195,22 @@ export function betChipOffset(
   return { left: avatarLeft - m.chip - 4 * m.scale, top };
 }
 
-/** The label stack's height: name, status pill, stack. */
+/**
+ * The label stack's height: the nameplate (name over stack), the rack, the status badge. The rack
+ * is reserved on every seat — the hero's and an undealt one too — so dealing never moves a seat.
+ */
 export function labelBlock(m: SeatMetrics): number {
   return (
+    m.platePadY * 2 +
+    m.scale * 2 +
     m.nameLine +
+    m.stackLine +
+    m.rackH -
+    m.rackTuck +
     m.pillGap +
     m.pillBorder * 2 +
     m.pillPadY * 2 +
-    m.statusLine +
-    m.stackGap +
-    m.stackLine
+    m.statusLine
   );
 }
 
@@ -164,8 +227,13 @@ export function labelDrop(m: SeatMetrics): number {
  *
  * `core` is the avatar: the part of the seat that stays on the felt.
  */
-export function playerSeatBounds(anchor: SeatAnchor, tableWidth: number, seatCount = 4): SeatExtents {
-  const m = seatMetrics(tableWidth);
+export function playerSeatBounds(
+  anchor: SeatAnchor,
+  tableWidth: number,
+  seatCount = 4,
+  tabletop = false,
+): SeatExtents {
+  const m = seatMetrics(tableWidth, tabletop);
   const radius = m.avatar / 2;
   const direction = seatDirection(anchor, seatCount);
   const chip = betChipOffset(anchor, m, seatCount);
@@ -190,9 +258,14 @@ export function playerSeatBounds(anchor: SeatAnchor, tableWidth: number, seatCou
     right: Math.max(m.width / 2, chipLeft + m.chip),
     top: badges,
     // Reserve the full name/status/stack even for empty seats and changing states.
-    bottom: radius + labelDrop(m),
+    bottom: radius + labelDrop(m) - (tabletop && anchor.index === 0 ? m.rackH - m.rackTuck : 0),
     core: radius,
   };
+}
+
+/** `playerSeatBounds` for the tabletop room's larger seat. */
+export function tabletopSeatBounds(anchor: SeatAnchor, tableWidth: number, seatCount = 4): SeatExtents {
+  return playerSeatBounds(anchor, tableWidth, seatCount, true);
 }
 
 /** How a felt seats its players, as `PokerTable` props. */
@@ -247,9 +320,9 @@ function tabletopSeating(seatCount: number): TableSeating {
       seatPlacement: "room",
       layoutConfig: {
         seatAngles: tabletopSeatAngles(seatCount),
-        seatRadius: { x: 1.6, y: 0.86 },
-        communityY: 0.44,
-        potY: 0.6,
+        seatRadius: { x: 1.05, y: 0.86 },
+        communityY: 0.51,
+        potY: 0.69,
       },
     };
     TABLETOP_SEATING.set(seatCount, seating);
