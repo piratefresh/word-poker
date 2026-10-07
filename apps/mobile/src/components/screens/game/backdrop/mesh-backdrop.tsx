@@ -71,7 +71,6 @@ const MESH_LOOKS: Partial<Record<BackdropStyle, BackdropLook>> = {
 /** The repeatable pictures, tiled across the room rather than stretched over it. */
 const TILED_LOOKS: Partial<Record<BackdropStyle, number>> = {
   fire: require("../../../../../assets/images/ui/bgs/bg-fire-2.png"),
-  wood: require("../../../../../assets/images/ui/bgs/bg-wood.png"),
   water: require("../../../../../assets/images/ui/bgs/bg-water.png"),
 };
 /** Every picture is 941 × 1672; a tile is drawn at this share of that, in points. */

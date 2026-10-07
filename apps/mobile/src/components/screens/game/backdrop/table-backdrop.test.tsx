@@ -13,6 +13,8 @@ jest.mock("@shopify/react-native-skia/lib/module/web", () => ({
   },
 }));
 jest.mock("./tavern-light", () => ({ TavernLight: () => null }));
+jest.mock("./coin-bowl", () => ({ CoinBowl: () => null }));
+jest.mock("./drink", () => ({ Drink: () => null }));
 jest.mock("expo-image", () => ({
   Image: ({ testID = "table-painting" }: { testID?: string }) => {
     const { View } = jest.requireActual("react-native");
@@ -20,7 +22,8 @@ jest.mock("expo-image", () => ({
   },
 }));
 
-afterEach(() => setBackdropStyle("emerald"));
+beforeEach(() => setBackdropStyle("emerald"));
+afterEach(() => setBackdropStyle("tabletop"));
 
 test.each<BackdropStyle>(["tabletop", "tavern", "planet"])(
   "switching to %s shows room artwork immediately and removes the oval painting",
@@ -46,7 +49,7 @@ test.each<BackdropStyle>(["tabletop", "tavern", "planet"])(
   },
 );
 
-test.each<BackdropStyle>(["emerald", "ember", "wood", "fire", "water"])(
+test.each<BackdropStyle>(["emerald", "ember", "fire", "water"])(
   "%s keeps its canvas backdrop and table painting",
   async (look) => {
     setBackdropStyle(look);
@@ -64,5 +67,6 @@ test.each<BackdropStyle>(["emerald", "ember", "wood", "fire", "water"])(
 test("an explicit tabletop look overrides the session's emerald selection", async () => {
   const view = await render(<TableBackdrop look="tabletop" />);
   expect(view.getByTestId("tabletop-backdrop")).toBeOnTheScreen();
+  expect(view.getByTestId("tabletop-drink", { includeHiddenElements: true })).toBeOnTheScreen();
   expect(view.queryByTestId("canvas-backdrop")).toBeNull();
 });
