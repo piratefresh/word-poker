@@ -6,7 +6,6 @@ import type {
 import type { JSX } from "react";
 import { Text, View } from "react-native";
 
-import { useCompactControls } from "@/components/screens/game/screen-scale";
 import { WORD_REJECTION_COPY } from "@/features/table/word-rejection-copy";
 
 import { styles } from "./styles";
@@ -35,7 +34,6 @@ export function DraftLine({
   checkedResult?: WordCheckResult | null;
 }): JSX.Element {
   const refused = reason !== null;
-  const tight = useCompactControls();
 
   return (
     <>
@@ -48,21 +46,12 @@ export function DraftLine({
                   accessibilityLabel={`${score.total} points`}
                   style={[
                     styles.score,
-                    tight && styles.scoreTight,
                     refused && styles.scoreRefused,
                   ]}
                   testID="word-builder-score"
                 >
                   {score.total}
                   {" pts"}
-                </Text>
-              )}
-              {score === null || score.fullRackBonus === 0 ? null : (
-                <Text style={styles.rackBonus} testID="word-builder-full-rack">
-                  {"· "}
-                  {"+"}
-                  {score.fullRackBonus}
-                  {" full rack"}
                 </Text>
               )}
             </>

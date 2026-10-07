@@ -4,6 +4,7 @@ import Svg, { Path } from "react-native-svg";
 
 import { GameButton } from "@/components/ui/game-button";
 import { colors } from "@/constants/theme";
+import { useScreenScale } from "@/components/screens/game/screen-scale";
 
 import { haptic } from "./haptics";
 import { useWordBuilderScope } from "./word-builder";
@@ -17,16 +18,22 @@ import { useWordBuilderScope } from "./word-builder";
  */
 export function WordShuffleButton(): JSX.Element {
   const { canShuffle, shuffle } = useWordBuilderScope();
+  const scale = useScreenScale();
 
   return (
     <GameButton
       accessibilityLabel="Shuffle the tiles your word does not hold"
       disabled={!canShuffle}
+      compact
+      horizontalPadding={4}
+      label="SHUFFLE"
+      scale={scale}
+      variant="gold"
       onPress={() => {
         haptic("settle");
         shuffle();
       }}
-      style={shuffleStyles.button}
+      style={[shuffleStyles.button, { height: 30 * scale }]}
       testID="word-builder-shuffle"
     >
       <ShuffleGlyph />
@@ -37,24 +44,24 @@ export function WordShuffleButton(): JSX.Element {
 /** The shuffle, drawn rather than lettered: two paths crossing between the arrowheads. */
 function ShuffleGlyph(): JSX.Element {
   return (
-    <Svg fill="none" height={18} viewBox="0 0 18 18" width={18}>
+    <Svg fill="none" height={14} viewBox="0 0 18 18" width={14}>
       <Path
         d="M2 5h2.2c1.4 0 2.7.7 3.5 1.8l2.6 4.4c.8 1.1 2.1 1.8 3.5 1.8H15"
-        stroke={colors.text}
+        stroke={colors.onGold}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={1.6}
       />
       <Path
         d="M2 13h2.2c1.4 0 2.7-.7 3.5-1.8l2.6-4.4C11.1 5.7 12.4 5 13.8 5H15"
-        stroke={colors.text}
+        stroke={colors.onGold}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={1.6}
       />
       <Path
         d="m13.3 3.5 1.7 1.5-1.7 1.5M13.3 11.5l1.7 1.5-1.7 1.5"
-        stroke={colors.text}
+        stroke={colors.onGold}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={1.6}
@@ -65,5 +72,5 @@ function ShuffleGlyph(): JSX.Element {
 
 // The word check's height, so the rack's two word controls read as a pair.
 const shuffleStyles = StyleSheet.create({
-  button: { height: 32, minWidth: 40, width: 40 },
+  button: { minWidth: 0 },
 });

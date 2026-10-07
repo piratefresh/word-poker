@@ -14,7 +14,6 @@ import { colors, opacity } from "@/constants/theme";
 import {
   WordBuilder,
   WordHand,
-  WordPreview,
   type WordBuilderProps,
 } from "./word-builder";
 import { WordShuffleButton } from "./shuffle-button";
@@ -84,7 +83,6 @@ async function renderBuilder(overrides: Partial<WordBuilderProps> = {}) {
   const view = await render(
     <WordBuilder {...props}>
       <WordHand />
-      <WordPreview />
       <WordShuffleButton />
     </WordBuilder>,
   );
@@ -159,7 +157,6 @@ function Rack({ boards }: { boards: readonly (readonly (Tile | null)[])[] }) {
       })}
     >
       <WordHand />
-      <WordPreview />
       <WordShuffleButton />
       <Pressable
         onPress={() => setStreet((at) => at + 1)}
@@ -310,7 +307,7 @@ describe("<WordBuilder />", () => {
       "EL",
     );
     expect(standing.view.getByTestId("word-builder-score")).toHaveTextContent(
-      /· 3pts/,
+      /3 pts/,
     );
     expect(standing.view.queryByTestId("word-builder-full-rack")).toBeNull();
     expect(scoreColor(standing.view)).toBe(colors.gold);
@@ -323,7 +320,7 @@ describe("<WordBuilder />", () => {
       word: "EL",
     });
     expect(rack.view.getByTestId("word-builder-score")).toHaveTextContent(
-      /· 13pts/,
+      /13 pts/,
     );
     expect(rack.view.getByTestId("word-builder-full-rack")).toHaveTextContent(
       /\+10 full rack/,
@@ -338,7 +335,7 @@ describe("<WordBuilder />", () => {
       word: "EL",
     });
     expect(refused.view.getByTestId("word-builder-score")).toHaveTextContent(
-      /· 3pts/,
+      /3 pts/,
     );
     expect(scoreColor(refused.view)).toBe(colors.textFaint);
     expect(refused.view.getByRole("alert")).toHaveTextContent(

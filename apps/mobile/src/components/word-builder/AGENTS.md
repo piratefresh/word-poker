@@ -18,7 +18,7 @@ shared hook first.
 
 `apps/mobile/src/components/word-builder/` is the one builder for every mode: `WordHand` is the
 sortable strip of tiles and goes in the felt's rack slot (`GameScreen`'s `rack` prop), and
-`WordPreview` is the draft as one line of text directly above it — it draws nothing until the
+The draft is one line of text in the tray header beside the label — it draws nothing until the
 strip spells something. The builder carries no buttons of its own: the shuffle is
 `WordShuffleButton`, placed with `WordCheckButton` in a row under the rack (`GameScreen`'s
 `rackActions` prop), so the word's controls sit with its tiles and the betting rows keep their

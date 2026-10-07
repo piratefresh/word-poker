@@ -447,6 +447,8 @@ export function TileStrip({
   );
 
   const rack = rackFor(useWindowDimensions());
+  const hasChoice = strip.some(({ tile }) => "alternativeLetter" in tile);
+  const stripHeight = hasChoice ? rack.height : rack.height - FACE_HEIGHT * rack.scale;
   // A hand never holds more than the places (§7's seven), but cap the empties at 0 rather than
   // trust it: a negative count would draw nothing and shift every step.
   const laidOut = Math.max(places, data.length);
@@ -468,7 +470,7 @@ export function TileStrip({
       <View
         style={[
           styles.stripContent,
-          { height: rack.height, width: rowWidth(laidOut, step, rack) },
+          { height: stripHeight, width: rowWidth(laidOut, step, rack) },
         ]}
       >
         {Array.from({ length: empty }, (_, index) => (
@@ -801,6 +803,7 @@ function TileContent({
     ownership,
     scale,
     selected: held && !picking,
+    shadow: false,
     size,
     testID: `word-builder-tile-${tile.id}`,
   };

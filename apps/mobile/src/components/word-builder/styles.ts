@@ -18,29 +18,15 @@ import {
  * local to a component are named after one.
  */
 export const styles = StyleSheet.create({
-  // The draft line above the rack: centred over the strip, with the felt behind it, and no
-  // sheet of its own — the line is all it is.
-  // A fixed slot above the rack that the line floats in, so a first letter never adds height to the
-  // column: the table above would otherwise shrink the moment a tile is played.
-  previewAnchor: { height: 48, zIndex: 2 },
-  // Small screens: room for the word and its points on two lines, taken from the table above.
-  previewAnchorTight: { height: 36 },
-  // The points sit right under the word rather than a gap below it.
-  previewRowTight: { gap: 0, paddingBottom: 0 },
-  // Line boxes as tall as the type, so the points sit under the word and not a line below it.
-  wordTight: { lineHeight: 22 },
-  scoreTight: { lineHeight: 13 },
+  previewRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    flexShrink: 1,
+    flexWrap: "nowrap",
+    columnGap: spacing.sm,
+  },
   // A step lower: the rack rides closer to the action row.
   stripTight: { top: 6 },
-  previewRow: {
-    alignItems: "center",
-    bottom: 0,
-    gap: spacing.sm,
-    left: 0,
-    paddingBottom: spacing.sm,
-    position: "absolute",
-    right: 0,
-  },
   lettersLabel: {
     ...type.label,
     color: colors.textFaint,
@@ -105,11 +91,26 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.sm,
   },
+  // The draft's line above the tray, on the wood: one line, centred, as tall when empty.
+  previewSlot: { alignItems: "center", justifyContent: "flex-end", minHeight: 26 },
   word: { ...type.numeric, fontSize: fontSize.title, letterSpacing: 3 },
   score: { ...type.numeric, color: colors.gold, fontSize: fontSize.small },
   // A draft §11 would refuse is worth nothing, so its number is drawn as what it is.
   scoreRefused: { color: colors.textFaint },
-  rackBonus: { ...type.label, color: colors.success },
+  rackBonus: { ...type.label, color: colors.onGold },
+  // A pill hung off the tray's top-right corner, half over its edge.
+  rackBonusPill: {
+    backgroundColor: colors.gold,
+    borderColor: "#fff3dc",
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    position: "absolute",
+    right: 10,
+    top: -12,
+    zIndex: 2,
+  },
   reason: {
     color: colors.warning,
     fontFamily: fonts.sansMedium,
@@ -117,33 +118,40 @@ export const styles = StyleSheet.create({
     lineHeight: 19,
   },
   // The cream tray the strip sits in (STO-538), built like the buttons: a face standing on a
-  // darker lip. Colours are sampled off the tabletop reference.
+  // darker lip. Its back edge recedes into the tabletop, with the front edge anchored.
   trayLip: {
     alignSelf: "stretch",
-    backgroundColor: "#d9b983",
+    backgroundColor: "#bc7d39",
     borderRadius: radius.lg,
-    boxShadow: [
-      { blurRadius: 6, color: "rgba(38,18,0,0.35)", offsetX: 0, offsetY: 3 },
-    ],
-    marginHorizontal: spacing.sm,
+    marginHorizontal: 12,
+    transform: [{ perspective: 500 }, { rotateX: "16deg" }],
+    transformOrigin: "center bottom",
   },
   // The strip's row keeps a band under the tiles for a choice tile's face chips, so the face
   // takes no bottom padding of its own: the band is the room.
   trayFace: {
-    backgroundColor: "#f6e0ba",
-    borderColor: "#fbeed0",
+    backgroundColor: "#ffe0b0",
+    borderColor: "#fff3dc",
     borderRadius: radius.lg,
     borderWidth: border.hairline,
     marginBottom: 4,
     paddingBottom: spacing.xxs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 6,
     paddingTop: spacing.xs,
   },
+  // The tray's header: the label at the left, the word's controls at the right, tiles below.
+  trayHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: spacing.xs,
+  },
+  trayActions: { flexDirection: "row", gap: spacing.xs },
   trayLabel: {
     color: "#4a3018",
-    fontFamily: fonts.arcade,
-    fontSize: fontSize.caption,
-    letterSpacing: 0.6,
+    fontFamily: fonts.sansBlack,
+    fontSize: 14,
+    letterSpacing: 0.3,
     marginBottom: spacing.xs,
     marginLeft: spacing.xxs,
   },
