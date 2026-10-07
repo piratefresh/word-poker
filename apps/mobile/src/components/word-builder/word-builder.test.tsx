@@ -2,6 +2,7 @@ import {
   fireEvent,
   render,
   type RenderResult,
+  within,
 } from "@testing-library/react-native";
 import type { Tile, TilePlay, WordScore } from "@wordpoker/contracts";
 import { WORD_REJECTION_REASONS } from "@wordpoker/contracts";
@@ -243,6 +244,35 @@ describe("<WordBuilder />", () => {
 
     await fireEvent.press(view.getByTestId("word-builder-tile-p-ae"));
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "c-l" }]);
+  });
+
+  test("shows a held choice tile as the one face it plays, the chips still under it", async () => {
+    const { view } = await renderBuilder({
+      plays: DRAFT,
+      score: SCORE,
+      word: "EL",
+    });
+    const hidden = { includeHiddenElements: true } as const;
+
+    // The word plays the A/E tile as E, so the tile prints E alone; A lives in the chip under
+    // it, which is how the seat names the other face.
+    const held = within(view.getByTestId("word-builder-tile-p-ae"));
+    expect(held.getByText("E", hidden)).toBeOnTheScreen();
+    expect(held.queryByText("A", hidden)).toBeNull();
+    expect(held.queryByText("/", hidden)).toBeNull();
+
+    // A choice tile the word does not hold keeps printing the pair it can be played as.
+    const open = within(view.getByTestId("word-builder-tile-c-ts"));
+    expect(open.getByText("T", hidden)).toBeOnTheScreen();
+    expect(open.getByText("S", hidden)).toBeOnTheScreen();
+
+    // Both faces are still on screen under the tile, the played one chosen.
+    expect(
+      view.getByTestId("word-builder-face-p-ae-E").props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      view.getByTestId("word-builder-face-p-ae-A").props.accessibilityState.selected,
+    ).toBe(false);
   });
 
   test("plays the other face of a choice tile that is already in the word, in place", async () => {

@@ -61,7 +61,12 @@ export interface TileProps {
   scale?: number;
   ownership?: TileOwnership;
   selected?: boolean;
-  /** The letter a selected choice tile is playing, used to highlight its point value. */
+  /**
+   * The letter a choice tile is playing (§10): the face it prints in place of its pair — that
+   * letter, at a single letter's size, with that face's own value — and the points it
+   * highlights. Absent while nothing is chosen, and on a single-letter tile, which prints its
+   * one face either way.
+   */
   chosenFace?: string;
   dimmed?: boolean;
   disabled?: boolean;
@@ -193,6 +198,24 @@ function secondFace(tile: TileData): string | null {
 }
 
 /**
+ * The one face a choice tile shows while the word plays it (§10): `A` for an A/E played as A,
+ * the other letter left to the chips under the rack. Null when no face is named — both letters
+ * keep printing — and on a single-letter tile, which has only the one.
+ */
+function playedFace(tile: TileData, chosenFace: string | undefined): string | null {
+  const second = secondFace(tile);
+  if (second === null || chosenFace === undefined) return null;
+  return chosenFace === tile.letter || chosenFace === second ? chosenFace : null;
+}
+
+/** What one face of the tile is worth: the picked face's own value where the pair disagrees (§10). */
+function faceValue(tile: TileData, face: string): number {
+  return "alternativeLetter" in tile && face === tile.alternativeLetter
+    ? tile.alternativePoints
+    : tile.points;
+}
+
+/**
  * What the face shows as the tile's value: the one value of a single letter, and a choice
  * tile's separate values only when its faces disagree — A/E showing `1`, a Q/K showing `10/5`.
  */
@@ -250,6 +273,7 @@ export function Tile({
 }: TileProps) {
   const metrics = scaleTileMetrics(size, scale);
   const second = secondFace(tile);
+  const played = playedFace(tile, chosenFace);
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -657,15 +681,16 @@ export function Tile({
                 style={[
                   styles.letter,
                   {
-                    fontSize: second === null
-                      ? metrics.letterSize
-                      : metrics.alternateSize,
+                    fontSize:
+                      played !== null || second === null
+                        ? metrics.letterSize
+                        : metrics.alternateSize,
                   },
                 ]}
               >
-                {tile.letter}
+                {played ?? tile.letter}
               </Text>
-              {second === null ? null : (
+              {played !== null || second === null ? null : (
                 <>
                   <Text
                     maxFontSizeMultiplier={1.2}
@@ -693,7 +718,16 @@ export function Tile({
                 },
               ]}
             >
-              {"alternativeLetter" in tile ? (
+              {played !== null ? (
+                // The played face prints its own value alone: the other face is not scored (§10).
+                <Text
+                  style={{
+                    color: selected ? colors.goldHi : styles.points.color,
+                  }}
+                >
+                  {faceValue(tile, played)}
+                </Text>
+              ) : "alternativeLetter" in tile ? (
                 <>
                   <Text
                     style={{

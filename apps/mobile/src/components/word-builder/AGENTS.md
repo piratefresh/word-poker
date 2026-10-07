@@ -44,6 +44,12 @@ tile dealt — is never fought by a private copy of the list. A tile ignores a p
 `DRAG_SETTLE_MS` after a drop, because the pan does not cancel the tile's own press on the web —
 the pointer never leaves the tile, since the tile travels with it.
 
+A choice tile (§10) stops printing its pair the moment the word plays it: the tile shows the one
+face it plays — that letter, at a single letter's size, with that face's own value — and the two
+chips under it keep naming both faces, so the seat can switch to the other one. Nothing chosen yet
+draws the pair as it always did, and the tile read aloud still gives both faces and the one played
+(§39).
+
 The rack is a straight row of `TILE_METRICS`'s `medium` tile, grown by the window's `screenScale`
 (`screens/game/screen-scale.ts`; exactly 1 below a 600-point shorter side, then growing with it up to
 a cap, `rackFor` in `strip.tsx`) — the one factor the banner, HUD buttons, community tiles and action
