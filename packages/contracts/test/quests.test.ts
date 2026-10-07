@@ -62,6 +62,15 @@ describe("isQuestHandClaim", () => {
     assert.ok(!isQuestHandClaim({ facts: FACTS }));
   });
 
+  it("refuses an oversized token, a non-rack word, and a non-integer or negative pot", () => {
+    assert.ok(!isQuestHandClaim({ handToken: "x".repeat(65), facts: FACTS }));
+    assert.ok(!isQuestHandClaim({ handToken: "a", facts: { ...FACTS, heroWord: "quiz" } }));
+    assert.ok(!isQuestHandClaim({ handToken: "a", facts: { ...FACTS, heroWord: "ABCDEFGH" } }));
+    assert.ok(!isQuestHandClaim({ handToken: "a", facts: { ...FACTS, pot: 1.5 } }));
+    assert.ok(!isQuestHandClaim({ handToken: "a", facts: { ...FACTS, pot: -1 } }));
+    assert.ok(isQuestHandClaim({ handToken: "a", facts: { ...FACTS, heroWord: "QUIZ" } }));
+  });
+
   it("refuses facts with an unknown field type or out-of-range number", () => {
     for (const facts of [
       { ...FACTS, heroWon: "yes" },

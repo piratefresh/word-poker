@@ -59,7 +59,7 @@ export function StoreScreen() {
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
         <Column alignment="start" spacing={spacing.md} {...fullWidth(styles.screen)}>
-          <Button label="Back" onPress={() => router.back()} testID="store-back" variant="text" />
+          <Button label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} testID="store-back" variant="text" />
           <Text textStyle={titleText}>Coin Store</Text>
           <Text textStyle={kickerText}>TOP UP YOUR WALLET</Text>
           <Spacer size={spacing.sm} />

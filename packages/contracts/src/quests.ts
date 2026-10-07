@@ -7,7 +7,7 @@
  * definition of what a quest is and what it is judged against.
  */
 
-import type { ShowdownDecider } from "./showdown";
+import { SHOWDOWN_DECIDERS, type ShowdownDecider } from "./showdown";
 
 /** Every quest the catalog can pay, in the order `QUEST_CATALOG` defines them. */
 export const QUEST_IDS = [
@@ -88,10 +88,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-const SHOWDOWN_DECIDER_VALUES: readonly string[] = ["final-score", "word-length", "tile-draw"];
+/** The longest `handToken` a claim may carry — it is stored verbatim as a permanent dedupe key. */
+export const QUEST_HAND_TOKEN_MAX_LENGTH = 64;
+
+/** A rack is seven tiles, so a hero word is 1–7 uppercase letters. */
+const HERO_WORD = /^[A-Z]{1,7}$/;
 
 function isShowdownDeciderOrNull(value: unknown): value is ShowdownDecider | null {
-  return value === null || SHOWDOWN_DECIDER_VALUES.includes(value as string);
+  return value === null || (SHOWDOWN_DECIDERS as readonly unknown[]).includes(value);
 }
 
 function isQuestHandFacts(value: unknown): value is QuestHandFacts {
@@ -99,14 +103,15 @@ function isQuestHandFacts(value: unknown): value is QuestHandFacts {
   return (
     typeof value.revealed === "boolean" &&
     typeof value.heroWon === "boolean" &&
-    (value.heroWord === null || typeof value.heroWord === "string") &&
+    (value.heroWord === null || (typeof value.heroWord === "string" && HERO_WORD.test(value.heroWord))) &&
     typeof value.heroScore === "number" &&
     Number.isInteger(value.heroScore) &&
     value.heroScore >= 0 &&
     value.heroScore <= MAX_HERO_SCORE &&
     isShowdownDeciderOrNull(value.heroDecidedBy) &&
     typeof value.pot === "number" &&
-    Number.isFinite(value.pot) &&
+    Number.isSafeInteger(value.pot) &&
+    value.pot >= 0 &&
     typeof value.wildTable === "boolean" &&
     typeof value.heroUsedPower === "boolean"
   );
@@ -118,6 +123,7 @@ export function isQuestHandClaim(value: unknown): value is QuestHandClaim {
   return (
     typeof value.handToken === "string" &&
     value.handToken.length > 0 &&
+    value.handToken.length <= QUEST_HAND_TOKEN_MAX_LENGTH &&
     isQuestHandFacts(value.facts)
   );
 }
@@ -141,10 +147,8 @@ export function isQuestStateResponse(value: unknown): value is QuestStateRespons
   if (!isRecord(value) || !isRecord(value.streak) || !Array.isArray(value.quests)) return false;
   const { streak } = value;
   return (
-    typeof streak.current === "number" &&
-    Number.isFinite(streak.current) &&
-    (streak.creditedToday === null ||
-      (typeof streak.creditedToday === "number" && Number.isFinite(streak.creditedToday))) &&
+    isXpCount(streak.current) &&
+    (streak.creditedToday === null || isXpCount(streak.creditedToday)) &&
     isXpCount(value.xp) &&
     isXpCount(value.level) &&
     value.level >= 1 &&

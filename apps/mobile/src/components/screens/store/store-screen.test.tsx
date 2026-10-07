@@ -13,7 +13,7 @@ import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-cli
 
 import { StoreScreen } from "./store-screen";
 
-jest.mock("expo-router", () => ({ router: { back: jest.fn() } }));
+jest.mock("expo-router", () => ({ router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn() } }));
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: jest.fn(), sendVerificationEmail: jest.fn() },
 }));

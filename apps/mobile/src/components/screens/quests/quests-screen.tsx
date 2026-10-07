@@ -49,7 +49,7 @@ export function QuestsScreen(): ReactElement {
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
         <Column alignment="start" spacing={spacing.md} {...fullWidth(styles.screen)}>
-          <Button label="Back" onPress={() => router.back()} testID="quests-back" variant="text" />
+          <Button label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} testID="quests-back" variant="text" />
           <Text textStyle={titleText}>Quests</Text>
           <Text textStyle={kickerText}>EARN COINS FOR WINS &amp; STREAKS</Text>
           <Spacer size={spacing.sm} />

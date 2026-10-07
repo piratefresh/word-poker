@@ -7,7 +7,7 @@ import { render } from "@testing-library/react-native";
 
 import { QuestsScreen } from "./quests-screen";
 
-jest.mock("expo-router", () => ({ router: { back: jest.fn() } }));
+jest.mock("expo-router", () => ({ router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn() } }));
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: jest.fn() } }));
 
 const mockRefresh = jest.fn();

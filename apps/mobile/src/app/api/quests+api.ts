@@ -4,7 +4,9 @@
  * Conventions of `wallet+api.ts`: the session comes from Better Auth, a RevenueCat failure is
  * logged and never thrown (the row stays `pending`, the next `GET` resolves it), and nothing here
  * re-judges a hand — `claimQuestHand` dedupes by `handToken` and `@wordpoker/game-rules`' pure
- * evaluator is the only judge. Earning coins needs a verified email, the same gate the welcome
+ * evaluator judges the *claimed* facts. The client authors those facts (shape-validated in
+ * contracts, not corroborated), so XP and quest farming by a verified account is an accepted
+ * risk (STO-543: "we'd rather people play"); there is no rate limit. Earning coins needs a verified email, the same gate the welcome
  * grant uses: a throwaway account should not be able to farm a streak.
  */
 

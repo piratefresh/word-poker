@@ -126,10 +126,10 @@ export async function recordQuestHand(
       return { completed: [], duplicate: true, xp: row?.xp ?? 0 };
     }
 
-    // The floor keeps a hostile `xp` from dragging a total negative; claims report whole,
-    // capped amounts (contracts' `MAX_HERO_SCORE`), so this never bites a real hand.
+    // The floor (both arms) keeps a hostile `xp` from dragging a total negative; claims report
+    // whole, capped amounts (contracts' `MAX_HERO_SCORE`), so this never bites a real hand.
     const [total] = await db.execute<{ xp: number }[]>(
-      `insert into "player_progress" ("user_id", "xp") values (?, ?)
+      `insert into "player_progress" ("user_id", "xp") values (?, greatest(?::integer, 0))
        on conflict ("user_id") do update set "xp" = greatest("player_progress"."xp" + excluded."xp", 0)
        returning "xp"`,
       [userId, xp],

@@ -97,7 +97,7 @@ export function streakLength(dates: readonly string[], today: string): number {
  * Credits today's login streak, once. `current` is today's streak length whether or not this
  * call is the one that paid it; `creditedToday` is the reward *this call* paid, or `null` when
  * today was already credited (a repeat `GET`) or RevenueCat could not be reached (the row stays
- * `pending`, and the next `GET` resolves it — `getCoinBalance`'s own retry, not this module's).
+ * `pending`, and `GET /api/wallet`'s `retryPending` resolves it — not this module).
  */
 export async function creditDailyStreak(
   userId: string,
@@ -120,7 +120,7 @@ export async function creditDailyStreak(
  * claim path and the GET heal run this one rule, so a crash between an XP commit and its
  * wallet calls is healed by whichever runs next; each level's `wallet_event` row is held by
  * the reward-once index either way, and `levelPaid` only keeps the everyday run at zero extra
- * queries. Returns the coins the loop paid, for the caller that announces a level-up.
+ * queries.
  */
 async function payLevelUps(
   quests: QuestStore,
@@ -128,15 +128,11 @@ async function payLevelUps(
   paidThrough: number,
   level: number,
   deps: RewardsDeps,
-): Promise<number> {
-  let paid = 0;
+): Promise<void> {
   for (let crossed = paidThrough + 1; crossed <= level; crossed += 1) {
     await applyWalletChange(userId, "level", levelReward(crossed), { ref: `level-${crossed}` }, deps);
-    paid += levelReward(crossed);
   }
   if (level > paidThrough) await quests.setLevelPaid(userId, level);
-
-  return paid;
 }
 
 /**
@@ -181,6 +177,6 @@ export async function payCompletedQuests(userId: string, deps: RewardsDeps = {})
     await applyWalletChange(userId, "quest", questReward(row.questId), { ref: row.questId }, deps);
   }
 
-  const paid = await quests.playerProgress(userId);
-  await payLevelUps(quests, userId, paid.levelPaid, levelForXp(paid.xp).level, deps);
+  const progress = await quests.playerProgress(userId);
+  await payLevelUps(quests, userId, progress.levelPaid, levelForXp(progress.xp).level, deps);
 }
