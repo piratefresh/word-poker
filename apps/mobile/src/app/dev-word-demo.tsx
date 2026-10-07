@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
-import type { TilePlay } from "@wordpoker/contracts";
+import type { PrivateWordCheckState, TilePlay } from "@wordpoker/contracts";
 import {
   availableTiles,
   resolveSubmission,
@@ -11,7 +11,13 @@ import {
   type Dictionary,
 } from "@wordpoker/game-rules";
 
-import { WordBuilder, WordHand, WordPreview } from "@/components/word-builder";
+import {
+  WordBuilder,
+  WordCheckButton,
+  WordHand,
+  WordPreview,
+  WordShuffleButton,
+} from "@/components/word-builder";
 import { colors } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
 
@@ -72,20 +78,45 @@ function Finger() {
 
 const FINGER = 34;
 
-function Stage({ dictionary }: { dictionary: Dictionary }) {
+/** A hand with every check left, for a stage that shows the word's controls. */
+const FULL_CHECKS: PrivateWordCheckState = { checksRemaining: 5, result: null };
+
+/**
+ * The tutorial's deal on the real word builder. `revealed` is how much of the board is out —
+ * 3 is the flop, 5 the river, which is the whole deal and what the recording uses — and
+ * `actions` draws Shuffle and Check Word under the rack, as the felt does. `dev-tabletop-kit`
+ * reuses this rather than wire a second builder.
+ */
+export function Stage({
+  dictionary,
+  revealed = 5,
+  actions = false,
+  flush = false,
+}: {
+  dictionary: Dictionary;
+  revealed?: number;
+  actions?: boolean;
+  /** Drops the stage's side padding, so the rack has the room the felt's rack slot gives it. */
+  flush?: boolean;
+}) {
   const deal = useMemo(() => startTutorial({ dictionary, nowMs: 0 }).state, [dictionary]);
   const hero = deal.seats[0];
   const available = availableTiles(deal, 0);
   const [plays, setPlays] = useState<readonly TilePlay[]>([]);
+  const community = useMemo(
+    () => deal.community.map((tile, index) => (index < revealed ? tile : null)),
+    [deal, revealed],
+  );
 
   const submission = { plays: [...plays] };
   const resolution = resolveSubmission({ available, submission });
 
   return (
     <WordBuilder
-      community={deal.community}
+      community={community}
       confirmable={false}
       confirmed={false}
+      onCheckWord={actions ? noop : undefined}
       onDraft={setPlays}
       open
       plays={plays}
@@ -93,14 +124,23 @@ function Stage({ dictionary }: { dictionary: Dictionary }) {
       reason={null}
       score={resolution.ok ? scoreWord(resolution.tiles) : null}
       word={spellSubmission({ available, submission })}
+      wordCheck={actions ? FULL_CHECKS : undefined}
     >
-      <View style={styles.rack} testID="word-demo-rack">
+      <View style={[styles.rack, flush && styles.rackFlush]} testID="word-demo-rack">
         <WordPreview />
         <WordHand />
+        {actions ? (
+          <View style={styles.actions}>
+            <WordShuffleButton />
+            <WordCheckButton />
+          </View>
+        ) : null}
       </View>
     </WordBuilder>
   );
 }
+
+const noop = () => {};
 
 const styles = StyleSheet.create({
   screen: {
@@ -110,6 +150,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rack: { paddingHorizontal: 16, paddingVertical: 12, width: "100%" },
+  rackFlush: { paddingHorizontal: 0 },
+  actions: { flexDirection: "row", gap: 12, justifyContent: "center", marginTop: 12 },
   finger: {
     backgroundColor: "rgba(255,255,255,0.18)",
     borderColor: "rgba(255,255,255,0.85)",

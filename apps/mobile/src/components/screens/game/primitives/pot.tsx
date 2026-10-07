@@ -74,6 +74,6 @@ const styles = StyleSheet.create({
   pot: { alignItems: "center" },
   potLabel: { color: colors.textDim, fontFamily: fonts.mono },
   /** §30's Blinds, quiet under the pot: table information, not a headline. */
-  blindsAmount: { color: colors.textDim, fontFamily: fonts.mono },
+  blindsAmount: { color: "#fff", fontFamily: fonts.mono },
   sidePotAmount: { color: colors.textDim, fontFamily: fonts.mono },
 });

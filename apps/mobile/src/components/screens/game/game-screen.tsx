@@ -244,7 +244,7 @@ function GameScreenBody({
                 tableWidth={appearanceWidth ?? size.width}
               />
             )}
-            renderSeat={(slot) => <PlayerSeat {...slot} onPress={onSeatPress} />}
+            renderSeat={(slot) => <PlayerSeat {...slot} dealt={!waiting} onPress={onSeatPress} />}
             // The seats scale with the felt and, at up to four, sit inside the table — avatars
             // on the felt, labels at most on the rail — so the table fills its room.
             seatBounds={playerSeatBounds}

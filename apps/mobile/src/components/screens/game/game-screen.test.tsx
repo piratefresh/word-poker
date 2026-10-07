@@ -101,7 +101,7 @@ test("keeps a seat's tap under the HUD", async () => {
 
   // Pressed on the name inside the seat, so the tap has to travel out through the seat
   // and the felt layers to reach the handler.
-  await fireEvent.press(view.getByText(/MAGNUS/));
+  await fireEvent.press(view.getByText(/^YOU$/));
 
   expect(onSeatPress).toHaveBeenCalledWith(
     expect.objectContaining({ id: "magnus", isHero: true }),

@@ -26,10 +26,6 @@ jest.mock("@/components/hud/top-bar/timer-glass", () => ({ TimerGlass: () => nul
 // The painted shadow behind the action bar is a Skia shader, and decoration only.
 jest.mock("@/components/screens/game/backdrop/action-bar-shade", () => ({ ActionBarShade: () => null }));
 
-// The tile's pixel-art face is painted by Skia, which Jest has no canvas for: tests see the
-// gradient face it falls back to (STO-479).
-jest.mock("@/components/game/tile-texture/use-tile-texture", () => ({ useTileTexture: () => null }));
-
 // The choice accent's beam is decorative Skia; tests keep the static purple strip.
 jest.mock("@/components/game/tile-choice-beam", () => ({
   TileChoiceBeam: ({ color, height }) => {

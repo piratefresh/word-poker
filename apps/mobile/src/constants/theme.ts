@@ -171,10 +171,11 @@ export const gradients = {
     start: { x: 0, y: 0 },
     end: { x: 1, y: 1 },
   },
+  // Smooth ivory, lit from the upper left (STO-538); sampled off the tabletop reference.
   tile: {
-    colors: ["#fff3d1", palette.cream100, palette.cream300] as const,
-    start: { x: 0.15, y: 0 },
-    end: { x: 0.85, y: 1 },
+    colors: ["#fcefd2", "#f0dab2"] as const,
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
   },
   tileDim: {
     colors: [palette.cream400, "#a8987a", "#8a7a5e"] as const,
@@ -185,6 +186,25 @@ export const gradients = {
     colors: [palette.felt300, "#1d3711", "#0e1d09"] as const,
     start: { x: 0.5, y: 0 },
     end: { x: 0.5, y: 1 },
+  },
+} as const;
+
+/**
+ * The letter tile's material (STO-538): an ivory face (`gradients.tile`) on a tan slab, printed in
+ * near-black; its back is a crimson inlay with a lighter inset line and diamond. All of it is
+ * views — no image, no canvas — so a row of seven costs seven views, not seven GL contexts.
+ */
+export const tileMaterial = {
+  slab: "#c38143",
+  /** The dark rim round the slab's foot and the face's edge on a tile with no owner colour. */
+  edge: "#6b3a12",
+  ink: "#15110d",
+  back: {
+    gradient: ["#b81f29", "#8b161e"] as const,
+    slab: "#5a0b10",
+    edge: "#2e0407",
+    inset: "#e0545a",
+    diamond: "#d0383f",
   },
 } as const;
 

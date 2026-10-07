@@ -13,6 +13,10 @@ const SCENES = {
     portrait: require("../../../../../assets/images/ui/bgs/bg-planet-9-16.png"),
     landscape: require("../../../../../assets/images/ui/bgs/bg-planet-16-9.png"),
   },
+  tabletop: {
+    portrait: require("../../../../../assets/images/ui/v2/bgs/tabletop-portrait.webp"),
+    landscape: require("../../../../../assets/images/ui/v2/bgs/tabletop-landscape.webp"),
+  },
 };
 
 /** Full-screen artwork, with Planet dimmed beneath the game's readable chrome. */
