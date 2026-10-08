@@ -5,7 +5,11 @@
  * load in Node, so the shipped mock replaces it. Without this every suite that
  * touches an animated component dies inside `react-native-worklets` at import time.
  */
-jest.mock("react-native-reanimated", () => require("react-native-reanimated/mock"));
+// The mock ships `useReducedMotion` as a TODO; motion stays on unless a suite overrides it.
+jest.mock("react-native-reanimated", () => ({
+  ...require("react-native-reanimated/mock"),
+  useReducedMotion: () => false,
+}));
 
 // The table's mesh-gradient backdrop is Skia, which needs a GPU canvas a test renderer doesn't
 // have; it is decoration only, so tests draw nothing in its place.

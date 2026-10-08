@@ -24,6 +24,7 @@ import {
   type ModeVariant,
 } from "@/components/screens/home/components/mode-variants";
 import { LevelStrip } from "@/components/screens/home/level-strip";
+import { TileLogo } from "@/components/screens/home/tile-logo";
 import {
   colors,
   fonts,
@@ -186,8 +187,10 @@ export function HomeScreen() {
           spacing={spacing.md}
           style={{ ...styles.screen, width: windowWidth }}
         >
-          <Text textStyle={titleText}>Choose how to play</Text>
-          <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
+          <RNHostView matchContents>
+            <TileLogo width={contentWidth} />
+          </RNHostView>
+
           <Spacer size={spacing.sm} />
 
           {streakBanner ? (
@@ -288,7 +291,7 @@ const styles = {
   screen: {
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.huge,
+    paddingTop: spacing.md,
   },
   footer: {
     backgroundColor: colors.surface,
