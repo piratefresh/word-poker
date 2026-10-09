@@ -1,17 +1,19 @@
 /**
- * quests+api.ts — the signed-in, verified player's quests and login streak (STO-525).
+ * quests+api.ts — the signed-in, verified player's quests, login streak, and XP level (STO-525, STO-543).
  *
  * Conventions of `wallet+api.ts`: the session comes from Better Auth, a RevenueCat failure is
  * logged and never thrown (the row stays `pending`, the next `GET` resolves it), and nothing here
  * re-judges a hand — `claimQuestHand` dedupes by `handToken` and `@wordpoker/game-rules`' pure
- * evaluator is the only judge. Earning coins needs a verified email, the same gate the welcome
+ * evaluator judges the *claimed* facts. The client authors those facts (shape-validated in
+ * contracts, not corroborated), so XP and quest farming by a verified account is an accepted
+ * risk (STO-543: "we'd rather people play"); there is no rate limit. Earning coins needs a verified email, the same gate the welcome
  * grant uses: a throwaway account should not be able to farm a streak.
  */
 
 import { isQuestHandClaim, type QuestClaimResponse, type QuestStateResponse } from "@wordpoker/contracts";
-import { questProgress } from "@wordpoker/db";
+import { playerProgress, questProgress } from "@wordpoker/db";
 import { claimQuestHand, creditDailyStreak, payCompletedQuests } from "@wordpoker/economy";
-import { QUEST_CATALOG } from "@wordpoker/game-rules";
+import { QUEST_CATALOG, levelForXp } from "@wordpoker/game-rules";
 
 import { auth } from "@/auth/server/auth";
 
@@ -49,9 +51,12 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     const rows = await questProgress(userId);
+    const progress = await playerProgress(userId);
     const byId = new Map(rows.map((row) => [row.questId, row]));
     const body: QuestStateResponse = {
       streak,
+      xp: progress.xp,
+      level: levelForXp(progress.xp).level,
       quests: QUEST_CATALOG.map((def) => ({
         id: def.id,
         progress: byId.get(def.id)?.progress ?? 0,

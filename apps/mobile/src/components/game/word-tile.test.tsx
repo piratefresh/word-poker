@@ -31,6 +31,41 @@ describe("<Tile /> — §10's choice tiles", () => {
     expect(plain.queryByTestId("tile-choice-accent", { includeHiddenElements: true })).toBeNull();
   });
 
+  test("prints only the face the word plays, once a face is picked (§10)", async () => {
+    // The face's letters and values live inside the tile's face, which is hidden from assistive
+    // tech — the tile's own label is what a reader gets — so the queries have to say so.
+    const hidden = { includeHiddenElements: true } as const;
+
+    // Nothing picked: the pair prints as a pair, both letters, the slash between them, and both
+    // values.
+    const open = await render(<Tile side="front" tile={CHOICE} />);
+    expect(open.getByText("A", hidden)).toBeOnTheScreen();
+    expect(open.getByText("E", hidden)).toBeOnTheScreen();
+    expect(open.getAllByText("/", hidden)).toHaveLength(1);
+    expect(open.getByText("1/1", hidden)).toBeOnTheScreen();
+
+    // Played as E: the tile prints E alone, worth its own value, with no other letter or value.
+    const chosen = await render(<Tile chosenFace="E" side="front" tile={CHOICE} />);
+    expect(chosen.getByText("E", hidden)).toBeOnTheScreen();
+    expect(chosen.queryByText("A", hidden)).toBeNull();
+    expect(chosen.queryByText("/", hidden)).toBeNull();
+    expect(chosen.getByText("1", hidden)).toBeOnTheScreen();
+    // The accent stays: the tile is still a choice tile, and the chips name the other face.
+    expect(chosen.getByTestId("tile-choice-accent", hidden)).toBeOnTheScreen();
+
+    // A pair whose faces are worth different amounts prints the played face's own value (§10).
+    const king = await render(
+      <Tile
+        chosenFace="K"
+        side="front"
+        tile={{ id: "QK-1", letter: "Q", points: 10, alternativeLetter: "K", alternativePoints: 5 }}
+      />,
+    );
+    expect(king.getByText("K", hidden)).toBeOnTheScreen();
+    expect(king.getByText("5", hidden)).toBeOnTheScreen();
+    expect(king.queryByText("10", hidden)).toBeNull();
+  });
+
   test("reads both faces aloud, and what each is worth (§39)", () => {
     expect(getTileAccessibilityLabel(CHOICE)).toBe("A or E, 1 point");
     expect(getTileAccessibilityLabel(PLAIN)).toBe("A, 1 point");

@@ -58,7 +58,11 @@ jest.mock("expo-router", () => ({
 }));
 
 // This suite never reaches the felt that needs it (above), but it is still in the module graph:
-// the real module pulls in Better Auth's client, which Jest cannot parse.
+// the felt's providers pull in Better Auth's client, which Jest cannot parse — the quest
+// provider and the balance hook both read it.
+jest.mock("@/auth/client/auth-client", () => ({
+  authClient: { useSession: () => ({ data: null, isPending: false }) },
+}));
 jest.mock("@/lib/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
 }));

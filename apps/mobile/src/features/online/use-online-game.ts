@@ -587,6 +587,7 @@ export function useOnlineGame({
         seed: null,
         pot: view.result.pot,
         winner: view.result.winner,
+        foldedPlayerIds: view.seats.filter((seat) => seat.folded).map((seat) => seat.playerId),
         table: {
           players: view.seats.filter((seat) => !seat.sittingOut).length,
           folded: view.seats.filter((seat) => seat.folded).length,

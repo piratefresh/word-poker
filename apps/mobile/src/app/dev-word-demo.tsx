@@ -15,7 +15,6 @@ import {
   WordBuilder,
   WordCheckButton,
   WordHand,
-  WordPreview,
   WordShuffleButton,
 } from "@/components/word-builder";
 import { colors } from "@/constants/theme";
@@ -127,7 +126,6 @@ export function Stage({
       wordCheck={actions ? FULL_CHECKS : undefined}
     >
       <View style={[styles.rack, flush && styles.rackFlush]} testID="word-demo-rack">
-        <WordPreview />
         <WordHand />
         {actions ? (
           <View style={styles.actions}>

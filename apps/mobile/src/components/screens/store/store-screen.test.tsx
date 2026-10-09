@@ -13,7 +13,7 @@ import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-cli
 
 import { StoreScreen } from "./store-screen";
 
-jest.mock("expo-router", () => ({ router: { back: jest.fn() } }));
+jest.mock("expo-router", () => ({ router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn() } }));
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: jest.fn(), sendVerificationEmail: jest.fn() },
 }));
@@ -117,7 +117,11 @@ test("asks an unverified player to verify, and resends the mail", async () => {
 
   await waitFor(() => expect(view.getByTestId("store-verify")).toBeTruthy());
   await press(view, "store-verify-resend");
-  expect(authClient.sendVerificationEmail).toHaveBeenCalledWith({ email: "ada@example.com", callbackURL: "/" });
+  // The card names the platform's destination for the verified mail (jest-expo runs iOS here).
+  expect(authClient.sendVerificationEmail).toHaveBeenCalledWith({
+    email: "ada@example.com",
+    callbackURL: "wordpoker://",
+  });
 });
 
 test("offers no welcome to an unverified player who already has it", async () => {

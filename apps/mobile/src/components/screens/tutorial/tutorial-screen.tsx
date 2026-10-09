@@ -3,15 +3,17 @@ import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import { FREE_PLAY } from "@/components/hud";
 import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
+import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
+import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { CoachProvider, useCoachTour } from "@/components/ui/coach";
 import {
   WordBuilder,
   WordCheckButton,
   WordHand,
-  WordPreview,
   WordShuffleButton,
 } from "@/components/word-builder";
 import { colors, type } from "@/constants/theme";
@@ -50,6 +52,8 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
   const help = useCoachTour("helper", HELPER_TOUR);
   const lesson = useTutorialGame({ dictionary, paused: help.tour !== null });
   const { game, words, results } = lesson;
+  const { active: celebratingWin, complete: finishWinCelebration } =
+    useSimpleWinCelebration(results);
 
   return (
     <WordBuilder
@@ -69,14 +73,19 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
       <CoachProvider style={styles.table} tour={help.tour ?? lesson.coach}>
         <GameScreen
           actionsLocked={lesson.actionsLocked}
-          rackActions={
-            <>
-              <WordShuffleButton />
-              <WordCheckButton />
-            </>
-          }
+          // Free play: the tutorial's chips are part of the lesson, not the player's Wallet.
+          balance={FREE_PLAY}
           clockHeld={lesson.held}
           game={game}
+          winOverlay={
+            celebratingWin && results !== null ? (
+              <SimpleWinResultOverlay
+                key={results.hand}
+                onComplete={finishWinCelebration}
+                snapshot={results}
+              />
+            ) : null
+          }
           onAllIn={lesson.allIn}
           onBet={lesson.wager}
           onCheckOrCall={lesson.primary}
@@ -87,15 +96,21 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
           onRaiseAmountChange={lesson.changeRaise}
           rack={
             <>
-              <WordPreview />
-              <WordHand />
+              <WordHand
+                actions={
+                  <>
+                    <WordShuffleButton />
+                    <WordCheckButton />
+                  </>
+                }
+              />
             </>
           }
         />
       </CoachProvider>
       {/* The lesson's payoff is the real one: the settled hand, its words and its pot. Its deal
           replays the lesson from the start (STO-510 grows this into the hand-off to practice). */}
-      {game.phase === "payout" && results !== null ? (
+      {game.phase === "payout" && results !== null && !celebratingWin ? (
         <ResultsScreen onDeal={lesson.restart} onExit={leave} snapshot={results} />
       ) : null}
     </WordBuilder>

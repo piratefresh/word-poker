@@ -13,7 +13,7 @@ import { useLoopsEnabled, usePhaseClock } from "@/motion";
 import type { ToastQueue } from "./hud-toasts";
 import { HudToasts } from "./hud-toasts";
 import { hudBarHeight, HudTopBar } from "./hud-top-bar";
-import { BalanceView, PHASE_NUMBER } from "./hud-types";
+import { BalanceView } from "./hud-types";
 import type { TurnTimerView } from "./turn-clock";
 
 export interface HudProps {
@@ -32,6 +32,12 @@ export interface HudProps {
   /** Spoken turn phrase, e.g. "Magnus to act". */
   turnPhrase?: string;
   balance: BalanceView;
+  /**
+   * Whether the header hangs the table's mode under the phase capsule. The screen decides it:
+   * the tag takes a band under the header, and only the screen knows the room below it
+   * (`hangsModeTag` for the mode and the window).
+   */
+  modeTag?: boolean;
   /** The screen owns the queue, because game events are what push to it. Without one the
    *  HUD draws no toasts at all — the offline table runs this way while its felt announces
    *  nothing. */
@@ -39,7 +45,6 @@ export interface HudProps {
   /** The leave slot in the top bar. */
   onLeave?: () => void;
   onHelp?: () => void;
-  onSettings?: () => void;
   onBalancePress?: () => void;
   /** Overrides the OS reduced-motion value for every effect the HUD carries; the tests use
    *  it. Absent means each effect asks the OS for itself. */
@@ -55,6 +60,9 @@ export interface HudProps {
  * felt, so a screen that measured it instead would reserve nothing on the first frame
  * and then shove all of its content down once the measurement landed. It is derived from
  * the window the bar reads too, so the two agree on every frame of a resize.
+ *
+ * A tag the header hangs below the capsule (`hangsModeTag`) is not part of this: it hangs
+ * over the room, which keeps its seats clear of it (`PokerTable`'s `topChrome`).
  */
 export function useHudChromeHeight(): number {
   return hudBarHeight(useWindowDimensions());
@@ -77,10 +85,10 @@ export function Hud({
   stamp,
   turnPhrase,
   balance,
+  modeTag,
   toastQueue,
   onLeave,
   onHelp,
-  onSettings,
   onBalancePress,
   reduceMotion,
   style,
@@ -98,14 +106,14 @@ export function Hud({
         <HudTopBar
           balance={balance}
           loopsEnabled={loopsEnabled}
+          modeTag={modeTag}
           onBalancePress={onBalancePress}
           onHelp={onHelp}
           onLeave={onLeave}
-          onSettings={onSettings}
           phase={phase}
           // Derived rather than passed: the ordinal is a property of the phase, and two
           // screens each deciding what number a phase is would eventually disagree.
-          phaseNumber={PHASE_NUMBER[phase]}
+
           reduceMotion={reduceMotion}
           stamp={stamp}
           tick={tick}

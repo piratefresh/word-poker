@@ -1,9 +1,14 @@
 import { StyleSheet, View } from "react-native";
 
-import { Tile } from "@/components/game";
+import { Tile, type TileSize } from "@/components/game";
 import { duration } from "@/constants/theme";
 
 import type { LetterTileData } from "../game-types";
+
+/** The `TileSize` a row's pixel width maps to, so a face-down tile sized off the same width matches. */
+export function tileSizeFor(width: number): TileSize {
+  return width >= 56 ? "large" : width >= 40 ? "medium" : "small";
+}
 
 export function LetterTile({
   tile,
@@ -28,7 +33,7 @@ export function LetterTile({
       ownership="neutral"
       scale={scale}
       side="front"
-      size={size >= 56 ? "large" : size >= 40 ? "medium" : "small"}
+      size={tileSizeFor(size)}
       tile={tile}
     />
   );

@@ -1,3 +1,4 @@
+import "./finalization-registry-polyfill"; // must run before @colyseus/sdk evaluates
 import { Client } from "@colyseus/sdk";
 import Constants from "expo-constants";
 

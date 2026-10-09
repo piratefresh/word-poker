@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { QuestHandClaim, QuestId } from "@wordpoker/contracts";
-import type { OpenWalletEventInput, QuestProgressMap, QuestProgressRecord, SettleWalletEventInput, WalletEventRecord } from "@wordpoker/db";
+import type { OpenWalletEventInput, PlayerProgressRecord, QuestProgressMap, QuestProgressRecord, SettleWalletEventInput, WalletEventRecord } from "@wordpoker/db";
 import { emptyQuestProgress } from "@wordpoker/game-rules";
 import { randomUUID } from "node:crypto";
 
@@ -32,7 +32,7 @@ function memoryWalletStore(): MemoryWalletStore {
   return {
     rows,
     async openWalletEvent(input: OpenWalletEventInput) {
-      const onceOnly = input.kind === "welcome" || input.kind === "quest" || input.kind === "streak";
+      const onceOnly = input.kind === "welcome" || input.kind === "quest" || input.kind === "streak" || input.kind === "level";
       if (onceOnly && rows.some((row) => row.userId === input.userId && row.kind === input.kind && row.ref === (input.ref ?? null))) {
         return null;
       }
@@ -73,11 +73,17 @@ function memoryWalletStore(): MemoryWalletStore {
 interface MemoryQuestStore extends QuestStore {
   progress: QuestProgressMap;
   readonly hands: string[];
+  /** The player's XP row, as `player_progress` would hold it. */
+  standing: PlayerProgressRecord;
 }
 
-function memoryQuestStore(initial: QuestProgressMap = emptyQuestProgress()): MemoryQuestStore {
+function memoryQuestStore(
+  initial: QuestProgressMap = emptyQuestProgress(),
+  standing: PlayerProgressRecord = { xp: 0, levelPaid: 1 },
+): MemoryQuestStore {
   const hands: string[] = [];
   let progress = initial;
+  let xp = standing;
 
   return {
     hands,
@@ -87,15 +93,23 @@ function memoryQuestStore(initial: QuestProgressMap = emptyQuestProgress()): Mem
     set progress(next) {
       progress = next;
     },
+    get standing() {
+      return xp;
+    },
+    set standing(next) {
+      xp = next;
+    },
     async streakDates() {
       return [];
     },
-    async recordQuestHand(_userId, handToken, apply) {
-      if (hands.includes(handToken)) return { completed: [], duplicate: true };
+    // The db's own shape: the hand log dedupes, then the caller's xp is added exactly once.
+    async recordQuestHand(_userId, handToken, apply, amount) {
+      if (hands.includes(handToken)) return { completed: [], duplicate: true, xp: xp.xp };
       hands.push(handToken);
+      xp = { ...xp, xp: Math.max(xp.xp + amount, 0) };
       const { next, completed } = apply(progress);
       progress = next;
-      return { completed, duplicate: false };
+      return { completed, duplicate: false, xp: xp.xp };
     },
     async questProgress() {
       return (Object.entries(progress) as [QuestId, QuestProgressMap[QuestId]][]).map(([questId, entry]) => ({
@@ -104,6 +118,12 @@ function memoryQuestStore(initial: QuestProgressMap = emptyQuestProgress()): Mem
         streak: entry.streak,
         completedAt: entry.done ? new Date() : null,
       }));
+    },
+    async playerProgress() {
+      return xp;
+    },
+    async setLevelPaid(_userId, level) {
+      xp = { ...xp, levelPaid: Math.max(xp.levelPaid, level) };
     },
   };
 }
@@ -231,8 +251,50 @@ describe("claimQuestHand", () => {
     await claimQuestHand("u1", c, d);
     const second = await claimQuestHand("u1", c, d);
 
-    assert.deepEqual(second, { completed: [], duplicate: true });
+    assert.deepEqual(second, { completed: [], duplicate: true, xp: 37, level: 1 });
     assert.equal(d.store.rows.length, 1, "no second wallet_event row for the repeated claim");
+  });
+});
+
+describe("claimQuestHand — levels", () => {
+  // A revealed loss with word points: 22 xp, and no catalog quest completes.
+  const wordyLoss = () => claim({ heroWon: false });
+
+  it("pays a crossed level once, and a replay of the same hand pays nothing", async () => {
+    const quests = memoryQuestStore(emptyQuestProgress(), { xp: 90, levelPaid: 1 });
+    const d = deps([balances(190)], quests);
+    const c = wordyLoss(); // 22 xp: 90 -> 112, crossing level 2's hundred
+
+    const result = await claimQuestHand("u1", c, d);
+
+    assert.deepEqual(result, { completed: [], duplicate: false, xp: 112, level: 2 });
+    assert.deepEqual(
+      d.store.rows.map((row) => [row.kind, row.amount, row.ref]),
+      [["level", 100, "level-2"]],
+    );
+
+    const replay = await claimQuestHand("u1", c, d);
+
+    assert.deepEqual(replay, { completed: [], duplicate: true, xp: 112, level: 2 });
+    assert.equal(d.store.rows.length, 1, "the replay opened no second row");
+    assert.equal(quests.standing.levelPaid, 2);
+  });
+
+  it("pays every level a jump crosses", async () => {
+    const quests = memoryQuestStore(emptyQuestProgress(), { xp: 270, levelPaid: 1 });
+    const d = deps([balances(370), balances(520)], quests);
+
+    const result = await claimQuestHand("u1", wordyLoss(), d); // 270 -> 292: levels 2 and 3
+
+    assert.deepEqual(result, { completed: [], duplicate: false, xp: 292, level: 3 });
+    assert.deepEqual(
+      d.store.rows.map((row) => [row.ref, row.amount]),
+      [
+        ["level-2", 100],
+        ["level-3", 150],
+      ],
+    );
+    assert.equal(quests.standing.levelPaid, 3);
   });
 });
 
@@ -263,5 +325,36 @@ describe("payCompletedQuests", () => {
 
     assert.equal(d.store.rows.length, 1);
     assert.deepEqual([d.store.rows[0]?.kind, d.store.rows[0]?.ref], ["quest", "win-word-2"]);
+  });
+
+  it("pays a level an earlier crash left unpaid, exactly once", async () => {
+    // The XP commit landed (level 3 at 400 xp) but every wallet call was lost.
+    const quests = memoryQuestStore(emptyQuestProgress(), { xp: 400, levelPaid: 1 });
+    const d = deps([balances(100), balances(250)], quests);
+
+    await payCompletedQuests("u1", d);
+
+    assert.deepEqual(
+      d.store.rows.map((row) => [row.kind, row.ref, row.amount]),
+      [
+        ["level", "level-2", 100],
+        ["level", "level-3", 150],
+      ],
+    );
+    assert.equal(quests.standing.levelPaid, 3);
+
+    await payCompletedQuests("u1", d);
+
+    assert.equal(d.store.rows.length, 2, "the second heal re-opened nothing");
+  });
+
+  it("asks the wallet nothing when every reached level is already paid", async () => {
+    const quests = memoryQuestStore(emptyQuestProgress(), { xp: 500, levelPaid: 3 });
+    const d = deps([], quests);
+
+    await payCompletedQuests("u1", d);
+
+    assert.equal(d.store.rows.length, 0);
+    assert.equal(d.requests.length, 0, "no RevenueCat call for an already-paid level");
   });
 });

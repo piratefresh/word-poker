@@ -10,7 +10,15 @@ import { useOfflineGame, type OfflineGame } from "@/features/offline/use-offline
 import { WordBuilder } from "@/components/word-builder";
 import { POWER_USED_BEATS } from "@/components/powers/power-used";
 
+
 import { OfflineGameScreen } from "./offline-game-screen";
+
+// Keep the Continue interaction real while omitting Rive's native renderer.
+jest.mock("@/components/screens/results/simple-win-result-rive", () => ({
+  SimpleWinResultRive: () => null,
+}));
+
+// The community counter is the felt looks' label; the tabletop room draws no label band.
 
 // The session's end-state is a property of the state the hook maps, and a real session only
 // reaches it by busting the hero — a hand the tests cannot deal without rigging the deck. The
@@ -163,12 +171,12 @@ function roundButton(view: RenderResult, label: string): NonNullable<RenderResul
 }
 
 /**
- * The board's progress is reported by the felt's own strip above the community slots.
+ * The board's progress is reported by the community row on the felt.
  * The HUD carried a second counter there until it was removed, so this is the only
  * report on screen and a regression in either direction shows up here.
  */
 function expectBoard(view: RenderResult, dealt: number) {
-  expect(view.getByText(`COMMUNITY · ${dealt}/5`)).toBeOnTheScreen();
+  expect(view.getByLabelText(`Community ${dealt}/5`)).toBeOnTheScreen();
 }
 
 /** The ids of the tiles the strip is holding, in the order it holds them. */
@@ -238,21 +246,21 @@ describe("<OfflineGameScreen />", () => {
     // §11 wants the word list on screen before play, and the hand is judged against it, so
     // the felt does not draw until it has arrived.
     expect(view.getByText("Setting the table…")).toBeOnTheScreen();
-    expect(view.queryByText("PHASE 2 · PRE-FLOP")).toBeNull();
+    expect(view.queryByText("PREFLOP")).toBeNull();
   });
 
   test("deals a hand and puts the hero on the clock, with the row the engine armed", async () => {
     const view = await renderTable();
 
     expectBoard(view, 0);
-    expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
+    expect(view.getByText("PREFLOP")).toBeOnTheScreen();
     expect(view.getByText("YOUR TURN")).toBeOnTheScreen();
     // The badge only lands on the felt if the mapped state flags the hero's seat.
-    expect(view.getByText(/^YOU$/)).toBeOnTheScreen();
+    expect(view.getByText("YOU")).toBeOnTheScreen();
 
     // The pinned hand posts 10 / 20 and then raises to 60, so the felt states a real call and a
     // real pot — the numbers the engine counted, not a placeholder row.
-    expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
+    expect(view.getByRole("button", { name: "Call $60" })).toBeOnTheScreen();
     expect(view.getByTestId("pot")).toHaveTextContent(/\$90/);
     expect(control(view, "all-in-button").getByText("ALL IN")).toBeOnTheScreen();
   });
@@ -313,9 +321,9 @@ describe("<OfflineGameScreen />", () => {
     const view = await renderTable();
 
     const streets: [dealt: number, phase: string][] = [
-      [3, "PHASE 3 · THE FLOP"],
-      [4, "PHASE 4 · THE TURN"],
-      [5, "PHASE 5 · THE RIVER"],
+      [3, "FLOP"],
+      [4, "TURN"],
+      [5, "RIVER"],
     ];
 
     for (const [dealt, phase] of streets) {
@@ -337,8 +345,8 @@ describe("<OfflineGameScreen />", () => {
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
     expect(control(view, "action-fold").getByText("FOLD")).toBeOnTheScreen();
-    expect(control(view, "action-check-call").getByText("$60")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("$100")).toBeOnTheScreen();
+    expect(view.getByRole("button", { name: "Call $60" })).toBeOnTheScreen();
+    expect(view.queryByTestId("action-wager")).toBeNull();
     expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
@@ -366,13 +374,19 @@ describe("<OfflineGameScreen />", () => {
     await buildHeroWord(view);
 
     // The window's last sixty seconds, run a beat at a time: the table's clock is what closes it.
-    for (let step = 0; step < 80 && view.queryByText("PHASE 6 · PAYOUT") === null; step += 1) {
+    for (let step = 0; step < 80 && view.queryByTestId("simple-win-continue") === null; step += 1) {
       await act(async () => {
         jest.advanceTimersByTime(BEAT_MS);
       });
     }
 
-    expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
+    expect(view.getByTestId("simple-win-continue")).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(view.getByTestId("simple-win-overlay")).toBeOnTheScreen();
+    expect(view.queryByText("HAND #1 · RESULTS")).toBeNull();
+    await fireEvent.press(view.getByTestId("simple-win-continue"));
     expect(view.getAllByText("WINNER")).toHaveLength(1);
 
     // The payoff of the hand is the results, over the felt: the table's own Deal is gone, and
@@ -405,7 +419,7 @@ describe("<OfflineGameScreen />", () => {
 
     await fireEvent.press(view.getByTestId("results-deal"));
 
-    expect(view.getByText("PHASE 2 · PRE-FLOP")).toBeOnTheScreen();
+    expect(view.getByText("PREFLOP")).toBeOnTheScreen();
     expectBoard(view, 0);
     // Nothing of the results is left on screen — or reachable to a second tap.
     expect(view.queryByTestId("results-deal")).toBeNull();
@@ -419,8 +433,10 @@ describe("<OfflineGameScreen />", () => {
     // The pinned hand checks around to the hero on the river, which is where the row arms the
     // opening bet rather than a raise: the same slider, and the other engine action.
     for (let street = 0; street < 3; street += 1) await takeTurn(view);
-    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
-    expect(control(view, "action-wager").getByText("$20")).toBeOnTheScreen();
+    expect(view.getByText("RIVER")).toBeOnTheScreen();
+    expect(view.getByRole("button", { name: "Check" })).toBeOnTheScreen();
+    await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
+    expect(view.getByRole("button", { name: "Bet $20" })).toBeOnTheScreen();
 
     const before = potAmount(view);
     await fireEvent.press(view.getByTestId("action-wager"));
@@ -432,7 +448,7 @@ describe("<OfflineGameScreen />", () => {
     // These opponents have no word in the one-word fixture dictionary: all three fold.
     expect(before).toBe(240);
     expect(potAmount(view)).toBe(260);
-    expect(view.getByText("PHASE 6 · PAYOUT")).toBeOnTheScreen();
+    expect(view.getByText("PAYOUT")).toBeOnTheScreen();
 
   });
 
@@ -444,13 +460,13 @@ describe("<OfflineGameScreen />", () => {
     // own controls gone quiet: the call button falls back to `CALL $0` and does nothing.
     await fireEvent.press(view.getByTestId("action-check-call"));
 
-    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
-    expect(view.queryByText("PHASE 6 · PAYOUT")).toBeNull();
+    expect(view.getByText("RIVER")).toBeOnTheScreen();
+    expect(view.queryByText("PAYOUT")).toBeNull();
 
     await beat();
 
-    expect(view.getByText("PHASE 5 · THE RIVER")).toBeOnTheScreen();
-    expect(view.queryByText("PHASE 6 · PAYOUT")).toBeNull();
+    expect(view.getByText("RIVER")).toBeOnTheScreen();
+    expect(view.queryByText("PAYOUT")).toBeNull();
   });
 
   test("shows the session's end-state over the felt, and New game restarts it", async () => {
@@ -488,7 +504,7 @@ describe("<OfflineGameScreen />", () => {
       sessionOver: true,
       newGame,
     };
-    jest.mocked(useOfflineGame).mockReturnValueOnce(over);
+    jest.mocked(useOfflineGame).mockReturnValue(over);
 
     const view = await renderTable();
 
@@ -501,5 +517,9 @@ describe("<OfflineGameScreen />", () => {
     await fireEvent.press(view.getByTestId("new-game-button"));
 
     expect(newGame).toHaveBeenCalledTimes(1);
+    // The restart redraws the table, so the injected state must stay until the test is done.
+    jest.mocked(useOfflineGame).mockImplementation(
+      jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/features/offline/use-offline-game").useOfflineGame,
+    );
   });
 });

@@ -38,7 +38,7 @@
 #
 # Selector notes — the native half of the web flow's lesson. A device matches text as a
 # whole-string regex and does not fold case, so a selector is what a component prints
-# (`CHECK`, `BET $20`, `PHASE 2 · PRE-FLOP`), with `$` escaped for the regex. And where the
+# (`CHECK`, `BET $20`, `PREFLOP`), with `$` escaped for the regex. And where the
 # felt makes a text selector ambiguous — its seat nameplates print CHECK and CALL as status —
 # the flow reaches for a control's testID instead: `action-check-call` walks the round and,
 # inside §19's window, is the confirm. Tiles are held by the strip's ids, which are the deal's
@@ -63,7 +63,7 @@ tags:
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 90000
 - assertVisible:
     text: "COMMUNITY · 0/5"
@@ -83,10 +83,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 5 · THE RIVER"
+        text: "RIVER"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          visible: "YOUR TURN|RIVER"
           timeout: 40000
           optional: true
       - runFlow:
@@ -100,8 +100,11 @@ tags:
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 20000
+- tapOn:
+    id: "wager-slider"
+    point: "2%,50%"
 - assertVisible:
-    text: "BET \\$20"
+    id: "action-wager"
 - assertVisible:
     text: "\\$720"
 - tapOn:
@@ -117,7 +120,7 @@ tags:
 - assertNotVisible:
     text: "BET \\$20"
 - assertVisible:
-    text: "PHASE 5 · THE RIVER"
+    text: "RIVER"
 
 # The river's close opened §19's window: the band under the felt — the draft line and the strip
 # of tiles the seat sorts — is what the flow builds its word through. The phase stays the river
@@ -154,7 +157,7 @@ tags:
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
 # immediately when the bots found words, or on the window's clock when they did not.
 - extendedWaitUntil:
-    visible: "PHASE 6 · PAYOUT"
+    visible: "PAYOUT"
     timeout: 70000
 - assertVisible:
     text: "WINNER"
@@ -163,6 +166,6 @@ tags:
 - tapOn:
     text: "Deal"
 - assertVisible:
-    text: "PHASE 2 · PRE-FLOP"
+    text: "PREFLOP"
 - assertVisible:
     text: "COMMUNITY · 0/5"

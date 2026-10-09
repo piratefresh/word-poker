@@ -1,12 +1,13 @@
 /**
- * rewards.ts — turning a settled hand or a day's first visit into coins (STO-525).
+ * rewards.ts — turning a settled hand or a day's first visit into coins (STO-525, STO-543).
  *
  * Neither path invents state of its own: a hand's quest progress lives in `quest_progress`
- * (`@wordpoker/db`), judged by the pure evaluator in `@wordpoker/game-rules`, and the login
- * streak is read straight off the player's `streak` wallet events — there is no `login_streak`
- * table to drift out of sync with them. Every coin either path pays still goes through
- * `applyWalletChange`, so a reward is a `wallet_event` row like any other, and the once-only rule
- * is that table's own unique index, not something this module has to re-implement.
+ * (`@wordpoker/db`), judged by the pure evaluator in `@wordpoker/game-rules`, the login
+ * streak is read straight off the player's `streak` wallet events, and a level is whatever the
+ * player's XP total says it is — there is no `login_streak` table and no level ledger to drift
+ * out of sync. Every coin either path pays still goes through `applyWalletChange`, so a reward
+ * is a `wallet_event` row like any other, and the once-only rule is that table's own unique
+ * index, not something this module has to re-implement.
  */
 
 import {
@@ -16,13 +17,16 @@ import {
   type QuestId,
 } from "@wordpoker/contracts";
 import {
+  playerProgress as playerProgressDb,
   questProgress as questProgressDb,
   recordQuestHand as recordQuestHandDb,
+  setLevelPaid as setLevelPaidDb,
   streakDates as streakDatesDb,
+  type PlayerProgressRecord,
   type QuestProgressMap,
   type QuestProgressRecord,
 } from "@wordpoker/db";
-import { QUEST_CATALOG, applyQuestHand } from "@wordpoker/game-rules";
+import { QUEST_CATALOG, applyQuestHand, levelForXp, levelReward, xpForHand } from "@wordpoker/game-rules";
 
 import { applyWalletChange } from "./wallet";
 import type { WalletDeps } from "./wallet";
@@ -34,8 +38,11 @@ export interface QuestStore {
     userId: string,
     handToken: string,
     apply: (map: QuestProgressMap) => { next: QuestProgressMap; completed: readonly QuestId[] },
-  ): Promise<{ completed: readonly QuestId[]; duplicate: boolean }>;
+    xp: number,
+  ): Promise<{ completed: readonly QuestId[]; duplicate: boolean; xp: number }>;
   questProgress(userId: string): Promise<QuestProgressRecord[]>;
+  playerProgress(userId: string): Promise<PlayerProgressRecord>;
+  setLevelPaid(userId: string, level: number): Promise<void>;
 }
 
 export interface RewardsDeps extends WalletDeps {
@@ -44,8 +51,10 @@ export interface RewardsDeps extends WalletDeps {
 
 const databaseQuestStore: QuestStore = {
   streakDates: (userId) => streakDatesDb(userId),
-  recordQuestHand: (userId, handToken, apply) => recordQuestHandDb(userId, handToken, apply),
+  recordQuestHand: (userId, handToken, apply, xp) => recordQuestHandDb(userId, handToken, apply, xp),
   questProgress: (userId) => questProgressDb(userId),
+  playerProgress: (userId) => playerProgressDb(userId),
+  setLevelPaid: (userId, level) => setLevelPaidDb(userId, level),
 };
 
 function questReward(id: QuestId): number {
@@ -88,7 +97,7 @@ export function streakLength(dates: readonly string[], today: string): number {
  * Credits today's login streak, once. `current` is today's streak length whether or not this
  * call is the one that paid it; `creditedToday` is the reward *this call* paid, or `null` when
  * today was already credited (a repeat `GET`) or RevenueCat could not be reached (the row stays
- * `pending`, and the next `GET` resolves it — `getCoinBalance`'s own retry, not this module's).
+ * `pending`, and `GET /api/wallet`'s `retryPending` resolves it — not this module).
  */
 export async function creditDailyStreak(
   userId: string,
@@ -106,28 +115,58 @@ export async function creditDailyStreak(
   return { current: day, creditedToday: result.applied ? reward : null };
 }
 
-/** Records one settled hand and pays every quest it completed. A duplicate claim pays nothing. */
+/**
+ * Pays every level in `(paidThrough, level]` and advances the player's high-water mark. The
+ * claim path and the GET heal run this one rule, so a crash between an XP commit and its
+ * wallet calls is healed by whichever runs next; each level's `wallet_event` row is held by
+ * the reward-once index either way, and `levelPaid` only keeps the everyday run at zero extra
+ * queries.
+ */
+async function payLevelUps(
+  quests: QuestStore,
+  userId: string,
+  paidThrough: number,
+  level: number,
+  deps: RewardsDeps,
+): Promise<void> {
+  for (let crossed = paidThrough + 1; crossed <= level; crossed += 1) {
+    await applyWalletChange(userId, "level", levelReward(crossed), { ref: `level-${crossed}` }, deps);
+  }
+  if (level > paidThrough) await quests.setLevelPaid(userId, level);
+}
+
+/**
+ * Records one settled hand, pays every level its XP reaches, and pays every quest it completed.
+ * A duplicate claim pays nothing — but still heals any level an earlier crash left unpaid.
+ */
 export async function claimQuestHand(
   userId: string,
   claim: QuestHandClaim,
   deps: RewardsDeps = {},
 ): Promise<QuestClaimResponse> {
   const quests = deps.quests ?? databaseQuestStore;
-  const { completed, duplicate } = await quests.recordQuestHand(userId, claim.handToken, (map) =>
-    applyQuestHand(map, claim.facts),
+  const before = await quests.playerProgress(userId);
+  const { completed, duplicate, xp } = await quests.recordQuestHand(
+    userId,
+    claim.handToken,
+    (map) => applyQuestHand(map, claim.facts),
+    xpForHand(claim.facts),
   );
+  const { level } = levelForXp(xp);
 
   for (const id of completed) {
     await applyWalletChange(userId, "quest", questReward(id), { ref: id }, deps);
   }
+  await payLevelUps(quests, userId, before.levelPaid, level, deps);
 
-  return { completed, duplicate };
+  return { completed, duplicate, xp, level };
 }
 
 /**
- * Pays every quest the player's stored progress already marks done. The unique index makes a
- * quest already paid a no-op, so this heals the gap between a progress commit and a crashed
- * wallet call rather than re-paying anything — safe to call on every `GET /api/quests`.
+ * Pays every quest the player's stored progress already marks done, and any level their XP has
+ * reached but the wallet has not seen. The unique indexes make both a no-op once paid, so this
+ * heals the gap between a progress commit and a crashed wallet call rather than re-paying
+ * anything — safe to call on every `GET /api/quests`.
  */
 export async function payCompletedQuests(userId: string, deps: RewardsDeps = {}): Promise<void> {
   const quests = deps.quests ?? databaseQuestStore;
@@ -137,4 +176,7 @@ export async function payCompletedQuests(userId: string, deps: RewardsDeps = {})
     if (row.completedAt === null) continue;
     await applyWalletChange(userId, "quest", questReward(row.questId), { ref: row.questId }, deps);
   }
+
+  const progress = await quests.playerProgress(userId);
+  await payLevelUps(quests, userId, progress.levelPaid, levelForXp(progress.xp).level, deps);
 }

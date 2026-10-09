@@ -5,6 +5,10 @@ import { ArcadeDigits } from "@/components/hud/top-bar/arcade-digits";
 import { colors, fonts } from "@/constants/theme";
 
 import { seatMetrics } from "../seat-metrics";
+import { PotBowl } from "./pot-bowl";
+
+/** How far the pot text rides up over the chip stacks, at the phone size. */
+const STACK_OVERLAP = 26;
 
 /** The pot's measures at the phone size, grown by the seats' factor on a larger table. */
 function potStyles(scale: number) {
@@ -33,6 +37,7 @@ export function Pot({
   sidePots = [],
   blinds,
   tableWidth,
+  tabletop = false,
 }: {
   amount: number;
   sidePots?: readonly number[];
@@ -40,22 +45,65 @@ export function Pot({
   blinds?: { smallBlind: number; bigBlind: number };
   /** The felt's width: the pot grows with the table by the seats' own factor. Phone size without it. */
   tableWidth?: number;
+  tabletop?: boolean;
 }) {
-  const scaled = usePotStyles(tableWidth ? seatMetrics(tableWidth).scale : 1);
+  const scale = tableWidth ? seatMetrics(tableWidth, tabletop).scale : 1;
+  const scaled = usePotStyles(scale);
   return (
     <View pointerEvents="none" style={[styles.pot, scaled.pot]} testID="pot">
-      <Text style={[styles.potLabel, scaled.potLabel]}>POT</Text>
-      <ArcadeDigits style={scaled.potAmount}>
-        {`$${amount.toLocaleString()}`}
-      </ArcadeDigits>
-      {blinds ? (
+      {tabletop ? <PotBowl amount={amount} scale={scale} /> : null}
+      <View
+        style={
+          tabletop
+            ? [
+                {
+                  // Laid over the stacks' bottom rows, on a dark pill so the digits read on any chip colour.
+                  alignItems: "center",
+                  backgroundColor: "rgba(20, 12, 6, 0.6)",
+                  borderRadius: 24 * scale,
+                  marginTop: -STACK_OVERLAP * scale,
+                  minWidth: 74 * scale,
+                  paddingHorizontal: 12 * scale,
+                  paddingVertical: 2 * scale,
+                },
+              ]
+            : undefined
+        }
+      >
         <Text
-          style={[styles.blindsAmount, scaled.blindsAmount]}
-          testID="felt-blinds"
+          style={[
+            styles.potLabel,
+            scaled.potLabel,
+            tabletop && {
+              color: "#fff8e9",
+              fontFamily: fonts.arcade,
+              fontSize: 10 * scale,
+              lineHeight: 11 * scale,
+              letterSpacing: 0,
+            },
+          ]}
         >
-          {`BLINDS $${blinds.smallBlind.toLocaleString()} / $${blinds.bigBlind.toLocaleString()}`}
+          POT
         </Text>
-      ) : null}
+        <ArcadeDigits
+          style={{
+            ...scaled.potAmount,
+            ...(tabletop
+              ? { fontSize: 26 * scale, lineHeight: 27 * scale }
+              : {}),
+          }}
+        >
+          {`$${amount.toLocaleString()}`}
+        </ArcadeDigits>
+        {blinds ? (
+          <Text
+            style={[styles.blindsAmount, scaled.blindsAmount]}
+            testID="felt-blinds"
+          >
+            {`BLINDS $${blinds.smallBlind.toLocaleString()} / $${blinds.bigBlind.toLocaleString()}`}
+          </Text>
+        ) : null}
+      </View>
       {sidePots.map((side, index) => (
         <Text
           key={`side-pot-${index}`}

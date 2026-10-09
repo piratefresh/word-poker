@@ -10,7 +10,7 @@ export type { HudTopBarProps } from "./hud-top-bar";
 export { HudToasts, useToastQueue } from "./hud-toasts";
 export type { HudToastsProps, ToastQueue } from "./hud-toasts";
 
-export { PHASE_LABEL, PHASE_NUMBER } from "./hud-types";
+export { FREE_PLAY, PHASE_LABEL, PHASE_NUMBER, hangsModeTag } from "./hud-types";
 export type { BalanceView } from "./hud-types";
 
 export {

@@ -67,6 +67,19 @@ export function useCompactControls(): boolean {
   return isCompactWindow(useWindowDimensions());
 }
 
+/** Below this a portrait window's betting row shrinks, leaving the height to the felt. */
+const SHORT_HEIGHT = 800;
+
+/** Whether the window is a portrait one too short for the full-size betting row. */
+export function isShortWindow(window: Window): boolean {
+  return window.height >= window.width && window.height < SHORT_HEIGHT;
+}
+
+/** `isShortWindow`, read where it is drawn. */
+export function useShortControls(): boolean {
+  return isShortWindow(useWindowDimensions());
+}
+
 /** The table's widest box at a scale of one, rail and seats included. */
 const TABLE_BASE_WIDTH = 420;
 

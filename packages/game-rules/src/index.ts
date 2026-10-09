@@ -111,3 +111,14 @@ export type { JudgedSeat, PotContest, ResolvePayoutOptions, ResolvedPayout } fro
 export { chooseBotPower, decideBotPowerUse } from "./bot/bot-power";
 export { QUEST_CATALOG, applyQuestHand, emptyQuestProgress } from "./quests";
 export type { QuestDefinition, QuestProgressEntry, QuestProgressMap } from "./quests";
+export {
+  LEVEL_REWARD_BASE,
+  LEVEL_XP_BASE,
+  XP_PER_HAND,
+  XP_WIN_BONUS,
+  levelForXp,
+  levelReward,
+  xpForHand,
+  xpToReach,
+} from "./xp";
+export type { LevelStanding } from "./xp";

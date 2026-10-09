@@ -9,5 +9,5 @@ name: Four-seat - ready up
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 180000

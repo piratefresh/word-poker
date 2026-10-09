@@ -53,7 +53,7 @@ tags:
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 30000
 
 # The button calls its small blind, then the big blind checks. Later the opponent checks and the
@@ -61,10 +61,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 5 · THE RIVER"
+        text: "RIVER"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          visible: "YOUR TURN|RIVER"
           timeout: 40000
           optional: true
       - runFlow:
@@ -95,7 +95,7 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 6 · PAYOUT"
+        text: "PAYOUT"
     commands:
       - tapOn:
           id: "action-check-call"

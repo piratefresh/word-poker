@@ -3,25 +3,23 @@ import { useCallback, useState } from "react";
 import type { BettingState } from "../game-types";
 
 /**
- * The wager slider's amount, clamped to the round's bounds and snapped to its step. `onChange`
- * hears every amount the seat settles on.
+ * Zero selects check/call. Positive wagers are clamped to the engine's bounds and snapped
+ * to its step. A new turn resets the selection even when its bounds stay the same.
  */
 export function useRaiseAmount(
   betting: BettingState,
   onChange?: (amount: number) => void,
+  turnKey = "",
 ) {
-  // The slider's amount belongs to the round, not to the screen: a new street — or a bet the
-  // hero has to answer — moves the raise floor, and an amount left over from the last round
-  // would offer a raise the engine refuses. Keying on the bounds re-seeds the amount exactly
-  // when they move, not while the seat is dragging.
-  const boundsKey = `${betting.minRaise}:${betting.maxRaise}`;
+  // Never carry a previous turn's selected wager into the next action.
+  const boundsKey = `${turnKey}:${betting.minRaise}:${betting.maxRaise}:${betting.primary}`;
   const [raise, setRaise] = useState({
     key: boundsKey,
-    amount: betting.raiseAmount,
+    amount: 0,
   });
   if (raise.key !== boundsKey)
-    setRaise({ key: boundsKey, amount: betting.raiseAmount });
-  const amount = Math.max(
+    setRaise({ key: boundsKey, amount: 0 });
+  const amount = raise.key !== boundsKey || raise.amount === 0 ? 0 : Math.max(
     betting.minRaise,
     Math.min(Math.max(betting.maxRaise, betting.minRaise), raise.amount),
   );
@@ -30,7 +28,7 @@ export function useRaiseAmount(
   const change = useCallback(
     (next: number) => {
       const stepped = Math.round(next / raiseStep) * raiseStep;
-      const value = Math.max(minRaise, Math.min(maxRaise, stepped));
+      const value = stepped <= 0 ? 0 : Math.max(minRaise, Math.min(maxRaise, stepped));
       setRaise({ key: boundsKey, amount: value });
       onChange?.(value);
     },

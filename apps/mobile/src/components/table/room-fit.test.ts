@@ -38,3 +38,22 @@ test("a wider room spreads seats without growing their chrome", () => {
   expect(wide[0].y).toBe(small[0].y);
   expect(wide.map((seat) => seat.key)).toEqual(seats.map((seat) => seat.key));
 });
+
+test("starts the seats below chrome hanging over the room's top", () => {
+  const size = { width: 420, height: 520 };
+  const appearanceWidth = 420;
+  const HANGING = 34;
+  const bare = placeSeatsInRoom(seats, size, playerSeatBounds, appearanceWidth);
+  const cleared = placeSeatsInRoom(seats, size, playerSeatBounds, appearanceWidth, HANGING);
+
+  for (const seat of cleared) {
+    const bounds = playerSeatBounds(seat, appearanceWidth, seats.length);
+    expect(seat.y * size.height - bounds.top).toBeGreaterThanOrEqual(12 + HANGING);
+  }
+  // The seats already under the hanging chrome — the far ones — are the ones that move.
+  expect(bare[2].y).toBeLessThan(cleared[2].y);
+  // The hero keeps to the bottom of the room it had: the chrome eats into the band, not the
+  // room's own edges.
+  expect(cleared[0].y * size.height + playerSeatBounds(cleared[0], appearanceWidth, 4).bottom)
+    .toBeLessThanOrEqual(size.height - 12);
+});

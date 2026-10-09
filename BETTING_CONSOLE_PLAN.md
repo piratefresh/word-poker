@@ -20,18 +20,18 @@ The game logic does not change. `BettingState` already carries everything the co
 
 ## Decisions
 
-| Topic | Decision |
-|---|---|
-| Rendering | `expo-image` pictures scaled by one factor (console width ÷ art width) and positioned from picture-pixel rects in a `console-art.ts`, as `banner.ts` does. No nine-slice: RN's `capInsets` is iOS-only. |
-| Text | All lettering is live `Text` in `fonts.arcade` (Lilita One, already loaded) with a dark `textShadow`. The art carries no words or numbers. |
-| Mug button | The check/call/confirm action (`state.primary`), with `testID="action-check-call"`. It's the most-pressed control, so it gets the biggest target. This matches `controller-sketch.png`. |
+| Topic      | Decision                                                                                                                                                                                                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rendering  | `expo-image` pictures scaled by one factor (console width ÷ art width) and positioned from picture-pixel rects in a `console-art.ts`, as `banner.ts` does. No nine-slice: RN's `capInsets` is iOS-only.                                                                                                       |
+| Text       | All lettering is live `Text` in `fonts.arcade` (Lilita One, already loaded) with a dark `textShadow`. The art carries no words or numbers.                                                                                                                                                                    |
+| Mug button | The check/call/confirm action (`state.primary`), with `testID="action-check-call"`. It's the most-pressed control, so it gets the biggest target. This matches `controller-sketch.png`.                                                                                                                       |
 | Button row | FOLD (red) · ALL IN (dark) · BET/RAISE (gold, amount over label). The mockup's dark "$20 CALL" would repeat the mug, so ALL IN takes the dark slot. This keeps all-in reachable when a short stack can't make a min raise and the slider is disabled. **Open: confirm, or say what the dark slot should be.** |
-| Slider | Keep `raise-slider.tsx`'s responder logic and `adjustable` a11y; only the visuals change. `@expo/ui`'s Slider can't take a painted track or thumb. |
-| Fill | The green pill is drawn full length inside a `View` with `overflow: hidden` and `width: progress%`. The cut end hides under the thumb, so no stretching art is needed. |
-| States | Pressed: the face sinks 2 pt and darkens (an overlay view). Disabled: `opacity.disabled`. No extra art per state. |
-| Unchanged | Shuffle and `CHECK 5/5` under the rack: `GameButton`'s `dark` slab already matches the sheet's dark buttons. |
-| Deferred | The **raise-presets dropdown** (½ Pot / Pot / 2× Pot / All In). It isn't in the target mockup, it needs `pot` in `BettingState`, and it needs a rule for what "pot" means as a raise-to (`docs/rules/`). Add it when wanted. |
-| Tracking | One story in **Word Poker Native** under the current epic, with the steps below as its checklist. |
+| Slider     | Keep `raise-slider.tsx`'s responder logic and `adjustable` a11y; only the visuals change. `@expo/ui`'s Slider can't take a painted track or thumb.                                                                                                                                                            |
+| Fill       | The green pill is drawn full length inside a `View` with `overflow: hidden` and `width: progress%`. The cut end hides under the thumb, so no stretching art is needed.                                                                                                                                        |
+| States     | Pressed: the face sinks 2 pt and darkens (an overlay view). Disabled: `opacity.disabled`. No extra art per state.                                                                                                                                                                                             |
+| Unchanged  | Shuffle and `CHECK 5/5` under the rack: `GameButton`'s `dark` slab already matches the sheet's dark buttons.                                                                                                                                                                                                  |
+| Deferred   | The **raise-presets dropdown** (½ Pot / Pot / 2× Pot / All In). It isn't in the target mockup, it needs `pot` in `BettingState`, and it needs a rule for what "pot" means as a raise-to (`docs/rules/`). Add it when wanted.                                                                                  |
+| Tracking   | One story in **Word Poker Native** under the current epic, with the steps below as its checklist.                                                                                                                                                                                                             |
 
 ## Assets needed
 
@@ -40,18 +40,18 @@ Every piece must be **its own file**: transparent background, **no lettering or 
 red/orange halos around the console, slider and buttons from background removal; those halos would show
 on the felt. Sizes are the minimum for a crisp result at the desktop scale (`MAX_SCALE` 1.6).
 
-| # | File (`assets/images/ui/console/`) | What | Min size (px) | In the sheet already? |
-|---|---|---|---|---|
-| 1 | `console.webp` | The wood + gold-rim + felt tray **with no slots, slider, coin or mug painted in**: just the empty felt panel on its wood base. The right end can stay plain; the mug sits over it. | 1800 wide | No. The sheet's console has the square, slider, coin and circle baked in. |
-| 2 | `slot-square.webp` | The gold-framed felt square (the power's slot). Code places it, so a Classic table (no power) can leave it out. | 300 | Yes, standalone at the right of row 1 (needs a clean edge and more resolution). |
-| 3 | `track.webp` | The empty cream slider pill. | 1200 wide | Yes (row 2, third pill), but only ~290 px. Needs a high-res export. |
-| 4 | `fill.webp` | The green fill pill, same size and shape as the track's inside. | 1200 wide | Yes (row 2, first pill), at low resolution. |
-| 5 | `thumb.webp` | The spade coin **on its own**. | 256 | No. It's only painted onto the slider. |
-| 6 | `bubble.webp` | The purple amount bubble with its tail, blank. | 600 wide | Yes, blank (bottom middle). Needs a clean edge and more resolution. |
-| 7 | `mug.webp` | The beer-mug round button, **blank** (no "CHECK"). Foam and rim as drawn. | 512 | No. "CHECK" is baked in. |
-| 8 | `button-red.webp` | FOLD's red slab, blank. | 600 wide | No. Lettering is baked in. |
-| 9 | `button-dark.webp` | The charcoal slab, blank. | 600 wide | No. Lettering is baked in. |
-| 10 | `button-gold.webp` | The gold slab, blank. | 600 wide | No. Lettering is baked in. |
+| #   | File (`assets/images/ui/console/`) | What                                                                                                                                                                               | Min size (px) | In the sheet already?                                                           |
+| --- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------- |
+| 1   | `console.webp`                     | The wood + gold-rim + felt tray **with no slots, slider, coin or mug painted in**: just the empty felt panel on its wood base. The right end can stay plain; the mug sits over it. | 1800 wide     | No. The sheet's console has the square, slider, coin and circle baked in.       |
+| 2   | `slot-square.webp`                 | The gold-framed felt square (the power's slot). Code places it, so a Classic table (no power) can leave it out.                                                                    | 300           | Yes, standalone at the right of row 1 (needs a clean edge and more resolution). |
+| 3   | `track.webp`                       | The empty cream slider pill.                                                                                                                                                       | 1200 wide     | Yes (row 2, third pill), but only ~290 px. Needs a high-res export.             |
+| 4   | `fill.webp`                        | The green fill pill, same size and shape as the track's inside.                                                                                                                    | 1200 wide     | Yes (row 2, first pill), at low resolution.                                     |
+| 5   | `thumb.webp`                       | The spade coin **on its own**.                                                                                                                                                     | 256           | No. It's only painted onto the slider.                                          |
+| 6   | `bubble.webp`                      | The purple amount bubble with its tail, blank.                                                                                                                                     | 600 wide      | Yes, blank (bottom middle). Needs a clean edge and more resolution.             |
+| 7   | `mug.webp`                         | The beer-mug round button, **blank** (no "CHECK"). Foam and rim as drawn.                                                                                                          | 512           | No. "CHECK" is baked in.                                                        |
+| 8   | `button-red.webp`                  | FOLD's red slab, blank.                                                                                                                                                            | 600 wide      | No. Lettering is baked in.                                                      |
+| 9   | `button-dark.webp`                 | The charcoal slab, blank.                                                                                                                                                          | 600 wide      | No. Lettering is baked in.                                                      |
+| 10  | `button-gold.webp`                 | The gold slab, blank.                                                                                                                                                              | 600 wide      | No. Lettering is baked in.                                                      |
 
 Buttons 8–10 should share **one size and aspect** so they line up in one row. Not needed: the standalone
 circle frame (the mug has its own rim), the gold pill, the dark shuffle/check buttons, the MIN/MAX

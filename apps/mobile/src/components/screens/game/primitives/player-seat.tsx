@@ -1,10 +1,11 @@
-import { useMemo, type ReactNode } from "react";
 import { Image } from "expo-image";
+import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { RackTileBack } from "@/components/game";
 import { ChipSprite } from "@/components/chip/chip-sprite";
 import { chipToneForAmount } from "@/components/chip/chip-value";
+import { ShadowBox } from "@/components/ui/shadow-box";
 
 import type { SeatSlot } from "@/components/table";
 import {
@@ -21,11 +22,14 @@ import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
 import { SeatBeam } from "./seat-beam";
 import {
   betChipOffset,
-  PLATE_OVER,
   seatDirection,
   seatMetrics,
   type SeatMetrics,
 } from "../seat-metrics";
+
+// Relative, not `@/assets`: Jest maps `@/` to `src/` only.
+const RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-3-tight.png");
+const TABLETOP_RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-5.png");
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   waiting: "WAITING",
@@ -93,32 +97,32 @@ function seatStyles(m: SeatMetrics) {
     },
     roleText: { fontSize: m.badgeText, lineHeight: m.badgeText * 1.2 },
     plate: {
-      borderRadius: m.pillRadius * 2,
+      borderRadius: m.plateRadius,
       borderWidth: m.scale,
-      gap: m.stackGap,
       marginTop: m.nameGap,
       maxWidth: m.width,
-      paddingHorizontal: m.pillPadX,
-      paddingVertical: m.scale,
-      zIndex: 1,
+      paddingHorizontal: m.platePadX,
+      paddingVertical: m.platePadY,
     },
-    // Stacked seats pull the plate up over the avatar's rim, the approved tabletop look.
-    plateOver: { marginTop: -m.avatar * PLATE_OVER },
-    plateName: { fontSize: m.nameSize, lineHeight: m.nameLine },
-    stackRow: { gap: m.stackGap },
+    playerName: {
+      fontSize: m.nameSize,
+      letterSpacing: m.nameTracking,
+      lineHeight: m.nameLine,
+    },
+    stackRow: { gap: m.coin * 0.4 },
     coin: {
-      borderRadius: m.stackSize / 2,
+      borderRadius: m.coin / 2,
       borderWidth: m.scale,
-      height: m.stackSize,
-      width: m.stackSize,
+      height: m.coin,
+      width: m.coin,
     },
-    statusRow: { gap: m.badgeGap, marginTop: m.pillGap },
     statusPill: {
       borderRadius: 999,
       borderWidth: m.pillBorder,
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
     },
+    statusRow: { marginTop: m.pillGap },
     statusText: {
       fontSize: m.statusSize,
       letterSpacing: m.statusTracking,
@@ -129,7 +133,7 @@ function seatStyles(m: SeatMetrics) {
       fontSize: m.statusSize,
       letterSpacing: m.emptyLabelTracking,
       lineHeight: m.statusLine,
-      marginTop: m.nameGap,
+      marginTop: m.pillGap,
     },
     betChip: {
       borderRadius: m.chip / 2,
@@ -141,11 +145,11 @@ function seatStyles(m: SeatMetrics) {
 }
 
 /** One set of seat styles per felt width: the table re-renders often, and resizes rarely. */
-function useSeatStyles(tableWidth: number) {
+function useSeatStyles(tableWidth: number, tabletop: boolean) {
   return useMemo(() => {
-    const metrics = seatMetrics(tableWidth);
+    const metrics = seatMetrics(tableWidth, tabletop);
     return { metrics, scaled: seatStyles(metrics) };
-  }, [tableWidth]);
+  }, [tableWidth, tabletop]);
 }
 
 /**
@@ -163,10 +167,17 @@ export function PlayerSeat({
   seatCount,
   size,
   appearanceWidth,
-  dealt = true,
+  dealt = false,
+  tabletop = false,
   onPress,
-}: SeatSlot<GamePlayer> & { dealt?: boolean; onPress?: (player: GamePlayer) => void }) {
-  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width);
+}: SeatSlot<GamePlayer> & {
+  /** The hand is dealt: an opponent still in it shows its two tiles face down in a rack. */
+  dealt?: boolean;
+  /** The tabletop room's larger seat (`seatMetrics`); its bounds are `tabletopSeatBounds`. */
+  tabletop?: boolean;
+  onPress?: (player: GamePlayer) => void;
+}) {
+  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width, tabletop);
   const direction = seatDirection(anchor, seatCount);
   const beside = direction !== "stacked";
   const frame = beside
@@ -213,11 +224,7 @@ export function PlayerSeat({
   const lit = active || winner;
   // The seat whose move it is — the hero's or any other — wears the beam while its turn runs.
   const turn = active || seat.status === "thinking";
-  const statusColor = winner
-    ? colors.goldHi
-    : active
-      ? colors.gold
-      : colors.success;
+  const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
   // The rack shows for a dealt-in opponent only: the hero's tiles sit in the word builder,
@@ -246,9 +253,7 @@ export function PlayerSeat({
             ]}
             testID={`seat-avatar-${seat.id}`}
           >
-            <Text style={[styles.initials, scaled.initials]}>
-              {seat.initials}
-            </Text>
+            <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
           </View>
         </SeatBeam>
         {seat.roles?.length ? (
@@ -265,17 +270,18 @@ export function PlayerSeat({
       </View>
       {labelColumn(
         <>
-          {/* The nameplate: over the avatar's lower rim when the labels stack under it. */}
-          <View style={[styles.plate, scaled.plate, firstLabel, !beside && scaled.plateOver]}>
-            <Text numberOfLines={1} style={[styles.plateName, scaled.plateName]}>
+          <View style={[styles.plate, scaled.plate, tabletop && { width: metrics.width - 10 * metrics.scale }, firstLabel]}>
+            <Text numberOfLines={1} style={[styles.playerName, scaled.playerName]}>
               {seat.isHero ? "YOU" : seat.name.toUpperCase()}
             </Text>
             <View style={[styles.stackRow, scaled.stackRow]}>
               <View style={[styles.coin, scaled.coin]} />
-              <Text style={[styles.stack, scaled.stack]}>{formatAmount(seat.stack).replace("$", "")}</Text>
+              <Text numberOfLines={1} style={[styles.stack, scaled.stack]}>
+                {seat.stack.toLocaleString()}
+              </Text>
             </View>
           </View>
-          {rack ? <RackLayers m={metrics} /> : null}
+          {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View style={[styles.statusRow, scaled.statusRow]}>
             <View
               style={[
@@ -353,35 +359,40 @@ export function PlayerSeat({
   );
 }
 
-/** The rack's art, shared by the wood and by the lip that re-draws over the tiles' feet. */
-const RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-3-tight.png");
-
 /**
- * The opponent rack (STO-532) as three sibling layers of the label column — never one nested
- * box, which the web's implicit stacking contexts would sink under the plate: the wood sits
- * under the plate's edge, the standing tiles rise above it, and the lip re-draws the rack's
- * bottom rail over their feet. The tiles and the lip are pinned to the column's bottom, one
- * badge-height up from its end, so they track the badge however the plate is styled.
+ * The opponent rack as three sibling layers of the label column — never one nested box, which
+ * the web's implicit stacking contexts would sink under the plate: the wood sits under the
+ * plate's edge, the standing tiles rise above it, and the lip re-draws the rack's bottom rail
+ * over their feet. The tiles and the lip are pinned to the column's bottom, one badge-height up
+ * from its end, so they track the badge however the plate is styled.
  */
-function RackLayers({ m }: { m: SeatMetrics }) {
+function RackLayers({ m, tabletop }: { m: SeatMetrics; tabletop: boolean }) {
   const badge = m.pillGap + m.pillPadY * 2 + m.pillBorder * 2 + m.statusLine;
+  const art = tabletop ? TABLETOP_RACK_ART : RACK_ART;
+  const tileWidth = m.rackW * (tabletop ? 0.4 : 64 / 190);
+  const tileHeight = tabletop ? tileWidth * 1.1 : undefined;
   return (
     <>
-      <Image
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        contentFit="contain"
-        source={RACK_ART}
-        style={[styles.rackWood, { height: m.rackH, marginTop: -m.rackTuck, width: m.rackW }]}
-      />
+      {/* The art is a transparent PNG, so the shadow it casts on the table comes from a rounded
+          box the size of the rack, not from the image. */}
+      <View
+        style={[
+          styles.rackWood,
+          { borderRadius: m.rackW * 0.07, height: m.rackH, marginTop: -m.rackTuck, width: m.rackW },
+        ]}
+      >
+        <ShadowBox radius={m.rackW * 0.07} shadows={[{ dy: 12, blur: 22, color: "rgba(30,14,0,0.85)" }]} />
+        <Image accessible={false} contentFit="contain" source={art} style={StyleSheet.absoluteFill} />
+      </View>
       <View style={[styles.rackTiles, { bottom: badge + m.rackFeet, gap: m.rackW / 38 }]}>
-        <RackTileBack width={(m.rackW * 64) / 190} />
-        <RackTileBack width={(m.rackW * 64) / 190} />
+        <RackTileBack height={tileHeight} width={tileWidth} />
+        <RackTileBack height={tileHeight} width={tileWidth} />
       </View>
       <View pointerEvents="none" style={[styles.rackLip, { bottom: badge, height: m.rackLip }]}>
         <Image
+          accessible={false}
           contentFit="contain"
-          source={RACK_ART}
+          source={art}
           style={{ bottom: 0, height: m.rackH, position: "absolute", width: m.rackW }}
         />
       </View>
@@ -423,24 +434,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   roleText: { color: colors.onGold, fontFamily: fonts.monoBold },
-  // The nameplate (STO-532): a dark plate with a gold-tinted rim — the reference's banner —
-  // carrying the name and, on a second line, a coin and the stack as a plain count.
+  // The name, stack and status sit on dark wood, so they read on the desk, the felt and the rail.
   plate: {
     alignItems: "center",
-    backgroundColor: "#2b1d10",
-    borderColor: "rgba(214,178,102,0.5)",
+    backgroundColor: "#603014",
+    borderColor: "#d59750",
+    boxShadow: "inset 0 2px 2px #f1b667, inset 0 -3px 6px #351807, 0 3px 4px #30150780",
+    zIndex: 1,
   },
-  plateName: { color: "#fff6e3", fontFamily: fonts.arcade },
-  stackRow: { alignItems: "center", flexDirection: "row", justifyContent: "center" },
-  coin: { backgroundColor: "#f2c14e", borderColor: "#8a5a16" },
-  stack: { color: "#fdf3d8", fontFamily: fonts.arcade },
+  playerName: { color: "#fff8e9", fontFamily: fonts.arcade },
+  stackRow: { alignItems: "center", flexDirection: "row" },
+  coin: { backgroundColor: "#FFC72C", borderColor: "#8A5A00", boxShadow: "inset 0 0 0 2px #ffe787" },
+  stack: { color: "#fff8e9", fontFamily: fonts.arcade },
   statusPill: {
-    backgroundColor: "rgba(20,14,8,0.78)",
-    borderColor: "rgba(232,220,192,0.28)",
+    backgroundColor: "#171412",
+    borderColor: "#e6d7c0",
+    boxShadow: "inset 0 1px 1px #ffffff18, inset 0 -2px 3px #00000080, 0 2px 3px #30150770",
   },
-  statusText: { color: palette.cream200, fontFamily: fonts.arcade },
+  statusText: { color: "#fff8e9", fontFamily: fonts.arcade },
   statusTextLit: { color: colors.onGold },
-  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%" },
+  // Above the rack's lip (zIndex 3), so the pill overlaps the rack's bottom rail.
+  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%", zIndex: 4, elevation: 4 },
   actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
@@ -467,5 +481,5 @@ const styles = StyleSheet.create({
   // the standing tiles and the lip rise above it.
   rackWood: { zIndex: 0 },
   rackTiles: { flexDirection: "row", position: "absolute", zIndex: 2 },
-  rackLip: { left: 0, overflow: "hidden", position: "absolute", right: 0, zIndex: 3 },
+  rackLip: { alignItems: "center", left: 0, overflow: "hidden", position: "absolute", right: 0, zIndex: 3 },
 });

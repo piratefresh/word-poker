@@ -44,6 +44,7 @@ export function seatFixture(overrides: Partial<ResultsSeat> & { name: string }):
       .join(""),
     color: colors.players[0],
     isYou: false,
+    folded: false,
     word: null,
     tiles: [],
     base: 0,

@@ -39,8 +39,10 @@ describe("coin vocabulary", () => {
       "cash_out",
       "quest",
       "streak",
+      "level",
     ]);
     assert.ok(isWalletEventKind("buy_in"));
+    assert.ok(isWalletEventKind("level"));
     assert.ok(!isWalletEventKind("gift"));
   });
 });

@@ -24,6 +24,11 @@ export function formatAmount(amount: number): string {
   return `${sign}$${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
 
+/** `12,000` — grouped like `formatAmount`, but with no `$`: the Wallet's coins, not chips. */
+export function formatCoins(coins: number): string {
+  const whole = Number.isFinite(coins) ? Math.trunc(coins) : 0;
+  return whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 /** Scale suffix for stacks that no longer fit a seat row. */
 const COMPACT_STEPS = [

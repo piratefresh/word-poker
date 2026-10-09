@@ -71,7 +71,7 @@ tags:
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
-    visible: "PHASE 2 · PRE-FLOP"
+    visible: "PREFLOP"
     timeout: 90000
 - assertVisible:
     text: "COMMUNITY · 0/5"
@@ -97,10 +97,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 5 · THE RIVER"
+        text: "RIVER"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PHASE 5 · THE RIVER"
+          visible: "YOUR TURN|RIVER"
           timeout: 40000
           optional: true
       - runFlow:
@@ -115,6 +115,10 @@ tags:
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 20000
+# Select the minimum opening bet; the combined button defaults to Check.
+- tapOn:
+    id: "wager-slider"
+    point: "2%,50%"
 - assertVisible:
     id: "action-wager"
     containsDescendants:
@@ -139,7 +143,7 @@ tags:
     containsDescendants:
       - text: "\\$20"
 - assertVisible:
-    text: "PHASE 5 · THE RIVER"
+    text: "RIVER"
 
 # The river's close opened §19's window: the band under the felt — the draft line and the
 # strip of tiles the seat sorts — is what the flow builds its word through. The phase stays
@@ -181,7 +185,7 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 6 · PAYOUT"
+        text: "PAYOUT"
     commands:
       - tapOn:
           id: "action-check-call"
@@ -190,7 +194,7 @@ tags:
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
 # immediately when the bots found words, or on the window's clock when they did not.
 - extendedWaitUntil:
-    visible: "PHASE 6 · PAYOUT"
+    visible: "PAYOUT"
     timeout: 70000
 - assertVisible:
     text: "WINNER"
@@ -218,7 +222,7 @@ tags:
 - tapOn:
     text: "DEAL ANOTHER"
 - assertVisible:
-    text: "PHASE 2 · PRE-FLOP"
+    text: "PREFLOP"
 - assertVisible:
     text: "COMMUNITY · 0/5"
 - assertNotVisible:

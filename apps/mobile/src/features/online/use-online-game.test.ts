@@ -190,6 +190,11 @@ describe("useOnlineGame", () => {
       HERO,
       liveState({
         phase: "payout",
+        seats: new Map([
+          [HERO, seat(HERO, 0)],
+          [OPPONENT, seat(OPPONENT, 1)],
+          ["folded-player", seat("folded-player", 2, { hasFolded: true })],
+        ]),
         toActSeat: -1,
         betting: { active: false },
         result: {
@@ -215,7 +220,9 @@ describe("useOnlineGame", () => {
     expect(results?.hand).toBe(1);
     expect(results?.seed).toBeNull();
     expect(results?.pot).toBe(250);
-    expect(results?.seats.map((seat) => seat.playerId)).toEqual([HERO, OPPONENT]);
+    expect(results?.seats.map((seat) => seat.playerId)).toEqual([HERO, OPPONENT, "folded-player"]);
+    expect(results?.seats[2]).toMatchObject({ folded: true, word: null, tiles: [], takesPot: false });
+    expect(results?.summary).toBe("3 PLAYERS · 1 FOLD · 1 WORD PLAYED");
     expect(results?.seats[0]).toMatchObject({
       word: "GO",
       total: 3,

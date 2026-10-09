@@ -15,8 +15,10 @@ import { Client } from "pg";
 
 import {
   openWalletEvent,
+  playerProgress,
   questProgress,
   recordQuestHand,
+  setLevelPaid,
   streakDates,
   type QuestProgressEntry,
   type QuestProgressMap,
@@ -78,10 +80,11 @@ describe(
           }),
           completed: ["win-word-2"],
         }),
+        25,
         { orm },
       );
 
-      assert.deepEqual(result, { completed: ["win-word-2"], duplicate: false });
+      assert.deepEqual(result, { completed: ["win-word-2"], duplicate: false, xp: 25 });
 
       const rows = await questProgress(userId, { orm });
       assert.equal(rows.length, 2);
@@ -101,13 +104,37 @@ describe(
         return { next: map, completed: [] };
       };
 
-      const first = await recordQuestHand(userId, token, apply, { orm });
-      assert.deepEqual(first, { completed: [], duplicate: false });
+      const first = await recordQuestHand(userId, token, apply, 10, { orm });
+      assert.deepEqual(first, { completed: [], duplicate: false, xp: 10 });
       assert.equal(calls, 1);
 
-      const second = await recordQuestHand(userId, token, apply, { orm });
-      assert.deepEqual(second, { completed: [], duplicate: true });
+      const second = await recordQuestHand(userId, token, apply, 10, { orm });
+      assert.deepEqual(second, { completed: [], duplicate: true, xp: 10 });
       assert.equal(calls, 1, "apply never runs for a duplicate token");
+    });
+
+    it("adds a hand's xp once, and a repeated hand token adds none", async () => {
+      const userId = `user-${randomUUID()}`;
+      const token = `token-${randomUUID()}`;
+      const hand = () => echo({ next: fullMap({}), completed: [] });
+
+      assert.deepEqual(await playerProgress(userId, { orm }), { xp: 0, levelPaid: 1 });
+
+      await recordQuestHand(userId, token, hand(), 25, { orm });
+      const replay = await recordQuestHand(userId, token, hand(), 25, { orm });
+      assert.equal(replay.xp, 25, "the repeated token added nothing");
+
+      await recordQuestHand(userId, `token-${randomUUID()}`, hand(), 15, { orm });
+      assert.deepEqual(await playerProgress(userId, { orm }), { xp: 40, levelPaid: 1 });
+    });
+
+    it("advances the level high-water mark, and never moves it backwards", async () => {
+      const userId = `user-${randomUUID()}`;
+
+      await setLevelPaid(userId, 3, { orm });
+      await setLevelPaid(userId, 2, { orm });
+
+      assert.deepEqual(await playerProgress(userId, { orm }), { xp: 0, levelPaid: 3 });
     });
 
     it("keeps a quest's completedAt once set, across a later run that leaves it done", async () => {
@@ -119,6 +146,7 @@ describe(
           next: fullMap({ "win-word-2": { progress: 1, streak: 0, done: true } }),
           completed: ["win-word-2"],
         }),
+        0,
         { orm },
       );
       const firstCompletedAt = (await questProgress(userId, { orm })).find((row) => row.questId === "win-word-2")
@@ -136,6 +164,7 @@ describe(
           }),
           completed: [],
         }),
+        0,
         { orm },
       );
       const secondCompletedAt = (await questProgress(userId, { orm })).find((row) => row.questId === "win-word-2")
@@ -169,10 +198,10 @@ describe(
       const [count] = await orm.em.getConnection().execute<{ count: string }[]>(
         `select count(*) as count
            from information_schema.tables
-          where table_schema = current_schema() and table_name in ('quest_progress', 'quest_hand_log')`,
+          where table_schema = current_schema() and table_name in ('quest_progress', 'quest_hand_log', 'player_progress')`,
       );
 
-      assert.equal(Number(count?.count), 0, "both tables are gone after a rollback");
+      assert.equal(Number(count?.count), 0, "every quest and progress table is gone after a rollback");
     });
   },
 );

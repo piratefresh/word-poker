@@ -40,6 +40,7 @@ import {
   palette,
   tileMaterial,
 } from "@/constants/theme";
+import { ShadowBox } from "@/components/ui/shadow-box";
 import { webTestID } from "@/lib/web-id";
 
 import { TileChoiceBeam } from "./tile-choice-beam";
@@ -60,7 +61,16 @@ export interface TileProps {
   /** Grows the size's metrics by a factor, for a window larger than the size was drawn for. */
   scale?: number;
   ownership?: TileOwnership;
+  /** The cast shadow on the wood; the word builder's tiles draw none. */
+  shadow?: boolean;
   selected?: boolean;
+  /**
+   * The letter a choice tile is playing (§10): the face it prints in place of its pair — that
+   * letter, at a single letter's size, with that face's own value — and the points it
+   * highlights. Absent while nothing is chosen, and on a single-letter tile, which prints its
+   * one face either way.
+   */
+  chosenFace?: string;
   dimmed?: boolean;
   disabled?: boolean;
   interactive?: boolean;
@@ -146,20 +156,8 @@ export function scaleTileMetrics(size: TileSize, factor: number): TileMetrics {
   return scaled;
 }
 
-/**
- * The contact shadow under a tile, in points of a medium tile (other sizes scale it). A lift adds
- * the `lift*` amounts — selected is a lift of 1, a flip's midpoint another — so the shadow widens
- * and fades as the tile rises off the table.
- */
-const CONTACT_SHADOW = {
-  offsetY: 3,
-  blur: 4,
-  alpha: 0.55,
-  liftOffsetY: 3,
-  liftBlur: 6,
-  liftSpread: 1.5,
-  liftFade: 0.2,
-} as const;
+/** The letter and its points: Lilita One's heavy round face, against the reference's lettering. */
+const TILE_FONT = fonts.arcade;
 
 const FLIP_EASING = Easing.bezier(...motionEasing.flip);
 const DEAL_EASING = Easing.bezier(...motionEasing.deal);
@@ -185,6 +183,24 @@ const CHOICE_ACCENT = palette.violet400;
  */
 function secondFace(tile: TileData): string | null {
   return "alternativeLetter" in tile ? tile.alternativeLetter : null;
+}
+
+/**
+ * The one face a choice tile shows while the word plays it (§10): `A` for an A/E played as A,
+ * the other letter left to the chips under the rack. Null when no face is named — both letters
+ * keep printing — and on a single-letter tile, which has only the one.
+ */
+function playedFace(tile: TileData, chosenFace: string | undefined): string | null {
+  const second = secondFace(tile);
+  if (second === null || chosenFace === undefined) return null;
+  return chosenFace === tile.letter || chosenFace === second ? chosenFace : null;
+}
+
+/** What one face of the tile is worth: the picked face's own value where the pair disagrees (§10). */
+function faceValue(tile: TileData, face: string): number {
+  return "alternativeLetter" in tile && face === tile.alternativeLetter
+    ? tile.alternativePoints
+    : tile.points;
 }
 
 /**
@@ -229,7 +245,9 @@ export function Tile({
   size = "medium",
   scale = 1,
   ownership = "neutral",
+  shadow = true,
   selected = false,
+  chosenFace,
   dimmed = false,
   disabled = false,
   interactive = false,
@@ -244,6 +262,7 @@ export function Tile({
 }: TileProps) {
   const metrics = scaleTileMetrics(size, scale);
   const second = secondFace(tile);
+  const played = playedFace(tile, chosenFace);
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -455,31 +474,6 @@ export function Tile({
       ],
     };
   });
-  // The shadow stays on the table while the tile lifts off it, so a lifted tile — selected, or
-  // mid-flip — casts a wider, fainter one. A dealing tile has none until it has landed.
-  const shadowUnit = metrics.height / TILE_METRICS.medium.height;
-  const contactMotion = useAnimatedStyle(() => {
-    const lift =
-      selectedProgress.get() +
-      (animation === "deal"
-        ? 0
-        : interpolate(rotation.get(), [0, 0.5, 1], [0, 1, 0]));
-    const landed =
-      animation === "deal"
-        ? interpolate(dealProgress.get(), [0, 0.58, 1], [0, 1, 1])
-        : 1;
-    return {
-      boxShadow: [
-        {
-          offsetX: 0,
-          offsetY: (CONTACT_SHADOW.offsetY + lift * CONTACT_SHADOW.liftOffsetY) * shadowUnit,
-          blurRadius: (CONTACT_SHADOW.blur + lift * CONTACT_SHADOW.liftBlur) * shadowUnit,
-          spreadDistance: lift * CONTACT_SHADOW.liftSpread * shadowUnit,
-          color: `rgba(38,18,0,${(CONTACT_SHADOW.alpha - lift * CONTACT_SHADOW.liftFade) * landed})`,
-        },
-      ],
-    };
-  });
   // The slab is the tile's body, so it turns with the face: ivory under the front, crimson under
   // the back. It flips colour as the tile goes edge-on, which is when neither face can be seen.
   const slabMotion = useAnimatedStyle(() => {
@@ -552,16 +546,6 @@ export function Tile({
       id={webTestID(testID)}
       testID={testID}
     >
-      {/* The shadow is a sibling under the shell, not the shell's own: it stays on the table
-          while the shell lifts, and it is a view, so there is no canvas to cost a GL context. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.contact,
-          { borderRadius: metrics.radius },
-          contactMotion,
-        ]}
-      />
       <Animated.View
         style={[
           styles.shell,
@@ -569,11 +553,28 @@ export function Tile({
           shellMotion,
         ]}
       >
+        {/* The tile's cast shadow on the wood, scaled with its thickness like the slab. */}
+        {shadow ? (
+          <ShadowBox
+            radius={metrics.radius}
+            // A tight contact shadow at the foot, and a short soft one: the tile sits on the wood.
+            shadows={[
+              { dy: metrics.slab * 0.3, blur: metrics.slab * 0.8, color: "rgba(30,14,0,0.7)" },
+              { dy: metrics.slab * 0.8, blur: metrics.slab * 2, color: "rgba(30,14,0,0.35)" },
+            ]}
+          />
+        ) : null}
         {/* The slab: the tile's thickness, one static view under the face. It is the whole tile's
             size with rounded corners, so the face covers all of it but the foot. */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.slab, { borderRadius: metrics.radius }, slabMotion]}
+          style={[
+            styles.slab,
+            {
+              borderRadius: metrics.radius,
+            },
+            slabMotion,
+          ]}
         />
         <View
           style={[
@@ -651,15 +652,16 @@ export function Tile({
                 style={[
                   styles.letter,
                   {
-                    fontSize: second === null
-                      ? metrics.letterSize
-                      : metrics.alternateSize,
+                    fontSize:
+                      played !== null || second === null
+                        ? metrics.letterSize
+                        : metrics.alternateSize,
                   },
                 ]}
               >
-                {tile.letter}
+                {played ?? tile.letter}
               </Text>
-              {second === null ? null : (
+              {played !== null || second === null ? null : (
                 <>
                   <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>/</Text>
                   <Text
@@ -682,7 +684,38 @@ export function Tile({
                 },
               ]}
             >
-              {facePoints(tile).join("/")}
+              {played !== null ? (
+                // The played face prints its own value alone: the other face is not scored (§10).
+                <Text
+                  style={{
+                    color: selected ? colors.goldHi : styles.points.color,
+                  }}
+                >
+                  {faceValue(tile, played)}
+                </Text>
+              ) : "alternativeLetter" in tile ? (
+                <>
+                  <Text
+                    style={{
+                      color: selected && chosenFace === tile.letter
+                        ? colors.goldHi
+                        : styles.points.color,
+                    }}
+                  >
+                    {tile.points}
+                  </Text>
+                  /
+                  <Text
+                    style={{
+                      color: selected && chosenFace === tile.alternativeLetter
+                        ? colors.goldHi
+                        : styles.points.color,
+                    }}
+                  >
+                    {tile.alternativePoints}
+                  </Text>
+                </>
+              ) : tile.points}
             </Text>
           </LinearGradient>
         </Animated.View>
@@ -730,7 +763,6 @@ export function Tile({
 
 const styles = StyleSheet.create({
   outer: { overflow: "visible" },
-  contact: { ...StyleSheet.absoluteFill },
   shell: { overflow: "visible" },
   // The dark rim shows only where the face does not cover the slab: its foot and corners.
   slab: { ...StyleSheet.absoluteFill, borderWidth: border.hairline },
@@ -764,7 +796,7 @@ const styles = StyleSheet.create({
   },
   slash: {
     color: "rgba(21,17,13,0.5)",
-    fontFamily: fonts.arcade,
+    fontFamily: TILE_FONT,
     marginHorizontal: 1,
   },
   points: {

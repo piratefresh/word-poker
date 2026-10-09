@@ -18,7 +18,7 @@ shared hook first.
 
 `apps/mobile/src/components/word-builder/` is the one builder for every mode: `WordHand` is the
 sortable strip of tiles and goes in the felt's rack slot (`GameScreen`'s `rack` prop), and
-`WordPreview` is the draft as one line of text directly above it — it draws nothing until the
+The draft is one line of text in the tray header beside the label — it draws nothing until the
 strip spells something. The builder carries no buttons of its own: the shuffle is
 `WordShuffleButton`, placed with `WordCheckButton` in a row under the rack (`GameScreen`'s
 `rackActions` prop), so the word's controls sit with its tiles and the betting rows keep their
@@ -43,6 +43,12 @@ strip re-seeds its layout from that order (see `strip.tsx`), so an external edit
 tile dealt — is never fought by a private copy of the list. A tile ignores a press for
 `DRAG_SETTLE_MS` after a drop, because the pan does not cancel the tile's own press on the web —
 the pointer never leaves the tile, since the tile travels with it.
+
+A choice tile (§10) stops printing its pair the moment the word plays it: the tile shows the one
+face it plays — that letter, at a single letter's size, with that face's own value — and the two
+chips under it keep naming both faces, so the seat can switch to the other one. Nothing chosen yet
+draws the pair as it always did, and the tile read aloud still gives both faces and the one played
+(§39).
 
 The rack is a straight row of `TILE_METRICS`'s `medium` tile, grown by the window's `screenScale`
 (`screens/game/screen-scale.ts`; exactly 1 below a 600-point shorter side, then growing with it up to

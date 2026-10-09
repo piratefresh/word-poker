@@ -81,10 +81,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PHASE 6 · PAYOUT"
+        text: "PAYOUT"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PHASE 6 · PAYOUT"
+          visible: "YOUR TURN|PAYOUT"
           timeout: 70000
           optional: true
       - runFlow:

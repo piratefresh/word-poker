@@ -122,11 +122,15 @@ describe("the strip's order", () => {
 });
 
 describe("the rack's tile", () => {
-  test("is the medium tile, ungrown, on a phone upright or on its side", () => {
-    for (const window of [
-      { width: 390, height: 844 },
-      { width: 844, height: 390 },
-    ]) {
+  test("is the medium tile on a phone on its side, matching the felt's community tiles", () => {
+    const rack = rackFor({ width: 852, height: 393 });
+    expect(rack).toBe(RACK.landscape);
+    expect(rack.size).toBe("medium");
+    expect(rack.itemWidth).toBe(44);
+  });
+
+  test("is the medium tile, ungrown, on an upright phone", () => {
+    for (const window of [{ width: 390, height: 844 }]) {
       const rack = rackFor(window);
       expect(rack).toBe(RACK.phone);
       expect(rack.size).toBe("medium");

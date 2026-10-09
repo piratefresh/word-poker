@@ -84,7 +84,7 @@ Catalog (retuning is a data-only change):
 | `win-streak-3` | ON A ROLL | Win 3 hands in a row. | 3 | 200 |
 
 Rewards are small beside the 5,000 welcome grant and the 2,000-coin smallest pack; the whole catalog pays
-2,250 once. Retune against pack prices before the flag turns on.
+2,150 once. Retune against pack prices before the flag turns on.
 
 Predicates:
 - Word ladder + `word-25`: `revealed && heroWon` and `heroWord.length === L` / `heroScore >= 25`.

@@ -3,6 +3,10 @@ import { seatFixture, snapshotFixture } from "@/components/screens/results/resul
 import { resultsFacts } from "./quest-facts";
 
 describe("resultsFacts", () => {
+  test("a folded player's new scoreboard card does not change quest reporting", () => {
+    const snapshot = snapshotFixture({ seats: [seatFixture({ name: "Guest", isYou: true, folded: true })] });
+    expect(resultsFacts(snapshot, { wildTable: false, heroUsedPower: false })).toBeNull();
+  });
   test("a showdown win carries the hero's word, score, decider and the pot", () => {
     const snapshot = snapshotFixture({
       pot: 300,

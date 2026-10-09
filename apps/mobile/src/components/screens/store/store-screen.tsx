@@ -17,14 +17,13 @@ import {
   type UniversalStyle,
   type UniversalTextStyle,
 } from "@expo/ui";
-import { WELCOME_GRANT } from "@wordpoker/contracts";
 import { router } from "expo-router";
-import { useState } from "react";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
 import { formatCoins } from "@/lib/format";
 import { fullWidth } from "@/lib/full-width";
+import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 
 import type { CoinPackRow } from "./coin-packs";
 import { useCoinStore, type PurchaseNotice } from "./use-coin-store";
@@ -40,18 +39,6 @@ export function StoreScreen() {
   const { data: session } = authClient.useSession();
   const user = session?.user;
   const store = useCoinStore(user?.id);
-  const [resend, setResend] = useState<"idle" | "sending" | "sent" | "failed">("idle");
-
-  const resendVerification = async () => {
-    if (!user) return;
-    setResend("sending");
-    try {
-      const { error } = await authClient.sendVerificationEmail({ email: user.email, callbackURL: "/" });
-      setResend(error ? "failed" : "sent");
-    } catch {
-      setResend("failed");
-    }
-  };
 
   const signedOut = store.balance.status === "signed-out";
 
@@ -59,7 +46,7 @@ export function StoreScreen() {
     <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
       <ScrollView>
         <Column alignment="start" spacing={spacing.md} {...fullWidth(styles.screen)}>
-          <Button label="Back" onPress={() => router.back()} testID="store-back" variant="text" />
+          <Button label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} testID="store-back" variant="text" />
           <Text textStyle={titleText}>Coin Store</Text>
           <Text textStyle={kickerText}>TOP UP YOUR WALLET</Text>
           <Spacer size={spacing.sm} />
@@ -94,21 +81,7 @@ export function StoreScreen() {
               </Column>
 
               {user && !user.emailVerified && store.balance.status === "ready" && !store.balance.welcomed ? (
-                <Column spacing={spacing.sm} testID="store-verify" {...fullWidth(styles.card)}>
-                  <Text textStyle={bodyText}>
-                    {`Verify your email to claim ${formatCoins(WELCOME_GRANT)} coins`}
-                  </Text>
-                  <Button
-                    disabled={resend === "sending" || resend === "sent"}
-                    label={resend === "sent" ? "Sent — check your inbox" : "Resend email"}
-                    onPress={resendVerification}
-                    testID="store-verify-resend"
-                    variant="outlined"
-                  />
-                  {resend === "failed" ? (
-                    <Text textStyle={errorText}>The email could not be sent. Try again.</Text>
-                  ) : null}
-                </Column>
+                <VerifyEmailCard email={user.email} testID="store-verify" />
               ) : null}
 
               {store.packs.status === "unavailable" ? (

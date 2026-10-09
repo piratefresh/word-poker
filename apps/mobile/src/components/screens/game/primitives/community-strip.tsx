@@ -1,13 +1,12 @@
 import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 
 import type { LetterTileData } from "../game-types";
-import { useScreenScale } from "../screen-scale";
+import { isCompactWindow, useScreenScale } from "../screen-scale";
+import { Tile, TILE_METRICS } from "@/components/game";
 import { LabelBand } from "./label-band";
-import { communityDealDelayMs, EmptyTile, LetterTile } from "./letter-tile";
+import { communityDealDelayMs, EmptyTile, LetterTile, tileSizeFor } from "./letter-tile";
 
-// Relative, not `@/assets`: Jest maps `@/` to `src/` only.
-const COMMUNITY_RACK = require("../../../../../assets/images/ui/community-rack-5.png");
 /** The rack picture, in its own pixels. */
 const RACK_IMAGE = { width: 2172, height: 724 };
 /** The painted frame's top and bottom (the rest of the picture is transparent margin). */
@@ -46,41 +45,70 @@ function rackStyles(tile: number) {
   });
 }
 
+/** What an undealt slot's face-down tile is drawn from; its letter is never shown. */
+const BACK_TILE: LetterTileData = { id: "undealt", letter: "A", points: 1 };
+
 export function CommunityStrip({
   tiles,
+  inTable = false,
+  scale: requestedScale,
 }: {
   tiles: readonly (LetterTileData | null)[];
+  /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
+  inTable?: boolean;
+  scale?: number;
 }) {
-  const scale = useScreenScale();
-  const tileSize = COMMUNITY_TILE * scale;
+  const screenScale = useScreenScale();
+  const scale = requestedScale ?? screenScale;
+  const window = useWindowDimensions();
+  // Match the word builder's medium tiles, or small tiles on a compact phone.
+  const tileWidth = inTable
+    ? TILE_METRICS[isCompactWindow(window) ? "small" : "medium"].width
+    : COMMUNITY_TILE;
+  const tileSize = tileWidth * scale;
   const rack = useMemo(() => rackStyles(tileSize), [tileSize]);
   const five = Array.from({ length: 5 }, (_, index) => tiles[index] ?? null);
   return (
-    <View style={styles.community}>
-      <LabelBand>
-        COMMUNITY {"·"} {five.filter(Boolean).length}/5
-      </LabelBand>
-      <View style={rack.rack}>
-        {/* <Image
-          contentFit="fill"
-          pointerEvents="none"
-          source={COMMUNITY_RACK}
-          style={rack.art}
-        /> */}
-        <View style={[styles.tileRow, rack.opening]}>
-          {five.map((tile, index) =>
+    <View
+      aria-label={inTable ? `Community ${five.filter(Boolean).length}/5` : undefined}
+      role={inTable ? "group" : undefined}
+      style={inTable ? undefined : styles.community}
+    >
+      {inTable ? null : (
+        <LabelBand>
+          COMMUNITY {"·"} {five.filter(Boolean).length}/5
+        </LabelBand>
+      )}
+      <View style={inTable ? undefined : rack.rack}>
+        <View
+          style={[
+            styles.tileRow,
+            !inTable && rack.opening,
+            { gap: 6 * scale },
+          ]}
+        >
+          {five.map((tile, index) => (
             tile ? (
               <LetterTile
                 dealDelayMs={communityDealDelayMs(index)}
                 key={`community-${index}`}
                 scale={scale}
-                size={COMMUNITY_TILE}
+                size={tileWidth}
                 tile={tile}
+              />
+            ) : inTable ? (
+              <Tile
+                key={`community-${index}`}
+                ownership="neutral"
+                scale={scale}
+                side="back"
+                size={tileSizeFor(tileWidth)}
+                tile={BACK_TILE}
               />
             ) : (
               <EmptyTile key={`community-${index}`} size={tileSize} />
-            ),
-          )}
+            )
+          ))}
         </View>
       </View>
     </View>

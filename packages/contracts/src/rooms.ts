@@ -30,8 +30,8 @@ export type BuyInPreset = (typeof BUY_IN_PRESETS)[number];
 /** §5: a table is heads-up at its smallest. */
 export const MIN_SEATS = 2;
 
-/** §5: a table seats six at its largest. */
-export const MAX_SEATS = 6;
+/** §5: a table seats four at its largest (the tabletop layout has no room for more). */
+export const MAX_SEATS = 4;
 
 /** §2's table name is a short label on a card; anything longer is a paste accident. */
 export const ROOM_NAME_MAX_LENGTH = 32;

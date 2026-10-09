@@ -39,7 +39,7 @@ import {
   isCompactWindow,
   screenScale,
 } from "@/components/screens/game/screen-scale";
-import { colors, glow, spacing } from "@/constants/theme";
+import { colors, glow, layout, spacing } from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
 import { haptic } from "./haptics";
@@ -99,6 +99,9 @@ export const RACK = {
   phone: rackGeometry("medium"),
   /** An iPhone SE-class window: the small tile, which frees height for the table. */
   compact: rackGeometry("small"),
+  /** A phone on its side: the medium tile, matching the felt's own community tiles; the step
+   *  tightens on its own (`stepFor`) if seven of them outrun the tray's width. */
+  landscape: rackGeometry("medium"),
 } as const;
 
 /**
@@ -112,6 +115,9 @@ export function rackFor(window: {
 }): RackGeometry {
   const scale = screenScale(window);
   if (scale !== 1) return rackGeometry("medium", scale);
+  if (window.width > window.height && window.height < layout.wideShortSide) {
+    return RACK.landscape;
+  }
   return isCompactWindow(window) ? RACK.compact : RACK.phone;
 }
 
@@ -447,6 +453,8 @@ export function TileStrip({
   );
 
   const rack = rackFor(useWindowDimensions());
+  const hasChoice = strip.some(({ tile }) => "alternativeLetter" in tile);
+  const stripHeight = hasChoice ? rack.height : rack.height - FACE_HEIGHT * rack.scale;
   // A hand never holds more than the places (§7's seven), but cap the empties at 0 rather than
   // trust it: a negative count would draw nothing and shift every step.
   const laidOut = Math.max(places, data.length);
@@ -457,7 +465,7 @@ export function TileStrip({
     <View
       accessibilityLabel="Your letter rack"
       onLayout={measure}
-      style={[styles.strip, rack === RACK.compact && styles.stripTight]}
+      style={[styles.strip, rack !== RACK.phone && styles.stripTight]}
       testID="word-builder-strip"
     >
       {/*
@@ -468,7 +476,7 @@ export function TileStrip({
       <View
         style={[
           styles.stripContent,
-          { height: rack.height, width: rowWidth(laidOut, step, rack) },
+          { height: stripHeight, width: rowWidth(laidOut, step, rack) },
         ]}
       >
         {Array.from({ length: empty }, (_, index) => (
@@ -801,6 +809,7 @@ function TileContent({
     ownership,
     scale,
     selected: held && !picking,
+    shadow: false,
     size,
     testID: `word-builder-tile-${tile.id}`,
   };

@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, View } from "react-native";
 
+import { ShadowBox } from "@/components/ui/shadow-box";
 import { tileMaterial } from "@/constants/theme";
 
 /**
@@ -11,14 +12,15 @@ import { tileMaterial } from "@/constants/theme";
  * leans into the wood, and its feet are meant to hide behind the rack's lip. Drawn at a
  * 64-point base and re-sized by `width`, for seats that scale with their table.
  */
-export function RackTileBack({ width = 64 }: { width?: number }) {
+export function RackTileBack({ width = 64, height = (width * 58) / 64 }: { width?: number; height?: number }) {
   const s = width / 64;
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.tile, rackTileSize(s)]}
+      style={[styles.tile, rackTileSize(s, height)]}
     >
+      <ShadowBox radius={Math.max(2, 5 * s)} shadows={[{ dx: 3, dy: 9, blur: 14, color: "rgba(30,14,0,0.85)" }]} />
       <LinearGradient colors={tileMaterial.back.gradient} style={[styles.face, rackFaceSize(s)]}>
         <View style={[styles.diamond, { height: 19 * s, width: 19 * s }]} />
       </LinearGradient>
@@ -27,10 +29,10 @@ export function RackTileBack({ width = 64 }: { width?: number }) {
 }
 
 /** The tile's box and its ivory side thickness, at `s` of the 64-point base. */
-function rackTileSize(s: number) {
+function rackTileSize(s: number, height: number) {
   return {
     width: Math.round(64 * s),
-    height: Math.round(58 * s),
+    height: Math.round(height),
     borderRadius: Math.max(2, 5 * s),
     borderTopWidth: Math.max(1, 2 * s),
     borderLeftWidth: Math.max(1, 3 * s),
@@ -49,7 +51,6 @@ function rackFaceSize(s: number) {
 const styles = StyleSheet.create({
   tile: {
     backgroundColor: "#f6e7c8",
-    boxShadow: "2px 1px 2px rgba(44,19,6,0.5)",
     borderTopColor: "#fff8e5",
     borderLeftColor: "#fff3d8",
     borderRightColor: "#ae8050",

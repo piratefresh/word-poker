@@ -2,7 +2,7 @@
  * results-screen.tsx — the hand's payoff, over the felt it was played on.
  *
  * One screen, after every hand: the hand's number, a headline with its one gold span, the
- * pot, the two ways out, a card per seat that reached the reveal, and a rating card. It is a
+ * pot, the two ways out, a card per seat dealt into the hand, and a rating card. It is a
  * scroll view over the felt rather than a live surface — no timers of its own, no sockets, one
  * frozen payload and one entrance sequence (STO-379).
  *

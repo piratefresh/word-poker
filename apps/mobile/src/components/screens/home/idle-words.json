@@ -1,0 +1,22 @@
+[
+  {"word":"RIVER", "start":"IRREV", "activate":[2,0,3,1,4], "sorts":[[0,1],[2,4]]},
+  {"word":"BLUFF", "start":"BFULF", "activate":[1,4,0,2,3], "sorts":[[1,3]]},
+  {"word":"MONSTER", "start":"ERSNTMO", "activate":[3,0,5,1,6,2,4], "sorts":[[0,5],[2,3],[1,6]]},
+  {"word":"MARKET", "start":"AMTKER", "activate":[4,1,0,5,2,3], "sorts":[[2,5],[0,1]]},
+  {"word":"PLAYER", "start":"YALPER", "activate":[2,5,0,3,1,4], "sorts":[[0,3],[1,2]]},
+  {"word":"CASINO", "start":"COSINA", "activate":[0,3,1,5,2,4], "sorts":[[1,5]]},
+  {"word":"TABLE", "start":"EBALT", "activate":[4,2,0,3,1], "sorts":[[0,4],[1,2]]},
+  {"word":"POKER", "start":"KOPRE", "activate":[1,3,0,4,2], "sorts":[[0,2],[3,4]]},
+  {"word":"CHIPS", "start":"PIHSC", "activate":[3,0,4,1,2], "sorts":[[0,4],[1,2],[3,4]]},
+  {"word":"RAISE", "start":"ARSIE", "activate":[2,4,1,0,3], "sorts":[[0,1],[2,3]]},
+  {"word":"FLUSH", "start":"SHUFL", "activate":[3,0,4,2,1], "sorts":[[0,3],[1,4]]},
+  {"word":"CARDS", "start":"CRADS", "activate":[0,4,2,1,3], "sorts":[[1,2]]},
+  {"word":"CHECK", "start":"HCKCE", "activate":[2,4,1,3,0], "sorts":[[0,1],[2,4],[3,0]]},
+  {"word":"BOARD", "start":"ADBRO", "activate":[1,3,0,4,2], "sorts":[[0,2],[1,4]]},
+  {"word":"SCORE", "start":"ECORS", "activate":[4,1,2,0,3], "sorts":[[0,4]]},
+  {"word":"QUEEN", "start":"UEQNE", "activate":[1,0,3,4,2], "sorts":[[0,1],[3,4],[2,0]]},
+  {"word":"TILES", "start":"TELIS", "activate":[2,4,0,1,3], "sorts":[[1,3]]},
+  {"word":"POWER", "start":"EORPW", "activate":[0,2,4,1,3], "sorts":[[0,3],[2,4]]},
+  {"word":"STAKES", "start":"KSESAT", "activate":[5,2,0,4,1,3], "sorts":[[0,3],[1,5],[2,4]]},
+  {"word":"GAMBLE", "start":"EABMLG", "activate":[3,1,4,0,5,2], "sorts":[[2,3],[0,5]]}
+]

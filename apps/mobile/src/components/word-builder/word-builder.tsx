@@ -12,8 +12,10 @@ import { createContext, useCallback, useContext, useMemo } from "react";
 import { AccessibilityInfo, Platform, Text, View } from "react-native";
 
 import { GameButton } from "@/components/ui/game-button";
+import { ShadowBox } from "@/components/ui/shadow-box";
+import { colors, radius } from "@/constants/theme";
 
-import { useCompactControls } from "@/components/screens/game/screen-scale";
+import { useScreenScale } from "@/components/screens/game/screen-scale";
 import { DraftLine } from "./draft-line";
 import {
   inStripOrder,
@@ -59,13 +61,13 @@ export interface WordDraft {
  * (§10, §11, §19).
  *
  * It is two placements of one draft, because the tiles belong where the seat's hand already is:
- * `WordHand` is the strip and goes in the felt's rack slot with `WordPreview` above it, the
- * draft as one line of text. `WordBuilder` itself owns the draft they share — the strip's
+ * `WordHand` is the strip and goes in the felt's rack slot, with the draft as one line of text
+ * beside the tray's label. `WordBuilder` itself owns the draft they share — the strip's
  * order, which is the word's order — so a mode composes the two and never a copy of them:
  *
  * ```tsx
  * <WordBuilder {...window}>
- *   <GameScreen game={game} rack={<><WordPreview /><WordHand /></>} />
+ *   <GameScreen game={game} rack={<WordHand />} />
  * </WordBuilder>
  * ```
  *
@@ -112,7 +114,7 @@ export interface WordBuilderProps extends WordDraft {
   children: ReactNode;
 }
 
-/** What `WordHand`, `WordPreview`, and the felt's shuffle read: one draft, and the edits. */
+/** What `WordHand` and the felt's shuffle read: one draft, and the edits. */
 export interface WordBuilderScope {
   readonly strip: readonly StripEntry[];
   readonly held: ReadonlyMap<string, string | undefined>;
@@ -287,28 +289,52 @@ export function WordBuilder({
  * The hand, for the felt's rack slot: the tiles the seat sorts and taps, where the seat's tiles
  * already are.
  */
-export function WordHand(): JSX.Element {
-  const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip } =
+export function WordHand({
+  actions,
+}: {
+  /** The word's controls — shuffle, check, a held power — in a column at the tray's right end. */
+  actions?: ReactNode;
+}): JSX.Element {
+  const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip, draft } =
     useWordBuilderScope();
+  const bonus = draft.word.length === 0 ? 0 : (draft.score?.fullRackBonus ?? 0);
 
   // The tray wraps the strip and never sizes it: the places and their step are the strip's own.
   // The tray's seven places are the seven tiles a seat can play (§7); the ones not dealt yet
   // draw as dashed slots, so a hand a street short of the river reads as one still filling.
   return (
-    <View style={styles.trayLip} testID="word-builder-tray">
-      <View style={styles.trayFace}>
-        <Text style={styles.trayLabel}>WORD BUILDER</Text>
-        <TileStrip
-          flip={swapFlip}
-          held={held}
-          live={live}
-          onPick={pickTile}
-          onReorder={reorder}
-          onToggle={toggle}
-          places={WORD_PLACES}
-          sortable={sortable}
-          strip={strip}
-        />
+    <View>
+      {/* The draft reads above the tray, on the wood: the tray is the tiles alone. The slot is
+          kept while the line is empty, so the first letter played does not move the felt. */}
+      <View style={styles.previewSlot}>
+        <DraftPreview />
+      </View>
+      <View style={styles.trayLip} testID="word-builder-tray">
+        <ShadowBox radius={radius.lg} shadows={[{ dy: 10, blur: 20, color: "rgba(30,14,0,0.7)" }]} />
+        {bonus === 0 ? null : (
+          <View style={styles.rackBonusPill}>
+            <Text style={styles.rackBonus} testID="word-builder-full-rack">
+              +{bonus} full rack
+            </Text>
+          </View>
+        )}
+        <View style={styles.trayFace}>
+          <View style={styles.trayHeader}>
+            <Text style={styles.trayLabel}>WORD BUILDER</Text>
+            {actions == null ? null : <View style={styles.trayActions}>{actions}</View>}
+          </View>
+          <TileStrip
+            flip={swapFlip}
+            held={held}
+            live={live}
+            onPick={pickTile}
+            onReorder={reorder}
+            onToggle={toggle}
+            places={WORD_PLACES}
+            sortable={sortable}
+            strip={strip}
+          />
+        </View>
       </View>
     </View>
   );
@@ -318,16 +344,12 @@ export function WordHand(): JSX.Element {
 const WORD_PLACES = PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;
 
 /**
- * The draft as the seat reads it, for the line above the rack: the letters the strip spells,
- * what §7 makes them worth, and §11's reason when the word cannot stand.
- *
- * It is text and nothing else — the tiles below are the whole working surface, and a sheet
- * drawn around one line spent the felt's room on nothing — and it draws nothing at all until
+ * The draft as the seat reads it, beside the tray's label: the letters the strip spells, what §7
+ * makes them worth, and §11's reason when the word cannot stand. It draws nothing at all until
  * there is a word or a refusal to show.
  */
-export function WordPreview(): JSX.Element | null {
+function DraftPreview(): JSX.Element | null {
   const { draft, wordCheck } = useWordBuilderScope();
-  const tight = useCompactControls();
 
   const result = wordCheck?.result ?? null;
   const checkedResult =
@@ -335,40 +357,24 @@ export function WordPreview(): JSX.Element | null {
       ? result
       : null;
 
-  // The slot is kept while the line is empty, so the first letter played does not move the felt.
-  if (draft.word.length === 0 && draft.reason === null)
-    return (
-      <View
-        style={[styles.previewAnchor, tight && styles.previewAnchorTight]}
-      />
-    );
+  if (draft.word.length === 0 && draft.reason === null) return null;
 
   return (
-    <View style={[styles.previewAnchor, tight && styles.previewAnchorTight]}>
-      <View
-        style={[styles.previewRow, tight && styles.previewRowTight]}
-        testID="word-preview"
-      >
-        <View style={styles.previewLine}>
-          <View style={styles.previewContent}>
-            <Text
-              style={[styles.word, tight && styles.wordTight]}
-              testID="word-builder-word"
-            >
-              {draft.word}
-            </Text>
-          </View>
-        </View>
-        <DraftLine
-          checkedResult={checkedResult}
-          reason={draft.reason}
-          score={draft.score}
-          word={draft.word}
-        />
-      </View>
+    <View style={styles.previewRow} testID="word-preview">
+      <Text style={styles.word} testID="word-builder-word">
+        {draft.word}
+      </Text>
+      <DraftLine
+        checkedResult={checkedResult}
+        reason={draft.reason}
+        score={draft.score}
+        word={draft.word}
+      />
     </View>
   );
 }
+
+
 
 /**
  * The explicit dictionary lookup, for the row under the rack (`GameScreen`'s `rackActions` prop):
@@ -376,6 +382,7 @@ export function WordPreview(): JSX.Element | null {
  */
 export function WordCheckButton(): JSX.Element | null {
   const { draft, wordCheck, onCheckWord } = useWordBuilderScope();
+  const scale = useScreenScale();
 
   const remaining = wordCheck?.checksRemaining ?? 0;
   const canCheck =
@@ -405,13 +412,18 @@ export function WordCheckButton(): JSX.Element | null {
   return (
     <GameButton
       disabled={!canCheck}
-      label="CHECK WORD"
+      label="CHECK"
       labelAccent={`${remaining}/${WORD_CHECKS_PER_HAND}`}
+      compact
+      horizontalPadding={4}
+      scale={scale}
       onPress={handleCheck}
-      style={{ height: 32 }}
+      style={{ height: 30 * scale, minWidth: 0 }}
       testID="word-check-button"
-      variant="green"
-    />
+      variant="gold"
+    >
+      <Text style={{ color: colors.onGold, fontSize: 14 * scale }}>✓</Text>
+    </GameButton>
   );
 }
 

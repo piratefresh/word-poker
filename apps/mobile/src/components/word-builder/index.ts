@@ -2,7 +2,7 @@
  * The word builder, in the parts it is made of.
  *
  * One draft, drawn twice: `WordHand` is the strip of tiles that goes in the felt's rack slot —
- * the seat's hand, sorted by dragging and tapped to play — with `WordPreview`, the draft as
+ * the seat's hand, sorted by dragging and tapped to play — with the draft as
  * one line of text, above it. `WordBuilder` owns the draft they share. A mode composes
  * them (see `@/components/screens/offline/offline-game-screen`), and a mode's adapter hands the
  * builder a `WordDraft` — the draft its engine holds, in the builder's words — plus the tiles
@@ -17,7 +17,6 @@ export {
   WordBuilder,
   WordCheckButton,
   WordHand,
-  WordPreview,
 } from "./word-builder";
 export type { WordBuilderProps, WordDraft } from "./word-builder";
 export type { SwapFlip } from "./strip";

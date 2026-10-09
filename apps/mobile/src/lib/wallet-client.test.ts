@@ -77,7 +77,12 @@ describe("fetchCoinCatalog", () => {
 
 describe("fetchQuestState", () => {
   test("reads the streak and quest progress", async () => {
-    const state = { streak: { current: 1, creditedToday: 50 }, quests: [{ id: "pot-500", progress: 1, done: true }] };
+    const state = {
+      streak: { current: 1, creditedToday: 50 },
+      xp: 37,
+      level: 1,
+      quests: [{ id: "pot-500", progress: 1, done: true }],
+    };
     fetchMock.mockResolvedValue(reply(200, state));
 
     await expect(fetchQuestState()).resolves.toEqual(state);
@@ -118,9 +123,14 @@ describe("sendQuestHandClaim", () => {
   };
 
   test("posts the claim and reads what it completed", async () => {
-    fetchMock.mockResolvedValue(reply(200, { completed: ["win-word-3"], duplicate: false }));
+    fetchMock.mockResolvedValue(reply(200, { completed: ["win-word-3"], duplicate: false, xp: 37, level: 1 }));
 
-    await expect(sendQuestHandClaim(CLAIM)).resolves.toEqual({ completed: ["win-word-3"], duplicate: false });
+    await expect(sendQuestHandClaim(CLAIM)).resolves.toEqual({
+      completed: ["win-word-3"],
+      duplicate: false,
+      xp: 37,
+      level: 1,
+    });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("http://api.test/api/quests");
     expect(init).toMatchObject({ method: "POST", body: JSON.stringify(CLAIM) });

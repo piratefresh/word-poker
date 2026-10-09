@@ -2,9 +2,10 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import type { RoundPhase } from "@wordpoker/contracts";
 
-import { type BalanceView } from "./hud-types";
+import { FREE_PLAY, hangsModeTag, type BalanceView } from "./hud-types";
 import { HudTopBar, hudBarHeight, type HudTopBarProps } from "./hud-top-bar";
-import { bannerLayout } from "./top-bar/banner";
+import { CHIP_HEIGHT } from "./top-bar/balance-chip";
+import { MODE_TAG_BLOCK, MODE_TAG_GAP } from "./top-bar/banner";
 import { deriveTurnTimer, type TurnTimerView } from "./turn-clock";
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
@@ -36,29 +37,32 @@ async function renderBar(props: Partial<HudTopBarProps> = {}) {
     <HudTopBar
       balance={{ state: "ready", amount: 1240 }}
       phase="turn"
-      phaseNumber={4}
       turn={null}
       {...props}
     />,
   );
 }
 
-const PHASE_CASES: [RoundPhase, number, string][] = [
-  ["preflop", 1, "PHASE 1 · PRE-FLOP"],
-  ["flop", 2, "PHASE 2 · THE FLOP"],
-  ["turn", 4, "PHASE 4 · THE TURN"],
-  ["river", 5, "PHASE 5 · THE RIVER"],
-  ["payout", 6, "PHASE 6 · PAYOUT"],
+const PHASE_CASES: [RoundPhase, string][] = [
+  ["preflop", "PREFLOP"],
+  ["flop", "FLOP"],
+  ["turn", "TURN"],
+  ["river", "RIVER"],
+  ["payout", "PAYOUT"],
 ];
 
-test.each(PHASE_CASES)(
-  "stamps %s as its ordinal and table name",
-  async (phase, phaseNumber, stamp) => {
-    await renderBar({ phase, phaseNumber });
+test.each(PHASE_CASES)("names %s in the capsule", async (phase, stamp) => {
+  await renderBar({ phase });
 
-    expect(screen.getByText(stamp)).toBeOnTheScreen();
-  },
-);
+  expect(screen.getByText(stamp)).toBeOnTheScreen();
+});
+
+test("a waiting table's stamp replaces the phase and runs no clock", async () => {
+  await renderBar({ stamp: "WAITING FOR PLAYERS" });
+
+  expect(screen.getByText("WAITING FOR PLAYERS")).toBeOnTheScreen();
+  expect(screen.queryByText("--:--")).toBeNull();
+});
 
 /** label is what a screen reader reads, text is what is on screen. */
 const BALANCE_CASES: [string, BalanceView, string, string][] = [
@@ -66,6 +70,7 @@ const BALANCE_CASES: [string, BalanceView, string, string][] = [
   ["empty", { state: "ready", amount: 0 }, "Balance $0", "$0"],
   ["loading", { state: "loading" }, "Balance loading", "···"],
   ["unavailable", { state: "unavailable" }, "Balance unavailable", "—"],
+  ["free-play", FREE_PLAY, "Free play", "FREE PLAY"],
 ];
 
 test.each(BALANCE_CASES)(
@@ -94,12 +99,30 @@ const READ_ONLY_CASES: [string, BalanceView][] = [
   ["a ready balance", { state: "ready", amount: 1240 }],
   ["a loading balance", { state: "loading" }],
   ["an unavailable balance", { state: "unavailable" }],
+  ["a free-play balance", FREE_PLAY],
 ];
 
 test.each(READ_ONLY_CASES)("%s is a value, not a control", async (_name, balance) => {
   await renderBar({ balance });
 
   expect(screen.queryByRole("button", { name: /balance/i })).toBeNull();
+});
+
+test("hangs the mode's tag under the capsule, and only there", async () => {
+  const view = await renderBar({ balance: FREE_PLAY, modeTag: true });
+
+  expect(view.getByLabelText("Free play")).toBeOnTheScreen();
+  // One readout: the corner group is not drawing a second copy of it.
+  expect(view.getAllByLabelText("Free play")).toHaveLength(1);
+});
+
+test("keeps a mode's tag in the corner group where the screen cannot hang it", async () => {
+  const view = await renderBar({ balance: FREE_PLAY, modeTag: false });
+
+  // Without a tag under the capsule the chip rides the corner with the help button, where it
+  // has always been: a room too short for the tag leaves the header as it was.
+  expect(view.getByLabelText("Free play")).toBeOnTheScreen();
+  expect(view.getByRole("button", { name: "How to play" })).toBeOnTheScreen();
 });
 
 test("the signed-out chip is the one pressable balance and signs the player in", async () => {
@@ -124,15 +147,14 @@ test("a signed-out balance with nowhere to go is left out of the header", async 
 
 const BUTTON_CASES: [
   string,
-  keyof Pick<HudTopBarProps, "onLeave" | "onHelp" | "onSettings">,
+  keyof Pick<HudTopBarProps, "onLeave" | "onHelp">,
 ][] = [
   ["Leave the table", "onLeave"],
   ["How to play", "onHelp"],
-  ["Settings", "onSettings"],
 ];
 
 test.each(BUTTON_CASES)("%s invokes its handler", async (label, prop) => {
-  const handlers = { onLeave: jest.fn(), onHelp: jest.fn(), onSettings: jest.fn() };
+  const handlers = { onLeave: jest.fn(), onHelp: jest.fn() };
   await renderBar(handlers);
 
   await fireEvent.press(screen.getByRole("button", { name: label }));
@@ -202,38 +224,19 @@ describe("the banner's size", () => {
     expect(hudBarHeight({ width: 2560, height: 1440 })).toBeGreaterThan(large);
     expect(hudBarHeight({ width: 3840, height: 2160 })).toBe(hudBarHeight({ width: 2560, height: 1440 }));
   });
-});
 
-describe("the clock's glass", () => {
-  test("sits inside the banner's frame, with its outline inside its own box", () => {
-    for (const window of [
-      { width: 360, height: 780 },
-      { width: 390, height: 844 },
-      { width: 1920, height: 1080 },
-    ]) {
-      const { frame, glass } = bannerLayout(window);
-      const { box } = glass;
-
-      expect(box.left).toBeGreaterThan(0);
-      expect(box.top).toBeGreaterThan(0);
-      expect(Number(box.left) + box.width).toBeLessThan(frame.width);
-      expect(Number(box.top) + box.height).toBeLessThan(frame.height);
-      for (const { x, y } of glass.outline) {
-        expect(x).toBeGreaterThanOrEqual(0);
-        expect(y).toBeGreaterThanOrEqual(0);
-        expect(x).toBeLessThanOrEqual(box.width + 1e-9);
-        expect(y).toBeLessThanOrEqual(box.height + 1e-9);
-      }
-    }
+  test("hangs a mode's tag under the capsule in portrait, and keeps it in the corner on its side", () => {
+    expect(hangsModeTag(FREE_PLAY, { width: 390, height: 844 })).toBe(true);
+    // A landscape bar has the width to keep the tag beside the clock, and its middle seat
+    // is drawn right under the capsule.
+    expect(hangsModeTag(FREE_PLAY, { width: 844, height: 390 })).toBe(false);
+    // Only a mode: a figure is a readout wherever it is.
+    expect(hangsModeTag({ state: "ready", amount: 1240 }, { width: 390, height: 844 })).toBe(false);
+    expect(hangsModeTag({ state: "loading" }, { width: 390, height: 844 })).toBe(false);
+    expect(hangsModeTag({ state: "unavailable" }, { width: 390, height: 844 })).toBe(false);
   });
 
-  test("grows with the banner, so the light and the frame cannot drift apart", () => {
-    const phone = bannerLayout({ width: 390, height: 844 });
-    const desk = bannerLayout({ width: 1920, height: 1080 });
-    const growth = desk.glass.scale / phone.glass.scale;
-
-    expect(growth).toBeGreaterThan(1);
-    expect(desk.glass.box.width).toBeCloseTo(phone.glass.box.width * growth);
-    expect(desk.frame.width).toBeCloseTo(phone.frame.width * growth);
+  test("hangs the tag deep enough under the capsule to clear it", () => {
+    expect(MODE_TAG_BLOCK).toBeGreaterThanOrEqual(CHIP_HEIGHT + MODE_TAG_GAP);
   });
 });

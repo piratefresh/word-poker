@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   StyleSheet,
   useWindowDimensions,
@@ -12,19 +12,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Hud,
   TurnClockProvider,
+  hangsModeTag,
   useHudChromeHeight,
   type BalanceView,
 } from "@/components/hud";
-import { ChipLayer, PokerTable } from "@/components/table";
+import { MODE_TAG_BLOCK } from "@/components/hud/top-bar/banner";
+import { ChipLayer, PokerTable, useTableLayout } from "@/components/table";
 import { CoachTarget } from "@/components/ui/coach";
 
 import {
-  ActionBarShade,
-  BackdropPicker,
-  BackdropUrgencyProvider,
   TableBackdrop,
-  useBackdropStyle,
 } from "./backdrop";
+import { CoinBowlGameContext } from "./backdrop/coin-bowl-motion";
 import { BettingControls, bettingRowStyle, useRaiseAmount } from "./betting";
 import type { GamePlayer, GameScreenState } from "./game-types";
 import {
@@ -40,11 +39,23 @@ import {
   useCompactControls,
   useScreenScale,
 } from "./screen-scale";
-import { playerSeatBounds, tableSeating } from "./seat-metrics";
+import {
+  COMMUNITY_ROW_HEIGHT,
+  tableSeating,
+  tabletopSeatBounds,
+} from "./seat-metrics";
 import { DEVICE_CLOCK_SAMPLE, heroTurnPhrase, useHandTurn } from "./turn";
 
 export interface GameScreenProps {
   game: GameScreenState;
+  /**
+   * What the header's balance chip reads — each mode states its own economy rather than the
+   * felt guessing one: an online seat passes its Wallet read (`useBalanceView`), free play
+   * (offline, tutorial) passes the shared `FREE_PLAY`.
+   */
+  balance: BalanceView;
+  /** Where the signed-out chip goes: the online felt routes its tap to sign-in. */
+  onBalancePress?: () => void;
   /**
    * What the felt draws where the seat's hand goes, or nothing for its own rack: a mode that
    * makes the hand playable (the word builder does, for §19's window) passes the interactive
@@ -52,13 +63,8 @@ export interface GameScreenProps {
    */
   rack?: ReactNode;
   /**
-   * A mode's own control at the action row's start, beside fold, check and the bet: a Wild
-   * table's held power sits there.
-   */
-  bettingLeading?: ReactNode;
-  /**
    * A mode's own controls in a row right under the rack: the word builder's shuffle and word
-   * check, so the word's controls sit with the tiles they act on and the betting rows keep
+   * check, and a Wild table's held power, so the word's controls sit with the tiles they act on and the betting rows keep
    * their width. A table that has not dealt yet has no hand to act on, so draws none.
    */
   rackActions?: ReactNode;
@@ -67,9 +73,10 @@ export interface GameScreenProps {
    * table's region and nothing past it, so the community above and the rack below stay in view.
    */
   overFelt?: ReactNode;
+  /** A short, presentation-only celebration above the table after a showdown. */
+  winOverlay?: ReactNode;
   onBack?: () => void;
   onHelp?: () => void;
-  onSettings?: () => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
   /**
@@ -109,9 +116,6 @@ export interface GameScreenProps {
   actionsLocked?: boolean;
 }
 
-/** No wallet is wired into the hand yet, so the HUD says so instead of painting `$0`. */
-const BALANCE_UNAVAILABLE: BalanceView = { state: "unavailable" };
-
 export function GameScreen(props: GameScreenProps) {
   return (
     <TurnClockProvider sample={DEVICE_CLOCK_SAMPLE}>
@@ -123,13 +127,14 @@ export function GameScreen(props: GameScreenProps) {
 /** The body reads the clock, so it has to sit inside the provider rather than beside it. */
 function GameScreenBody({
   game,
+  balance,
   rack,
-  bettingLeading,
   rackActions,
   overFelt,
+  winOverlay,
   onBack,
   onHelp,
-  onSettings,
+  onBalancePress,
   onFold,
   onCheckOrCall,
   onBet,
@@ -144,23 +149,36 @@ function GameScreenBody({
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
   const hudHeight = useHudChromeHeight();
-  const [backdropOpen, setBackdropOpen] = useState(false);
   const window = useWindowDimensions();
   const { height } = window;
   const stageWidth = stageMaxWidth(window);
-  const backdrop = useBackdropStyle();
-  const roomSeating = backdrop === "tavern" || backdrop === "planet";
-  const chromeWidth = tableMaxWidth(window) ?? window.width;
-  const tableWidth = roomSeating ? undefined : tableMaxWidth(window);
-  const shadeFeather = 28 * useScreenScale();
-  const [barHeight, setBarHeight] = useState(0);
-  const compact = height - insets.top - insets.bottom < 690;
+  // In landscape the table fills the screen and the builder and the betting panel stand in side
+  // columns over its lower corners, leaving the pot and hero between them.
+  const landscape = window.width > window.height;
+  const scale = useScreenScale();
   const tight = useCompactControls();
+  const [controlsHeight, setControlsHeight] = useState(0);
+  const tableHeight = height - insets.top - insets.bottom - hudHeight - (landscape ? 0 : controlsHeight);
+  // Short phones need extra clearance for the deeper two-slot tabletop rack.
+  const roomChromeWidth = Math.max(tight ? 220 : 240, tableHeight * (400 / (tight ? 540 : 470)));
+  const chromeWidth = Math.min(tableMaxWidth(window) ?? window.width, roomChromeWidth);
+  const compact = height - insets.top - insets.bottom < 690;
   const [raiseAmount, changeRaise] = useRaiseAmount(
     game.betting,
     onRaiseAmountChange,
+    game.id,
   );
   const view = useHandTurn(game, clockHeld);
+
+  // Who the wager button waits on: the seat wearing "thinking" is the one acting. The hero
+  // keeps the live face on their own turn — illegal actions included, which stay disabled —
+  // and through §19's word window, which arms the confirm while it is nobody's acting turn:
+  // that wait is the hero's own. No acting seat (between streets, payout) is a wait with no
+  // name and no clock to drain.
+  const actingSeat = game.players.find((player) => player?.status === "thinking") ?? null;
+  const rowIsHeros =
+    game.players.find((player) => player?.isHero)?.status === "your-turn" ||
+    game.betting.primary === "confirm";
 
   const goBack = useCallback(() => {
     if (onBack) onBack();
@@ -172,29 +190,86 @@ function GameScreenBody({
   // press takes: `canBet` names it BET, and the same fact picks the engine action behind it. A
   // mode that armed the control for a bet is told it was a bet — nothing re-derives it.
   const commitWager = game.betting.canBet ? onBet : onRaise;
-  const seating = tableSeating(game.seatCount);
+  const seating = tableSeating(game.seatCount, true);
+  const layoutConfig = useMemo(() => {
+    const landscapeLayout = landscape
+      // The pot sits below the community row, same as portrait, so the row reads as five tiles
+      // in a line rather than three, a gap, then two.
+      ? { communityY: 0.47, potY: 0.62 }
+      : {};
+    if (!landscape || (game.seatCount !== 2 && game.seatCount !== 4)) {
+      return { ...seating.layoutConfig, ...landscapeLayout };
+    }
+    const seatAngles = [...(seating.layoutConfig.seatAngles ?? [])];
+    seatAngles[game.seatCount === 2 ? 1 : 2] = 1.5 * Math.PI;
+    return { ...seating.layoutConfig, ...landscapeLayout, seatAngles };
+  }, [game.seatCount, landscape, seating]);
+  // In landscape the top opponent sits just below the HUD, centered under the phase capsule.
+  const seatPositionOverrides = useMemo(() => {
+    if (!landscape || (game.seatCount !== 2 && game.seatCount !== 4)) return undefined;
+    return {
+      [game.seatCount === 2 ? 1 : 2]: {
+        y: (12 + 68 * scale - hudHeight) / Math.max(1, tableHeight),
+      },
+    };
+  }, [game.seatCount, landscape, scale, hudHeight, tableHeight]);
+
+  // Keep the mode under the capsule in portrait; the table reserves its clearance below.
+  const modeTag = hangsModeTag(balance, window);
+
+  const rackBlock = (
+    <>
+      <BestWord
+        payout={game.phase === "payout"}
+        score={game.bestScore}
+        word={game.bestWord}
+      />
+      <CoachTarget id="rack">
+        {rack ?? (
+          <PlayerRack
+            community={game.community}
+            privateTiles={game.privateTiles}
+          />
+        )}
+        {rackActions == null || waiting ? null : (
+          <View style={styles.rackActions}>{rackActions}</View>
+        )}
+      </CoachTarget>
+    </>
+  );
+  const bettingBlock = (
+    <View
+      style={
+        !waiting && !landscape &&
+        (rackActions != null ? styles.bettingCloser : styles.bettingTucked)
+      }
+    >
+      {waiting ? (
+        <View style={styles.waiting}>{waiting.controls}</View>
+      ) : (
+        <BettingControls
+          amount={raiseAmount}
+          locked={actionsLocked}
+          waitingOn={rowIsHeros
+            ? undefined
+            : { name: actingSeat?.name, view: actingSeat ? view : undefined }}
+          onAllIn={onAllIn}
+          onAmountChange={changeRaise}
+          onCheckOrCall={onCheckOrCall}
+          onFold={onFold}
+          onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
+          pot={game.pot}
+          state={game.betting}
+        />
+      )}
+    </View>
+  );
 
   return (
     <LinearGradient colors={["#0a1d17", "#051410"]} style={styles.screen}>
-      <BackdropUrgencyProvider
-        value={waiting || view.paused ? 0 : view.elapsedFraction}
-      >
-        <TableBackdrop />
-      </BackdropUrgencyProvider>
-      {/* The painted shadow the action bar sits on: full screen width so it has no side edges,
-          running to the bottom of the screen under the home-indicator inset, and it fades out
-          `shadeFeather` above the bar. Under the content layer, and it takes no touches. */}
-      {barHeight > 0 ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.barShade,
-            { height: barHeight + insets.bottom + shadeFeather },
-          ]}
-        >
-          <ActionBarShade feather={shadeFeather} />
-        </View>
-      ) : null}
+      {/* The backdrop's coin bowl and the pot bowl both play the table's turns. */}
+      <CoinBowlGameContext.Provider value={game}>
+      <TableBackdrop />
       {/* Above the HUD, so the community label reads over the timer banner's hanging tip; the
           layer takes no touches of its own, so the HUD's buttons stay pressable. */}
       <View
@@ -202,39 +277,42 @@ function GameScreenBody({
         style={[
           styles.content,
           {
-            maxWidth: stageWidth,
+            maxWidth: landscape ? undefined : stageWidth,
             paddingBottom: insets.bottom,
+            paddingLeft: landscape ? insets.left : 0,
+            paddingRight: landscape ? insets.right : 0,
             paddingTop: insets.top + hudHeight,
           },
         ]}
       >
-        <CoachTarget id="community">
-          <CommunityStrip tiles={game.community} />
-        </CoachTarget>
         <CoachTarget
           id="table"
           style={[
             styles.tableRegion,
-            compact && styles.tableRegionCompact,
-            !roomSeating && tight && tableWidth === undefined && styles.tableRegionTight,
-            tableWidth !== undefined && {
-              alignSelf: "center",
-              maxWidth: tableWidth,
-              width: "100%",
-            },
+            landscape && styles.tableRegionLandscape,
+            !landscape && compact && styles.tableRegionCompact,
           ]}
         >
           <PokerTable
-            appearanceWidth={roomSeating ? chromeWidth : undefined}
+            seatPositionOverrides={seatPositionOverrides}
+            appearanceWidth={chromeWidth}
             community={[]}
+            /* The header's mode tag hangs over the room's top; the seats start below it. */
+            topChrome={modeTag ? MODE_TAG_BLOCK : 0}
             hud={
               // The chips in flight go over the felt, inside the table's own layout provider: the
               // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
-              <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
+              <>
+                <CommunityInTable
+                  scale={scale}
+                  tiles={game.community}
+                />
+                <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
+              </>
             }
             // The table runs to the room's edges.
             chromeInset={0}
-            layoutConfig={seating.layoutConfig}
+            layoutConfig={layoutConfig}
             renderCommunity={() => null}
             renderPot={({ size, appearanceWidth }) => (
               <Pot
@@ -242,96 +320,137 @@ function GameScreenBody({
                 sidePots={game.sidePots}
                 blinds={game.blinds}
                 tableWidth={appearanceWidth ?? size.width}
+                tabletop
               />
             )}
-            renderSeat={(slot) => <PlayerSeat {...slot} dealt={!waiting} onPress={onSeatPress} />}
+            renderSeat={(slot) => (
+              <PlayerSeat {...slot} dealt={!waiting} onPress={onSeatPress} tabletop />
+            )}
             // The seats scale with the felt and, at up to four, sit inside the table — avatars
             // on the felt, labels at most on the rail — so the table fills its room.
-            seatBounds={playerSeatBounds}
-            seatPlacement={roomSeating ? "room" : seating.seatPlacement}
+            seatBounds={tabletopSeatBounds}
+            seatPlacement="room"
             seatCount={game.seatCount}
             seats={game.players}
-            style={styles.table}
+            style={[styles.table, landscape && { overflow: "visible" }]}
             testID="poker-table"
           />
           {overFelt}
+          {winOverlay}
         </CoachTarget>
-        <BestWord
-          payout={game.phase === "payout"}
-          score={game.bestScore}
-          word={game.bestWord}
-        />
-        <CoachTarget id="rack">
-          {rack ?? (
-            <PlayerRack
-              community={game.community}
-              privateTiles={game.privateTiles}
-            />
-          )}
-          {rackActions == null || waiting ? null : (
-            <View style={styles.rackActions}>{rackActions}</View>
-          )}
-        </CoachTarget>
-        <View
-          onLayout={(event: LayoutChangeEvent) =>
-            setBarHeight(event.nativeEvent.layout.height)
-          }
-        >
-          {waiting ? (
-            <View style={styles.waiting}>{waiting.controls}</View>
-          ) : (
-            <BettingControls
-              amount={raiseAmount}
-              leading={bettingLeading}
-              locked={actionsLocked}
-              onAllIn={onAllIn}
-              onAmountChange={changeRaise}
-              onCheckOrCall={onCheckOrCall}
-              onFold={onFold}
-              onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
-              state={game.betting}
-            />
-          )}
-        </View>
+        {landscape ? (
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.bottomBand,
+              {
+                bottom: insets.bottom,
+                left: insets.left,
+                right: insets.right,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.sideColumn,
+                styles.wordBuilderColumn,
+                { width: 400 * scale },
+              ]}
+            >
+              {rackBlock}
+            </View>
+            <View style={[styles.bettingColumn, { width: 280 * scale }]}>
+              {bettingBlock}
+            </View>
+          </View>
+        ) : (
+          <View testID="game-controls" onLayout={(event: LayoutChangeEvent) => setControlsHeight(event.nativeEvent.layout.height)}>
+            {rackBlock}
+            {bettingBlock}
+          </View>
+        )}
       </View>
       <Hud
-        balance={BALANCE_UNAVAILABLE}
+        balance={balance}
         handId={game.handId}
+        modeTag={modeTag}
+        onBalancePress={onBalancePress}
         onHelp={onHelp}
         onLeave={goBack}
-        // Until the table has a settings sheet, the gear opens the backdrop picker.
-        onSettings={onSettings ?? (() => setBackdropOpen((open) => !open))}
         phase={game.phase}
         stamp={waiting?.stamp}
         style={{ top: insets.top }}
         turn={waiting ? null : view}
         turnPhrase={heroTurnPhrase(game)}
       />
-      {backdropOpen ? (
-        <BackdropPicker
-          onClose={() => setBackdropOpen(false)}
-          top={insets.top + hudHeight}
-        />
-      ) : null}
+      </CoinBowlGameContext.Provider>
     </LinearGradient>
   );
 }
 
+/**
+ * The tabletop's community row, centred on the layout's community anchor. It stays one view so
+ * the tutorial's `community` target has a box to highlight; the box has a real height because
+ * Android does not draw a child spilling out of a zero-size anchor (STO-516).
+ */
+function CommunityInTable({
+  tiles,
+  scale,
+}: {
+  tiles: GameScreenState["community"];
+  scale: number;
+}) {
+  const { layout, resolveContainer } = useTableLayout();
+  const center = resolveContainer({ x: 0.5, y: layout.config.communityY });
+  const height = COMMUNITY_ROW_HEIGHT * scale;
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[styles.communityInTable, { height, top: center.y - height / 2 }]}
+    >
+      <CoachTarget id="community">
+        <CommunityStrip inTable scale={scale} tiles={tiles} />
+      </CoachTarget>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  communityInTable: {
+    alignItems: "center",
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
   screen: { flex: 1 },
   content: { alignSelf: "center", flex: 1, width: "100%", zIndex: 1 },
-  barShade: { bottom: 0, left: 0, position: "absolute", right: 0 },
   tableRegion: { flex: 1, minHeight: 272 },
+  // Landscape: the room runs under the whole screen and the side columns sit over its corners.
+  tableRegionLandscape: { minHeight: 0 },
+  bottomBand: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    position: "absolute",
+  },
+  sideColumn: { maxWidth: "36%" },
+  wordBuilderColumn: { marginBottom: 20, maxWidth: "42%" },
+  bettingColumn: { maxWidth: "32%" },
   tableRegionCompact: { minHeight: 234 },
   // A small phone: the felt is narrower than the screen, so the height it keeps goes to the word.
-  tableRegionTight: { alignSelf: "center", width: "86%" },
   table: { backgroundColor: "transparent", flex: 1 },
   waiting: bettingRowStyle,
+  bettingCloser: { marginTop: -6 },
+  // The wager button's artwork has transparent room above its housing; the rack sits into it.
+  bettingTucked: { marginTop: -8 },
   rackActions: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
-    paddingTop: 6,
+    paddingHorizontal: 22,
+    paddingTop: 4,
+    paddingBottom: 2,
   },
 });

@@ -7,13 +7,11 @@
  * run the browser into its context cap. Views do the whole job here:
  *
  *   1. a vertical gradient — light at the top, the variant's body in the middle, dark at the foot;
- *   2. the bevel: a dark outline, then a raised rim round the face in the variant's lighter edge
- *      colour, so the face reads as sitting inside a moulded border;
- *   3. the gloss: a soft sheen over the upper half, a bright specular line just inside the rim at
- *      the top, and a faint light line at the foot where the lip's bounce catches the face;
- *   4. on the secondary slabs (`dark`), a hairline frame set just inside the rim.
+ *   2. a hair of light along the top edge and a soft sheen over the upper half;
+ *   3. a darker band along the foot: the inner bevel;
+ *   4. on the secondary slabs (`dark`, `danger`), a hairline frame set just inside the edge.
  *
- * Under the face sits the lip, five points of the variant's shadow colour. A press sinks the face
+ * Under the face sits the lip, three points of the variant's shadow colour. A press sinks the face
  * into it — the lip closes and the label goes down with the face — which is what makes the button
  * read as a physical control rather than a lit rectangle.
  *
@@ -32,7 +30,14 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { border, colors, fonts, opacity, radius } from "@/constants/theme";
+import {
+  border,
+  colors,
+  fonts,
+  opacity,
+  palette,
+  radius,
+} from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
 export type GameButtonVariant = "gold" | "dark" | "danger" | "blue" | "green";
@@ -51,9 +56,9 @@ export interface GameButtonProps {
   children?: ReactNode;
   onPress?: () => void;
   /**
-   * `gold` is the table's call to action (raise, bet, all in); `blue` is the call; `danger` is
-   * the red that gives something up (fold); `green` is the word's check; `dark` is every other
-   * control.
+   * `gold` is the table's call to action (bet, raise, all in, confirm); `dark` is every other
+   * control; `danger` is the dark button with a red edge — the one that gives something up;
+   * `blue` is the quiet answer (check, call); `green` is the word's check.
    */
   variant?: GameButtonVariant;
   disabled?: boolean;
@@ -61,6 +66,8 @@ export interface GameButtonProps {
   scale?: number;
   /** The small-screen size: 44 tall (still a full touch target) with a 10-point label. */
   compact?: boolean;
+  /** The face's horizontal padding at scale 1; a row of tight buttons passes less than the 12 default. */
+  horizontalPadding?: number;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   accessibilityLabel?: string;
@@ -68,84 +75,81 @@ export interface GameButtonProps {
 
 /** How far the face stands off its lip, and how far a press sinks it. */
 const LIP = 5;
-const PRESS_DEPTH = 3;
-/** The raised rim round the face: its width, which the gloss lines sit just inside. */
-const RIM = 3;
+const PRESS_DEPTH = 2;
 /** How far inside the face's edge the slab's inner frame is drawn. */
-const FRAME_INSET = RIM + 2;
+const FRAME_INSET = 3;
 
 interface Material {
   /** Top to foot. */
   gradient: readonly [string, string, string];
-  /** The shadow colour under the face, and the dark outline round it. */
   lip: string;
-  /** The raised rim round the face: lighter than the body, so it catches the light. */
   edge: string;
   ink: string;
-  /** The specular line along the top, inside the rim; its light also tints the foot's line. */
   highlight: string;
   sheen: string;
+  bevel: string;
   inkShadow: string;
-  /** A hairline set a few points inside the rim: the slab's double frame. */
+  /** A hairline set a few points inside the edge: the slab's double frame. */
   frame?: string;
-  /** The tint `labelAccent` prints in. */
+  /** The ink of `labelAccent`. */
   accent?: string;
 }
 
-// The colours are sampled off the tabletop reference (STO-538): the face's body, the lip and
-// outline under it, and the lighter rim round it. The reference's face barely shades — its
-// gloss is in the rim and the specular lines — so the gradient's head and foot sit close to the
-// body.
 const MATERIALS: Record<GameButtonVariant, Material> = {
   gold: {
-    gradient: ["#ffd04a", "#fec53a", "#f2ab25"],
-    lip: "#b45f06",
-    edge: "#ffdc6e",
-    ink: "#3b2406",
-    highlight: "rgba(255,250,225,0.9)",
-    sheen: "rgba(255,255,255,0.24)",
-    inkShadow: "rgba(255,240,200,0.45)",
+    gradient: [palette.gold300, "#b8892a", "#6b4e12"],
+    lip: "#3d2a06",
+    edge: palette.gold400,
+    ink: colors.onGold,
+    highlight: "rgba(255,244,205,0.4)",
+    sheen: "rgba(255,255,255,0.14)",
+    bevel: "rgba(61,42,6,0.5)",
+    inkShadow: "rgba(255,240,200,0.4)",
   },
-  blue: {
-    gradient: ["#2a82ea", "#1071dc", "#0c62c0"],
-    lip: "#013b85",
-    edge: "#4a9cf5",
-    ink: "#ffffff",
-    highlight: "rgba(225,240,255,0.85)",
-    sheen: "rgba(255,255,255,0.2)",
-    inkShadow: "rgba(0,28,70,0.7)",
-  },
-  green: {
-    gradient: ["#0f7a3d", "#0b6b36", "#08592c"],
-    lip: "#013a17",
-    edge: "#2f9a5c",
-    ink: "#ffffff",
-    highlight: "rgba(215,255,230,0.8)",
-    sheen: "rgba(255,255,255,0.18)",
-    inkShadow: "rgba(0,32,12,0.7)",
-    accent: "#f5d547",
-  },
-  // The secondary: a charcoal slab, near flat, with a lighter charcoal rim and a pale hairline
-  // just inside it, the label set bright. It recedes beside the gold without going muddy.
+  // The secondary: a charcoal slab, near flat, framed twice — a black edge and a pale hairline
+  // just inside it — with the label set bright. It recedes beside the gold without going muddy.
   dark: {
-    gradient: ["#2d2f36", "#24252a", "#1c1d22"],
-    lip: "#0b0b0e",
-    edge: "#3c3e46",
+    gradient: ["#2a2c2b", "#212322", "#1a1c1b"],
+    lip: "#050605",
+    edge: "#0b0c0b",
     ink: colors.textBright,
-    highlight: "rgba(255,255,255,0.14)",
-    sheen: "rgba(255,255,255,0.04)",
+    highlight: "rgba(255,255,255,0.06)",
+    sheen: "rgba(255,255,255,0.03)",
+    bevel: "rgba(0,0,0,0.35)",
     inkShadow: "rgba(0,0,0,0.85)",
-    frame: "rgba(255,255,255,0.12)",
+    frame: "rgba(255,255,255,0.16)",
   },
   // The control that gives something up: a struck red slab, same build as `gold`.
   danger: {
-    gradient: ["#e0283a", "#d31f2f", "#bf1127"],
-    lip: "#790112",
-    edge: "#f0414d",
-    ink: "#ffffff",
-    highlight: "rgba(255,215,213,0.9)",
-    sheen: "rgba(255,255,255,0.2)",
-    inkShadow: "rgba(60,0,8,0.7)",
+    gradient: ["#c4573f", "#93251a", "#5e120b"],
+    lip: "#2e0a05",
+    edge: "#a03a28",
+    ink: colors.textBright,
+    highlight: "rgba(255,220,210,0.3)",
+    sheen: "rgba(255,255,255,0.12)",
+    bevel: "rgba(46,10,5,0.5)",
+    inkShadow: "rgba(0,0,0,0.7)",
+  },
+  blue: {
+    gradient: ["#4d7fbe", "#1e4689", "#12305f"],
+    lip: "#081733",
+    edge: "#36629e",
+    ink: colors.textBright,
+    highlight: "rgba(210,230,255,0.3)",
+    sheen: "rgba(255,255,255,0.12)",
+    bevel: "rgba(8,23,51,0.5)",
+    inkShadow: "rgba(0,0,0,0.7)",
+  },
+  green: {
+    gradient: ["#3fae66", "#0b6b36", "#08592c"],
+    lip: "#013a17",
+    edge: "#2f9a5c",
+    ink: colors.textBright,
+    highlight: "rgba(215,255,230,0.5)",
+    sheen: "rgba(255,255,255,0.18)",
+    bevel: "rgba(1,58,23,0.45)",
+    inkShadow: "rgba(0,32,12,0.7)",
+    accent: "#f5d547",
   },
 };
 
@@ -159,6 +163,7 @@ export function GameButton({
   disabled = false,
   scale = 1,
   compact = false,
+  horizontalPadding = 12,
   style,
   testID,
   accessibilityLabel,
@@ -166,14 +171,12 @@ export function GameButton({
   const material = MATERIALS[variant];
   // A pointer over the button lifts the sheen; a finger never hovers, so this is the web's alone.
   const [hovered, setHovered] = useState(false);
-  const printed =
-    labelAccent === undefined ? label : `${label ?? ""} ${labelAccent}`.trim();
 
   return (
     <Pressable
       accessibilityLabel={
         accessibilityLabel ??
-        (amount === undefined ? printed : `${printed ?? ""} ${amount}`.trim())
+        (amount === undefined ? label : `${label ?? ""} ${amount}`.trim())
       }
       accessibilityRole="button"
       accessibilityState={{ disabled }}
@@ -184,7 +187,7 @@ export function GameButton({
       style={[
         styles.button,
         { backgroundColor: material.lip },
-        scale !== 1 && { height: 48 * scale, minWidth: 48 * scale },
+        scale !== 1 && { height: 50 * scale, minWidth: 48 * scale },
         compact && styles.buttonCompact,
         disabled && styles.disabled,
         style,
@@ -200,8 +203,14 @@ export function GameButton({
           <View
             style={[
               styles.face,
-              { borderColor: material.lip },
-              scale !== 1 && { paddingHorizontal: 12 * scale },
+              {
+                borderColor: material.edge,
+                // The bevel: a bright rim along the top, a soft shade pooling at the foot.
+                boxShadow: sunk
+                  ? `inset 0px 3px 5px ${material.bevel}`
+                  : `inset 0px 3px 0px ${material.highlight}, inset 0px 0px 4px 1px ${material.highlight}, inset 0px -5px 6px ${material.bevel}`,
+              },
+              { paddingHorizontal: horizontalPadding * scale },
               sunk ? styles.faceSunk : styles.faceUp,
             ]}
           >
@@ -212,13 +221,12 @@ export function GameButton({
               start={{ x: 0.5, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <View
-              pointerEvents="none"
-              style={[styles.rim, { borderColor: material.edge }]}
-            />
             <LinearGradient
               colors={[
-                hovered && !disabled ? brighten(material.sheen) : material.sheen,
+                // At rest the sheen is the material's own alpha; a hover lifts it.
+                hovered && !disabled
+                  ? brighten(material.sheen)
+                  : material.sheen,
                 "rgba(255,255,255,0)",
               ]}
               end={{ x: 0.5, y: 1 }}
@@ -236,11 +244,7 @@ export function GameButton({
             />
             <View
               pointerEvents="none"
-              style={[
-                styles.glint,
-                { backgroundColor: material.highlight },
-                sunk && styles.highlightSunk,
-              ]}
+              style={[styles.bevel, { backgroundColor: material.bevel }]}
             />
             {material.frame === undefined ? null : (
               <View
@@ -249,7 +253,9 @@ export function GameButton({
                   styles.frame,
                   {
                     borderColor:
-                      hovered && !disabled ? brighten(material.frame) : material.frame,
+                      hovered && !disabled
+                        ? brighten(material.frame)
+                        : material.frame,
                   },
                   scale !== 1 && { margin: FRAME_INSET * scale },
                 ]}
@@ -257,15 +263,23 @@ export function GameButton({
             )}
             {/* The content has a view of its own so it stacks above the layers: on the web a
                 bare svg icon is unpositioned and would paint under them. */}
-            <View style={[styles.content, amount !== undefined && styles.contentStacked]}>
+            <View
+              style={[
+                styles.content,
+                amount !== undefined && styles.contentStacked,
+              ]}
+            >
               {children}
               {amount === undefined ? null : (
                 <Text
                   numberOfLines={1}
                   style={[
                     styles.amount,
-                    scale !== 1 && { fontSize: 16 * scale },
-                    { color: material.ink, textShadowColor: material.inkShadow },
+                    scale !== 1 && { fontSize: 17 * scale },
+                    {
+                      color: material.ink,
+                      textShadowColor: material.inkShadow,
+                    },
                   ]}
                 >
                   {amount}
@@ -279,10 +293,13 @@ export function GameButton({
                     amount !== undefined && styles.labelSecondary,
                     compact && amount === undefined && styles.labelCompact,
                     scale !== 1 && {
-                      fontSize: (amount === undefined ? 11 : 10) * scale,
-                      letterSpacing: 1.2 * scale,
+                      fontSize: (amount === undefined ? 14 : 11) * scale,
+                      letterSpacing: 0.3 * scale,
                     },
-                    { color: material.ink, textShadowColor: material.inkShadow },
+                    {
+                      color: material.ink,
+                      textShadowColor: material.inkShadow,
+                    },
                   ]}
                 >
                   {label}
@@ -303,22 +320,26 @@ export function GameButton({
 
 /** Doubles an rgba colour's alpha — the hover's lift of the sheen. */
 function brighten(rgba: string): string {
-  return rgba.replace(/[\d.]+\)$/, (alpha) => `${Math.min(1, parseFloat(alpha) * 2)})`);
+  return rgba.replace(
+    /[\d.]+\)$/,
+    (alpha) => `${Math.min(1, parseFloat(alpha) * 2)})`,
+  );
 }
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: radius.sm + 2,
-    height: 48,
+    borderRadius: radius.md,
+    boxShadow: "0px 3px 5px rgba(0,0,0,0.45)",
+    height: 50,
     minWidth: 48,
   },
-  buttonCompact: { height: 44, minWidth: 44 },
-  labelCompact: { fontSize: 10 },
+  buttonCompact: { height: 46, minWidth: 44 },
+  labelCompact: { fontSize: 12 },
   disabled: { opacity: opacity.disabled },
   face: {
     alignItems: "center",
-    borderRadius: radius.sm + 2,
-    borderWidth: border.hairline,
+    borderRadius: radius.md,
+    borderWidth: 2,
     flex: 1,
     justifyContent: "center",
     overflow: "hidden",
@@ -328,48 +349,31 @@ const styles = StyleSheet.create({
   /** An amount over its action: the number leads, the label sits under it. */
   contentStacked: { flexDirection: "column", gap: 0 },
   amount: {
-    fontFamily: fonts.arcade,
-    fontSize: 16,
+    fontFamily: fonts.sansBlack,
+    fontSize: 17,
     textAlign: "center",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
   },
-  labelSecondary: { fontSize: 10, letterSpacing: 1 },
+  labelSecondary: { fontSize: 11, letterSpacing: 0.3 },
   /** At rest the face stands on the lip; the lip shows as a dark band at its foot. */
   faceUp: { marginBottom: LIP },
   /** Pressed, the face sinks: the band closes and the whole face — label too — moves down. */
   faceSunk: { marginBottom: LIP - PRESS_DEPTH, marginTop: PRESS_DEPTH },
   sheen: {
-    height: "50%",
+    height: "55%",
     left: 0,
     position: "absolute",
     right: 0,
     top: 0,
   },
-  /** The raised rim round the face: a border of the material's lighter edge colour. */
-  rim: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: radius.sm + 1,
-    borderWidth: RIM,
-  },
-  /** The bright specular line along the top, just inside the rim. */
   highlight: {
     borderRadius: radius.pill,
-    height: 2,
-    left: RIM + 3,
-    position: "absolute",
-    right: RIM + 3,
-    top: RIM - 1,
-  },
-  /** The faint light line along the foot, just inside the rim. */
-  glint: {
-    borderRadius: radius.pill,
-    bottom: RIM - 1,
     height: border.hairline,
-    left: RIM + 3,
-    opacity: 0.45,
+    left: 3,
     position: "absolute",
-    right: RIM + 3,
+    right: 3,
+    top: 1,
   },
   highlightSunk: { opacity: 0.35 },
   frame: {
@@ -378,10 +382,17 @@ const styles = StyleSheet.create({
     borderWidth: border.hairline,
     margin: FRAME_INSET,
   },
+  bevel: {
+    bottom: 0,
+    height: 2,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
   label: {
-    fontFamily: fonts.arcade,
-    fontSize: 11,
-    letterSpacing: 1.2,
+    fontFamily: fonts.sansBlack,
+    fontSize: 14,
+    letterSpacing: 0.3,
     textAlign: "center",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,

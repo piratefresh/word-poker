@@ -13,6 +13,9 @@ import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { useWindowDimensions } from "react-native";
 
+import { levelForXp } from "@wordpoker/game-rules";
+
+import { authClient } from "@/auth/client/auth-client";
 import {
   ModeCard,
   type ModeCardProps,
@@ -21,6 +24,9 @@ import {
   ModeVariants,
   type ModeVariant,
 } from "@/components/screens/home/components/mode-variants";
+import { LevelStrip } from "@/components/screens/home/level-strip";
+import { TileLogo, Wordmark } from "@/components/screens/home/tile-logo";
+import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import {
   colors,
   fonts,
@@ -29,12 +35,12 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { authClient } from "@/auth/client/auth-client";
 import { formatCoins } from "@/lib/format";
 import { fullWidth } from "@/lib/full-width";
 import { useQuests } from "@/lib/quests-provider";
 
-type ModeKey = "tutorial" | "online" | "offline" | "leaderboard" | "store" | "quests";
+type ModeKey =
+  "tutorial" | "online" | "offline" | "leaderboard" | "store" | "quests";
 
 /**
  * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
@@ -128,20 +134,6 @@ const QUESTS_MODE: Mode = {
 
 const CARD_PADDING = spacing.lg;
 
-const titleText = {
-  color: colors.textBright,
-  fontFamily: fonts.serifBold,
-  fontSize: fontSize.h2,
-  lineHeight: 36,
-} satisfies UniversalTextStyle;
-
-const kickerText = {
-  color: colors.gold,
-  fontFamily: fonts.mono,
-  fontSize: fontSize.caption,
-  letterSpacing: 2,
-} satisfies UniversalTextStyle;
-
 const signedInText = {
   color: colors.textDim,
   fontFamily: fonts.sans,
@@ -157,8 +149,11 @@ const bannerText = {
 
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
-  const { streakBanner, dismissStreakBanner } = useQuests();
+  const { streakBanner, dismissStreakBanner, state, levelUp, dismissLevelUp } =
+    useQuests();
+  const standing = state ? levelForXp(state.xp) : null;
   const [pending, setPending] = useState<ModeKey | null>(null);
+  const [logoIdle, setLogoIdle] = useState(false);
   // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
   // card shrinks to its own content, so the column's width is handed down as a number.
   const { width: windowWidth } = useWindowDimensions();
@@ -182,9 +177,17 @@ export function HomeScreen() {
           spacing={spacing.md}
           style={{ ...styles.screen, width: windowWidth }}
         >
-          <Text textStyle={titleText}>Choose how to play</Text>
-          <Text textStyle={kickerText}>PICK ONE TO CONTINUE</Text>
-          <Spacer size={spacing.sm} />
+          <RNHostView matchContents>
+            <Wordmark visible={logoIdle} />
+          </RNHostView>
+
+          <RNHostView matchContents>
+            <TileLogo onIdleChange={setLogoIdle} width={contentWidth} />
+          </RNHostView>
+
+          {session?.user && !session.user.emailVerified ? (
+            <VerifyEmailCard email={session.user.email} testID="home-verify" />
+          ) : null}
 
           {streakBanner ? (
             <Column
@@ -199,7 +202,34 @@ export function HomeScreen() {
             </Column>
           ) : null}
 
-          {(coinStoreEnabled() ? [...MODES, QUESTS_MODE, STORE_MODE] : MODES).map((mode) => {
+          {levelUp ? (
+            <Column
+              onPress={dismissLevelUp}
+              spacing={spacing.none}
+              testID="level-up-banner"
+              {...fullWidth(styles.banner)}
+            >
+              <Text textStyle={bannerText}>
+                {`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
+              </Text>
+            </Column>
+          ) : null}
+
+          {standing ? (
+            <RNHostView matchContents>
+              <LevelStrip
+                intoLevel={standing.intoLevel}
+                level={standing.level}
+                toNext={standing.toNext}
+                width={contentWidth}
+              />
+            </RNHostView>
+          ) : null}
+
+          {(coinStoreEnabled()
+            ? [...MODES, QUESTS_MODE, STORE_MODE]
+            : MODES
+          ).map((mode) => {
             const disabled = pending !== null && pending !== mode.key;
             const { variants } = mode;
             return (
@@ -230,8 +260,14 @@ export function HomeScreen() {
 
           <Spacer size={spacing.lg} />
 
-          <Column spacing={spacing.md} style={{ ...styles.footer, width: contentWidth }}>
-            <Row alignment="center" style={{ width: contentWidth - spacing.lg * 2 }}>
+          <Column
+            spacing={spacing.md}
+            style={{ ...styles.footer, width: contentWidth }}
+          >
+            <Row
+              alignment="center"
+              style={{ width: contentWidth - spacing.lg * 2 }}
+            >
               <Text textStyle={signedInText}>Signed in as</Text>
               <Spacer flexible />
               <Text textStyle={signedInText}>
@@ -260,7 +296,7 @@ const styles = {
   screen: {
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.huge,
+    paddingTop: spacing.md,
   },
   footer: {
     backgroundColor: colors.surface,

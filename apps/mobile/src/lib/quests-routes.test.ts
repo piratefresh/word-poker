@@ -5,14 +5,14 @@
  */
 
 import { QUEST_IDS } from "@wordpoker/contracts";
-import { questProgress } from "@wordpoker/db";
+import { playerProgress, questProgress } from "@wordpoker/db";
 import { claimQuestHand, creditDailyStreak, payCompletedQuests } from "@wordpoker/economy";
 
 import { GET, POST } from "@/app/api/quests+api";
 import { auth } from "@/auth/server/auth";
 
 jest.mock("@/auth/server/auth", () => ({ auth: { api: { getSession: jest.fn() } } }));
-jest.mock("@wordpoker/db", () => ({ questProgress: jest.fn() }));
+jest.mock("@wordpoker/db", () => ({ questProgress: jest.fn(), playerProgress: jest.fn() }));
 jest.mock("@wordpoker/economy", () => ({
   creditDailyStreak: jest.fn(),
   payCompletedQuests: jest.fn(),
@@ -23,11 +23,13 @@ const getSession = jest.mocked(auth.api.getSession) as unknown as jest.Mock;
 const credit = jest.mocked(creditDailyStreak);
 const pay = jest.mocked(payCompletedQuests);
 const progress = jest.mocked(questProgress);
+const xpRow = jest.mocked(playerProgress);
 const claim = jest.mocked(claimQuestHand);
 
 beforeEach(() => {
   jest.resetAllMocks();
   jest.spyOn(console, "error").mockImplementation(() => {});
+  xpRow.mockResolvedValue({ xp: 0, levelPaid: 1 });
 });
 
 afterEach(() => {
@@ -79,6 +81,7 @@ describe("GET /api/quests", () => {
       order.push("progress");
       return [{ questId: "win-word-2", progress: 1, streak: 0, completedAt: new Date() }];
     });
+    xpRow.mockResolvedValue({ xp: 300, levelPaid: 3 });
 
     const response = await GET(request("GET"));
 
@@ -89,6 +92,9 @@ describe("GET /api/quests", () => {
 
     const body = await response.json();
     expect(body.streak).toEqual({ current: 1, creditedToday: 50 });
+    // 300 xp sits 17 into level 3's 237-xp span.
+    expect(body.xp).toBe(300);
+    expect(body.level).toBe(3);
     expect(body.quests).toHaveLength(QUEST_IDS.length);
     expect(body.quests.find((q: { id: string }) => q.id === "win-word-2")).toEqual({
       id: "win-word-2",

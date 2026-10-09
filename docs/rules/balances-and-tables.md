@@ -79,7 +79,7 @@ configuration and not the code.
 The range's floor is 20 big blinds, so no one sits down too short to play a hand. The
 tournament and cash-game tiers of the product spec are [Formats](formats.md) §41–§42.
 
-Maximum players at every tier: 6.
+Maximum players at every tier: 4.
 
 ---
 
@@ -101,7 +101,7 @@ Each table card displays:
 
 Buy-In: 20,000 – 50,000 Coins
 Blinds: 500 / 1,000
-Players: 4/6
+Players: 4/4
 
 [ JOIN ]
 
@@ -162,7 +162,7 @@ The Wallet deduction and Table Stack creation must happen as one transaction. Th
 Each table supports:
 
 - Minimum recommended players: 4
-- Maximum players: 6
+- Maximum players: 4
 - One house-controlled dealer
 - Buy-ins inside the tier's range, up to the Buy-In Cap
 - A small blind and a big blind (below)
@@ -223,3 +223,47 @@ A dealer-position marker rotates clockwise after each completed hand. The blinds
   big blind acts last (§15). Heads-up, the dealer button (the small blind) acts first.
 - Later betting rounds: the first remaining active seat clockwise from the dealer button acts
   first.
+
+---
+
+# 45. Account XP, Levels & Level-Up Coins
+
+Progress for simply playing. A player's account holds two quest-adjacent numbers — total **XP**
+and the **level** that XP is filling — alongside the Wallet (§1), which pays every level-up.
+
+## Earning XP
+
+Every settled hand the player reports pays XP, once per hand:
+
+| Source | XP |
+| ------ | -- |
+| Playing the hand | 10 |
+| Winning it | +15 |
+| Word points | +1 per point of the hero's confirmed word score |
+
+A fold-out win (no reveal) earns the 10 and the 15 but no word points. Hands earn in every
+mode — offline, online, tutorial — and there is no daily cap: a claim's word score is the
+number the client reports, capped by the wire validator so it cannot move XP dishonestly.
+
+## Levels
+
+Levels are read off the cumulative curve `100 × (level − 1)^1.5`, so every threshold is a
+whole number: level 2 costs 100 XP, level 3 costs 283 in total, level 4 costs 520, level 5
+800. A hand whose XP crosses several thresholds lands the player on the highest one, and each
+level in between counts as reached. The player's current level shows how far into it they are
+(`intoLevel` / `toNext`) on the XP bar.
+
+## Level-Up Rewards
+
+Each level the player *reaches* pays coins into the Wallet:
+
+- Level 2 pays 100; every level pays `50 × level`.
+- Every 5th level (5, 10, 15 …) pays double: `100 × level`.
+
+Each level pays exactly once, ever, through the Wallet's reward-once index (`level-<n>`) — a
+retried report, a replayed hand, or a server crash and heal can open that row only once. If a
+crash lands between the XP commit and the wallet call, the next read of the quest state pays
+any missed level before showing it.
+
+The starting numbers in this section are the launch tuning; rebalancing is a change to the
+table above and `packages/game-rules/src/xp.ts` together.

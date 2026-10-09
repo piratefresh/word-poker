@@ -20,7 +20,7 @@ export function resultsFacts(
   snapshot: ResultsSnapshot,
   extra: { readonly wildTable: boolean; readonly heroUsedPower: boolean },
 ): QuestHandFacts | null {
-  const hero = snapshot.seats.find((seat) => seat.isYou);
+  const hero = snapshot.seats.find((seat) => seat.isYou && !seat.folded);
   if (hero === undefined) return null;
 
   return {

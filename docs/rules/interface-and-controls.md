@@ -47,6 +47,12 @@ Wallet Balance may be shown in a secondary location, but it must not appear as p
 
 # 31. Betting Control Requirements
 
+The primary button combines Check, Call, Bet, and Raise. Each turn starts with the slider at
+its leftmost position: the button shows Check when checking is legal, or Call with the chips
+owed when facing a bet. Moving the slider selects a legal Bet amount or Raise To round total;
+returning it to the left restores Check or Call. The label and tap use the same action.
+During the word-confirm window, Check still confirms the word. Fold and All In remain separate.
+
 ## Fold
 
 - Ends the player's participation in the current hand.
