@@ -32,7 +32,7 @@ export type OfferFate = "offered" | "kept" | "dropped";
 /**
  * One offer in the Power Draw's row. It lands face up with a hit — 0.55 → 1.14 → 1 — at its own
  * place in the stagger, rises and brightens while it is hovered, focused or pressed, and once the
- * table has settled the draw either lifts and flies down toward the action row (the kept card)
+ * table has settled the draw either lifts and flies down toward the lower edge of the felt (the kept card)
  * or fades and shrinks away. The burst of light behind it is the row's, not the card's
  * (`PowerImpact`), so every burst stays under every card.
  *

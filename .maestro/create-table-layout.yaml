@@ -1,0 +1,75 @@
+# STO-445: actual action visibility, without creating a room or funding a seat.
+# Run against Expo web at both reported portrait and short landscape sizes:
+# On this Windows Chrome, window chrome consumes 16px width and 151px height:
+# maestro test --platform web --headless --screen-size 448x813 -e APP_URL=http://localhost:8081 .maestro/create-table-layout.yaml
+# maestro test --platform web --headless --screen-size 678x471 -e APP_URL=http://localhost:8081 .maestro/create-table-layout.yaml
+# Pass TEST_USER_PASSWORD from the existing E2E test-account configuration.
+url: ${APP_URL}/online
+name: Create table — fields scroll, actions stay visible
+tags:
+  - web
+  - online
+env:
+  TEST_USER_EMAIL: e2e@wordpoker.dev
+---
+- openLink: ${APP_URL}/online
+- extendedWaitUntil:
+    visible: "Word Poker|DEAL A NEW TABLE"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Word Poker"
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Email"
+          direction: DOWN
+      - tapOn:
+          text: "Email"
+      - inputText: ${TEST_USER_EMAIL}
+      - scrollUntilVisible:
+          element:
+            id: "Password"
+          direction: DOWN
+      - tapOn:
+          css: input[type=password]
+      - inputText: ${TEST_USER_PASSWORD}
+      - scrollUntilVisible:
+          element:
+            text: "Sign in"
+          direction: DOWN
+      - tapOn:
+          text: "Sign in"
+      - extendedWaitUntil:
+          notVisible: "Sign in"
+          timeout: 60000
+- openLink: ${APP_URL}/online
+- extendedWaitUntil:
+    visible: "DEAL A NEW TABLE"
+    timeout: 30000
+- tapOn: "DEAL A NEW TABLE"
+- assertVisible:
+    text: "Create"
+- assertVisible:
+    text: "Cancel"
+# Empty-name validation must not push the footer below the viewport.
+- tapOn:
+    text: "Create"
+- assertVisible:
+    text: "Give the table a name."
+- assertVisible:
+    text: "Create"
+- assertVisible:
+    text: "Cancel"
+- scrollUntilVisible:
+    element:
+      id: create-table-power-ups
+    direction: DOWN
+- assertVisible:
+    text: "Create"
+- assertVisible:
+    text: "Cancel"
+- tapOn:
+    text: "Cancel"
+- assertNotVisible:
+    text: "Create"

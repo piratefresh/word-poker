@@ -418,8 +418,9 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
    * against Colyseus's timer service and a test paces the room by choosing `tickMs`. */
   private onTick(): void {
     try {
+      // Never write synced state here unconditionally: every write is a patch, and a patch every
+      // tick re-renders every client's felt 20×/s. `state.now` moves with `project()` instead.
       const now = this.now();
-      this.state.now = now;
       const game = this.game;
       if (game === null) return;
 

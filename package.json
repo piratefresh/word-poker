@@ -7,6 +7,7 @@
     "pnpm": ">=12"
   },
   "scripts": {
+    "android:device": "pnpm --filter @wordpoker/mobile exec expo run:android --device",
     "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm kill:ports && pnpm --filter @wordpoker/mobile start",
     "kill:ports": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8081,8082 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; exit 0\"",
@@ -15,6 +16,8 @@
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",
     "smoke:online:wild": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Wild",
     "smoke:online:four": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online-four.ps1",
+    "smoke:online:android": "node scripts/smoke-online-native.mjs android",
+    "smoke:online:ios": "node scripts/smoke-online-native.mjs ios",
     "typecheck": "pnpm -r --if-present typecheck",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "dictionary:prepare": "pnpm --filter @wordpoker/game-rules dictionary:prepare"

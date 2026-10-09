@@ -18,7 +18,7 @@
  * then back to the lobby.
  *
  * At a Wild table (§44) the felt carries the same power surfaces as the offline table — the Power
- * Draw over the felt, the held chip in the action row, the confirm, the "power used" card and the
+ * Draw over the felt, the held chip beside the hero, the confirm, the "power used" card and the
  * rack's flip — fed by the adapter's `PowerView`, so none of them learns which table it is at.
  */
 
@@ -187,6 +187,15 @@ export function OnlineFelt({
             }
             game={game}
             balance={balance}
+            heroSideAccessory={
+              powers === null ? null : (
+                <PowerHeldChip
+                  active={power.targeting.stage !== "idle"}
+                  held={powers.held}
+                  onPress={power.toggle}
+                />
+              )
+            }
             onAllIn={allIn}
             onBack={onLeave}
             onBalancePress={goToSignIn}
@@ -199,13 +208,6 @@ export function OnlineFelt({
                 <WordHand
                   actions={
                     <>
-                      {powers === null ? null : (
-                        <PowerHeldChip
-                          active={power.targeting.stage !== "idle"}
-                          held={powers.held}
-                          onPress={power.toggle}
-                        />
-                      )}
                       <WordShuffleButton />
                       <WordCheckButton />
                     </>

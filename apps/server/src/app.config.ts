@@ -7,7 +7,30 @@ import {
   createEndpoint,
   LobbyRoom,
 } from "colyseus";
+import { admin } from "@colyseus/admin";
+import type { MonitorOptions } from "@colyseus/monitor";
+import { GameDatabase } from "@colyseus/database";
 import { GAME_ROOM_NAME, LOBBY_ROOM_NAME } from "@wordpoker/contracts";
+
+/**
+ * The admin panel's own accounts live in a local SQLite file (`colyseus.db`), not the app's
+ * Postgres: `GameDatabase` auto-migrates its tables on boot, and the shared database belongs to
+ * Better Auth and the Wallet. `admin()` refuses to boot without `JWT_SECRET`, so the panel only
+ * mounts where it is set: `.env.development` locally, the app's environment on Colyseus Cloud.
+ */
+const adminEnabled = Boolean(process.env.JWT_SECRET);
+const database = adminEnabled ? new GameDatabase() : undefined;
+
+/** The monitor's room grid, plus which PM2 process holds each room — Cloud runs several. */
+const MONITOR_COLUMNS: MonitorOptions["columns"] = [
+  "roomId",
+  "name",
+  "clients",
+  "maxClients",
+  "locked",
+  "elapsedTime",
+  "processId",
+];
 
 /**
  * Import your Room files
@@ -22,6 +45,7 @@ import { GameRoom } from "./rooms/GameRoom.js";
 const game = defineRoom(GameRoom).enableRealtimeListing();
 
 const server = defineServer({
+  database,
 
   /**
    * Define your room handlers:
@@ -46,6 +70,18 @@ const server = defineServer({
     api_hello: createEndpoint("/api/hello", { method: "GET" }, async (ctx) => {
       return { message: "Hello World" };
     }),
+    /**
+     * Ops tools: the admin panel at /admin/ (dashboard, live rooms), with the monitor at /monitor
+     * and the playground at /playground behind its login. The first visit to /admin/ asks for an
+     * email and password to create the first admin.
+     */
+    ...(adminEnabled
+      ? {
+          ...admin({}),
+          ...monitor({ columns: MONITOR_COLUMNS, use: [admin.guard()] }),
+          ...playground({ prefix: "/playground", use: [admin.guard()] }),
+        }
+      : {}),
   }),
 
   /**
@@ -57,24 +93,6 @@ const server = defineServer({
     app.get("/hi", (req, res) => {
       res.send("It's time to kick ass and chew bubblegum!");
     });
-
-    /**
-     * Use @colyseus/monitor
-     * If you expose it in production, make sure to protect it with a password:
-     * https://docs.colyseus.io/tools/monitoring#password-protection
-     */
-    if (process.env.NODE_ENV !== "production") {
-      app.use("/monitor", monitor());
-    }
-
-    /**
-     * Use @colyseus/playground
-     * (It is not recommended to expose this route in a production environment)
-     * Available at http://localhost:2567/playground
-     */
-    if (process.env.NODE_ENV !== "production") {
-      app.use("/playground", playground());
-    }
   }
 });
 

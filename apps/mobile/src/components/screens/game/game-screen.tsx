@@ -41,6 +41,7 @@ import {
 } from "./screen-scale";
 import {
   COMMUNITY_ROW_HEIGHT,
+  seatMetrics,
   tableSeating,
   tabletopSeatBounds,
 } from "./seat-metrics";
@@ -64,10 +65,12 @@ export interface GameScreenProps {
   rack?: ReactNode;
   /**
    * A mode's own controls in a row right under the rack: the word builder's shuffle and word
-   * check, and a Wild table's held power, so the word's controls sit with the tiles they act on and the betting rows keep
-   * their width. A table that has not dealt yet has no hand to act on, so draws none.
+   * check, so the word's controls sit with the tiles they act on and the betting rows keep their
+   * width. A table that has not dealt yet has no hand to act on, so draws none.
    */
   rackActions?: ReactNode;
+  /** A mode's control placed just left of the hero's seat on the felt. */
+  heroSideAccessory?: ReactNode;
   /**
    * What a mode draws over the felt itself — §44's Power Draw, the "power used" card. It fills the
    * table's region and nothing past it, so the community above and the rack below stay in view.
@@ -130,6 +133,7 @@ function GameScreenBody({
   balance,
   rack,
   rackActions,
+  heroSideAccessory,
   overFelt,
   winOverlay,
   onBack,
@@ -311,6 +315,16 @@ function GameScreenBody({
                   tiles={game.community}
                 />
                 <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
+                {overFelt}
+                {heroSideAccessory == null ? null : (
+                  <HeroSeatAccessory
+                    avatarSize={seatMetrics(chromeWidth, true).avatar}
+                    gap={8 * scale}
+                    heroSeatIndex={game.players.findIndex((player) => player?.isHero)}
+                  >
+                    {heroSideAccessory}
+                  </HeroSeatAccessory>
+                )}
               </>
             }
             // The table runs to the room's edges.
@@ -338,7 +352,6 @@ function GameScreenBody({
             style={[styles.table, landscape && { overflow: "visible" }]}
             testID="poker-table"
           />
-          {overFelt}
           {winOverlay}
         </CoachTarget>
         {landscape ? (
@@ -418,6 +431,50 @@ function CommunityInTable({
   );
 }
 
+/** Places a control to the left of the hero avatar, measured in the table's shared pixel space. */
+function HeroSeatAccessory({
+  avatarSize,
+  gap,
+  heroSeatIndex,
+  children,
+}: {
+  avatarSize: number;
+  gap: number;
+  heroSeatIndex: number;
+  children: ReactNode;
+}) {
+  const { layout, resolveContainer } = useTableLayout();
+  const [accessorySize, setAccessorySize] = useState({ width: 0, height: 0 });
+  const hero = layout.seats[heroSeatIndex];
+  if (hero === undefined) return null;
+
+  const point = resolveContainer(hero);
+  const left = Math.max(0, point.x - avatarSize / 2 - gap - accessorySize.width);
+  const top = point.y - accessorySize.height / 2;
+
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[StyleSheet.absoluteFill, styles.heroSideAccessoryLayer]}
+    >
+      <View
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setAccessorySize((current) =>
+            current.width === width && current.height === height
+              ? current
+              : { width, height },
+          );
+        }}
+        pointerEvents="box-none"
+        style={[styles.heroSideAccessory, { left, top }]}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   communityInTable: {
     alignItems: "center",
@@ -456,4 +513,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 2,
   },
+  // Above the targeting scrim so the same card still toggles and cancels while choosing.
+  heroSideAccessoryLayer: { zIndex: 21 },
+  heroSideAccessory: { position: "absolute" },
 });

@@ -292,7 +292,7 @@ export function WordBuilder({
 export function WordHand({
   actions,
 }: {
-  /** The word's controls — shuffle, check, a held power — in a column at the tray's right end. */
+  /** The word's controls — shuffle and check — in a column at the tray's right end. */
   actions?: ReactNode;
 }): JSX.Element {
   const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip, draft } =

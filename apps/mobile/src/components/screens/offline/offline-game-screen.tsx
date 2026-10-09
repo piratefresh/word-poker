@@ -192,6 +192,15 @@ function OfflineTable({
           // Free play (ADR 0002): the offline table's chips are local, so no Wallet is read.
           balance={FREE_PLAY}
           game={game}
+          heroSideAccessory={
+            powers === null ? null : (
+              <PowerHeldChip
+                active={power.targeting.stage !== "idle"}
+                held={powers.held}
+                onPress={power.toggle}
+              />
+            )
+          }
           winOverlay={
             xp.hero !== null ? (
               <XpResultOverlay hero={xp.hero} key={results?.hand} onComplete={xp.complete} report={xp.report} />
@@ -235,13 +244,6 @@ function OfflineTable({
               <WordHand
                 actions={
                   <>
-                    {powers === null ? null : (
-                      <PowerHeldChip
-                        active={power.targeting.stage !== "idle"}
-                        held={powers.held}
-                        onPress={power.toggle}
-                      />
-                    )}
                     <WordShuffleButton />
                     <WordCheckButton />
                   </>

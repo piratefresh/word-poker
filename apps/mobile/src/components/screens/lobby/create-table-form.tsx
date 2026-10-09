@@ -20,7 +20,6 @@ import {
   Column,
   Picker,
   RNHostView,
-  ScrollView,
   Text,
   type UniversalTextStyle,
 } from "@expo/ui";
@@ -44,6 +43,8 @@ import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/con
 import { formatAmount } from "@/lib/format";
 import { DEAL_MODE_NAMES } from "@/features/table/power-view";
 import { createTable } from "@/features/online/room-session";
+
+import { CreateTableLayout } from "./create-table-layout";
 
 export type CreateTableFormProps = {
   visible: boolean;
@@ -112,6 +113,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     alignSelf: "stretch",
+    flexShrink: 0,
     gap: spacing.sm,
     paddingTop: spacing.sm,
   },
@@ -178,7 +180,26 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
       snapPoints={["full"]}
       testID="create-table-sheet"
     >
-      <ScrollView testID="create-table-scroll">
+      <CreateTableLayout
+        actions={
+          <View style={styles.actions} testID="create-table-actions">
+            <GoldButton
+              disabled={submitting}
+              label={submitting ? "Creating…" : "Create"}
+              onPress={submit}
+              testID="create-table-submit"
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={dismiss}
+              style={styles.cancel}
+              testID="create-table-cancel"
+            >
+              <RNText style={styles.cancelLabel}>Cancel</RNText>
+            </Pressable>
+          </View>
+        }
+      >
         <Column alignment="start" spacing={spacing.lg}>
           <Column alignment="start" spacing={spacing.xxs}>
             <Text textStyle={titleText}>Create a table</Text>
@@ -187,7 +208,7 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
 
           <Column alignment="start" spacing={spacing.xs}>
             <Text textStyle={fieldLabelText}>TABLE NAME</Text>
-            <RNHostView>
+            <RNHostView matchContents testID="create-table-name-host">
               <TextInput
                 accessibilityLabel="Table name"
                 autoCapitalize="words"
@@ -266,29 +287,8 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
               {refusal.message}
             </Text>
           ) : null}
-
-          {/* The universal Button draws as dark bare text on the web — invisible on the felt
-              (STO-445) — so the actions are the design's gold primary and a text link. */}
-          <RNHostView>
-            <View style={styles.actions}>
-              <GoldButton
-                disabled={submitting}
-                label={submitting ? "Creating…" : "Create"}
-                onPress={submit}
-                testID="create-table-submit"
-              />
-              <Pressable
-                accessibilityRole="button"
-                onPress={dismiss}
-                style={styles.cancel}
-                testID="create-table-cancel"
-              >
-                <RNText style={styles.cancelLabel}>Cancel</RNText>
-              </Pressable>
-            </View>
-          </RNHostView>
         </Column>
-      </ScrollView>
+      </CreateTableLayout>
     </BottomSheet>
   );
 }

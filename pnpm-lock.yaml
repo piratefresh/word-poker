@@ -386,6 +386,15 @@ importers:
 
   apps/server:
     dependencies:
+      '@colyseus/admin':
+        specifier: ^0.18.6
+        version: 0.18.6(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@colyseus/database@0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2))(zod@4.6.2)
+      '@colyseus/auth':
+        specifier: ^0.18.4
+        version: 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/database':
+        specifier: ^0.18.4
+        version: 0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2)
       '@colyseus/schema':
         specifier: ^5.0.14
         version: 5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3)
@@ -400,7 +409,7 @@ importers:
         version: link:../../packages/game-rules
       colyseus:
         specifier: ^0.18.2
-        version: 0.18.6(13d892ed6979e157c82dd453392b75d4)
+        version: 0.18.6(b055dc4692c4d775e0afe22605aa22f5)
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@8.1.1)
@@ -1095,8 +1104,16 @@ packages:
   '@better-fetch/fetch@1.3.1':
     resolution: {integrity: sha512-ABkD1WhyfPZprKRQI3bhATjeiFuNWC9PXhfGWqL+sg/gKrM977oFrYkdb4msM3hgUGonr7KlOsOFT5TU2rht9g==}
 
-  '@colyseus/auth@0.18.2':
-    resolution: {integrity: sha512-PxlMZP9vXXvMjfEK+bxh3pvN44FeW4yIVcDtqrYfJVHXIspBCcZt5CEDhzd0N8bWTO9GYKixJqhZ9oCosZYyFw==}
+  '@colyseus/admin@0.18.6':
+    resolution: {integrity: sha512-YBS8nkpYTlm0ah0RNpEq5YE9y9tufZtYXliL5JqIw4GWUvR1JqD2D66wyEcUv4Hxw86shnP0/pFqQ7ilXJG64A==}
+    engines: {node: '>= 22.x'}
+    peerDependencies:
+      '@colyseus/auth': 0.18.x
+      '@colyseus/core': 0.18.x
+      '@colyseus/database': 0.18.x
+
+  '@colyseus/auth@0.18.4':
+    resolution: {integrity: sha512-OrEgUYB86a7w1L/QMdz/Jzq4Kx/yW9qdkyGlVNhauHzxJljuIv31JayT9+Vm+2DqH5syhq04xu83xhtK2LZS3g==}
     engines: {node: '>= 22.x'}
     peerDependencies:
       '@colyseus/core': 0.18.x
@@ -1135,6 +1152,20 @@ packages:
       express:
         optional: true
       zod:
+        optional: true
+
+  '@colyseus/database@0.18.4':
+    resolution: {integrity: sha512-oHEG/GHBnRKAWKVTMXZwlMgaoChS4OAUnCo2HCDElEICfthjO0iFKmFKw2eMugbAeFf+f2hhFZrN9dpZSzwL0A==}
+    engines: {node: '>= 22.x'}
+    peerDependencies:
+      '@colyseus/auth': 0.18.x
+      '@colyseus/core': 0.18.x
+      '@electric-sql/pglite': ^0.4.5 || ^0.5.0
+      postgres: ^3.4.7
+    peerDependenciesMeta:
+      '@electric-sql/pglite':
+        optional: true
+      postgres:
         optional: true
 
   '@colyseus/greeting-banner@4.0.2':
@@ -3691,6 +3722,122 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
+
+  drizzle-orm@1.0.0-rc.2:
+    resolution: {integrity: sha512-UXYDkbplF5wX0hwxll+80QhEwUvAJLBu+tAK/d4fna18kLE6VuliAzufF/ieDEIJeSnLRYgtmsXD6x1Xuy1kIg==}
+    peerDependencies:
+      '@aws-sdk/client-rds-data': '>=3'
+      '@cloudflare/workers-types': '>=4'
+      '@effect/sql-pg': '>=4.0.0-beta.58 || >=4.0.0'
+      '@electric-sql/pglite': '>=0.2.0'
+      '@libsql/client': '>=0.10.0'
+      '@libsql/client-wasm': '>=0.10.0'
+      '@neondatabase/serverless': '>=0.10.0'
+      '@op-engineering/op-sqlite': '>=2'
+      '@opentelemetry/api': ^1.4.1
+      '@planetscale/database': '>=1.13'
+      '@sinclair/typebox': '>=0.34.8'
+      '@sqlitecloud/drivers': '>=1.0.653'
+      '@tidbcloud/serverless': '*'
+      '@tursodatabase/database': '>=0.2.1'
+      '@tursodatabase/database-common': '>=0.2.1'
+      '@tursodatabase/database-wasm': '>=0.2.1'
+      '@types/better-sqlite3': '*'
+      '@types/mssql': ^9.1.4
+      '@types/pg': '*'
+      '@types/sql.js': '*'
+      '@upstash/redis': '>=1.34.7'
+      '@vercel/postgres': '>=0.8.0'
+      '@xata.io/client': '*'
+      arktype: '>=2.0.0'
+      better-sqlite3: '>=9.3.0'
+      bun-types: '*'
+      effect: '>=4.0.0-beta.58 || >=4.0.0'
+      expo-sqlite: '>=14.0.0'
+      mssql: ^11.0.1
+      mysql2: '>=2'
+      pg: '>=8'
+      postgres: '>=3'
+      sql.js: '>=1'
+      sqlite3: '>=5'
+      typebox: '>=1.0.0'
+      valibot: '>=1.0.0-beta.7'
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@aws-sdk/client-rds-data':
+        optional: true
+      '@cloudflare/workers-types':
+        optional: true
+      '@effect/sql-pg':
+        optional: true
+      '@electric-sql/pglite':
+        optional: true
+      '@libsql/client':
+        optional: true
+      '@libsql/client-wasm':
+        optional: true
+      '@neondatabase/serverless':
+        optional: true
+      '@op-engineering/op-sqlite':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+      '@planetscale/database':
+        optional: true
+      '@sinclair/typebox':
+        optional: true
+      '@sqlitecloud/drivers':
+        optional: true
+      '@tidbcloud/serverless':
+        optional: true
+      '@tursodatabase/database':
+        optional: true
+      '@tursodatabase/database-common':
+        optional: true
+      '@tursodatabase/database-wasm':
+        optional: true
+      '@types/better-sqlite3':
+        optional: true
+      '@types/mssql':
+        optional: true
+      '@types/pg':
+        optional: true
+      '@types/sql.js':
+        optional: true
+      '@upstash/redis':
+        optional: true
+      '@vercel/postgres':
+        optional: true
+      '@xata.io/client':
+        optional: true
+      arktype:
+        optional: true
+      better-sqlite3:
+        optional: true
+      bun-types:
+        optional: true
+      effect:
+        optional: true
+      expo-sqlite:
+        optional: true
+      mssql:
+        optional: true
+      mysql2:
+        optional: true
+      pg:
+        optional: true
+      postgres:
+        optional: true
+      sql.js:
+        optional: true
+      sqlite3:
+        optional: true
+      typebox:
+        optional: true
+      valibot:
+        optional: true
+      zod:
+        optional: true
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -7720,9 +7867,18 @@ snapshots:
 
   '@better-fetch/fetch@1.3.1': {}
 
-  '@colyseus/auth@0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
+  '@colyseus/admin@0.18.6(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@colyseus/database@0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2))(zod@4.6.2)':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/auth': 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/better-call': 1.3.3(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/database': 0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2)
+    transitivePeerDependencies:
+      - zod
+
+  '@colyseus/auth@0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
+    dependencies:
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@types/jsonwebtoken': 9.0.10
       connect-redis: 7.1.1(express-session@1.19.0(supports-color@8.1.1))
       cookie: 0.7.2
@@ -7747,7 +7903,7 @@ snapshots:
 
   '@colyseus/clock@2.0.3': {}
 
-  '@colyseus/core@0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
+  '@colyseus/core@0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
     dependencies:
       '@colyseus/better-call': 1.3.3(zod@4.6.2)
       '@colyseus/greeting-banner': 4.0.2
@@ -7759,7 +7915,7 @@ snapshots:
       msgpackr: 2.1.0
       nanoid: 3.3.19
     optionalDependencies:
-      '@colyseus/auth': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/auth': 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@colyseus/ws-transport': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))
       '@pm2/io': 6.1.0(supports-color@8.1.1)
       express: 5.2.1(supports-color@8.1.1)
@@ -7767,7 +7923,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@colyseus/core@0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
+  '@colyseus/core@0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
     dependencies:
       '@colyseus/better-call': 1.3.3(zod@4.6.2)
       '@colyseus/greeting-banner': 4.0.2
@@ -7779,13 +7935,56 @@ snapshots:
       msgpackr: 2.1.0
       nanoid: 3.3.19
     optionalDependencies:
-      '@colyseus/auth': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/auth': 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@colyseus/ws-transport': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))
       '@pm2/io': 6.1.0(supports-color@8.1.1)
       express: 5.2.1(supports-color@8.1.1)
       zod: 4.6.2
     transitivePeerDependencies:
       - supports-color
+
+  '@colyseus/database@0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2)':
+    dependencies:
+      '@colyseus/auth': 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@standard-schema/spec': 1.1.0
+      drizzle-orm: 1.0.0-rc.2(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@effect/sql-pg'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@opentelemetry/api'
+      - '@planetscale/database'
+      - '@sinclair/typebox'
+      - '@sqlitecloud/drivers'
+      - '@tidbcloud/serverless'
+      - '@tursodatabase/database'
+      - '@tursodatabase/database-common'
+      - '@tursodatabase/database-wasm'
+      - '@types/better-sqlite3'
+      - '@types/mssql'
+      - '@types/pg'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - arktype
+      - better-sqlite3
+      - bun-types
+      - effect
+      - expo-sqlite
+      - mssql
+      - mysql2
+      - pg
+      - sql.js
+      - sqlite3
+      - typebox
+      - valibot
+      - zod
 
   '@colyseus/greeting-banner@4.0.2': {}
 
@@ -7802,9 +8001,9 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@colyseus/monitor@0.18.3(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)':
+  '@colyseus/monitor@0.18.3(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       node-os-utils: 2.0.5
       zod: 4.6.2
     transitivePeerDependencies:
@@ -7816,17 +8015,17 @@ snapshots:
       - express
       - supports-color
 
-  '@colyseus/playground@0.18.4(@colyseus/auth@0.18.2)(@colyseus/core@0.18.14)(zod@4.6.2)':
+  '@colyseus/playground@0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(zod@4.6.2)':
     dependencies:
-      '@colyseus/auth': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/auth': 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@colyseus/better-call': 1.3.3(zod@4.6.2)
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
     optionalDependencies:
       zod: 4.6.2
 
-  '@colyseus/redis-driver@0.18.2(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
+  '@colyseus/redis-driver@0.18.2(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       ioredis: 5.11.1(supports-color@8.1.1)
     transitivePeerDependencies:
       - '@colyseus/auth'
@@ -7838,9 +8037,9 @@ snapshots:
       - supports-color
       - zod
 
-  '@colyseus/redis-presence@0.18.4(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
+  '@colyseus/redis-presence@0.18.4(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       ioredis: 5.11.1(supports-color@8.1.1)
     transitivePeerDependencies:
       - '@colyseus/auth'
@@ -7869,7 +8068,7 @@ snapshots:
       tslib: 2.8.1
       ws: 8.21.3
     optionalDependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
     transitivePeerDependencies:
       - bufferutil
       - typescript
@@ -7885,7 +8084,7 @@ snapshots:
       tslib: 2.8.1
       ws: 8.21.3
     optionalDependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
     transitivePeerDependencies:
       - bufferutil
       - typescript
@@ -7898,7 +8097,7 @@ snapshots:
 
   '@colyseus/testing@0.18.5(@colyseus/core@0.18.14)(@colyseus/sdk@0.18.2(@colyseus/core@0.18.14)(typescript@5.9.3)(zod@4.6.2))(@colyseus/tools@0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1))':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@colyseus/sdk': 0.18.2(@colyseus/core@0.18.14)(typescript@5.9.3)(zod@4.6.2)
       '@colyseus/tools': 0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1)
       httpie: 2.0.0-next.13
@@ -7909,7 +8108,7 @@ snapshots:
 
   '@colyseus/tools@0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1)':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@colyseus/ws-transport': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))
       '@pm2/io': 6.1.0(supports-color@8.1.1)
       dotenv: 17.4.2
@@ -7918,12 +8117,12 @@ snapshots:
 
   '@colyseus/uwebsockets-transport@0.18.3(@colyseus/core@0.18.14)':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       uWebSockets.js: https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/cfc9a40d8132a34881813cec3d5f8e3a185b3ce3
 
   '@colyseus/ws-transport@0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))':
     dependencies:
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@6.0.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@types/ws': 8.18.1
       ws: 8.21.3
     optionalDependencies:
@@ -10364,14 +10563,14 @@ snapshots:
       color-convert: 2.0.1
       color-string: 1.9.1
 
-  colyseus@0.18.6(13d892ed6979e157c82dd453392b75d4):
+  colyseus@0.18.6(b055dc4692c4d775e0afe22605aa22f5):
     dependencies:
-      '@colyseus/auth': 0.18.2(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
-      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
-      '@colyseus/monitor': 0.18.3(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)
-      '@colyseus/playground': 0.18.4(@colyseus/auth@0.18.2)(@colyseus/core@0.18.14)(zod@4.6.2)
-      '@colyseus/redis-driver': 0.18.2(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
-      '@colyseus/redis-presence': 0.18.4(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/auth': 0.18.4(@colyseus/core@0.18.14)(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/core': 0.18.14(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/monitor': 0.18.3(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)
+      '@colyseus/playground': 0.18.4(@colyseus/auth@0.18.4)(@colyseus/core@0.18.14)(zod@4.6.2)
+      '@colyseus/redis-driver': 0.18.2(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
+      '@colyseus/redis-presence': 0.18.4(@colyseus/auth@0.18.4)(@colyseus/better-call@1.3.3(zod@4.6.2))(@colyseus/schema@5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.2)
       '@colyseus/schema': 5.0.33(patch_hash=1edd733717cadbab421546f43d838afeb433d658d2fc8a6319cf2b14303bf9b3)(typescript@5.9.3)
       '@colyseus/tools': 0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1)
       '@colyseus/uwebsockets-transport': 0.18.3(@colyseus/core@0.18.14)
@@ -10642,6 +10841,14 @@ snapshots:
       domhandler: 5.0.3
 
   dotenv@17.4.2: {}
+
+  drizzle-orm@1.0.0-rc.2(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(expo-sqlite@57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(pg@8.23.0)(zod@4.6.2):
+    optionalDependencies:
+      '@sinclair/typebox': 0.34.52
+      '@types/pg': 8.23.1
+      expo-sqlite: 57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
+      pg: 8.23.0
+      zod: 4.6.2
 
   dunder-proto@1.0.1:
     dependencies:
@@ -11353,55 +11560,6 @@ snapshots:
       - react-native-worklets
       - supports-color
     optional: true
-
-  expo-router@57.0.24(b67db539c778540c1b1e3618426d489d):
-    dependencies:
-      '@expo/log-box': 57.0.4(@expo/dom-webview@57.0.1)(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      '@expo/metro-runtime': 57.0.16(@expo/log-box@57.0.4)(expo@57.0.26)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      '@expo/schema-utils': 57.0.2
-      '@expo/ui': 57.0.21(fef7a3241d4c8da1d683796ee1bb9d64)
-      '@radix-ui/react-slot': 1.3.3(@types/react@19.2.18)(react@19.2.3)
-      '@radix-ui/react-tabs': 1.1.21(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@react-native-masked-view/masked-view': 0.3.2(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      client-only: 0.0.1
-      color: 4.2.3
-      debug: 4.4.3(supports-color@8.1.1)
-      escape-string-regexp: 4.0.0
-      expo: 57.0.26(3f6f2882b53f6297b51bc8b98827cdc7)
-      expo-constants: 57.0.17(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(supports-color@8.1.1)
-      expo-glass-effect: 57.0.4(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      expo-linking: 57.0.9(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)
-      expo-server: 57.0.3
-      expo-symbols: 57.0.3(expo-font@57.0.4)(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      fast-deep-equal: 3.1.3
-      invariant: 2.2.4
-      nanoid: 3.3.19
-      query-string: 7.1.3
-      react: 19.2.3
-      react-fast-compare: 3.2.2
-      react-is: 19.3.0
-      react-native: 0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1)
-      react-native-drawer-layout: 4.2.10(af03c708e394143f07ded5ed828d4c68)
-      react-native-safe-area-context: 5.7.0(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      react-native-screens: 4.26.2(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      server-only: 0.0.1
-      sf-symbols-typescript: 2.2.0
-      shallowequal: 1.1.0
-      standard-navigation: 0.0.5
-      vaul: 1.1.2(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-    optionalDependencies:
-      '@testing-library/react-native': 14.0.1(jest@29.7.0(@types/node@26.6.2)(supports-color@8.1.1))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(test-renderer@1.2.0(@types/react@19.2.18)(react@19.2.3))
-      react-dom: 19.2.3(react@19.2.3)
-      react-native-gesture-handler: 2.32.0(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      react-native-reanimated: 4.5.1(react-native-worklets@0.10.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
-      react-native-web: 0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-    transitivePeerDependencies:
-      - '@babel/core'
-      - '@types/react'
-      - '@types/react-dom'
-      - expo-font
-      - react-native-worklets
-      - supports-color
 
   expo-secure-store@57.0.4(expo@57.0.26):
     dependencies:

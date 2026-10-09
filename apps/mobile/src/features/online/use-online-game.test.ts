@@ -134,6 +134,53 @@ async function mount(room: FakeRoom): Promise<Handle> {
 }
 
 describe("useOnlineGame", () => {
+  test.each(["waiting", "preflop"])("keeps a second-joining hero at the bottom during %s", async (phase) => {
+    const room = makeRoom(HERO, liveState({
+      phase,
+      table: { name: "Felt", buyIn: 5_000, smallBlind: 50, bigBlind: 100, maxSeats: 2 },
+      toActSeat: 1,
+      seats: new Map([
+        [OPPONENT, seat(OPPONENT, 0, { ready: true })],
+        [HERO, seat(HERO, 1)],
+      ]),
+    }));
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ seat: 1 })));
+
+    expect(handle.current.game?.players[0]).toMatchObject({ id: HERO, isHero: true });
+    expect(handle.current.game?.players[1]).toMatchObject({
+      id: OPPONENT,
+      name: "Seat 1",
+      status: phase === "waiting" ? "ready" : "waiting",
+    });
+    if (phase === "preflop") {
+      expect(handle.current.game?.players[0]?.status).toBe("your-turn");
+      expect(handle.current.game?.betting.canCheck).toBe(true);
+    }
+  });
+
+  test("rotates a four-seat table without changing the dealer or acting player", async () => {
+    const room = makeRoom(HERO, liveState({
+      table: { name: "Felt", buyIn: 5_000, smallBlind: 50, bigBlind: 100, maxSeats: 4 },
+      toActSeat: 3,
+      seats: new Map([
+        [OPPONENT, seat(OPPONENT, 0)],
+        ["second", seat("second", 1)],
+        [HERO, seat(HERO, 2)],
+        ["fourth", seat("fourth", 3)],
+      ]),
+    }));
+    const handle = await mount(room);
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ seat: 2, isYourTurn: false })));
+
+    expect(handle.current.game?.players.map((player) => player?.id)).toEqual([
+      HERO, "fourth", OPPONENT, "second",
+    ]);
+    expect(handle.current.game?.players[1]?.status).toBe("thinking");
+    expect(handle.current.game?.players[2]?.roles).toContain("dealer");
+    expect(handle.current.game?.betting.canCheck).toBe(false);
+  });
+
   test("maps the broadcast into the felt's state, the hero in its own seat", async () => {
     const room = makeRoom(HERO, liveState());
     const handle = await mount(room);

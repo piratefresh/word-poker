@@ -530,13 +530,16 @@ test("refuses an over-long table name before it spends a round trip", async () =
   );
 });
 
-test("keeps the create actions reachable inside a full-height scrollable sheet", async () => {
+test("keeps the create actions outside the scrolling fields", async () => {
   const { view } = await openLobby();
   await openForm(view);
 
   const sheetScroll = view.getByTestId("create-table-scroll");
-  expect(within(sheetScroll).getByTestId("create-table-submit")).toBeOnTheScreen();
-  expect(within(sheetScroll).getByTestId("create-table-cancel")).toBeOnTheScreen();
+  expect(within(sheetScroll).queryByTestId("create-table-submit")).toBeNull();
+  expect(within(sheetScroll).queryByTestId("create-table-cancel")).toBeNull();
+  const actions = within(view.getByTestId("create-table-actions"));
+  expect(actions.getByTestId("create-table-submit")).toBeOnTheScreen();
+  expect(actions.getByTestId("create-table-cancel")).toBeOnTheScreen();
 });
 
 test("refuses a seat count outside §5 before it spends a round trip", async () => {

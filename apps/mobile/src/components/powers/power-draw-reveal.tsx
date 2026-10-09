@@ -61,8 +61,9 @@ function rowFor(region: { height: number; width: number }, count: number) {
 /**
  * §44's Power Draw as the hero sees it: the felt darkens, a pulse of light gathers, and the
  * offers land face up left to right, each with a hit of its own. Once the row has landed the
- * seat may choose; the kept card lifts with a stronger hit and flies down toward the action row
- * while the rest fall away. A draw that runs out keeps the first offer and plays the same exit.
+ * seat may choose; the kept card lifts with a stronger hit and flies down toward the lower edge
+ * of the felt while the rest fall away. A draw that runs out keeps the first offer and plays the
+ * same exit.
  *
  * The adapter's `draw` is the table's truth: it names the kept card (`picked`) while the draw is
  * still open on other seats' choices, and closes the moment every seat has kept one — offline,

@@ -684,8 +684,8 @@ function availableFor(priv: PrivateView | null, view: RoomView | null): readonly
 }
 
 /**
- * The room as the Hero View reads it: the broadcast seats in engine order, placed on the felt by
- * their seat number, and the hero's turn and word slot off the seat's own private message.
+ * The room as the Hero View reads it: seats stay in engine order, with display positions rotated
+ * to put the hero at the bottom, and the hero's turn and word slot off its private message.
  *
  * The waiting room draws too: the seats that have sat down, around an empty felt, each wearing
  * READY once it has said so. It is read as a table on preflop with no turn, no board and no rack
@@ -702,6 +702,7 @@ function perspectiveOf(
   const phase = waiting ? "preflop" : roundPhaseOf(view.phase);
   if (phase === null) return null;
 
+  const heroSeat = view.seats.find((seat) => seat.playerId === heroId)?.seat ?? 0;
   const seats = engineOrder(view.seats).map((seat) => {
     const isHero = seat.playerId === heroId;
     return {
@@ -713,7 +714,7 @@ function perspectiveOf(
       allIn: seat.allIn,
       sittingOut: seat.sittingOut,
       actedThisRound: seat.actedThisRound,
-      place: seat.seat,
+      place: (seat.seat - heroSeat + view.maxSeats) % view.maxSeats,
       // Anonymous seats until identity lands (Epic B): the hero is unnamed so the felt's "· YOU"
       // badge is the only word on it, opponents are numbered by their seat.
       name: isHero ? "You" : `Seat ${seat.seat + 1}`,

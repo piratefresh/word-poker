@@ -14,8 +14,8 @@ import { POWER_CARD_ASPECT, PowerCard, PowerCardMini, powerCardLabel } from "./p
 import type { PowerTargeting } from "./use-power-targeting";
 
 /**
- * The power the hero holds this hand, in the felt's action row (`GameScreen`'s `rackActions`)
- * beside the shuffle: the card the Power Draw kept, drawn small.
+ * The power the hero holds this hand, just left of their seat on the felt: the card the Power
+ * Draw kept, drawn small.
  *
  * Lit while the table would take the power — the hero's own betting turn, or §19's window before
  * it confirms — and dimmed otherwise; once spent it wears USED until the next deal. A tap starts

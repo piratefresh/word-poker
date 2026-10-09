@@ -141,3 +141,20 @@ apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with th
 
 Set EXPO_PUBLIC_GAME_URL at build time to an address the device can reach; localhost on the device is not the development machine. Keep this device flow manual and out of CI until its server and opponent are provisioned.
 
+The local runner automates that wiring on one machine (Windows or macOS):
+
+    node scripts/smoke-online-native.mjs android
+
+It starts the seeded Colyseus, Metro (`--clear`, auth bypass, local game URL), the scripted
+opponent, cold-starts the dev client on its Metro, and runs the flow with `ATTACH=1`. Every ADB
+call is bounded and asynchronous — a hung `adb` has wedged whole runs — and `SMOKE_TIMEOUT_MS`
+(default 900000) starts before setup. Cancellation and timeout stop Maestro and the service
+process trees. `MAESTRO_BIN` pins one Maestro install: an install directory that has
+overlayed releases keeps stale JARs around and crashes the driver with `NoSuchMethodError`, so
+keep one clean extract per version and point `MAESTRO_BIN` at it. If taps take tens of seconds,
+compare a small Settings flow with the felt and time `adb shell uiautomator dump` in both.
+A cold boot restored a stalled Settings flow to ten consecutive passes of about 10–12 s on
+2026-10-09; this demonstrates an environment contribution, not a fix for app input latency.
+To cold-restart the emulator, use
+(`adb emu kill`, then relaunch it detached — never two qemu instances on one AVD).
+

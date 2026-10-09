@@ -61,7 +61,7 @@ export function PowerCard({ id, width }: { id: PowerUpId; width: number }) {
 }
 
 /**
- * The card too small to read, as the action row holds it: the same gold frame and felt face with
+ * The card too small to read, as the felt holds it: the same gold frame and felt face with
  * the power's art alone. The title and line stay on the full card; whoever places this one says
  * them to a screen reader (`powerCardLabel`).
  */
