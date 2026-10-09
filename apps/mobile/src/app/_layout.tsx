@@ -36,6 +36,7 @@ import {
 } from "@/lib/pending-destination";
 import { leaveTable } from "@/features/online/room-session";
 import { QuestsProvider } from "@/lib/quests-provider";
+import "@/lib/rive-backend";
 import { useRevenueCatIdentity } from "@/lib/use-revenuecat";
 
 Sentry.init({
