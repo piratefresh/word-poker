@@ -295,7 +295,14 @@ export function useOnlineGame({
   // can repeat a tile the reshuffled bag just handed back, so a rack counts only beside the board
   // of the hand it was dealt for — until then the seat holds nothing.
   const priv = received !== null && received.hand === view?.handCount ? received : null;
-  const [heroDraft, setHeroDraft] = useState<readonly TilePlay[]>([]);
+  const [draftPlays, setHeroDraft] = useState<readonly TilePlay[]>([]);
+  // A power can swap a played tile out of the rack (mulligan, magnet, wild): the draft keeps only
+  // tiles the seat still holds, or every later edit is refused as "not in your tiles".
+  const available = useMemo(() => availableFor(priv, view), [priv, view]);
+  const heroDraft = useMemo(() => {
+    const kept = draftPlays.filter((play) => available.some((tile) => tile.id === play.tileId));
+    return kept.length === draftPlays.length ? draftPlays : kept;
+  }, [available, draftPlays]);
   const lastDraftWindowHand = useRef<number | null>(null);
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
   // The hero's own move, shown the instant it is tapped and kept only until the server's own
@@ -458,7 +465,6 @@ export function useOnlineGame({
    */
   const setDraft = useCallback(
     (next: readonly TilePlay[]) => {
-      const available = availableFor(priv, view);
       const resolution = resolveSubmission({ available, submission: { plays: [...next] } });
       if (!resolution.ok && isUnbuildable(resolution.reason)) {
         setRefusal(resolution.reason);
@@ -471,7 +477,7 @@ export function useOnlineGame({
         room.send(GAME_MESSAGES.draftWord, { submission: { plays: [...next] } });
       }
     },
-    [priv, room, view],
+    [available, room, view],
   );
 
   const confirmWord = useCallback(() => {

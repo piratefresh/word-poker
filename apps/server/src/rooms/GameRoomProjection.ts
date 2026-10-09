@@ -66,9 +66,12 @@ export class GameRoomProjection {
   }
 
   privateState(input: PrivateStateInput): PrivateSeatState {
-    const seat = input.game?.seats[input.binding.seat];
+    // The engine's seat index is its own (present seats, in order), not the table seat number:
+    // find the seat by player id, as the word window does, so the rack sent is the one it judges.
+    const index = input.game?.seats.findIndex((candidate) => candidate.id === input.binding.playerId) ?? -1;
+    const seat = index < 0 ? undefined : input.game?.seats[index];
     const activeTurn =
-      input.game?.wordWindow?.status !== "open" && input.game?.toActIndex === input.binding.seat;
+      seat !== undefined && input.game?.wordWindow?.status !== "open" && input.game?.toActIndex === index;
     // Spread rather than set to `undefined`: a Classic seat's message carries no power key at all.
     const power = privatePowerState(input.game, input.binding.playerId, input.now);
 

@@ -529,6 +529,25 @@ describe("GameRoom", () => {
       assert.strictEqual(room.state.phase, "preflop");
     });
 
+    it("sends a seat past an empty table seat its own rack", async () => {
+      const room = await colyseus.createRoom("game", { name: "Gap", buyIn: 500, maxSeats: 4 });
+      const first = await colyseus.connectTo(room);
+      const leaver = await colyseus.connectTo(room);
+      const third = await colyseus.connectTo(room);
+      await leaver.leave();
+      await room.waitForNextPatch();
+
+      // Table seat 2, engine seat 1: the rack is the engine's seat for this player, not index 2.
+      let received: PrivateSeatState | undefined;
+      third.onMessage(GAME_EVENTS.privateState, (payload) => (received = payload as PrivateSeatState));
+      await readyUp(room, [first, third]);
+      for (let tick = 0; tick < 50 && received?.hand !== room.state.handCount; tick += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.strictEqual(room.state.seats.get(third.sessionId)?.seat, 2);
+      assert.strictEqual(received?.rack.length, 2, "the seat past the gap holds its own rack");
+    });
+
     it("runs a dropped seat's own turn clock and folds it at the deadline (§29)", async () => {
       const room = await colyseus.createRoom("game", {
         name: "Disconnect test",
