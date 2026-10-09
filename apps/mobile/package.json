@@ -27,7 +27,7 @@
     "@expo/vector-icons": "^15.1.1",
     "@revenuecat/purchases-js": "^1.67.1",
     "@rive-app/canvas": "^2.44.0",
-    "@rive-app/react-native": "^0.5.2",
+    "@rive-app/react-native": "^0.5.4",
     "@shopify/react-native-skia": "^2.6.2",
     "@wordpoker/contracts": "workspace:*",
     "@wordpoker/db": "workspace:*",
