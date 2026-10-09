@@ -2,10 +2,11 @@
  * balance-chip.tsx — the header's balance. It is the only quantity up there that can be
  * unknown, and each way of not knowing it reads differently to a player: a stalled fetch
  * painted as `$0` would tell them they are broke. So every unknown state gets its own
- * wording, and only the signed-out chip is a control.
+ * wording, and only the signed-out chip is a control. Free play is not a quantity at all
+ * but the table's mode (offline, tutorial — ADR 0002), drawn as a static tag.
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import {
   border,
@@ -25,6 +26,8 @@ import { GLASS_EDGE, GLASS_FILL } from "./glass";
 const CHIP_HEIGHT = 30;
 const CHIP_MAX_WIDTH = 92;
 
+export { CHIP_HEIGHT };
+
 /** Loading needs a placeholder that cannot be mistaken for a figure. */
 const LOADING_PLACEHOLDER = "···";
 const UNAVAILABLE_PLACEHOLDER = "—";
@@ -32,9 +35,11 @@ const UNAVAILABLE_PLACEHOLDER = "—";
 export function BalanceChip({
   balance,
   onPress,
+  style,
 }: {
   balance: BalanceView;
   onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
 }) {
   if (balance.state === "signed-out") {
     // No handler means no destination, and a chip that looks tappable but does nothing
@@ -48,7 +53,7 @@ export function BalanceChip({
         onPress={onPress}
         style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
       >
-        <Text style={styles.chipActionText}>SIGN IN</Text>
+        <Text style={styles.chipTag}>SIGN IN</Text>
       </Pressable>
     );
   }
@@ -59,11 +64,15 @@ export function BalanceChip({
       accessibilityLabel={balanceLabel(balance)}
       accessibilityRole="text"
       accessible
-      style={styles.chip}
+      style={[styles.chip, style]}
     >
       <Text
         numberOfLines={1}
-        style={[styles.chipValue, !ready && styles.chipPlaceholder]}
+        style={
+          balance.state === "free-play"
+            ? [styles.chipValue, styles.chipTag]
+            : [styles.chipValue, !ready && styles.chipPlaceholder]
+        }
       >
         {balanceText(balance)}
       </Text>
@@ -82,6 +91,8 @@ function balanceLabel(
       return "Balance loading";
     case "unavailable":
       return "Balance unavailable";
+    case "free-play":
+      return "Free play";
   }
 }
 
@@ -95,6 +106,8 @@ function balanceText(
       return LOADING_PLACEHOLDER;
     case "unavailable":
       return UNAVAILABLE_PLACEHOLDER;
+    case "free-play":
+      return "FREE PLAY";
   }
 }
 
@@ -117,7 +130,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   chipPlaceholder: { color: colors.textDim },
-  chipActionText: {
+  /** Small caps tag text: the SIGN IN control's label, and the static FREE PLAY tag. */
+  chipTag: {
     color: colors.gold,
     fontFamily: fonts.mono,
     fontSize: fontSize.micro,

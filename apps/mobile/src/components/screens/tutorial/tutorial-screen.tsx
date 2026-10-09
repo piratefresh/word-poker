@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import { FREE_PLAY } from "@/components/hud";
 import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
@@ -72,6 +73,8 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
       <CoachProvider style={styles.table} tour={help.tour ?? lesson.coach}>
         <GameScreen
           actionsLocked={lesson.actionsLocked}
+          // Free play: the tutorial's chips are part of the lesson, not the player's Wallet.
+          balance={FREE_PLAY}
           clockHeld={lesson.held}
           game={game}
           winOverlay={

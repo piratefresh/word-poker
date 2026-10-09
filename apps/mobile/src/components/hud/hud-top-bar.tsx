@@ -1,7 +1,13 @@
 /**
- * hud-top-bar.tsx — the in-hand HUD header: the wooden phase and timer capsule at the top
- * centre, flanked by round wooden back / help / settings buttons in the corners.
- * The pieces live in : the capsule, its clock, the balance chip and the buttons.
+ * hud-top-bar.tsx — the in-hand HUD header: one row with the wooden phase and timer capsule
+ * centred between the corner groups — back on the left, the balance chip and the help button
+ * on the right, so the chip can never reach the clock. The pieces live in `top-bar/`: the
+ * capsule, its clock, the chip and the buttons.
+ *
+ * A balance that is the table's mode rather than a figure (free play) is not a readout sharing
+ * the corner with the clock: in portrait it hangs under the capsule as its tag, over the room
+ * below rather than in the bar's own height — the room's seats are placed clear of it
+ * (`MODE_TAG_BLOCK`). A landscape bar keeps it beside the clock.
  *
  * The capsule rises into place once per phase change, and the digits breathe while the hero
  * is the one on turn. Both hang off the HUD's phase clock and the loop gate rather than off
@@ -30,13 +36,18 @@ import {
 
 import type { RoundPhase } from "@wordpoker/contracts";
 
-import { useCompactControls, useScreenScale } from "@/components/screens/game/screen-scale";
+import { useScreenScale } from "@/components/screens/game/screen-scale";
 
 import { PHASE_LABEL, type BalanceView } from "./hud-types";
 import { BalanceChip } from "./top-bar/balance-chip";
-import { BAR_TOP_PAD, CAPSULE_HEIGHT, hudBarHeight } from "./top-bar/banner";
+import {
+  BAR_TOP_PAD,
+  CAPSULE_HEIGHT,
+  MODE_TAG_GAP,
+  hudBarHeight,
+} from "./top-bar/banner";
 import { PhaseCapsule } from "./top-bar/phase-capsule";
-import { BackChevron, GearGlyph, WoodButton } from "./top-bar/wood-button";
+import { BackChevron, WoodButton } from "./top-bar/wood-button";
 import type { TurnTimerView } from "./turn-clock";
 
 export { hudBarHeight };
@@ -48,10 +59,15 @@ export interface HudTopBarProps {
   /** Words for the stamp in place of the phase's, for a table with no hand dealt yet. */
   stamp?: string;
   balance: BalanceView;
+  /**
+   * Whether this header hangs the table's mode under the capsule. Decided above the felt
+   * (`hangsModeTag`, and the room that has to seat its row below it): the bar draws the tag
+   * where it is told rather than guessing at a room it cannot see.
+   */
+  modeTag?: boolean;
   /** Back slot: this is the leave-table affordance. */
   onLeave?: () => void;
   onHelp?: () => void;
-  onSettings?: () => void;
   /** Only meaningful for the signed-out and unavailable balance states. */
   onBalancePress?: () => void;
   /** Spoken turn phrase, e.g. "Magnus to act". Passed through to the announcement hook. */
@@ -76,9 +92,9 @@ export function HudTopBar({
   stamp,
   turn,
   balance,
+  modeTag = false,
   onLeave,
   onHelp,
-  onSettings,
   onBalancePress,
   turnPhrase,
   tick,
@@ -91,7 +107,6 @@ export function HudTopBar({
   const localTick = useSharedValue(0);
   const window = useWindowDimensions();
   const scale = useScreenScale();
-  const compact = useCompactControls();
   const clockTick = tick ?? localTick;
   const loopsOn = loopsEnabled ?? true;
   const systemReduceMotion = useReducedMotion();
@@ -134,31 +149,38 @@ export function HudTopBar({
 
   return (
     <View style={{ height: hudBarHeight(window) }} testID={testID}>
-      {/* The capsule rises on a phase change; the corner buttons stay put. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.capsulePlate, { top: BAR_TOP_PAD, right: compact ? 48 : 0 }, entrance]}
-      >
-        <PhaseCapsule
-          label={stamp ?? PHASE_LABEL[phase]}
-          loopsEnabled={loopsOn}
-          phrase={turnPhrase}
-          reduceMotion={reduce}
-          showClock={stamp === undefined}
-          turn={turn}
-        />
-      </Animated.View>
       <View pointerEvents="box-none" style={[styles.bar, { top: BAR_TOP_PAD, height: CAPSULE_HEIGHT * scale }]}>
         <WoodButton label="Leave the table" onPress={onLeave}>
           <BackChevron />
         </WoodButton>
-        <BalanceChip balance={balance} onPress={onBalancePress} />
+        {/* The capsule rises on a phase change; the corner buttons stay put. It centres in
+            the room the corner groups leave rather than across the whole window, so no
+            corner control can overlap the clock — and the mode's tag, when there is one,
+            hangs under the capsule as part of that same block. */}
+        <Animated.View pointerEvents="none" style={[styles.capsuleSlot, entrance]}>
+          {/* Drawn before the capsule so the capsule's foot overlaps the tag's top. */}
+          {modeTag ? (
+            <View style={[styles.modeTag, { top: CAPSULE_HEIGHT * scale + MODE_TAG_GAP }]}>
+              <BalanceChip balance={balance} style={styles.modeTagChip} />
+            </View>
+          ) : null}
+          <PhaseCapsule
+            label={stamp ?? PHASE_LABEL[phase]}
+            loopsEnabled={loopsOn}
+            phrase={turnPhrase}
+            reduceMotion={reduce}
+            showClock={stamp === undefined}
+            turn={turn}
+          />
+        </Animated.View>
+        {/* A tag sits under the capsule, so that one balance is not in this group — the
+            numbers that are readouts, and the one chip that is a control, are. */}
         <View style={styles.trailing}>
+          {modeTag ? null : (
+            <BalanceChip balance={balance} onPress={onBalancePress} />
+          )}
           <WoodButton label="How to play" onPress={onHelp}>
             <Text style={styles.helpGlyph}>?</Text>
-          </WoodButton>
-          <WoodButton label="Settings" onPress={onSettings}>
-            <GearGlyph />
           </WoodButton>
         </View>
       </View>
@@ -176,7 +198,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
   },
-  capsulePlate: { alignItems: "center", left: 0, position: "absolute", right: 0 },
+  capsuleSlot: { alignItems: "center", flex: 1 },
+  /** The mode's tag: centred under the capsule, out of the corner row's flow. */
+  modeTag: { alignItems: "center", left: 0, position: "absolute", right: 0 },
+  /** The capsule's own felt-green inlay (`phase-capsule.tsx`), so the tag reads as hung off it. */
+  modeTagChip: { backgroundColor: "#1E5A33", borderColor: "#123A21" },
   helpGlyph: {
     color: "#FFE7B0",
     fontFamily: fonts.arcade,
@@ -185,6 +211,5 @@ const styles = StyleSheet.create({
   trailing: {
     flexDirection: "row",
     gap: 6,
-    marginLeft: "auto",
   },
 });

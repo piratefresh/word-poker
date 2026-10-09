@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Svg, { Circle, Line, Polyline } from "react-native-svg";
+import Svg, { Polyline } from "react-native-svg";
 
 import { useScreenScale } from "@/components/screens/game/screen-scale";
 import { border, layout, opacity, radius } from "@/constants/theme";
@@ -14,20 +14,6 @@ import { CAPSULE_HEIGHT } from "./banner";
 const GLYPH = "#FFE7B0";
 /** The capsule's height, which the discs ride level with. */
 const DIAMETER = CAPSULE_HEIGHT;
-
-/** Eight teeth is the least that still reads as a cog at 14pt. */
-const GEAR_TEETH = [0, 45, 90, 135, 180, 225, 270, 315].map((degrees) => {
-  const radians = (degrees * Math.PI) / 180;
-  const cos = Math.cos(radians);
-  const sin = Math.sin(radians);
-  return {
-    degrees,
-    x1: 7 + cos * 4.2,
-    y1: 7 + sin * 4.2,
-    x2: 7 + cos * 6.2,
-    y2: 7 + sin * 6.2,
-  };
-});
 
 interface WoodButtonProps {
   label: string;
@@ -65,33 +51,6 @@ export function BackChevron() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={border.thin}
-      />
-    </Svg>
-  );
-}
-
-export function GearGlyph() {
-  return (
-    <Svg height={20} viewBox="0 0 14 14" width={20}>
-      {GEAR_TEETH.map((tooth) => (
-        <Line
-          key={tooth.degrees}
-          stroke={GLYPH}
-          strokeLinecap="round"
-          strokeWidth={1.4}
-          x1={tooth.x1}
-          x2={tooth.x2}
-          y1={tooth.y1}
-          y2={tooth.y2}
-        />
-      ))}
-      <Circle
-        cx={7}
-        cy={7}
-        fill="none"
-        r={4.2}
-        stroke={GLYPH}
-        strokeWidth={1.4}
       />
     </Svg>
   );
