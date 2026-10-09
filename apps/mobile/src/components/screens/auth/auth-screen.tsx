@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import { useState } from "react";
-import { Platform, StyleSheet, Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 import {
   AuthShell,
@@ -8,7 +8,7 @@ import {
   FooterLine,
   GoldButton,
 } from "./auth-shell";
-import { EMAIL_VERIFIED_DEEP_LINK } from "@/constants/links";
+import { EMAIL_VERIFIED_CALLBACK } from "@/constants/links";
 import { colors, theme } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
 
@@ -16,12 +16,6 @@ import { authClient } from "@/auth/client/auth-client";
 const { type: typography } = theme;
 
 type AuthMode = "sign-in" | "sign-up";
-
-/**
- * Where the verification mail's link lands once Better Auth has verified it: Home, in the app on a
- * phone, or on the same web origin in a browser (a desktop has no `wordpoker://` handler).
- */
-const EMAIL_VERIFIED_CALLBACK = Platform.OS === "web" ? "/" : EMAIL_VERIFIED_DEEP_LINK;
 
 const NETWORK_ERROR =
   "Could not reach the server — check your connection and try again.";

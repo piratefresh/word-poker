@@ -117,7 +117,11 @@ test("asks an unverified player to verify, and resends the mail", async () => {
 
   await waitFor(() => expect(view.getByTestId("store-verify")).toBeTruthy());
   await press(view, "store-verify-resend");
-  expect(authClient.sendVerificationEmail).toHaveBeenCalledWith({ email: "ada@example.com", callbackURL: "/" });
+  // The card names the platform's destination for the verified mail (jest-expo runs iOS here).
+  expect(authClient.sendVerificationEmail).toHaveBeenCalledWith({
+    email: "ada@example.com",
+    callbackURL: "wordpoker://",
+  });
 });
 
 test("offers no welcome to an unverified player who already has it", async () => {
