@@ -100,8 +100,11 @@ tags:
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 20000
+- tapOn:
+    id: "wager-slider"
+    point: "2%,50%"
 - assertVisible:
-    text: "BET \\$20"
+    id: "action-wager"
 - assertVisible:
     text: "\\$720"
 - tapOn:

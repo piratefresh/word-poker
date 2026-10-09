@@ -3,12 +3,14 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type GestureResponderEvent,
   type LayoutChangeEvent,
 } from "react-native";
 
 import { CoachTarget } from "@/components/ui/coach";
+import { webTestID } from "@/lib/web-id";
 import { fonts, palette, radius } from "@/constants/theme";
 
 import type { BettingState } from "../game-types";
@@ -32,10 +34,12 @@ export function RaiseSlider({
 }) {
   const scale = useScreenScale();
   const tight = useCompactControls();
+  const { width, height } = useWindowDimensions();
+  const landscape = width > height;
   const [trackWidth, setTrackWidth] = useState(1);
 
-  const range = Math.max(1, state.maxRaise - state.minRaise);
-  const progress = (amount - state.minRaise) / range;
+  const range = Math.max(1, state.maxRaise - state.minRaise + state.raiseStep);
+  const progress = amount === 0 ? 0 : (amount - state.minRaise + state.raiseStep) / range;
   const potAfterCall = pot + (state.callAmount ?? 0);
   const wagerPhrase = state.wager === "bet" ? "bet" : "raise to";
   const presets = POT_PRESETS.map((preset) => {
@@ -57,13 +61,18 @@ export function RaiseSlider({
     };
   });
   const fromEvent = (event: GestureResponderEvent) => {
-    onAmountChange(
-      state.minRaise + (event.nativeEvent.locationX / trackWidth) * range,
-    );
+    const position = Math.max(0, Math.min(1, event.nativeEvent.locationX / trackWidth)) * range;
+    onAmountChange(position < state.raiseStep / 2 ? 0 : Math.max(state.minRaise, state.minRaise + position - state.raiseStep));
   };
   return (
     <CoachTarget id="raise" style={styles.raiseRow}>
-      <View style={[styles.presetRow, { marginHorizontal: 12 * scale }]}>
+      <View
+        style={[
+          styles.presetRow,
+          { marginHorizontal: 12 * scale },
+          landscape && styles.presetRowLandscape,
+        ]}
+      >
         {presets.map((preset) => (
           <Pressable
             key={preset.label}
@@ -86,6 +95,7 @@ export function RaiseSlider({
             <View
               style={[
                 styles.flagBadge,
+                landscape && { paddingHorizontal: 3 * scale },
                 preset.selected && styles.flagBadgeSelected,
               ]}
             >
@@ -93,42 +103,38 @@ export function RaiseSlider({
                 numberOfLines={1}
                 style={[
                   styles.flagText,
+                  landscape && { fontSize: 10 * scale },
                   preset.selected && styles.flagTextSelected,
                 ]}
               >
                 {preset.label}
               </Text>
             </View>
-            <View
-              style={[
-                styles.flagPole,
-                preset.selected && styles.flagPoleSelected,
-              ]}
-            />
           </Pressable>
         ))}
       </View>
       <View style={styles.trackRow}>
         <View
+          testID="wager-slider"
+          id={webTestID("wager-slider")}
           accessibilityActions={[
-            { name: "increment", label: "Increase raise" },
-            { name: "decrement", label: "Decrease raise" },
+            { name: "increment", label: "Increase wager" },
+            { name: "decrement", label: "Decrease wager or return to check or call" },
           ]}
-          accessibilityLabel="Raise amount"
+          accessibilityLabel="Wager amount"
           accessibilityRole="adjustable"
           accessibilityValue={{
-            min: state.minRaise,
+            min: 0,
             max: state.maxRaise,
             now: amount,
-            text: `$${amount}`,
+            text: amount === 0 ? (state.primary === "call" ? `Call $${state.callAmount ?? 0}` : "Check") : `$${amount}`,
           }}
           onAccessibilityAction={(event) =>
             !disabled &&
             onAmountChange(
-              amount +
-                (event.nativeEvent.actionName === "increment"
-                  ? state.raiseStep
-                  : -state.raiseStep),
+              event.nativeEvent.actionName === "increment"
+                ? (amount === 0 ? state.minRaise : amount + state.raiseStep)
+                : (amount <= state.minRaise ? 0 : amount - state.raiseStep),
             )
           }
           onLayout={(event: LayoutChangeEvent) =>
@@ -185,7 +191,8 @@ const POT_PRESETS = [
 
 const styles = StyleSheet.create({
   raiseRow: { flex: 1, minWidth: 0 },
-  presetRow: { flexDirection: "row", height: 30 },
+  presetRow: { flexDirection: "row", height: 30, marginBottom: 2 },
+  presetRowLandscape: { marginHorizontal: 0 },
   presetButton: {
     alignItems: "center",
     flex: 1,
@@ -199,8 +206,8 @@ const styles = StyleSheet.create({
     borderColor: palette.gold400,
     borderRadius: 4,
     borderWidth: 1,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
   },
   flagBadgeSelected: {
     backgroundColor: palette.gold300,
@@ -209,12 +216,10 @@ const styles = StyleSheet.create({
   flagText: {
     color: palette.cream100,
     fontFamily: fonts.sansBlack,
-    fontSize: 9,
-    lineHeight: 10,
+    fontSize: 12,
+    lineHeight: 14,
   },
   flagTextSelected: { color: "#3c240c" },
-  flagPole: { backgroundColor: palette.gold400, height: 4, width: 2 },
-  flagPoleSelected: { backgroundColor: palette.gold100 },
   trackRow: {
     alignItems: "center",
     flexDirection: "row",

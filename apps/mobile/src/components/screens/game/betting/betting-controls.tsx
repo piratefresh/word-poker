@@ -1,20 +1,23 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
+import type { TurnTimerView } from "@/components/hud/turn-clock";
 import { CoachTarget } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
 
 import type { BettingState } from "../game-types";
-import { useCompactControls, useScreenScale } from "../screen-scale";
+import { useCompactControls, useScreenScale, useShortControls } from "../screen-scale";
 import { AllInSheet } from "./all-in-sheet";
 import { formatCompactAmount } from "./format-amount";
 import { RaiseSlider } from "./raise-slider";
+import { WagerButton } from "./wager-button";
 
 export function BettingControls({
   state,
   amount,
   pot,
   locked,
+  waitingOn,
   onAmountChange,
   onFold,
   onCheckOrCall,
@@ -26,6 +29,14 @@ export function BettingControls({
   pot: number;
   /** The row's own actions and the slider are held disabled (`actionsLocked`). */
   locked: boolean;
+  /**
+   * Off-turn: the table waits on another seat, so the wager button waits too — WAITING, that
+   * seat's name, its clock draining a ring. Omitted on the hero's turn.
+   */
+  waitingOn?: {
+    name?: string;
+    view?: TurnTimerView;
+  };
   onAmountChange: (amount: number) => void;
   onFold?: () => void;
   onCheckOrCall?: () => void;
@@ -35,15 +46,17 @@ export function BettingControls({
 }) {
   const scale = useScreenScale();
   const tight = useCompactControls();
+  const short = useShortControls();
   const [allInOpen, setAllInOpen] = useState(false);
   // The turn can move on under the sheet — the hero's own clock, most often — and a seat that
   // no longer has a stack to commit is not asked to confirm one.
   if (allInOpen && !state.canAllIn) setAllInOpen(false);
 
-  // §19's window keeps the check's own word on the confirm: the row's check is what locks it in.
-  // The same slider opens the round or raises it: with no bet out the action is a bet, and
-  // the amount is the round total either way (§22).
-  const wagerLabel = state.wager === "bet" ? "BET" : "RAISE";
+  // Zero selects check/call, including §19's word confirm. Positive amounts are round totals.
+  const selectedWager = amount > 0 && (state.canRaise || state.canBet);
+  const wagerLabel = selectedWager
+    ? (state.wager === "bet" ? "BET" : "RAISE TO")
+    : (state.primary === "call" ? "CALL" : "CHECK");
   const canFold = !locked && state.canFold;
   const canCheckOrCall =
     !locked && (state.canCheck || state.callAmount != null);
@@ -53,88 +66,69 @@ export function BettingControls({
     <View style={[styles.betting, tight && styles.bettingTight]}>
       <View style={[styles.controls, tight && styles.controlsTight]}>
         <View style={[styles.raiseActionRow, tight && styles.raiseActionRowTight]}>
-          <RaiseSlider
-            amount={amount}
-            disabled={!canWager}
-            onAmountChange={onAmountChange}
-            pot={pot}
-            state={state}
-          />
+          <View style={styles.leftColumn}>
+            <RaiseSlider
+              amount={amount}
+              disabled={!canWager}
+              onAmountChange={onAmountChange}
+              pot={pot}
+              state={state}
+            />
+            <CoachTarget
+              id="actions"
+              style={styles.actionRow}
+            >
+              {/* The row's controls carry ids as well as labels: the felt's nameplates print
+              CHECK, CALL and FOLD as seat status too, so a device flow that matched the
+              row by text alone could land on a seat instead of a control (see
+              .maestro/native/offline-hand.yaml). */}
+              <GameButton
+                disabled={!canFold}
+                label="FOLD"
+                horizontalPadding={8}
+                onPress={onFold}
+                compact
+                scale={scale}
+                style={[styles.action, short && styles.actionShort]}
+                testID="action-fold"
+                variant="danger"
+              />
+              <GameButton
+                disabled={!canAllIn}
+                // ALL IN is an action, not an amount: the stack is already on the felt and the
+                // confirm sheet still names what it commits.
+                label="ALL IN"
+                horizontalPadding={8}
+                onPress={() => setAllInOpen(true)}
+                compact
+                scale={scale}
+                style={[styles.action, short && styles.actionShort]}
+                testID="all-in-button"
+                variant="gold"
+              />
+            </CoachTarget>
+          </View>
           <CoachTarget
             id="wager"
             style={[styles.wagerAction, { minWidth: 76 * scale }]}
           >
-            <GameButton
-              disabled={!canWager}
-              amount={formatCompactAmount(amount)}
-              label={wagerLabel}
-              horizontalPadding={8}
-              onPress={onWager}
-              compact={tight}
-              scale={scale}
-              testID="action-wager"
-              variant="gold"
-            />
+            <CoachTarget id="check">
+              {/* The tutorial's hold keeps the disabled look: a lesson that wants the rack
+                  alone must not dress its controls up as a live wait. */}
+              <WagerButton
+                waitingOn={locked ? undefined : waitingOn}
+                disabled={selectedWager ? !canWager : !canCheckOrCall}
+                amount={selectedWager
+                  ? formatCompactAmount(amount)
+                  : state.primary === "call" ? formatCompactAmount(state.callAmount ?? 0) : undefined}
+                label={wagerLabel}
+                onPress={selectedWager ? onWager : onCheckOrCall}
+                size={(short ? 120 : tight ? 140 : 168) * scale}
+                testID={selectedWager ? "action-wager" : "action-check-call"}
+              />
+            </CoachTarget>
           </CoachTarget>
         </View>
-        <CoachTarget
-          id="actions"
-          style={[styles.actionRow, tight && styles.actionRowTight]}
-        >
-          {/* The row's controls carry ids as well as labels: the felt's nameplates print
-          CHECK, CALL and FOLD as seat status too, so a device flow that matched the
-          row by text alone could land on a seat instead of a control (see
-          .maestro/native/offline-hand.yaml). */}
-          <GameButton
-            disabled={!canFold}
-            label="FOLD"
-            horizontalPadding={8}
-            onPress={onFold}
-            compact={tight}
-            scale={scale}
-            style={styles.action}
-            testID="action-fold"
-            variant="danger"
-          />
-          {/* The check is a coach target of its own, so a lesson can point at the one press it asks
-          for. */}
-          <CoachTarget
-            id="check"
-            style={[styles.callAction, { minWidth: 48 * scale }]}
-          >
-            <GameButton
-              disabled={!canCheckOrCall}
-              amount={
-                state.primary === "call"
-                  ? formatCompactAmount(state.callAmount ?? 0)
-                  : undefined
-              }
-              label={state.primary === "call" ? "CALL" : "CHECK"}
-              horizontalPadding={8}
-              onPress={onCheckOrCall}
-              compact={tight}
-              scale={scale}
-              variant="blue"
-              // The one control the row arms for two actions, so a test cannot name it by its label:
-              // the felt's nameplates print CHECK and CALL as seat status too, and a text selector
-              // lands on whichever the tree puts first.
-              testID="action-check-call"
-            />
-          </CoachTarget>
-          <GameButton
-            disabled={!canAllIn}
-            // ALL IN is an action, not an amount: the stack is already on the felt and the
-            // confirm sheet still names what it commits.
-            label="ALL IN"
-            horizontalPadding={8}
-            onPress={() => setAllInOpen(true)}
-            compact={tight}
-            scale={scale}
-            style={styles.allIn}
-            testID="all-in-button"
-            variant="gold"
-          />
-        </CoachTarget>
       </View>
       <AllInSheet
         amount={state.allInAmount}
@@ -157,17 +151,20 @@ export const bettingRowStyle = {
 
 const styles = StyleSheet.create({
   betting: bettingRowStyle,
-  controls: { paddingHorizontal: 10, paddingVertical: 8 },
+  controls: { paddingHorizontal: 6, paddingVertical: 2 },
   bettingTight: { paddingHorizontal: 12 },
-  controlsTight: { paddingVertical: 4 },
-  raiseActionRow: { alignItems: "center", flexDirection: "row", gap: 6 },
+  controlsTight: { paddingVertical: 0 },
+  raiseActionRow: { alignItems: "center", flexDirection: "row", gap: 4 },
   raiseActionRowTight: { gap: 4 },
-  actionRowTight: { gap: 4 },
-  actionRow: { flexDirection: "row", gap: 6, paddingTop: 4 },
+  /** Slider and FOLD / ALL IN stack at the slider's width, beside the wager button. */
+  leftColumn: { flex: 1, gap: 2, minWidth: 0 },
+  actionRow: { flexDirection: "row", gap: 6 },
   /** A control that shares the row's width with its neighbours. */
   action: { flex: 1 },
-  /** Keep the call action and raise action large enough for their amounts. */
-  callAction: { flex: 1 },
-  wagerAction: { flexShrink: 0 },
-  allIn: { minWidth: 64 },
+  /** A short portrait window: still a 40-point touch target, under the compact 46. */
+  actionShort: { height: 40 },
+  // The sprite has transparent space around its housing; tuck it into the neighbours.
+  // marginTop/Bottom are lopsided on purpose: the centred row drops the button ~10 to line up
+  // with FOLD / ALL IN.
+  wagerAction: { flexShrink: 0, marginRight: -16, marginTop: -4, marginBottom: -24 },
 });
