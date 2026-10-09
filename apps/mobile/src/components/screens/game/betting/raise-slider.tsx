@@ -190,7 +190,10 @@ const POT_PRESETS = [
 ] as const;
 
 const styles = StyleSheet.create({
-  raiseRow: { flex: 1, minWidth: 0 },
+  // No `flex: 1` here or on the track row: the column around them has no height of its own, and
+  // native Yoga reads a zero flex basis literally there, collapsing the row so the action row
+  // below draws over the track (the web's CSS sizes it by content instead).
+  raiseRow: { minWidth: 0 },
   presetRow: { flexDirection: "row", height: 30, marginBottom: 2 },
   presetRowLandscape: { marginHorizontal: 0 },
   presetButton: {
@@ -223,7 +226,6 @@ const styles = StyleSheet.create({
   trackRow: {
     alignItems: "center",
     flexDirection: "row",
-    flex: 1,
     minHeight: 30,
   },
   touchArea: { flex: 1, height: 36, justifyContent: "center" },

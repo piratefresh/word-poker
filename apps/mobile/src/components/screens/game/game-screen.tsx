@@ -158,7 +158,10 @@ function GameScreenBody({
   const scale = useScreenScale();
   const tight = useCompactControls();
   const [controlsHeight, setControlsHeight] = useState(0);
-  const tableHeight = height - insets.top - insets.bottom - hudHeight - (landscape ? 0 : controlsHeight);
+  // Portrait's controls reach into the home indicator's band: half of it stays clear for the
+  // swipe, the rest goes to the felt instead of standing empty under the action row.
+  const bottomInset = landscape ? insets.bottom : Math.round(insets.bottom / 2);
+  const tableHeight = height - insets.top - bottomInset - hudHeight - (landscape ? 0 : controlsHeight);
   // Short phones need extra clearance for the deeper two-slot tabletop rack.
   const roomChromeWidth = Math.max(tight ? 220 : 240, tableHeight * (400 / (tight ? 540 : 470)));
   const chromeWidth = Math.min(tableMaxWidth(window) ?? window.width, roomChromeWidth);
@@ -278,7 +281,7 @@ function GameScreenBody({
           styles.content,
           {
             maxWidth: landscape ? undefined : stageWidth,
-            paddingBottom: insets.bottom,
+            paddingBottom: bottomInset,
             paddingLeft: landscape ? insets.left : 0,
             paddingRight: landscape ? insets.right : 0,
             paddingTop: insets.top + hudHeight,
