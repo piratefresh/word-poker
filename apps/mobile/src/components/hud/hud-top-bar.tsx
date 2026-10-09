@@ -7,7 +7,7 @@
  * A balance that is the table's mode rather than a figure (free play) is not a readout sharing
  * the corner with the clock: in portrait it hangs under the capsule as its tag, over the room
  * below rather than in the bar's own height — the room's seats are placed clear of it
- * (`MODE_TAG_BLOCK`). A landscape bar keeps it beside the clock.
+ * (`MODE_TAG_BLOCK`). A landscape bar keeps it beside the back button.
  *
  * The capsule rises into place once per phase change, and the digits breathe while the hero
  * is the one on turn. Both hang off the HUD's phase clock and the loop gate rather than off
@@ -106,6 +106,7 @@ export function HudTopBar({
   // own that never ticks: the hook is unconditional, so its order never depends on props.
   const localTick = useSharedValue(0);
   const window = useWindowDimensions();
+  const balanceOnLeft = window.width > window.height && !modeTag;
   const scale = useScreenScale();
   const clockTick = tick ?? localTick;
   const loopsOn = loopsEnabled ?? true;
@@ -154,6 +155,9 @@ export function HudTopBar({
           <WoodButton label="Leave the table" onPress={onLeave}>
             <BackChevron />
           </WoodButton>
+          {balanceOnLeft ? (
+            <BalanceChip balance={balance} onPress={onBalancePress} />
+          ) : null}
         </View>
         {/* The capsule rises on a phase change; the corner buttons stay put. The two corner
             groups share the row's spare width equally, so the capsule sits at the window's
@@ -178,7 +182,7 @@ export function HudTopBar({
         {/* A tag sits under the capsule, so that one balance is not in this group — the
             numbers that are readouts, and the one chip that is a control, are. */}
         <View style={[styles.corner, styles.trailing]}>
-          {modeTag ? null : (
+          {modeTag || balanceOnLeft ? null : (
             <BalanceChip balance={balance} onPress={onBalancePress} />
           )}
           <WoodButton label="How to play" onPress={onHelp}>

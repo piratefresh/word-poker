@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 
 import type { LetterTileData } from "../game-types";
-import { useScreenScale } from "../screen-scale";
-import { Tile } from "@/components/game";
+import { isCompactWindow, useScreenScale } from "../screen-scale";
+import { Tile, TILE_METRICS } from "@/components/game";
 import { LabelBand } from "./label-band";
-import { communityDealDelayMs, EmptyTile, LetterTile } from "./letter-tile";
+import { communityDealDelayMs, EmptyTile, LetterTile, tileSizeFor } from "./letter-tile";
 
 /** The rack picture, in its own pixels. */
 const RACK_IMAGE = { width: 2172, height: 724 };
@@ -52,20 +52,19 @@ export function CommunityStrip({
   tiles,
   inTable = false,
   scale: requestedScale,
-  potGap,
 }: {
   tiles: readonly (LetterTileData | null)[];
   /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
   inTable?: boolean;
   scale?: number;
-  /** A gap, in points, opened after the flop and centred on the row, for the pot to sit in. */
-  potGap?: number;
 }) {
   const screenScale = useScreenScale();
   const scale = requestedScale ?? screenScale;
-  const { width, height } = useWindowDimensions();
-  // Landscape phone: scale is 1 but the height is short, so the in-table tiles shrink.
-  const tileWidth = inTable ? (screenScale === 1 && width > height ? 44 : 58) : COMMUNITY_TILE;
+  const window = useWindowDimensions();
+  // Match the word builder's medium tiles, or small tiles on a compact phone.
+  const tileWidth = inTable
+    ? TILE_METRICS[isCompactWindow(window) ? "small" : "medium"].width
+    : COMMUNITY_TILE;
   const tileSize = tileWidth * scale;
   const rack = useMemo(() => rackStyles(tileSize), [tileSize]);
   const five = Array.from({ length: 5 }, (_, index) => tiles[index] ?? null);
@@ -86,15 +85,9 @@ export function CommunityStrip({
             styles.tileRow,
             !inTable && rack.opening,
             { gap: 6 * scale },
-            // The flop's three tiles before the gap and the turn and river after: shifting the row
-            // by one tile and its gap puts the gap, not the row, on the centre.
-            potGap != null && { marginRight: tileSize + 6 * scale },
           ]}
         >
-          {five.flatMap((tile, index) => [
-            ...(potGap != null && index === 3
-              ? [<View key="pot-gap" style={{ width: potGap }} />]
-              : []),
+          {five.map((tile, index) => (
             tile ? (
               <LetterTile
                 dealDelayMs={communityDealDelayMs(index)}
@@ -109,13 +102,13 @@ export function CommunityStrip({
                 ownership="neutral"
                 scale={scale}
                 side="back"
-                size="large"
+                size={tileSizeFor(tileWidth)}
                 tile={BACK_TILE}
               />
             ) : (
               <EmptyTile key={`community-${index}`} size={tileSize} />
-            ),
-          ])}
+            )
+          ))}
         </View>
       </View>
     </View>

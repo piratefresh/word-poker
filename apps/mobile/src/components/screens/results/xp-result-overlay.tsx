@@ -8,7 +8,7 @@
  */
 
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   AccessibilityInfo,
   Image,
@@ -17,6 +17,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
@@ -51,6 +52,8 @@ export function XpResultOverlay({ hero, report, onComplete }: {
 }): ReactElement {
   const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const compact = width > height;
   const { claimOutcomes } = useQuests();
   const { participation, word, total } = xpBreakdown(hero);
   const view = xpView(report, total, claimOutcomes ?? {});
@@ -74,6 +77,14 @@ export function XpResultOverlay({ hero, report, onComplete }: {
   }, [reducedMotion, steps]);
   const stepIndex = reducedMotion ? steps.length - 1 : reached.steps === steps ? reached.index : 0;
   const step = steps[stepIndex] ?? { level: 1, progress: 0 };
+
+  // Once the bar reaches its final step, scroll the Continue button into view for the viewer.
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    const settleMs = reducedMotion ? 0 : ENTRANCE_MS + STEP_MS * Math.max(steps.length - 1, 0);
+    const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), settleMs);
+    return () => clearTimeout(timer);
+  }, [reducedMotion, steps]);
 
   const entrance = useSharedValue(reducedMotion ? 1 : 0);
   useEffect(() => {
@@ -100,10 +111,14 @@ export function XpResultOverlay({ hero, report, onComplete }: {
     <Modal transparent visible statusBarTranslucent navigationBarTranslucent>
       <View accessibilityViewIsModal style={styles.backdrop} testID="xp-result-overlay">
         <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+          ]}
         >
-          <Animated.View style={[styles.content, content]}>
-            <View accessible accessibilityLabel={place} style={styles.pill}>
+          <Animated.View style={[styles.content, compact && styles.contentCompact, content]}>
+            <View accessible accessibilityLabel={place} style={[styles.pill, compact && styles.pillCompact]}>
               <Image accessible={false} resizeMode="contain" source={PLACEMENT_PILL} style={styles.pillArt} />
               <Text style={styles.pillText}>{place}</Text>
             </View>
@@ -118,14 +133,16 @@ export function XpResultOverlay({ hero, report, onComplete }: {
                   accessibilityLabel="Level progress"
                   accessibilityRole="progressbar"
                   accessibilityValue={{ min: 0, max: 100, now: Math.round(step.progress) }}
-                  style={styles.bar}
+                  style={[styles.bar, compact && styles.barCompact]}
                 >
                   <XpBar key={step.level} progress={step.progress} reducedMotion={reducedMotion} />
                 </View>
-                <Text accessibilityRole="header" style={styles.headline}>
+                <Text accessibilityRole="header" style={[styles.headline, compact && styles.headlineCompact]}>
                   You earned <Text style={styles.reward}>+{total} XP</Text>
                 </Text>
-                {awayLine === null ? null : <Text style={styles.away}>{awayLine}</Text>}
+                {awayLine === null ? null : (
+                  <Text style={[styles.away, compact && styles.awayCompact]}>{awayLine}</Text>
+                )}
                 <Text style={styles.sync} testID="xp-sync-note">
                   {view.sync === "pending" ? "XP pending sync"
                     : view.sync === "rejected" ? "XP could not be saved" : " "}
@@ -133,15 +150,15 @@ export function XpResultOverlay({ hero, report, onComplete }: {
               </>
             )}
 
-            <View style={styles.panel}>
+            <View style={[styles.panel, compact && styles.panelCompact]}>
               <LinearGradient
                 pointerEvents="none"
                 colors={["rgba(109, 49, 10, 0.88)", "rgba(63, 24, 4, 0.94)"]}
                 style={StyleSheet.absoluteFill}
               />
-              <Row label="Participation" value={participation} />
+              <Row label="Participation" value={participation} compact={compact} />
               <View style={styles.divider} />
-              <Row label="Word bonus" value={word} />
+              <Row label="Word bonus" value={word} compact={compact} />
             </View>
 
             <Pressable
@@ -150,9 +167,16 @@ export function XpResultOverlay({ hero, report, onComplete }: {
               onPress={onComplete}
               id={webTestID("xp-result-continue")}
               testID="xp-result-continue"
-              style={({ pressed }) => [styles.continue, pressed && styles.continuePressed]}
+              style={({ pressed }) => [
+                styles.continue,
+                compact && styles.continueCompact,
+                pressed && styles.continuePressed,
+              ]}
             >
-              <LinearGradient colors={["#36c9ff", "#069cff", "#0074dd"]} style={styles.continueFace}>
+              <LinearGradient
+                colors={["#36c9ff", "#069cff", "#0074dd"]}
+                style={[styles.continueFace, compact && styles.continueFaceCompact]}
+              >
                 <Text style={styles.continueText}>CONTINUE</Text>
               </LinearGradient>
             </Pressable>
@@ -163,9 +187,9 @@ export function XpResultOverlay({ hero, report, onComplete }: {
   );
 }
 
-function Row({ label, value }: { label: string; value: number }): ReactElement {
+function Row({ label, value, compact }: { label: string; value: number; compact: boolean }): ReactElement {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, compact && styles.rowCompact]}>
       <Text style={styles.rowLabel}>{label}:</Text>
       <Text style={styles.rowValue}>+{value} XP</Text>
     </View>
@@ -176,22 +200,27 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(18, 8, 3, 0.76)" },
   scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   content: { width: "100%", maxWidth: 440, alignItems: "center", gap: 18 },
+  contentCompact: { maxWidth: 320, gap: 8 },
   pill: { width: 240, maxWidth: "100%", height: 80, alignItems: "center", justifyContent: "center", overflow: "hidden", marginBottom: 16 },
+  pillCompact: { width: 160, height: 54, marginBottom: 0 },
   pillArt: { position: "absolute", width: "100%", height: "100%", top: 0, left: 0 },
   pillText: {
     fontFamily: fonts.ui, fontSize: 24, letterSpacing: 1, color: "#fff5df",
     textShadowColor: "#4b2006", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 2,
   },
   bar: { width: "100%", aspectRatio: XP_BAR_ASPECT, marginBottom: 4 },
+  barCompact: { marginBottom: 0 },
   headline: {
     fontFamily: fonts.ui, fontSize: 36, color: "#fff5df", textAlign: "center",
     textShadowColor: "#492006", textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 2,
   },
+  headlineCompact: { fontSize: 22 },
   reward: { color: "#ffd52a" },
   away: {
     fontFamily: fonts.uiMedium, fontSize: 21, color: "#fff0d4", textAlign: "center",
     textShadowColor: "#492006", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 2,
   },
+  awayCompact: { fontSize: 14 },
   sync: { fontFamily: fonts.sansMedium, fontSize: 12, color: palette.cream100, textAlign: "center" },
   notice: { fontFamily: fonts.uiMedium, fontSize: 20, color: palette.cream100, textAlign: "center" },
   panel: {
@@ -199,7 +228,9 @@ const styles = StyleSheet.create({
     borderRadius: 18, borderWidth: 2, borderColor: "#bd742b", overflow: "hidden",
     boxShadow: "0px 4px 8px rgba(49, 17, 2, 0.4)",
   },
+  panelCompact: { paddingHorizontal: 14, paddingVertical: 0 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 14 },
+  rowCompact: { paddingVertical: 6 },
   divider: { height: 1, backgroundColor: "rgba(235, 166, 72, 0.35)" },
   rowLabel: { flexShrink: 1, fontFamily: fonts.uiMedium, fontSize: 21, color: "#fff0d4" },
   rowValue: { fontFamily: fonts.ui, fontSize: 23, color: "#ffd52a" },
@@ -207,12 +238,14 @@ const styles = StyleSheet.create({
     width: "100%", marginTop: 12, paddingBottom: 6, borderRadius: 18, backgroundColor: "#003b79",
     borderWidth: 2, borderColor: "#002d59", boxShadow: "0px 4px 6px rgba(35, 13, 1, 0.5)",
   },
+  continueCompact: { marginTop: 4 },
   continuePressed: { paddingBottom: 2, paddingTop: 4 },
   continueFace: {
     minHeight: 64, padding: 14, justifyContent: "center", alignItems: "center",
     borderRadius: 15, borderWidth: 2, borderColor: "#72ddff",
     boxShadow: "inset 0px 2px 0px rgba(255, 255, 255, 0.65)",
   },
+  continueFaceCompact: { minHeight: 44, padding: 8 },
   continueText: {
     fontFamily: fonts.ui, fontSize: 27, letterSpacing: 1, color: "#fff5df", textAlign: "center",
     textShadowColor: "#00509a", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 1,

@@ -162,7 +162,6 @@ function GameScreenBody({
   // Short phones need extra clearance for the deeper two-slot tabletop rack.
   const roomChromeWidth = Math.max(tight ? 220 : 240, tableHeight * (400 / (tight ? 540 : 470)));
   const chromeWidth = Math.min(tableMaxWidth(window) ?? window.width, roomChromeWidth);
-  const tabletopScale = Math.min(1.8, chromeWidth / 400);
   const compact = height - insets.top - insets.bottom < 690;
   const [raiseAmount, changeRaise] = useRaiseAmount(
     game.betting,
@@ -194,9 +193,9 @@ function GameScreenBody({
   const seating = tableSeating(game.seatCount, true);
   const layoutConfig = useMemo(() => {
     const landscapeLayout = landscape
-      // The pot sits in the community row, its tiles either side, so the middle holds only the
-      // top seat, the row and the hero.
-      ? { communityY: 0.47, potY: 0.47 }
+      // The pot sits below the community row, same as portrait, so the row reads as five tiles
+      // in a line rather than three, a gap, then two.
+      ? { communityY: 0.47, potY: 0.62 }
       : {};
     if (!landscape || (game.seatCount !== 2 && game.seatCount !== 4)) {
       return { ...seating.layoutConfig, ...landscapeLayout };
@@ -305,8 +304,7 @@ function GameScreenBody({
               // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
               <>
                 <CommunityInTable
-                  potGap={landscape ? POT_GAP * tabletopScale : undefined}
-                  scale={tabletopScale}
+                  scale={scale}
                   tiles={game.community}
                 />
                 <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
@@ -361,7 +359,7 @@ function GameScreenBody({
             >
               {rackBlock}
             </View>
-            <View style={[styles.bettingColumn, { width: 400 * scale }]}>
+            <View style={[styles.bettingColumn, { width: 280 * scale }]}>
               {bettingBlock}
             </View>
           </View>
@@ -390,9 +388,6 @@ function GameScreenBody({
   );
 }
 
-/** The room the landscape community row leaves for the pot bowl, at the phone size. */
-const POT_GAP = 110;
-
 /**
  * The tabletop's community row, centred on the layout's community anchor. It stays one view so
  * the tutorial's `community` target has a box to highlight; the box has a real height because
@@ -401,11 +396,9 @@ const POT_GAP = 110;
 function CommunityInTable({
   tiles,
   scale,
-  potGap,
 }: {
   tiles: GameScreenState["community"];
   scale: number;
-  potGap?: number;
 }) {
   const { layout, resolveContainer } = useTableLayout();
   const center = resolveContainer({ x: 0.5, y: layout.config.communityY });
@@ -416,7 +409,7 @@ function CommunityInTable({
       style={[styles.communityInTable, { height, top: center.y - height / 2 }]}
     >
       <CoachTarget id="community">
-        <CommunityStrip inTable potGap={potGap} scale={scale} tiles={tiles} />
+        <CommunityStrip inTable scale={scale} tiles={tiles} />
       </CoachTarget>
     </View>
   );
@@ -443,7 +436,7 @@ const styles = StyleSheet.create({
   },
   sideColumn: { maxWidth: "36%" },
   wordBuilderColumn: { marginBottom: 20, maxWidth: "42%" },
-  bettingColumn: { maxWidth: "46%" },
+  bettingColumn: { maxWidth: "32%" },
   tableRegionCompact: { minHeight: 234 },
   // A small phone: the felt is narrower than the screen, so the height it keeps goes to the word.
   table: { backgroundColor: "transparent", flex: 1 },

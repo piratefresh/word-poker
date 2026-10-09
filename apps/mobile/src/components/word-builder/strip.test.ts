@@ -122,10 +122,11 @@ describe("the strip's order", () => {
 });
 
 describe("the rack's tile", () => {
-  test("is the small tile on a phone on its side", () => {
+  test("is the medium tile on a phone on its side, matching the felt's community tiles", () => {
     const rack = rackFor({ width: 852, height: 393 });
     expect(rack).toBe(RACK.landscape);
-    expect(rack.itemWidth).toBeLessThan(34);
+    expect(rack.size).toBe("medium");
+    expect(rack.itemWidth).toBe(44);
   });
 
   test("is the medium tile, ungrown, on an upright phone", () => {

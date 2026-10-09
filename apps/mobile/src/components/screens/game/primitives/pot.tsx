@@ -95,15 +95,15 @@ export function Pot({
         >
           {`$${amount.toLocaleString()}`}
         </ArcadeDigits>
+        {blinds ? (
+          <Text
+            style={[styles.blindsAmount, scaled.blindsAmount]}
+            testID="felt-blinds"
+          >
+            {`BLINDS $${blinds.smallBlind.toLocaleString()} / $${blinds.bigBlind.toLocaleString()}`}
+          </Text>
+        ) : null}
       </View>
-      {blinds ? (
-        <Text
-          style={[styles.blindsAmount, scaled.blindsAmount]}
-          testID="felt-blinds"
-        >
-          {`BLINDS $${blinds.smallBlind.toLocaleString()} / $${blinds.bigBlind.toLocaleString()}`}
-        </Text>
-      ) : null}
       {sidePots.map((side, index) => (
         <Text
           key={`side-pot-${index}`}

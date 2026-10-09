@@ -99,8 +99,9 @@ export const RACK = {
   phone: rackGeometry("medium"),
   /** An iPhone SE-class window: the small tile, which frees height for the table. */
   compact: rackGeometry("small"),
-  /** A phone on its side: the tray is ~240 wide, so seven tiles only fit at under a small tile. */
-  landscape: rackGeometry("small", 0.82),
+  /** A phone on its side: the medium tile, matching the felt's own community tiles; the step
+   *  tightens on its own (`stepFor`) if seven of them outrun the tray's width. */
+  landscape: rackGeometry("medium"),
 } as const;
 
 /**

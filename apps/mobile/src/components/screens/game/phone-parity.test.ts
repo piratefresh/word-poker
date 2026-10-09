@@ -26,8 +26,9 @@ describe.each(PHONES)("a phone window %j", (window) => {
     const rack = rackFor(window);
     const landscape = window.width > window.height;
     expect(rack).toBe(landscape ? RACK.landscape : RACK.phone);
-    expect(rack.itemWidth).toBeLessThan(landscape ? 34 : 45);
-    expect(rack.scale).toBe(landscape ? 0.82 : 1);
+    expect(rack.size).toBe("medium");
+    expect(rack.itemWidth).toBe(44);
+    expect(rack.scale).toBe(1);
   });
 });
 

@@ -29,12 +29,6 @@ import {
 // Relative, not `@/assets`: Jest maps `@/` to `src/` only.
 const RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-3-tight.png");
 const TABLETOP_RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-5.png");
-const PORTRAITS = [
-  require("../../../../../assets/images/ui/v2/avatar-you.png"),
-  require("../../../../../assets/images/ui/v2/avatar-river.png"),
-  require("../../../../../assets/images/ui/v2/avatar-buddy.png"),
-  require("../../../../../assets/images/ui/v2/avatar-sage.png"),
-];
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   waiting: "WAITING",
@@ -228,7 +222,6 @@ export function PlayerSeat({
   // The seat whose move it is — the hero's or any other — wears the beam while its turn runs.
   const turn = active || seat.status === "thinking";
   const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
-  const portrait = tabletop && seatCount <= 4 ? PORTRAITS[seat.isHero ? 0 : anchor.index] : undefined;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
   const statusLabel =
@@ -250,16 +243,11 @@ export function PlayerSeat({
               scaled.avatar,
               { backgroundColor: seat.color },
               lit && [scaled.avatarLit, { borderColor: statusColor }],
-              portrait !== undefined && styles.portraitAvatar,
               winner && glow(colors.goldHi, metrics.glow),
             ]}
             testID={`seat-avatar-${seat.id}`}
           >
-            {portrait === undefined ? (
-              <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
-            ) : (
-              <Image accessible={false} contentFit="cover" source={portrait} style={StyleSheet.absoluteFill} />
-            )}
+            <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
           </View>
         </SeatBeam>
         {seat.roles?.length ? (
@@ -431,7 +419,6 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   initials: { color: "#0c1410", fontFamily: fonts.sansBlack },
-  portraitAvatar: { borderColor: "#301507", overflow: "hidden" },
   /** The seat's markers, pinned to the avatar's corner and growing away from it: D, SB, BB. */
   roleRow: { flexDirection: "row", position: "absolute", zIndex: 2 },
   roleBadge: {
