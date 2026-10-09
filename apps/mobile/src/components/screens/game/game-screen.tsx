@@ -42,7 +42,6 @@ import {
 import {
   COMMUNITY_ROW_HEIGHT,
   tableSeating,
-  tabletopFitsTopChrome,
   tabletopSeatBounds,
 } from "./seat-metrics";
 import { DEVICE_CLOCK_SAMPLE, heroTurnPhrase, useHandTurn } from "./turn";
@@ -216,12 +215,8 @@ function GameScreenBody({
     };
   }, [game.seatCount, landscape, scale, hudHeight, tableHeight]);
 
-  // Whether the header hangs the table's mode under the capsule: the mode has to be able to sit
-  // there (a free-play table, on a portrait bar) and the room below has to be able to seat its
-  // opponents clear of the community row with the tag hanging over them.
-  const modeTag =
-    hangsModeTag(balance, window) &&
-    tabletopFitsTopChrome(tableHeight, chromeWidth, MODE_TAG_BLOCK);
+  // Keep the mode under the capsule in portrait; the table reserves its clearance below.
+  const modeTag = hangsModeTag(balance, window);
 
   const rackBlock = (
     <>
@@ -371,7 +366,7 @@ function GameScreenBody({
             </View>
           </View>
         ) : (
-          <View onLayout={(event: LayoutChangeEvent) => setControlsHeight(event.nativeEvent.layout.height)}>
+          <View testID="game-controls" onLayout={(event: LayoutChangeEvent) => setControlsHeight(event.nativeEvent.layout.height)}>
             {rackBlock}
             {bettingBlock}
           </View>

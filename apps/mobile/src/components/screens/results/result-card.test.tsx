@@ -21,6 +21,7 @@ import { resultsEntrance } from "@/constants/theme";
 import { ResultCard } from "./result-card";
 import {
   foldOutSnapshot,
+  seatFixture,
   longWordSnapshot,
   snapshotFixture,
   splitSnapshot,
@@ -36,6 +37,17 @@ jest.mock("react-native-reanimated", () => ({
 }));
 
 describe("<ResultCard />", () => {
+  test("labels a folded player without a word, score, tiles, or winner badge", async () => {
+    const view = await render(<ResultCard seat={seatFixture({ name: "Guest", isYou: true, folded: true })} />);
+
+    expect(view.getByLabelText("Guest (you), folded")).toBeOnTheScreen();
+    expect(view.getByText("FOLDED")).toBeOnTheScreen();
+    expect(view.queryByText("PTS")).toBeNull();
+    expect(view.queryByText(/Base /)).toBeNull();
+    expect(view.queryByText("NO WORD")).toBeNull();
+    expect(view.queryByTestId("result-card-guest-tiles", { includeHiddenElements: true })).toBeNull();
+    expect(view.queryByText("★ TAKES THE POT", { includeHiddenElements: true })).toBeNull();
+  });
   test("prints the badge on the seats the pot paid, and on no others", async () => {
     const view = await render(
       <>

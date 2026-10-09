@@ -1,7 +1,7 @@
 /**
  * hud-top-bar.tsx — the in-hand HUD header: one row with the wooden phase and timer capsule
- * centred between the corner groups — back on the left, the balance chip and the help button
- * on the right, so the chip can never reach the clock. The pieces live in `top-bar/`: the
+ * centred between the corner groups — back on the left, the balance chip (when it is not
+ * hanging under the capsule) and help on the right, so neither can reach the clock. The pieces live in `top-bar/`: the
  * capsule, its clock, the chip and the buttons.
  *
  * A balance that is the table's mode rather than a figure (free play) is not a readout sharing
@@ -150,18 +150,20 @@ export function HudTopBar({
   return (
     <View style={{ height: hudBarHeight(window) }} testID={testID}>
       <View pointerEvents="box-none" style={[styles.bar, { top: BAR_TOP_PAD, height: CAPSULE_HEIGHT * scale }]}>
-        <WoodButton label="Leave the table" onPress={onLeave}>
-          <BackChevron />
-        </WoodButton>
-        {/* The capsule rises on a phase change; the corner buttons stay put. It centres in
-            the room the corner groups leave rather than across the whole window, so no
-            corner control can overlap the clock — and the mode's tag, when there is one,
-            hangs under the capsule as part of that same block. */}
+        <View style={[styles.corner, styles.leading]}>
+          <WoodButton label="Leave the table" onPress={onLeave}>
+            <BackChevron />
+          </WoodButton>
+        </View>
+        {/* The capsule rises on a phase change; the corner buttons stay put. The two corner
+            groups share the row's spare width equally, so the capsule sits at the window's
+            centre and no corner control can overlap the clock — and the mode's tag, when
+            there is one, hangs under the capsule as part of that same block. */}
         <Animated.View pointerEvents="none" style={[styles.capsuleSlot, entrance]}>
           {/* Drawn before the capsule so the capsule's foot overlaps the tag's top. */}
           {modeTag ? (
-            <View style={[styles.modeTag, { top: CAPSULE_HEIGHT * scale + MODE_TAG_GAP }]}>
-              <BalanceChip balance={balance} style={styles.modeTagChip} />
+            <View testID="hud-mode-tag" style={[styles.modeTag, { top: CAPSULE_HEIGHT * scale + MODE_TAG_GAP }]}>
+              <BalanceChip balance={balance} />
             </View>
           ) : null}
           <PhaseCapsule
@@ -175,7 +177,7 @@ export function HudTopBar({
         </Animated.View>
         {/* A tag sits under the capsule, so that one balance is not in this group — the
             numbers that are readouts, and the one chip that is a control, are. */}
-        <View style={styles.trailing}>
+        <View style={[styles.corner, styles.trailing]}>
           {modeTag ? null : (
             <BalanceChip balance={balance} onPress={onBalancePress} />
           )}
@@ -198,18 +200,16 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
   },
-  capsuleSlot: { alignItems: "center", flex: 1 },
+  capsuleSlot: { alignItems: "center" },
+  /** Both corners grow alike, which is what centres the capsule between them. */
+  corner: { flex: 1, flexDirection: "row", gap: 6 },
+  leading: { justifyContent: "flex-start" },
   /** The mode's tag: centred under the capsule, out of the corner row's flow. */
   modeTag: { alignItems: "center", left: 0, position: "absolute", right: 0 },
-  /** The capsule's own felt-green inlay (`phase-capsule.tsx`), so the tag reads as hung off it. */
-  modeTagChip: { backgroundColor: "#1E5A33", borderColor: "#123A21" },
   helpGlyph: {
     color: "#FFE7B0",
     fontFamily: fonts.arcade,
     fontSize: 22,
   },
-  trailing: {
-    flexDirection: "row",
-    gap: 6,
-  },
+  trailing: { justifyContent: "flex-end" },
 });

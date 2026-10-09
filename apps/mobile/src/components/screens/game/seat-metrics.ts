@@ -116,33 +116,33 @@ export function avatarDiameter(tableWidth: number): number {
  * with readable nameplates, so these replace `BASE`'s avatar-led proportions.
  */
 const TABLETOP = {
-  avatar: 84,
-  width: 104,
-  nameGap: -28,
-  badge: 20,
-  badgeText: 8,
-  nameSize: 12,
-  nameLine: 15,
-  platePadX: 10,
-  platePadY: 4,
-  plateRadius: 8,
-  stackSize: 14,
-  stackLine: 17,
-  coin: 12,
-  rackW: 104,
+  avatar: 68,
+  width: 92,
+  nameGap: -22,
+  badge: 18,
+  badgeText: 7,
+  nameSize: 11,
+  nameLine: 13,
+  platePadX: 8,
+  platePadY: 3,
+  plateRadius: 7,
+  stackSize: 12,
+  stackLine: 15,
+  coin: 10,
+  rackW: 88,
   // The trimmed opponent-rack-5 artwork is 1280 by 723; its lower rail covers the tile feet.
-  rackH: 104 * (723 / 1280),
-  rackTuck: 104 * (2.4 / 75),
-  rackFeet: 104 * (152 / 1280),
-  rackLip: 104 * (176 / 1280),
-  pillPadX: 10,
+  rackH: 88 * (723 / 1280),
+  rackTuck: 88 * (2.4 / 75),
+  rackFeet: 88 * (152 / 1280),
+  rackLip: 88 * (176 / 1280),
+  pillPadX: 9,
   pillPadY: 2,
   // Negative: the status pill tucks against the rack's bottom rail instead of floating below it.
-  pillGap: -6,
-  statusSize: 10,
-  statusLine: 13,
+  pillGap: -5,
+  statusSize: 9,
+  statusLine: 12,
   statusTracking: 0.2,
-  chip: 24,
+  chip: 22,
 } as const;
 const TABLETOP_ROOM_WIDTH = 400;
 /** How far a wide window grows the tabletop seat. */
@@ -362,7 +362,7 @@ function tabletopSeating(seatCount: number): TableSeating {
         // fan, because that many seats only fit spread down the arc's sides.
         seatRows: seatCount <= 4,
         communityY: TABLETOP_COMMUNITY_Y,
-        potY: 0.66,
+        potY: 0.63,
       },
     };
     TABLETOP_SEATING.set(seatCount, seating);

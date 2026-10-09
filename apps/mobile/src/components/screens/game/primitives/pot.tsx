@@ -50,11 +50,7 @@ export function Pot({
   const scale = tableWidth ? seatMetrics(tableWidth, tabletop).scale : 1;
   const scaled = usePotStyles(scale);
   return (
-    <View
-      pointerEvents="none"
-      style={[styles.pot, scaled.pot]}
-      testID="pot"
-    >
+    <View pointerEvents="none" style={[styles.pot, scaled.pot]} testID="pot">
       {tabletop ? <PotBowl amount={amount} scale={scale} /> : null}
       <View
         style={

@@ -5,9 +5,9 @@ import { CoinBowlGameContext } from "../backdrop/coin-bowl-motion";
 import type { GameScreenState } from "../game-types";
 import { tableSeating } from "../seat-metrics";
 
-/** The pot bowl's view model, as `word-poker-pot-bowl-assets/README.md` documents it. */
+/** The pot stacks' view model, as `word-poker-chip-stacking-assets/README.md` documents it. */
 export interface PotBowlDriver {
-  number(name: "seat" | "chipType" | "fillLevel" | "winnerSeat", value: number): void;
+  number(name: "seat" | "chipType" | "fillLevel" | "winnerSeat" | `chip${number}`, value: number): void;
   boolean(name: "reduceMotion", value: boolean): void;
   fire(name: "deposit" | "allIn" | "payout" | "reset"): void;
 }
@@ -63,6 +63,7 @@ export function potBowlCue(previous: GameScreenState, next: GameScreenState): Po
 export function usePotBowl(driver: PotBowlDriver | null) {
   const game = useContext(CoinBowlGameContext);
   const previous = useRef<GameScreenState | null>(null);
+  const filled = useRef(0);
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -72,7 +73,6 @@ export function usePotBowl(driver: PotBowlDriver | null) {
 
   useEffect(() => {
     if (!driver || !game) return;
-    // The first state the bowl sees is drawn in place: no flight for chips already in the middle.
     const cue = previous.current
       ? potBowlCue(previous.current, game)
       : { kind: "reset" as const, fillLevel: fillLevel(game) };
@@ -83,17 +83,20 @@ export function usePotBowl(driver: PotBowlDriver | null) {
       driver.fire("payout");
       return;
     }
-    if (cue.kind === "reset") {
+    // Each slot keeps the colour of the bet that filled it; a slot drops in as `fillLevel` passes it.
+    const fill = (from: number, type: number) => {
+      for (let slot = from; slot < cue.fillLevel; slot++) driver.number(`chip${slot}`, type);
       driver.number("fillLevel", cue.fillLevel);
+      filled.current = cue.fillLevel;
+    };
+    if (cue.kind === "reset") {
+      fill(0, chipType(game.pot / Math.max(1, cue.fillLevel)));
       driver.fire("reset");
       return;
     }
     driver.number("seat", cue.seat);
     driver.number("chipType", cue.chipType);
     driver.fire(cue.kind);
-    // The pile chip pops as the flyer lands.
-    const landing = reducedMotion ? 0 : cue.kind === "allIn" ? 650 : 420;
-    const timer = setTimeout(() => driver.number("fillLevel", cue.fillLevel), landing);
-    return () => clearTimeout(timer);
-  }, [driver, game, reducedMotion]);
+    fill(filled.current, cue.chipType);
+  }, [driver, game]);
 }

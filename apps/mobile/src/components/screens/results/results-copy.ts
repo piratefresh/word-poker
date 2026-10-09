@@ -28,7 +28,7 @@ export function resultsHeadline({ seats, revealed }: CopyInput): ResultsHeadline
 
   if (!revealed) {
     // §26's fold-out: nothing was revealed and no word was asked for, so the subline says
-    // why there is one card instead of naming a word nobody played.
+    // why the winner took the pot instead of naming a word nobody played.
     return {
       lead: `${winners[0]?.name ?? ""} takes`,
       emphasis: "the pot",

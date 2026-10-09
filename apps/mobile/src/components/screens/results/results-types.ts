@@ -23,6 +23,8 @@ export interface ResultsSeat {
   readonly color: string;
   /** Whether this seat is the local player's — the italic `(you)` the card prints. */
   readonly isYou: boolean;
+  /** Folded seats appear after the showdown standings, without a word or score. */
+  readonly folded: boolean;
   /**
    * The word the seat's tiles spelled, uppercase, or `null` when it confirmed none (§11).
    * A seat that reached the reveal with nothing is a card at 0, never a missing card.
@@ -42,7 +44,7 @@ export interface ResultsSeat {
   readonly rack: number;
   /** §7: the seat's final score, the number §21's ladder ranked it by. */
   readonly total: number;
-  /** §21's 1-based place, best first: the ladder separates every pair of seats, so it is unique. */
+  /** §21's 1-based showdown place; 0 for a folded seat outside the ladder. */
   readonly place: number;
   /** Whether the hand's pots paid this seat — the card's gold and its `★ TAKES THE POT`. */
   readonly takesPot: boolean;
@@ -66,7 +68,7 @@ export interface ResultsHeadline {
 export interface ResultsTable {
   /** Every seat dealt into the hand, folded or not. */
   readonly players: number;
-  /** How many of them folded — seats that reached no reveal and get no card (§20). */
+  /** How many of them folded and did not participate in the reveal (§20). */
   readonly folded: number;
 }
 
@@ -86,11 +88,11 @@ export interface ResultsSnapshot {
   readonly pot: number;
   /**
    * Whether the hand reached §20's reveal. A fold-out (§26) has no reveal at all: it is one
-   * card for the seat left standing, and the copy says so.
+   * winner followed by the folded seats, and the copy says so.
    */
   readonly revealed: boolean;
   readonly table: ResultsTable;
-  /** The seats that reached the reveal, best first — the ladder's own order (§20, §21). */
+  /** Showdown standings best first (§20, §21), followed by the folded seats. */
   readonly seats: readonly ResultsSeat[];
   /** The headline, built by `results-copy.ts`. */
   readonly headline: ResultsHeadline;

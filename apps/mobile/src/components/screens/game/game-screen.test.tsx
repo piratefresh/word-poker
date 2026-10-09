@@ -69,6 +69,22 @@ test("shows one header, the HUD's own, and none of the header it replaced", asyn
   expect(view.queryAllByLabelText(/chat/)).toHaveLength(0);
 });
 
+test("keeps Free Play hanging on a short portrait phone after the controls are measured", async () => {
+  const original = Dimensions.get("window");
+  const window = { ...original, width: 375, height: 667 };
+  Dimensions.set({ window, screen: window });
+  try {
+    const view = await renderScreen({ balance: FREE_PLAY });
+    await fireEvent(view.getByTestId("game-controls"), "layout", {
+      nativeEvent: { layout: { width: 375, height: 280 } },
+    });
+    expect(view.getByTestId("hud-mode-tag")).toHaveTextContent("FREE PLAY");
+    expect(view.getAllByLabelText("Free play")).toHaveLength(1);
+  } finally {
+    await act(() => Dimensions.set({ window: original, screen: original }));
+  }
+});
+
 /** label is what a screen reader reads, text is what is on screen — the chip's readout passes through the felt untouched. */
 const BALANCE_STATES: [string, BalanceView, string, string][] = [
   ["ready figure", { state: "ready", amount: 1240 }, "Balance $1,240", "$1.2K"],

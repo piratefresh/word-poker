@@ -112,11 +112,15 @@ export function ResultCard({
   // numbers, the score they add up to, and the pot when the pot's this seat's.
   const label = [
     seat.isYou ? `${seat.name} (you)` : seat.name,
-    seat.word ?? "no word",
-    `${seat.total} points`,
-    `base ${seat.base}`,
-    `mult +${seat.mult}`,
-    `rack +${seat.rack}`,
+    ...(seat.folded
+      ? ["folded"]
+      : [
+          seat.word ?? "no word",
+          `${seat.total} points`,
+          `base ${seat.base}`,
+          `mult +${seat.mult}`,
+          `rack +${seat.rack}`,
+        ]),
     ...(winner ? ["takes the pot"] : []),
   ].join(", ");
 
@@ -147,14 +151,16 @@ export function ResultCard({
               </Text>
             ) : null}
           </Text>
-          <View style={styles.score}>
-            <Text allowFontScaling style={[styles.total, winner && styles.onGoldInk]}>
-              {seat.total}
-            </Text>
-            <Text allowFontScaling style={[styles.points, winner && styles.onGoldInk]}>
-              PTS
-            </Text>
-          </View>
+          {seat.folded ? null : (
+            <View style={styles.score}>
+              <Text allowFontScaling style={[styles.total, winner && styles.onGoldInk]}>
+                {seat.total}
+              </Text>
+              <Text allowFontScaling style={[styles.points, winner && styles.onGoldInk]}>
+                PTS
+              </Text>
+            </View>
+          )}
         </View>
 
         <Text
@@ -164,13 +170,17 @@ export function ResultCard({
             winner && styles.onGoldInk,
           ]}
         >
-          {seat.word ?? (seat.reason === null ? NO_WORD : WORD_REJECTION_COPY[seat.reason])}
+          {seat.folded
+            ? "FOLDED"
+            : seat.word ?? (seat.reason === null ? NO_WORD : WORD_REJECTION_COPY[seat.reason])}
         </Text>
 
         {/* §7's three numbers, all three of them: `Mult +0` and `Rack +0` say what did not happen. */}
-        <Text allowFontScaling style={[styles.breakdown, winner && styles.onGoldInk]}>
-          {`Base ${seat.base} · Mult +${seat.mult} · Rack +${seat.rack}`}
-        </Text>
+        {seat.folded ? null : (
+          <Text allowFontScaling style={[styles.breakdown, winner && styles.onGoldInk]}>
+            {`Base ${seat.base} · Mult +${seat.mult} · Rack +${seat.rack}`}
+          </Text>
+        )}
       </View>
     </View>
   );

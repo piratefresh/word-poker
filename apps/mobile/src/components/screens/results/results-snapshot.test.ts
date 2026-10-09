@@ -3,7 +3,6 @@ import {
   availableTiles,
   bettingBounds,
   chooseOfflineWord,
-  decideOfflineMove,
   evaluateWord,
   handSeed,
   reduce,
@@ -36,7 +35,7 @@ function playersOf(state: OfflineState) {
 }
 
 /**
- * One whole hand played by the engine alone — the table's own bot policy for every seat,
+ * One whole hand played by the engine alone — every seat checks or calls to reach showdown,
  * §19's window confirmed with the word each seat can actually build and then run out — so a
  * test can hold the settled state and the snapshot built from it side by side.
  */
@@ -64,7 +63,14 @@ function playOutHand(dictionary: Dictionary): OfflineState {
 
     const acting = state.toActIndex === null ? undefined : state.seats[state.toActIndex];
     if (acting === undefined) break;
-    state = reduce(state, decideOfflineMove(state, acting.id), 0);
+    if (state.betting === null || state.toActIndex === null) break;
+    const bounds = bettingBounds(state.seats, state.betting, state.toActIndex, state.stakes.bigBlind);
+    if (bounds === null) break;
+    state = reduce(
+      state,
+      bounds.canCheck ? { type: "check", playerId: acting.id } : { type: "call", playerId: acting.id },
+      0,
+    );
   }
 
   return state;
@@ -195,7 +201,7 @@ describe("buildResultsSnapshot", () => {
     expect(hero.tiles.map((tile) => tile.id)).toEqual(evaluation.tiles.map((played) => played.tileId));
   });
 
-  test("renders §26's fold-out as one card, no reveal, and says so", () => {
+  test("renders the fold-out winner first, followed by every folded player", () => {
     const state = playToFoldOut(testDictionary(["ZZ"]), "ellis");
     expect(state.result?.standings).toHaveLength(0);
 
@@ -203,7 +209,10 @@ describe("buildResultsSnapshot", () => {
     if (snapshot === null) throw new Error("the fold-out never settled");
 
     expect(snapshot.revealed).toBe(false);
-    expect(snapshot.seats).toHaveLength(1);
+    expect(snapshot.seats).toHaveLength(4);
+    expect(snapshot.seats.slice(1).map((seat) => seat.playerId)).toEqual([HERO, "jay", "mira"]);
+    expect(snapshot.seats.slice(1).every((seat) => seat.folded && !seat.takesPot)).toBe(true);
+    expect(snapshot.seats[0]?.folded).toBe(false);
     expect(snapshot.seats[0]?.name).toBe("Ellis");
     expect(snapshot.seats[0]?.word).toBeNull();
     expect(snapshot.seats[0]?.tiles).toEqual([]);
@@ -216,6 +225,8 @@ describe("buildResultsSnapshot", () => {
     expect(snapshot.headline.emphasis).toBe("the pot");
     expect(snapshot.headline.subline).toBe("ELLIS · EVERYONE FOLDED");
     expect(snapshot.summary).toBe("4 PLAYERS · 3 FOLDS · 0 WORDS PLAYED");
+    const bare = buildResultsSnapshot({ state, players: [] });
+    expect(bare?.seats.map((seat) => seat.playerId)).toEqual(["ellis", HERO, "jay", "mira"]);
   });
 
   test("keeps the seats' identity as the felt draws it, and falls back when it has none", () => {

@@ -35,7 +35,7 @@ export interface HudProps {
   /**
    * Whether the header hangs the table's mode under the phase capsule. The screen decides it:
    * the tag takes a band under the header, and only the screen knows the room below it
-   * (`hangsModeTag` for the mode and the window, `tabletopFitsTopChrome` for the room).
+   * (`hangsModeTag` for the mode and the window).
    */
   modeTag?: boolean;
   /** The screen owns the queue, because game events are what push to it. Without one the

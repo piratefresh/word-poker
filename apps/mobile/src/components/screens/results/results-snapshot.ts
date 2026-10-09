@@ -48,6 +48,7 @@ export interface SettledHand {
   readonly pot: number;
   readonly winner: PlayerId;
   readonly table: { readonly players: number; readonly folded: number };
+  readonly foldedPlayerIds: readonly PlayerId[];
   /** The ladder, best first; empty for a fold-out (§26), which has no reveal. */
   readonly standings: readonly SettledStanding[];
 }
@@ -81,6 +82,7 @@ export function buildResultsSnapshot({
       // The pot is the pots' own arithmetic (§25): the layers the hand built, added up.
       pot: result.payout.pots.reduce((total, pot) => total + pot.amount, 0),
       winner: result.winner,
+      foldedPlayerIds: state.seats.filter((seat) => seat.folded).map((seat) => seat.id),
       table: {
         players: state.seats.length,
         folded: state.seats.filter((seat) => seat.folded).length,
@@ -109,6 +111,14 @@ export function buildSettledSnapshot(
   const seats = revealed
     ? settled.standings.map((standing) => seatResult(standing, players))
     : [foldOutResult(settled.winner, players)];
+  for (const playerId of settled.foldedPlayerIds) {
+    seats.push({
+      ...foldOutResult(playerId, players),
+      folded: true,
+      place: 0,
+      takesPot: false,
+    });
+  }
 
   const pieces = {
     hand: settled.hand,
@@ -136,6 +146,7 @@ function seatResult(
 
   return {
     playerId: standing.playerId,
+    folded: false,
     ...identity(players, standing.playerId, standing.seat),
     word: standing.word,
     tiles,
@@ -158,6 +169,7 @@ function seatResult(
 function foldOutResult(winner: PlayerId, players: readonly (GamePlayer | null)[]): ResultsSeat {
   return {
     playerId: winner,
+    folded: false,
     ...identity(players, winner, -1),
     word: null,
     tiles: [],
@@ -180,7 +192,7 @@ function identity(
   players: readonly (GamePlayer | null)[],
   playerId: PlayerId,
   seat: number,
-): Omit<ResultsSeat, "playerId" | "word" | "tiles" | "base" | "mult" | "rack" | "total" | "place" | "takesPot" | "reason"> {
+): Pick<ResultsSeat, "name" | "initials" | "color" | "isYou"> {
   const player = players.find((candidate) => candidate?.id === playerId);
   return {
     name: player?.name ?? playerId,
