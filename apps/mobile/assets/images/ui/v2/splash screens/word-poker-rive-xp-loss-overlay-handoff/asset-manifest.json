@@ -1,0 +1,50 @@
+{
+  "package": "word-poker-rive-xp-loss-overlay",
+  "description": "Layered PNG assets and Codex handoff for a simple XP gain overlay shown after a loss or end-of-hand result.",
+  "reference": "reference/xp-loss-overlay-reference.png",
+  "dynamicContent": [
+    "placement text such as '4TH PLACE' or '2ND'",
+    "xp gain text such as '+24 XP'",
+    "current xp numeric value",
+    "target xp numeric value",
+    "level badge or star count if desired"
+  ],
+  "assets": [
+    {
+      "file": "assets/01-xp-bar-shell.png",
+      "role": "base XP bar shell / frame"
+    },
+    {
+      "file": "assets/02-xp-fill-strip.png",
+      "role": "animated fill layer inside the XP bar; crop or mask width in Rive"
+    },
+    {
+      "file": "assets/03-star-medallion.png",
+      "role": "left circular star medallion for the XP bar"
+    },
+    {
+      "file": "assets/04-xp-popup-pill.png",
+      "role": "blank popup plaque used for '+XP' amount"
+    },
+    {
+      "file": "assets/05-sunburst-bg.png",
+      "role": "large subtle background burst behind XP UI"
+    },
+    {
+      "file": "assets/06-sparkle-burst-fx.png",
+      "role": "foreground sparkle/star burst when XP pops in or bar completes"
+    },
+    {
+      "file": "assets/07-soft-gold-glow.png",
+      "role": "soft glow behind the bar or popup"
+    },
+    {
+      "file": "assets/08-bar-outer-glow.png",
+      "role": "optional pulse glow over the bar"
+    },
+    {
+      "file": "assets/09-placement-pill-blank.png",
+      "role": "blank pill/surface for placement label"
+    }
+  ]
+}

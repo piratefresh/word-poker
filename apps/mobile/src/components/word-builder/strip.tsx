@@ -36,6 +36,7 @@ import {
   type TileSize,
 } from "@/components/game";
 import {
+  isCompactLandscapeWindow,
   isCompactWindow,
   screenScale,
 } from "@/components/screens/game/screen-scale";
@@ -102,6 +103,9 @@ export const RACK = {
   /** A phone on its side: the medium tile, matching the felt's own community tiles; the step
    *  tightens on its own (`stepFor`) if seven of them outrun the tray's width. */
   landscape: rackGeometry("medium"),
+  /** A small phone on its side (an SE-class short side): the rack has no width to spare, so it
+   *  takes the small tile instead of squeezing the medium one into an overlap. */
+  landscapeCompact: rackGeometry("small"),
 } as const;
 
 /**
@@ -116,7 +120,7 @@ export function rackFor(window: {
   const scale = screenScale(window);
   if (scale !== 1) return rackGeometry("medium", scale);
   if (window.width > window.height && window.height < layout.wideShortSide) {
-    return RACK.landscape;
+    return isCompactLandscapeWindow(window) ? RACK.landscapeCompact : RACK.landscape;
   }
   return isCompactWindow(window) ? RACK.compact : RACK.phone;
 }

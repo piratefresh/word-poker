@@ -9,6 +9,7 @@
  */
 
 import { useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { layout } from "@/constants/theme";
 
@@ -62,9 +63,17 @@ export function isCompactWindow(window: Window): boolean {
   );
 }
 
-/** `isCompactWindow`, read where it is drawn. */
+/** `isCompactWindow`, read where it is drawn — against the usable height, insets carved out. */
 export function useCompactControls(): boolean {
-  return isCompactWindow(useWindowDimensions());
+  return isCompactWindow(useUsableWindow());
+}
+
+/** Below this a landscape window's rack shrinks, the way portrait's compact controls do. */
+const COMPACT_LANDSCAPE_HEIGHT = 450;
+
+/** Whether a landscape window is too short for the landscape rack's full-size tiles. */
+export function isCompactLandscapeWindow(window: Window): boolean {
+  return window.width > window.height && window.height < COMPACT_LANDSCAPE_HEIGHT;
 }
 
 /** Below this a portrait window's betting row shrinks, leaving the height to the felt. */
@@ -75,9 +84,21 @@ export function isShortWindow(window: Window): boolean {
   return window.height >= window.width && window.height < SHORT_HEIGHT;
 }
 
-/** `isShortWindow`, read where it is drawn. */
+/** `isShortWindow`, read where it is drawn — against the usable height, insets carved out. */
 export function useShortControls(): boolean {
-  return isShortWindow(useWindowDimensions());
+  return isShortWindow(useUsableWindow());
+}
+
+/**
+ * The window with the top/bottom safe-area insets carved out of its height: a notch and a home
+ * indicator eat real space on a device (Firefox's responsive mode simulates neither), so the
+ * compact/short breakpoints have to read the space actually left for the felt and controls, not
+ * the raw screen size.
+ */
+function useUsableWindow(): Window {
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  return { ...window, height: window.height - insets.top - insets.bottom };
 }
 
 /** The table's widest box at a scale of one, rail and seats included. */

@@ -227,9 +227,8 @@ export function PlayerSeat({
   const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
-  // The rack shows for a dealt-in opponent only: the hero's tiles sit in the word builder,
-  // and a folded or busted seat has handed them back.
-  const rack = dealt && !seat.isHero && !out;
+  // Opponent tiles stay hidden entirely — no rack art, nothing to count or infer from.
+  const rack = false;
   const statusLabel =
     seat.bet !== undefined && seat.bet > 0 && (seat.status === "bet" || seat.status === "raise")
       ? `${seat.status === "raise" ? "RAISE TO" : "BET"} ${formatAmount(seat.bet)}`
