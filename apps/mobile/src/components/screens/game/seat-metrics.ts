@@ -20,6 +20,13 @@ const BASE_GAP = 6;
 /** The smallest avatar a seat draws, and the size every base measure below is drawn for. */
 export const MIN_AVATAR = 38;
 
+/**
+ * How far a stacked seat's plate is pulled up over the avatar's rim, as a share of its
+ * diameter: the plate tucks behind the avatar, and the label stack below it starts that much
+ * higher up (`labelDrop`).
+ */
+export const PLATE_OVER = 0.22;
+
 /** The seat at `MIN_AVATAR`, in points. Every one of them scales with the avatar. */
 const BASE = {
   /** The seat's column: the name truncates inside it. */
@@ -248,9 +255,10 @@ export function labelBlock(m: SeatMetrics): number {
   );
 }
 
-/** How far the label stack reaches below the avatar's bottom edge, when it hangs under it. */
+/** How far the label stack reaches below the avatar's bottom edge, when it hangs under it: the
+ *  plate's top is pulled up over the avatar's rim by `PLATE_OVER`. */
 export function labelDrop(m: SeatMetrics): number {
-  return m.nameGap + labelBlock(m);
+  return labelBlock(m) - m.avatar * PLATE_OVER;
 }
 
 /**

@@ -663,12 +663,7 @@ export function Tile({
               </Text>
               {played !== null || second === null ? null : (
                 <>
-                  <Text
-                    maxFontSizeMultiplier={1.2}
-                    style={[styles.slash, { fontSize: metrics.alternateSize }]}
-                  >
-                    /
-                  </Text>
+                  <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>/</Text>
                   <Text
                     maxFontSizeMultiplier={1.2}
                     style={[styles.letter, { fontSize: metrics.alternateSize }]}
@@ -797,7 +792,7 @@ const styles = StyleSheet.create({
   },
   letter: {
     color: tileMaterial.ink,
-    fontFamily: TILE_FONT,
+    fontFamily: fonts.arcade,
   },
   slash: {
     color: "rgba(21,17,13,0.5)",
@@ -806,7 +801,7 @@ const styles = StyleSheet.create({
   },
   points: {
     color: tileMaterial.ink,
-    fontFamily: TILE_FONT,
+    fontFamily: fonts.arcade,
     position: "absolute",
   },
   poweredBadge: { position: "absolute" },

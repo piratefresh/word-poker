@@ -66,7 +66,7 @@ export interface GameButtonProps {
   scale?: number;
   /** The small-screen size: 44 tall (still a full touch target) with a 10-point label. */
   compact?: boolean;
-  /** Space on each side of the face's content, before screen scaling. */
+  /** The face's horizontal padding at scale 1; a row of tight buttons passes less than the 12 default. */
   horizontalPadding?: number;
   style?: StyleProp<ViewStyle>;
   testID?: string;

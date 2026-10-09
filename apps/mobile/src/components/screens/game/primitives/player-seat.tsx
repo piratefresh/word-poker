@@ -1,9 +1,10 @@
 import { Image } from "expo-image";
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { RackTileBack } from "@/components/game";
 import { ChipSprite } from "@/components/chip/chip-sprite";
 import { chipToneForAmount } from "@/components/chip/chip-value";
-import { RackTileBack } from "@/components/game";
 import { ShadowBox } from "@/components/ui/shadow-box";
 
 import type { SeatSlot } from "@/components/table";
@@ -116,7 +117,7 @@ function seatStyles(m: SeatMetrics) {
       width: m.coin,
     },
     statusPill: {
-      borderRadius: m.pillRadius,
+      borderRadius: 999,
       borderWidth: m.pillBorder,
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
@@ -153,10 +154,12 @@ function useSeatStyles(tableWidth: number, tabletop: boolean) {
 
 /**
  * A seat at the felt. The avatar is centred on the seat's anchor and scales with the table
- * (`seat-metrics.ts`), with its name, status and stack under it — or beside it, for the seats at
- * the top and bottom of the table (`seatDirection`). With `onPress` the whole seat is the
- * control; without it the seat is presentational — a seat that looks tappable but goes nowhere is
- * worse than one that never was.
+ * (`seat-metrics.ts`), with its nameplate, rack and status badge under it — or beside it, for
+ * the seats at the top and bottom of the table (`seatDirection`). An opponent dealt in keeps
+ * its two tiles standing in the rack (`dealt`, STO-532); the hero's tiles live in the word
+ * builder, and a folded or busted seat has none to show. With `onPress` the whole seat is the
+ * control; without it the seat is presentational — a seat that looks tappable but goes nowhere
+ * is worse than one that never was.
  */
 export function PlayerSeat({
   seat,
@@ -224,6 +227,9 @@ export function PlayerSeat({
   const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
+  // The rack shows for a dealt-in opponent only: the hero's tiles sit in the word builder,
+  // and a folded or busted seat has handed them back.
+  const rack = dealt && !seat.isHero && !out;
   const statusLabel =
     seat.bet !== undefined && seat.bet > 0 && (seat.status === "bet" || seat.status === "raise")
       ? `${seat.status === "raise" ? "RAISE TO" : "BET"} ${formatAmount(seat.bet)}`
@@ -275,7 +281,7 @@ export function PlayerSeat({
               </Text>
             </View>
           </View>
-          {/* {dealt && !seat.isHero && !out ? <RackLayers m={metrics} tabletop={tabletop} /> : null} */}
+          {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View style={[styles.statusRow, scaled.statusRow]}>
             <View
               style={[
@@ -440,11 +446,6 @@ const styles = StyleSheet.create({
   stackRow: { alignItems: "center", flexDirection: "row" },
   coin: { backgroundColor: "#FFC72C", borderColor: "#8A5A00", boxShadow: "inset 0 0 0 2px #ffe787" },
   stack: { color: "#fff8e9", fontFamily: fonts.arcade },
-  // The rack's sibling z-order with the plate (zIndex 1): the wood ducks under its edge,
-  // the standing tiles and the lip rise above it.
-  rackWood: { zIndex: 0 },
-  rackTiles: { flexDirection: "row", position: "absolute", zIndex: 2 },
-  rackLip: { alignItems: "center", left: 0, overflow: "hidden", position: "absolute", right: 0, zIndex: 3 },
   statusPill: {
     backgroundColor: "#171412",
     borderColor: "#e6d7c0",
@@ -476,4 +477,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     paddingHorizontal: 2,
   },
+  // The rack's sibling z-order with the plate (zIndex 1): the wood ducks under its edge,
+  // the standing tiles and the lip rise above it.
+  rackWood: { zIndex: 0 },
+  rackTiles: { flexDirection: "row", position: "absolute", zIndex: 2 },
+  rackLip: { alignItems: "center", left: 0, overflow: "hidden", position: "absolute", right: 0, zIndex: 3 },
 });
