@@ -39,7 +39,7 @@ import {
   isCompactWindow,
   screenScale,
 } from "@/components/screens/game/screen-scale";
-import { colors, glow, spacing } from "@/constants/theme";
+import { colors, glow, layout, spacing } from "@/constants/theme";
 import { webTestID } from "@/lib/web-id";
 
 import { haptic } from "./haptics";
@@ -99,6 +99,8 @@ export const RACK = {
   phone: rackGeometry("medium"),
   /** An iPhone SE-class window: the small tile, which frees height for the table. */
   compact: rackGeometry("small"),
+  /** A phone on its side: the tray is ~240 wide, so seven tiles only fit at under a small tile. */
+  landscape: rackGeometry("small", 0.82),
 } as const;
 
 /**
@@ -112,6 +114,9 @@ export function rackFor(window: {
 }): RackGeometry {
   const scale = screenScale(window);
   if (scale !== 1) return rackGeometry("medium", scale);
+  if (window.width > window.height && window.height < layout.wideShortSide) {
+    return RACK.landscape;
+  }
   return isCompactWindow(window) ? RACK.compact : RACK.phone;
 }
 
@@ -459,7 +464,7 @@ export function TileStrip({
     <View
       accessibilityLabel="Your letter rack"
       onLayout={measure}
-      style={[styles.strip, rack === RACK.compact && styles.stripTight]}
+      style={[styles.strip, rack !== RACK.phone && styles.stripTight]}
       testID="word-builder-strip"
     >
       {/*

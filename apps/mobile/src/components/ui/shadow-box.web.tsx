@@ -1,21 +1,17 @@
-import { WithSkiaWeb } from "@shopify/react-native-skia/lib/module/web";
-import type { ComponentType } from "react";
+import { StyleSheet, View } from "react-native";
 
-import type { ShadowBoxProps } from "./shadow-box-canvas";
+import type { ShadowBoxProps, ShadowSpec } from "./shadow-box-canvas";
 
 export type { ShadowBoxProps, ShadowSpec } from "./shadow-box-canvas";
 
-/** Imported only after CanvasKit is ready (wasm served from `public/canvaskit.wasm`). */
-const load = (): Promise<{ default: ComponentType<ShadowBoxProps> }> =>
-  import("./shadow-box-canvas").then(({ ShadowBoxCanvas }) => ({ default: ShadowBoxCanvas }));
+const css = (s: ShadowSpec) => `${s.inner ? "inset " : ""}${s.dx ?? 0}px ${s.dy}px ${s.blur}px ${s.color}`;
 
-export function ShadowBox(props: ShadowBoxProps) {
+/** CSS box-shadow instead of Skia on the web: no WebGL context per shadow (Chrome caps a page at 16). */
+export function ShadowBox({ radius, shadows }: ShadowBoxProps) {
   return (
-    <WithSkiaWeb
-      componentProps={props}
-      fallback={null}
-      getComponent={load}
-      opts={{ locateFile: () => "/canvaskit.wasm" }}
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { borderRadius: radius, boxShadow: shadows.map(css).join(", ") }]}
     />
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 
 import type { LetterTileData } from "../game-types";
 import { useScreenScale } from "../screen-scale";
@@ -52,28 +52,49 @@ export function CommunityStrip({
   tiles,
   inTable = false,
   scale: requestedScale,
+  potGap,
 }: {
   tiles: readonly (LetterTileData | null)[];
   /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
   inTable?: boolean;
   scale?: number;
+  /** A gap, in points, opened after the flop and centred on the row, for the pot to sit in. */
+  potGap?: number;
 }) {
   const screenScale = useScreenScale();
   const scale = requestedScale ?? screenScale;
-  const tileWidth = inTable ? 58 : COMMUNITY_TILE;
+  const { width, height } = useWindowDimensions();
+  // Landscape phone: scale is 1 but the height is short, so the in-table tiles shrink.
+  const tileWidth = inTable ? (screenScale === 1 && width > height ? 44 : 58) : COMMUNITY_TILE;
   const tileSize = tileWidth * scale;
   const rack = useMemo(() => rackStyles(tileSize), [tileSize]);
   const five = Array.from({ length: 5 }, (_, index) => tiles[index] ?? null);
   return (
-    <View style={inTable ? undefined : styles.community}>
+    <View
+      aria-label={inTable ? `Community ${five.filter(Boolean).length}/5` : undefined}
+      role={inTable ? "group" : undefined}
+      style={inTable ? undefined : styles.community}
+    >
       {inTable ? null : (
         <LabelBand>
           COMMUNITY {"·"} {five.filter(Boolean).length}/5
         </LabelBand>
       )}
       <View style={inTable ? undefined : rack.rack}>
-        <View style={[styles.tileRow, !inTable && rack.opening, { gap: 6 * scale }]}>
-          {five.map((tile, index) =>
+        <View
+          style={[
+            styles.tileRow,
+            !inTable && rack.opening,
+            { gap: 6 * scale },
+            // The flop's three tiles before the gap and the turn and river after: shifting the row
+            // by one tile and its gap puts the gap, not the row, on the centre.
+            potGap != null && { marginRight: tileSize + 6 * scale },
+          ]}
+        >
+          {five.flatMap((tile, index) => [
+            ...(potGap != null && index === 3
+              ? [<View key="pot-gap" style={{ width: potGap }} />]
+              : []),
             tile ? (
               <LetterTile
                 dealDelayMs={communityDealDelayMs(index)}
@@ -94,7 +115,7 @@ export function CommunityStrip({
             ) : (
               <EmptyTile key={`community-${index}`} size={tileSize} />
             ),
-          )}
+          ])}
         </View>
       </View>
     </View>

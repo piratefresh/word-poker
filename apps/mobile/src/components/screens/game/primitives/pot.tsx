@@ -7,8 +7,8 @@ import { colors, fonts } from "@/constants/theme";
 import { seatMetrics } from "../seat-metrics";
 import { PotBowl } from "./pot-bowl";
 
-/** How far the pot's plate climbs over the bowl, at the phone size. */
-const PLATE_OVERLAP = 40;
+/** How far the pot text rides up over the chip stacks, at the phone size. */
+const STACK_OVERLAP = 26;
 
 /** The pot's measures at the phone size, grown by the seats' factor on a larger table. */
 function potStyles(scale: number) {
@@ -50,15 +50,9 @@ export function Pot({
   const scale = tableWidth ? seatMetrics(tableWidth, tabletop).scale : 1;
   const scaled = usePotStyles(scale);
   return (
-    // The plate rides up over the bowl's foot; the same height comes back as padding underneath,
-    // because the slot centres the block and a shorter block would drag the bowl down with it.
     <View
       pointerEvents="none"
-      style={[
-        styles.pot,
-        scaled.pot,
-        tabletop && { paddingBottom: PLATE_OVERLAP * scale },
-      ]}
+      style={[styles.pot, scaled.pot]}
       testID="pot"
     >
       {tabletop ? <PotBowl amount={amount} scale={scale} /> : null}
@@ -67,8 +61,11 @@ export function Pot({
           tabletop
             ? [
                 {
+                  // Laid over the stacks' bottom rows, on a dark pill so the digits read on any chip colour.
+                  alignItems: "center",
+                  backgroundColor: "rgba(20, 12, 6, 0.6)",
                   borderRadius: 24 * scale,
-                  marginTop: -PLATE_OVERLAP * scale,
+                  marginTop: -STACK_OVERLAP * scale,
                   minWidth: 74 * scale,
                   paddingHorizontal: 12 * scale,
                   paddingVertical: 2 * scale,

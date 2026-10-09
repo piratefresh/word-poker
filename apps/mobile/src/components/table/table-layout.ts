@@ -79,6 +79,12 @@ export interface TableLayoutConfig {
   /** Vertical center of the pot region. */
   potY?: number;
   /**
+   * Seats in rows: every seat on one side of the ring takes that side's own rim, so a shallow
+   * arc reads as a line of seats across the table rather than a fan (the tabletop room's
+   * opponents, where a few seats have the width to sit level).
+   */
+  seatRows?: boolean;
+  /**
    * Optional explicit seat angles (radians, y-down). When omitted, seats are
    * distributed evenly starting from bottom-center (the hero seat).
    */
@@ -96,6 +102,7 @@ const DEFAULTS: Omit<ResolvedTableLayoutConfig, "seatCount"> = {
   communitySpan: 0.62,
   communityY: 0.44,
   potY: 0.62,
+  seatRows: false,
 };
 
 /** Bottom-center in y-down space is +90°, so the hero seat lands there. */
@@ -111,6 +118,16 @@ export function seatAngles(count: number): number[] {
   return Array.from({ length: count }, (_, i) => HERO_ANGLE + i * step);
 }
 
+/**
+ * The seat's depth on the ring: how far past the middle it sits, in [-1, 1]. Its own sine —
+ * unless the seats sit in rows, where every seat on a side takes that side's rim (`-1` north,
+ * `1` south) and the x spread alone places them.
+ */
+function seatDepth(angle: number, rows: boolean): number {
+  const depth = Math.sin(angle);
+  return rows ? Math.sign(depth) : depth;
+}
+
 function resolveConfig(config: TableLayoutConfig): ResolvedTableLayoutConfig {
   return {
     seatCount: config.seatCount,
@@ -120,6 +137,7 @@ function resolveConfig(config: TableLayoutConfig): ResolvedTableLayoutConfig {
     communitySpan: config.communitySpan ?? DEFAULTS.communitySpan,
     communityY: config.communityY ?? DEFAULTS.communityY,
     potY: config.potY ?? DEFAULTS.potY,
+    seatRows: config.seatRows ?? DEFAULTS.seatRows,
     seatAngles: config.seatAngles,
   };
 }
@@ -145,7 +163,7 @@ export function computeTableLayout(config: TableLayoutConfig): TableLayout {
     index,
     angle,
     x: cx + rx * Math.cos(angle),
-    y: cy + ry * Math.sin(angle),
+    y: cy + ry * seatDepth(angle, resolved.seatRows),
   }));
 
   const community = computeCommunity(resolved, cx);

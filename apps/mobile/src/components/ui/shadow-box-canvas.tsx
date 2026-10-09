@@ -10,6 +10,7 @@
 
 import { Canvas, Group, RoundedRect, Shadow, rect, rrect } from "@shopify/react-native-skia";
 import { useState } from "react";
+import { View } from "react-native";
 
 export interface ShadowSpec {
   dx?: number;
@@ -43,11 +44,13 @@ export function ShadowBoxCanvas({ radius, shadows }: ShadowBoxProps) {
   const box = { x: pad, y: pad, width, height, r: radius };
 
   return (
-    <Canvas
+    // Canvas onLayout is unsupported on Fabric, so measure a wrapping View instead.
+    <View
       onLayout={(e) => setSize(e.nativeEvent.layout)}
       pointerEvents="none"
       style={{ position: "absolute", bottom: -pad, left: -pad, right: -pad, top: -pad }}
     >
+      <Canvas style={{ flex: 1 }}>
       {width <= 0 || height <= 0
         ? null
         : shadows.map((s, i) => (
@@ -61,7 +64,8 @@ export function ShadowBoxCanvas({ radius, shadows }: ShadowBoxProps) {
               </RoundedRect>
             </Group>
           ))}
-    </Canvas>
+      </Canvas>
+    </View>
   );
 }
 

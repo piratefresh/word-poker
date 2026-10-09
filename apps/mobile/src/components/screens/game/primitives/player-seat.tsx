@@ -287,7 +287,7 @@ export function PlayerSeat({
               </Text>
             </View>
           </View>
-          {dealt && !seat.isHero && !out ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
+          {/* {dealt && !seat.isHero && !out ? <RackLayers m={metrics} tabletop={tabletop} /> : null} */}
           <View style={[styles.statusRow, scaled.statusRow]}>
             <View
               style={[

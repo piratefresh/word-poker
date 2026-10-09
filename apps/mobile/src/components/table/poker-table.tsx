@@ -23,7 +23,6 @@ import {
   type PixelSize,
   type SeatBounds,
 } from "./table-fit";
-import { TableImage } from "./table-image";
 import { placeSeatsInRoom } from "./room-fit";
 import {
   computeTableLayout,
@@ -98,6 +97,14 @@ export interface PokerTableProps<TSeat, TCard> {
   dealerSeat?: number | null;
   /** Geometry overrides (seat radius, community span, etc.). */
   layoutConfig?: Partial<Omit<TableLayoutConfig, "seatCount">>;
+  /** Per-seat normalized point overrides, applied to `"room"` placement only. */
+  seatPositionOverrides?: Readonly<Record<number, Partial<NormPoint>>>;
+  /**
+   * Chrome hanging over the room's top edge, in points — the header's tag row — which a
+   * `"room"` placement keeps its seats below (`placeSeatsInRoom`). Absent means nothing hangs
+   * there.
+   */
+  topChrome?: number;
 
   renderSeat: (slot: SeatSlot<TSeat>) => ReactNode;
   renderCommunity: (slot: CommunitySlot<TCard>) => ReactNode;
@@ -146,6 +153,8 @@ export function PokerTable<TSeat, TCard>({
   community,
   dealerSeat = null,
   layoutConfig,
+  seatPositionOverrides,
+  topChrome = 0,
   renderSeat,
   renderCommunity,
   renderPot,
@@ -205,7 +214,10 @@ export function PokerTable<TSeat, TCard>({
     if (inRoom && seatBounds) {
       return {
         ...ringLayout,
-        seats: placeSeatsInRoom(ringLayout.seats, felt, seatBounds, chromeWidth),
+        seats: placeSeatsInRoom(ringLayout.seats, felt, seatBounds, chromeWidth, topChrome).map((anchor) => {
+          const override = seatPositionOverrides?.[anchor.index];
+          return override ? { ...anchor, ...override } : anchor;
+        }),
       };
     }
     if (!onFelt || !seatBounds) return ringLayout;
@@ -222,7 +234,7 @@ export function PokerTable<TSeat, TCard>({
       seats: placed,
       pot: potY == null ? ringLayout.pot : { ...ringLayout.pot, y: potY },
     };
-  }, [ringLayout, onFelt, inRoom, seatBounds, felt, seatCount, chromeWidth]);
+  }, [ringLayout, onFelt, inRoom, seatBounds, felt, seatCount, chromeWidth, seatPositionOverrides, topChrome]);
 
   const scale = felt.width > 0 ? felt.width / 640 : 1;
 
@@ -254,12 +266,6 @@ export function PokerTable<TSeat, TCard>({
     <View style={[styles.container, style]} onLayout={onLayout} testID={testID}>
       {ready ? (
         <TableLayoutContext.Provider value={ctx}>
-          {/* The painted table: its rail's top fills the felt box, and the rest reaches past it. */}
-          <TableImage
-            style={[styles.art, { left: origin.x, top: origin.y }]}
-            width={felt.width}
-          />
-
           {/* Anchored chrome lives in the felt coordinate space. */}
           <View
             pointerEvents="box-none"
@@ -397,9 +403,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgElevated,
     overflow: "hidden",
-  },
-  art: {
-    position: "absolute",
   },
   anchorLayer: {
     position: "absolute",

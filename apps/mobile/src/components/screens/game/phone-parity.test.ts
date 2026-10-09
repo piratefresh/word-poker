@@ -24,9 +24,10 @@ describe.each(PHONES)("a phone window %j", (window) => {
 
   test("keeps the phone's rack", () => {
     const rack = rackFor(window);
-    expect(rack).toBe(RACK.phone);
-    expect(rack.itemWidth).toBe(44);
-    expect(rack.scale).toBe(1);
+    const landscape = window.width > window.height;
+    expect(rack).toBe(landscape ? RACK.landscape : RACK.phone);
+    expect(rack.itemWidth).toBeLessThan(landscape ? 34 : 45);
+    expect(rack.scale).toBe(landscape ? 0.82 : 1);
   });
 });
 

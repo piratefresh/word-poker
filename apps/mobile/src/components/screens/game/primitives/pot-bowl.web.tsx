@@ -7,9 +7,9 @@ import { ChipPile } from "@/components/chip/chip-pile";
 
 import { type PotBowlDriver, usePotBowl } from "./pot-bowl-motion";
 
-const RIVE_FILE = require("../../../../../assets/images/ui/v2/ambient/word-poker-pot-bowl-assets/pot-bowl.riv");
+const RIVE_FILE = require("../../../../../assets/images/ui/v2/ambient/the-pot-chips-stack.riv");
 
-/** The Rive pot bowl (600 × 450 artboard), with the drawn chip pile while it loads or if it fails. */
+/** The Rive pot chip stacks (360 × 220 artboard), with the drawn chip pile while it loads or if it fails. */
 export function PotBowl({ amount, scale }: { amount: number; scale: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [driver, setDriver] = useState<PotBowlDriver | null>(null);
@@ -22,8 +22,8 @@ export function PotBowl({ amount, scale }: { amount: number; scale: number }) {
     const rive = new Rive({
       canvas: element,
       src: Asset.fromModule(RIVE_FILE).uri,
-      artboard: "PotBowl",
-      stateMachines: "PotBowlMachine",
+      artboard: "PotStacks",
+      stateMachines: "PotStacksMachine",
       autoplay: true,
       autoBind: true,
       layout: new Layout({ fit: Fit.Contain }),
@@ -49,7 +49,7 @@ export function PotBowl({ amount, scale }: { amount: number; scale: number }) {
   }, []);
 
   return (
-    <View style={{ width: 160 * scale, height: 120 * scale }}>
+    <View style={{ width: 120 * scale, height: 73 * scale }}>
       {driver ? null : <View style={[StyleSheet.absoluteFill, styles.fallback]}><ChipPile amount={amount} scale={scale} /></View>}
       <canvas aria-hidden ref={canvas} style={{ width: "100%", height: "100%", opacity: driver ? 1 : 0 }} />
     </View>

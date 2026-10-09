@@ -13,17 +13,23 @@ import {
   type SeatAnchor,
   type SeatCount,
 } from "@/components/table";
+import { placeSeatsInRoom } from "@/components/table/room-fit";
+import { MODE_TAG_BLOCK } from "@/components/hud/top-bar/banner";
 
 import { FOUR_PLAYER_FLOP_FIXTURE } from "./game-fixtures";
 import { PlayerSeat } from "./primitives";
 import type { GamePlayer } from "./game-types";
 import {
+  COMMUNITY_ROW_HEIGHT,
   MIN_AVATAR,
   avatarDiameter,
   playerSeatBounds,
   seatDirection,
   seatMetrics,
+  tableSeating,
+  tabletopFitsTopChrome,
   tabletopSeatAngles,
+  tabletopSeatBounds,
 } from "./seat-metrics";
 
 /** Table regions from a phone up to a 1080p desktop window. */
@@ -283,4 +289,85 @@ test.each([2, 4, 6, 9])("seats the hero at the bottom and %i-seat opponents acro
   for (const angle of opponents) expect(Math.sin(angle)).toBeLessThan(-0.3);
   const xs = opponents.map(Math.cos);
   expect([...xs].sort((a, b) => a - b)).toEqual(xs);
+});
+
+describe("the tabletop room's seating", () => {
+  /**
+   * The seats as the game screen places them: the tabletop seating, in a room of that size,
+   * under the tag row the header hangs over the room's top.
+   */
+  function placedInRoom(seatCount: SeatCount, room: PixelSize): SeatAnchor[] {
+    const { layoutConfig } = tableSeating(seatCount, true);
+    const ring = computeTableLayout({ seatCount, ...layoutConfig });
+    return placeSeatsInRoom(ring.seats, room, tabletopSeatBounds, room.width, MODE_TAG_BLOCK);
+  }
+
+  test.each(BOXES)(
+    "lines a four-player table's opponents up across the top, the hero below them, in a %i×%i room",
+    (width, height) => {
+      const room = { width, height };
+      const [hero, ...opponents] = placedInRoom(4, room);
+
+      for (const opponent of opponents) {
+        expect(opponent.y).toBeCloseTo(opponents[0].y, 10);
+      }
+      expect(hero.y).toBeGreaterThan(opponents[0].y);
+      // Level seats are only placed with the room to sit level: no seat's own column may
+      // reach into its neighbour's. (A seat's bet chip hangs past its column by design — it
+      // sits level with the avatars, where its neighbour's column is clear.)
+      const column = seatMetrics(width, true).width;
+      for (let i = 1; i < opponents.length; i++) {
+        expect((opponents[i].x - opponents[i - 1].x) * width).toBeGreaterThanOrEqual(column);
+      }
+    },
+  );
+
+  test("leaves the community row clear of the opponents' seats with the mode's tag above them", () => {
+    const room = { width: 402, height: 551 };
+    expect(tabletopFitsTopChrome(room.height, room.width, MODE_TAG_BLOCK)).toBe(true);
+
+    const { layoutConfig } = tableSeating(4, true);
+    const [, ...opponents] = placedInRoom(4, room);
+    const scale = seatMetrics(room.width, true).scale;
+    const labels = opponents.map(
+      (seat) => seat.y * room.height + tabletopSeatBounds(seat, room.width, 4).bottom,
+    );
+    const communityTop =
+      (layoutConfig.communityY ?? 0) * room.height - (COMMUNITY_ROW_HEIGHT / 2) * scale;
+
+    expect(communityTop).toBeGreaterThan(Math.max(...labels));
+  });
+
+  test.each([
+    // The room a table region gets, measured on the web build at that window.
+    ["402×874", 402, 551, true],
+    ["412×915", 412, 592, true],
+    ["390×844", 390, 521, true],
+    ["360×800", 360, 519, true],
+    // The tag tucks under the capsule's foot, so it now clears the seats here too.
+    ["375×812", 375, 489, true],
+    ["375×667", 375, 386, false],
+  ] as [string, number, number, boolean][])(
+    "hangs the mode's tag over a %s room only where its seats still clear the community row",
+    (_window, width, roomHeight, fits) => {
+      expect(tabletopFitsTopChrome(roomHeight, width, MODE_TAG_BLOCK)).toBe(fits);
+    },
+  );
+
+  test("gives up the tag before it lets the seats reach the community row", () => {
+    // A room with the space for the row alone: the tag over it is one row too many.
+    const room = 470;
+    const width = 402;
+
+    expect(tabletopFitsTopChrome(room, width, 0)).toBe(true);
+    expect(tabletopFitsTopChrome(room, width, MODE_TAG_BLOCK)).toBe(false);
+  });
+
+  test("keeps a fuller table's opponents spread down the arc: that many would not sit level", () => {
+    const { layoutConfig } = tableSeating(9, true);
+    const opponents = computeTableLayout({ seatCount: 9, ...layoutConfig }).seats.slice(1);
+    const ys = opponents.map((seat) => seat.y);
+
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.1);
+  });
 });

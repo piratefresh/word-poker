@@ -11,6 +11,7 @@
  */
 
 import type { SeatAnchor, SeatExtents, TableLayoutConfig } from "@/components/table";
+import { ROOM_GUTTER } from "@/components/table/room-fit";
 
 /** The avatar at a felt `REFERENCE_TABLE_WIDTH` wide. */
 const REFERENCE_AVATAR = 64;
@@ -146,6 +147,39 @@ const TABLETOP = {
 const TABLETOP_ROOM_WIDTH = 400;
 /** How far a wide window grows the tabletop seat. */
 const TABLETOP_MAX_SCALE = 1.8;
+
+/** The tabletop room's community row center, as a fraction of the room's height. */
+const TABLETOP_COMMUNITY_Y = 0.46;
+
+/**
+ * The tabletop community row's own height, before the tabletop scale: the band across the room's
+ * middle that a seat above it has to stay clear of (`placeSeatsInRoom` only reserves the seat
+ * chrome, so the seating's own row has to fit above this).
+ */
+export const COMMUNITY_ROW_HEIGHT = 80;
+
+/**
+ * Whether a tabletop room `roomHeight` tall can hang `topChrome` points of header over its top
+ * band: with it, the opponents' row — avatars, racks and status pills — still ends above the
+ * community row. A room too short for the two keeps the header's tag in the header's corner
+ * instead of crowding the felt.
+ *
+ * The row's own reaches are the ones drawn for `appearanceWidth`; a fuller table is seated no
+ * further down than this, so it fits wherever this does.
+ */
+export function tabletopFitsTopChrome(
+  roomHeight: number,
+  appearanceWidth: number,
+  topChrome: number,
+): boolean {
+  const m = seatMetrics(appearanceWidth, true);
+  // The row's whole reach below the room's top: the badge over the avatar, the avatar, the rack
+  // and the status pill under them (`playerSeatBounds`' own top and bottom, joined at the avatar).
+  const rowBottom = ROOM_GUTTER + topChrome + (m.avatar - m.badgeTop) + labelDrop(m);
+  const communityTop =
+    TABLETOP_COMMUNITY_Y * roomHeight - (COMMUNITY_ROW_HEIGHT / 2) * m.scale;
+  return rowBottom <= communityTop;
+}
 
 /** Every measure of a seat at a felt `tableWidth` wide — or, `tabletop`, in a room that wide. */
 export function seatMetrics(tableWidth: number, tabletop = false): SeatMetrics {
@@ -297,7 +331,9 @@ export function tableSeating(seatCount: number, tabletop = false): TableSeating 
 /**
  * The tabletop room: the hero at the bottom and every opponent along an arc across the top, so
  * the community row and pot have the middle to themselves (the even ring would park a 4-seat
- * table's opponents halfway down the sides, on top of the row).
+ * table's opponents halfway down the sides, on top of the row). The arc is only as deep as the
+ * room's seating: up to four players the seating flattens it into a row (`seatRows`), and a
+ * fuller table spreads its opponents down the sides instead.
  */
 export function tabletopSeatAngles(seatCount: number): number[] {
   const opponents = seatCount - 1;
@@ -321,8 +357,12 @@ function tabletopSeating(seatCount: number): TableSeating {
       layoutConfig: {
         seatAngles: tabletopSeatAngles(seatCount),
         seatRadius: { x: 1.05, y: 0.86 },
-        communityY: 0.51,
-        potY: 0.69,
+        // Up to four players the opponents sit in one line across the top: the arc's own
+        // depth would float the middle one above its neighbours. A fuller table keeps the
+        // fan, because that many seats only fit spread down the arc's sides.
+        seatRows: seatCount <= 4,
+        communityY: TABLETOP_COMMUNITY_Y,
+        potY: 0.66,
       },
     };
     TABLETOP_SEATING.set(seatCount, seating);
