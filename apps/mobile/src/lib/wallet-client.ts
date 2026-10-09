@@ -39,6 +39,14 @@ export class WalletUnverifiedError extends Error {
   }
 }
 
+/** The route answered 400: a claim it could not read, which no retry will fix. */
+export class QuestClaimRejectedError extends Error {
+  constructor() {
+    super("That claim could not be read.");
+    this.name = "QuestClaimRejectedError";
+  }
+}
+
 function sessionInit(): RequestInit {
   if (Platform.OS === "web") return { credentials: "include" };
   const cookie = authClient.getCookie();
@@ -114,6 +122,7 @@ export async function sendQuestHandClaim(claim: QuestHandClaim): Promise<QuestCl
     body: JSON.stringify(claim),
   });
   if (response.status === 401) throw new WalletAuthError();
+  if (response.status === 400) throw new QuestClaimRejectedError();
   if (!response.ok) throw await questFailure(response);
 
   const body: unknown = await response.json();
