@@ -1,8 +1,9 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { Dimensions, Text } from "react-native";
 
+import { FREE_PLAY, type BalanceView } from "@/components/hud";
+
 import { FOUR_PLAYER_FLOP_FIXTURE } from "./game-fixtures";
-import { setBackdropStyle } from "./backdrop/backdrop-style";
 import { GameScreen, type GameScreenProps } from "./game-screen";
 
 // `useSafeAreaInsets` throws without a provider, and the shipped provider needs native
@@ -34,8 +35,16 @@ jest.mock("react-native-reanimated", () => ({
  */
 const FELT_BOX = { nativeEvent: { layout: { width: 360, height: 320 } } };
 
+/**
+ * The mode states its economy, so every call names a balance — the tests that don't care get
+ * a placeholder that cannot be mistaken for a figure.
+ */
+const LOADING_BALANCE: BalanceView = { state: "loading" };
+
 async function renderScreen(props: Partial<GameScreenProps> = {}) {
-  const view = await render(<GameScreen game={FOUR_PLAYER_FLOP_FIXTURE} {...props} />);
+  const view = await render(
+    <GameScreen balance={LOADING_BALANCE} game={FOUR_PLAYER_FLOP_FIXTURE} {...props} />,
+  );
   await fireEvent(view.getByTestId("poker-table"), "layout", FELT_BOX);
   return view;
 }
@@ -60,11 +69,22 @@ test("shows one header, the HUD's own, and none of the header it replaced", asyn
   expect(view.queryAllByLabelText(/chat/)).toHaveLength(0);
 });
 
-test("reports the balance as unavailable, never as a figure the player does not have", async () => {
-  const view = await renderScreen();
+/** label is what a screen reader reads, text is what is on screen — the chip's readout passes through the felt untouched. */
+const BALANCE_STATES: [string, BalanceView, string, string][] = [
+  ["ready figure", { state: "ready", amount: 1240 }, "Balance $1,240", "$1.2K"],
+  ["loading balance", { state: "loading" }, "Balance loading", "···"],
+  ["unavailable balance", { state: "unavailable" }, "Balance unavailable", "—"],
+  ["free play", FREE_PLAY, "Free play", "FREE PLAY"],
+];
 
-  expect(view.getByLabelText("Balance unavailable")).toHaveTextContent("—");
-});
+test.each(BALANCE_STATES)(
+  "reads the %s its mode stated, never a figure it did not",
+  async (_name, balance, label, text) => {
+    const view = await renderScreen({ balance });
+
+    expect(view.getByLabelText(label)).toHaveTextContent(text);
+  },
+);
 
 test("counts the turn down instead of re-anchoring its deadline on every render", async () => {
   jest.useFakeTimers();
@@ -90,7 +110,7 @@ test("opens a new turn from a new budget instead of keeping the old deadline", a
   // the screen first opened: holding the first deadline would leave the clock reading the
   // wrong budget for the rest of the hand.
   await view.rerender(
-    <GameScreen game={{ ...FOUR_PLAYER_FLOP_FIXTURE, secondsRemaining: 12 }} />,
+    <GameScreen balance={LOADING_BALANCE} game={{ ...FOUR_PLAYER_FLOP_FIXTURE, secondsRemaining: 12 }} />,
   );
 
   expect(view.getAllByText("00:12").length).toBeGreaterThan(0);
@@ -112,15 +132,14 @@ test("keeps a seat's tap under the HUD", async () => {
 
 const CHROME_BUTTONS: [
   string,
-  keyof Pick<GameScreenProps, "onBack" | "onHelp" | "onSettings">,
+  keyof Pick<GameScreenProps, "onBack" | "onHelp">,
 ][] = [
   ["Leave the table", "onBack"],
   ["How to play", "onHelp"],
-  ["Settings", "onSettings"],
 ];
 
 test.each(CHROME_BUTTONS)("%s invokes the screen's handler", async (label, prop) => {
-  const handlers = { onBack: jest.fn(), onHelp: jest.fn(), onSettings: jest.fn() };
+  const handlers = { onBack: jest.fn(), onHelp: jest.fn() };
   const view = await renderScreen(handlers);
 
   await fireEvent.press(view.getByRole("button", { name: label }));
@@ -147,6 +166,7 @@ test("calls the wager action the button is labelled with", async () => {
   const view = await renderScreen({ onBet, onRaise });
 
   // Facing a bet, the slider raises: the amount is the round total it would raise to.
+  await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
   await fireEvent.press(view.getByTestId("action-wager"));
   expect(onRaise).toHaveBeenCalledWith(40);
   expect(onBet).not.toHaveBeenCalled();
@@ -154,6 +174,7 @@ test("calls the wager action the button is labelled with", async () => {
   // With no bet out, the same slider opens the round — a bet, not a raise of nothing.
   await view.rerender(
     <GameScreen
+      balance={LOADING_BALANCE}
       game={{
         ...FOUR_PLAYER_FLOP_FIXTURE,
         betting: {
@@ -174,9 +195,39 @@ test("calls the wager action the button is labelled with", async () => {
     />,
   );
 
+  await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
   await fireEvent.press(view.getByTestId("action-wager"));
   expect(onBet).toHaveBeenCalledWith(20);
   expect(onRaise).toHaveBeenCalledTimes(1);
+});
+
+test("returns to call at the slider floor and resets a selected raise on a new turn", async () => {
+  const onCheckOrCall = jest.fn();
+  const onRaise = jest.fn();
+  const view = await renderScreen({ onCheckOrCall, onRaise });
+  expect(view.getByRole("button", { name: "Call $20" })).toBeOnTheScreen();
+  const adjust = async (actionName: string) => fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName } });
+  await adjust("increment");
+  expect(view.getByRole("button", { name: "Raise to $40" })).toBeOnTheScreen();
+  await adjust("decrement");
+  await fireEvent.press(view.getByRole("button", { name: "Call $20" }));
+  expect(onCheckOrCall).toHaveBeenCalledTimes(1);
+  expect(onRaise).not.toHaveBeenCalled();
+  await adjust("increment");
+  await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...FOUR_PLAYER_FLOP_FIXTURE, id: "next-turn" }} onCheckOrCall={onCheckOrCall} onRaise={onRaise} />);
+  expect(view.getByRole("button", { name: "Call $20" })).toBeOnTheScreen();
+  expect(view.queryByTestId("action-wager")).toBeNull();
+});
+
+test("keeps check available without a legal bet, including the word confirm window", async () => {
+  const onCheckOrCall = jest.fn();
+  const view = await renderScreen({
+    game: { ...FOUR_PLAYER_FLOP_FIXTURE, betting: { ...FOUR_PLAYER_FLOP_FIXTURE.betting, primary: "confirm", canCheck: true, callAmount: undefined, canBet: false, canRaise: false } },
+    onCheckOrCall,
+  });
+  await fireEvent.press(view.getByRole("button", { name: "Check" }));
+  expect(onCheckOrCall).toHaveBeenCalledTimes(1);
+  expect(view.queryByTestId("action-wager")).toBeNull();
 });
 
 test("asks before committing the whole stack, and only commits on the confirm", async () => {
@@ -240,7 +291,7 @@ test("holds every action in the row while a lesson locks it, and keeps the mode'
     onRaise,
   });
 
-  for (const id of ["action-fold", "action-check-call", "action-wager", "all-in-button"]) {
+  for (const id of ["action-fold", "action-check-call", "all-in-button"]) {
     await fireEvent.press(view.getByTestId(id));
   }
   await fireEvent.press(view.getByTestId("mode-control"));
@@ -260,6 +311,7 @@ test("draws each side pot under the main pot, and none when the hand has one pot
 
   await view.rerender(
     <GameScreen
+      balance={LOADING_BALANCE}
       game={{ ...FOUR_PLAYER_FLOP_FIXTURE, sidePots: [500, 250] }}
       onBack={jest.fn()}
     />,
@@ -269,23 +321,21 @@ test("draws each side pot under the main pot, and none when the hand has one pot
   expect(view.getByTestId("side-pot-1")).toHaveTextContent("SIDE POT $250");
 });
 
-describe("landscape tabletop", () => {
+describe("landscape", () => {
   const original = Dimensions.get("window");
   afterEach(() => {
     Dimensions.set({ window: original, screen: original });
-    setBackdropStyle("tabletop");
   });
 
   // Phone landscape is the tight case: every control the tutorial points at has to still be drawn.
   test("keeps the table, rack and every betting control on a phone on its side", async () => {
     const window = { ...original, width: 800, height: 390 };
     Dimensions.set({ window, screen: window });
-    setBackdropStyle("tabletop");
     const view = await renderScreen({ rackActions: <Text>RACK ACTIONS</Text> });
 
     expect(view.getByTestId("poker-table")).toBeOnTheScreen();
     expect(view.getByText("RACK ACTIONS")).toBeOnTheScreen();
-    for (const id of ["action-fold", "action-check-call", "action-wager", "all-in-button"]) {
+    for (const id of ["action-fold", "action-check-call", "all-in-button"]) {
       expect(view.getByTestId(id)).toBeOnTheScreen();
     }
   });
