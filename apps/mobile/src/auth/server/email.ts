@@ -9,11 +9,11 @@
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 /**
- * Resend's sandbox sender needs no verified domain, but only delivers to the
- * account owner's own address. Point `RESEND_FROM_EMAIL` at a verified domain
- * before shipping.
+ * Default sender, on the domain verified in Resend. (`onboarding@resend.dev`
+ * only delivers to the account owner's own address.) Override with
+ * `RESEND_FROM_EMAIL`.
  */
-const SANDBOX_FROM = "Word Poker <onboarding@resend.dev>";
+const DEFAULT_FROM = "Word Poker <hello@email.wordpoker.app>";
 
 /** One hour, matching `emailAndPassword.resetPasswordTokenExpiresIn`. */
 const LINK_LIFETIME = "one hour";
@@ -40,7 +40,7 @@ export async function sendEmail({ to, subject, html, text }: Email): Promise<voi
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL ?? SANDBOX_FROM,
+      from: process.env.RESEND_FROM_EMAIL ?? DEFAULT_FROM,
       to,
       subject,
       html,
