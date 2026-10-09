@@ -57,27 +57,46 @@ export function DraftLine({
             </>
           ) : (
             <View
+              accessible
               accessibilityLabel={
                 checkedResult.valid
                   ? `Valid Word, ${checkedResult.points ?? 0} points`
                   : "Not a word"
               }
-              style={styles.checkedResult}
+              style={[
+                styles.checkedResult,
+                checkedResult.valid
+                  ? styles.checkedResultValid
+                  : styles.checkedResultInvalid,
+              ]}
               testID="word-builder-check-result"
             >
               <Text
                 accessible={false}
-                style={
+                style={[
+                  styles.checkedIcon,
                   checkedResult.valid
                     ? styles.checkedValid
-                    : styles.checkedInvalid
-                }
+                    : styles.checkedInvalid,
+                ]}
               >
                 {checkedResult.valid ? "✓" : "×"}
               </Text>
 
+              <Text
+                accessible={false}
+                style={[
+                  styles.checkedLabel,
+                  checkedResult.valid
+                    ? styles.checkedValid
+                    : styles.checkedInvalid,
+                ]}
+              >
+                {checkedResult.valid ? "Valid word" : "Not a word"}
+              </Text>
+
               {checkedResult.valid ? (
-                <Text style={styles.checkedPoints}>
+                <Text accessible={false} style={styles.checkedPoints}>
                   {"· "}
                   {checkedResult.points ?? 0}
                   {" pts"}

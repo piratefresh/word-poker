@@ -46,23 +46,33 @@ export const styles = StyleSheet.create({
   previewEmpty: { color: colors.textFaint, fontSize: fontSize.small },
   checkedResult: {
     alignItems: "center",
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.pill,
+    borderWidth: border.hairline,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
+    justifyContent: "center",
+    minHeight: 32,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
-  checkedValid: {
-    color: colors.success,
-    fontFamily: fonts.sansMedium,
-    fontSize: fontSize.small,
+  checkedResultValid: { borderColor: colors.successHi },
+  checkedResultInvalid: { borderColor: colors.danger },
+  checkedIcon: {
+    fontFamily: fonts.sansBold,
+    fontSize: fontSize.bodyLg,
   },
-  checkedInvalid: {
-    color: colors.danger,
-    fontFamily: fonts.sansMedium,
-    fontSize: fontSize.small,
+  checkedLabel: {
+    fontFamily: fonts.sansBold,
+    fontSize: fontSize.body,
   },
+  checkedValid: { color: colors.successHi },
+  checkedInvalid: { color: colors.danger },
   checkedPoints: {
     ...type.numeric,
-    color: colors.success,
-    fontSize: fontSize.small,
+    color: colors.successHi,
+    fontSize: fontSize.body,
   },
   checkNotice: {
     backgroundColor: colors.surfaceStrong,
@@ -92,7 +102,7 @@ export const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   // The draft's line above the tray, on the wood: one line, centred, as tall when empty.
-  previewSlot: { alignItems: "center", justifyContent: "flex-end", minHeight: 26 },
+  previewSlot: { alignItems: "center", justifyContent: "flex-end", minHeight: 32 },
   word: { ...type.numeric, fontSize: fontSize.title, letterSpacing: 3 },
   score: { ...type.numeric, color: colors.gold, fontSize: fontSize.small },
   // A draft §11 would refuse is worth nothing, so its number is drawn as what it is.
