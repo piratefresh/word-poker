@@ -11,12 +11,17 @@ jest.mock("react-native-reanimated", () => ({
   useReducedMotion: () => false,
 }));
 
-// The table's mesh-gradient backdrop is Skia, which needs a GPU canvas a test renderer doesn't
-// have; it is decoration only, so tests draw nothing in its place.
-jest.mock("@/components/screens/game/backdrop/table-backdrop", () => ({ TableBackdrop: () => null }));
+jest.mock("expo-audio", () => ({
+  useAudioPlayer: () => ({
+    play: jest.fn(),
+    seekTo: jest.fn(async () => {}),
+    volume: 1,
+  }),
+}));
 
-// The table's painted rail and felt are Skia too, and decoration only: tests draw no table art.
-jest.mock("@/components/table/table-art/table-art", () => ({ TableArt: () => null }));
+// The tabletop backdrop is drink and coin-bowl art that animates natively, which a test renderer doesn't
+// run; it is decoration only, so tests draw nothing in its place.
+jest.mock("@/components/screens/game/backdrop/table-backdrop", () => ({ TableBackdrop: () => null }));
 
 // The pot bowl is a Rive view, native-only and decoration: tests draw no bowl.
 jest.mock("@/components/screens/game/primitives/pot-bowl", () => ({ PotBowl: () => null }));
@@ -32,8 +37,10 @@ jest.mock("@/components/screens/game/primitives/seat-beam", () => ({
   SeatBeam: ({ children }) => children,
 }));
 
-// The painted shadow behind the action bar is a Skia shader, and decoration only.
-jest.mock("@/components/screens/game/backdrop/action-bar-shade", () => ({ ActionBarShade: () => null }));
+// The wager button's off-turn glass dome is Skia decoration over a button tests drive directly.
+jest.mock("@/components/screens/game/betting/waiting-shield", () => ({ WaitingShield: () => null }));
+// Its housing is a Rive view, native-only: tests drive the button over no art.
+jest.mock("@/components/screens/game/betting/wager-art", () => ({ WagerArt: () => null }));
 
 // The choice accent's beam is decorative Skia; tests keep the static purple strip.
 jest.mock("@/components/game/tile-choice-beam", () => ({
@@ -63,3 +70,6 @@ jest.mock("react-native-purchases", () => {
     PURCHASES_ERROR_CODE: { PURCHASE_CANCELLED_ERROR: "1" },
   };
 });
+
+// The XP overlay's bar is a Rive view, native-only and decoration: tests read the numbers around it.
+jest.mock("@/components/screens/results/xp-bar", () => ({ XpBar: () => null }));

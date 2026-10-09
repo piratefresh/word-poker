@@ -22,7 +22,8 @@
  * rack's flip — fed by the adapter's `PowerView`, so none of them learns which table it is at.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { router } from "expo-router";
+import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
@@ -39,6 +40,8 @@ import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
+import { useXpResultOverlay } from "@/components/screens/results/use-xp-result-overlay";
+import { XpResultOverlay } from "@/components/screens/results/xp-result-overlay";
 import { GameButton } from "@/components/ui/game-button";
 import {
   WordBuilder,
@@ -59,8 +62,7 @@ import {
   useRoomConnection,
   type RoomConnectionLike,
 } from "@/features/online/use-room-connection";
-import { resultsFacts } from "@/lib/quest-facts";
-import { useQuests } from "@/lib/quests-provider";
+import { useBalanceView } from "@/lib/use-balance-view";
 
 export function OnlineFelt({
   room,
@@ -90,6 +92,14 @@ export function OnlineFelt({
     usePower,
     endPowerUsed,
   } = useOnlineGame({ room, dictionary });
+  // The header's chip is the signed-in player's Wallet (STO-562) — the one economy a real
+  // online table touches. The read follows the hand: dealt, and again when it reaches payout
+  // and the pot posts. STO-444's payouts replace the re-read with the real grant event.
+  const balance = useBalanceView(
+    game === null ? null : `${game.handId}:${game.phase === "payout" ? "paid" : "live"}`,
+  );
+  // The signed-out chip is the one balance control, and its tap is the way in.
+  const goToSignIn = useCallback(() => router.push("/sign-in"), []);
   // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
   const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
   const choosing = power.targeting.stage === "picking";
@@ -102,15 +112,13 @@ export function OnlineFelt({
     useSimpleWinCelebration(results);
   const connection = useRoomConnection(room);
 
-  // One quest claim per hand (STO-525): `powers` is non-null only at a Wild table (`use-online-game.ts`),
-  // so it doubles as the wild-table flag without a room message of its own.
-  const { reportHand } = useQuests();
-  const reportedHand = useRef<number | null>(null);
-  useEffect(() => {
-    if (results === null || reportedHand.current === results.hand) return;
-    reportedHand.current = results.hand;
-    reportHand(resultsFacts(results, { wildTable: powers !== null, heroUsedPower: powers?.held?.used === true }));
-  }, [powers, reportHand, results]);
+  // One quest claim per hand (STO-525), and the XP overlay a lost showdown opens on it (STO-573):
+  // `powers` is non-null only at a Wild table (`use-online-game.ts`), so it doubles as the
+  // wild-table flag without a room message of its own. A mounted felt is one session.
+  const xp = useXpResultOverlay(results, 0, {
+    wildTable: powers !== null,
+    heroUsedPower: powers?.held?.used === true,
+  });
 
   const reconnecting = connection === "reconnecting";
 
@@ -121,8 +129,10 @@ export function OnlineFelt({
     ) : waiting !== null ? (
       <View style={styles.table} testID="online-felt-waiting">
         <GameScreen
+          balance={balance}
           game={game}
           onBack={onLeave}
+          onBalancePress={goToSignIn}
           waiting={{
             stamp: "WAITING FOR PLAYERS",
             controls: <ReadyControls {...waiting} onReady={setReady} />,
@@ -151,7 +161,9 @@ export function OnlineFelt({
         <View style={styles.table}>
           <GameScreen
             winOverlay={
-              celebratingWin && results !== null ? (
+              xp.hero !== null ? (
+                <XpResultOverlay hero={xp.hero} key={results?.hand} onComplete={xp.complete} report={xp.report} />
+              ) : celebratingWin && results !== null ? (
                 <SimpleWinResultOverlay
                   key={results.hand}
                   onComplete={finishWinCelebration}
@@ -174,8 +186,10 @@ export function OnlineFelt({
               )
             }
             game={game}
+            balance={balance}
             onAllIn={allIn}
             onBack={onLeave}
+            onBalancePress={goToSignIn}
             onBet={wager}
             onCheckOrCall={primary}
             onFold={fold}
@@ -207,7 +221,7 @@ export function OnlineFelt({
   return (
     <View style={styles.root}>
       {body}
-      {results !== null && results.hand !== dismissed && !celebratingWin ? (
+      {results !== null && results.hand !== dismissed && !celebratingWin && xp.hero === null ? (
         <ResultsScreen
           onDeal={() => setDismissed(results.hand)}
           onExit={onLeave}

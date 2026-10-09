@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -13,12 +13,15 @@ import {
   swapFlipOf,
   usePowerTargeting,
 } from "@/components/powers";
+import { FREE_PLAY } from "@/components/hud";
 import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
+import { useXpResultOverlay } from "@/components/screens/results/use-xp-result-overlay";
+import { XpResultOverlay } from "@/components/screens/results/xp-result-overlay";
 import { CoachProvider, useCoachTour } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
 import {
@@ -39,8 +42,6 @@ import {
 import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/features/offline/offline-seed";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
-import { resultsFacts } from "@/lib/quest-facts";
-import { useQuests } from "@/lib/quests-provider";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -145,17 +146,17 @@ function OfflineTable({
   // The HUD's "How to play": a tour of the felt's own controls, over the hand in progress.
   const help = useCoachTour("helper", HELPER_TOUR);
 
-  // One quest claim per hand (STO-525), the moment its results land: the ref is the guard
-  // against the results overlay re-rendering the same hand more than once.
-  const { reportHand } = useQuests();
-  const reportedHand = useRef<number | null>(null);
-  useEffect(() => {
-    if (results === null || reportedHand.current === results.hand) return;
-    reportedHand.current = results.hand;
-    reportHand(
-      resultsFacts(results, { wildTable: powerUps === "choose3", heroUsedPower: powers?.held?.used === true }),
-    );
-  }, [powers?.held?.used, powerUps, reportHand, results]);
+  // One quest claim per hand (STO-525), the moment its results land, and the XP overlay a lost
+  // showdown opens on it (STO-573). A new session deals hand 1 again, so it counts as its own.
+  const [session, setSession] = useState(0);
+  const xp = useXpResultOverlay(results, session, {
+    wildTable: powerUps === "choose3",
+    heroUsedPower: powers?.held?.used === true,
+  });
+  const restart = useCallback(() => {
+    setSession((current) => current + 1);
+    newGame();
+  }, [newGame]);
 
   // Leaving the table is the app's own exit, not the results' invention: back the way the
   // felt's own back control goes, and home when there is nothing behind this screen.
@@ -188,9 +189,13 @@ function OfflineTable({
     >
       <CoachProvider style={styles.table} tour={help.tour}>
         <GameScreen
+          // Free play (ADR 0002): the offline table's chips are local, so no Wallet is read.
+          balance={FREE_PLAY}
           game={game}
           winOverlay={
-            celebratingWin && results !== null ? (
+            xp.hero !== null ? (
+              <XpResultOverlay hero={xp.hero} key={results?.hand} onComplete={xp.complete} report={xp.report} />
+            ) : celebratingWin && results !== null ? (
               <SimpleWinResultOverlay
                 key={results.hand}
                 onComplete={finishWinCelebration}
@@ -252,10 +257,10 @@ function OfflineTable({
         The session's last hand keeps its end-of-session sheet instead — a New game is the only
         useful thing left to say once the hero has busted (ADR 0002).
       */}
-      {payout && !sessionOver && results !== null && !celebratingWin ? (
+      {payout && !sessionOver && results !== null && !celebratingWin && xp.hero === null ? (
         <ResultsScreen onDeal={deal} onExit={leaveTable} snapshot={results} />
       ) : null}
-      {sessionOver ? <SessionOver game={game} onNewGame={newGame} /> : null}
+      {sessionOver && xp.hero === null ? <SessionOver game={game} onNewGame={restart} /> : null}
     </WordBuilder>
   );
 }
