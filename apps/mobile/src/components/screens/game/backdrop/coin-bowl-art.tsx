@@ -15,7 +15,7 @@ const ART = {
 /** Static artwork while Rive loads or if its runtime fails. */
 export function CoinBowlArtwork() {
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
       <Image
         accessible={false}
         contentFit="contain"

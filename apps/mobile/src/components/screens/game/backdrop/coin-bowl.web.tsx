@@ -50,7 +50,7 @@ export function CoinBowl() {
   }, []);
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
       {!loaded && <CoinBowlArtwork />}
       <canvas aria-hidden ref={canvas} style={{ width: "100%", height: "100%", opacity: loaded ? 1 : 0 }} />
     </View>

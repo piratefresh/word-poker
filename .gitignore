@@ -74,6 +74,9 @@ package-lock.json
 
 .env.local
 /packages/3d/
+# retired game-room backdrop art, kept locally in case a look returns;
+# git history is the durable copy — restore with `git checkout <sha> -- <path>`
+/archive/
 /.tmp/
 
 # local machine artifacts: JVM/Sentry crash dumps, agent worktrees, and the Colyseus Cloud

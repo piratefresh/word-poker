@@ -67,7 +67,7 @@ export function Drink() {
   }, []);
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
       <canvas
         aria-hidden
         ref={canvas}
