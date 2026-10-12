@@ -9,8 +9,8 @@
 #
 #   maestro test --platform web .maestro/online-hand.yaml -e ROOM_ID=the-id-printed-by-opponent
 #
-# Probe for seed 409 (browser is seat 1): rack Z, P, O/U, E/I, I, Y, B; board O/U, E/I, I, Y, B. PUB is a dictionary word in rack order: P, U on the O/U choice tile, then B.
-# Choice-tile-only deals changed the old BEE pin; a different seed or a server ignoring the seed
+# Probe for seed 409 (browser is seat 1): rack I, S/L; board Q/K, W, N, B, U. ILK is a dictionary word in strip order: I, L on the S/L choice tile, then K on the Q/K choice tile.
+# The vowel/consonant marble-bag deal (STO-579) changed the old PUB pin; a different seed or a server ignoring the seed
 # fails at the selectors instead of silently building a different word.
 #
 # The room is behind the auth guard. On a fresh headed profile this flow signs in through
@@ -21,7 +21,7 @@
 # reads first — and an element with no test id answers to its accessibility label. Device
 # selectors are in apps/mobile/.maestro/native/online-hand.yaml.
 url: http://localhost:8081/online
-name: Online hand - join, call the blind, build PUB and read results
+name: Online hand - join, call the blind, build ILK and read results
 tags:
   - web
   - online
@@ -75,20 +75,20 @@ tags:
                 id: "action-check-call"
             - waitForAnimationToEnd
 
-# At the river all five board tiles are available to the strip. Build the dictionary word PUB in rack order;
-# choose U explicitly on the O/U choice tile. The tiles and the face carry the strip's test ids,
+# At the river all five board tiles are available to the strip. Build the dictionary word ILK in strip order;
+# choose L and K explicitly on the S/L and Q/K choice tiles. The tiles and the face carry the strip's test ids,
 # the same ids a device flow taps.
 - extendedWaitUntil:
     visible: "COMMUNITY · 5/5"
     timeout: 20000
 - tapOn:
-    id: "word-builder-tile-P-1"
+    id: "word-builder-tile-I-2"
 - tapOn:
-    id: "word-builder-face-OU-1-U"
+    id: "word-builder-face-SL-1-L"
 - tapOn:
-    id: "word-builder-tile-B-1"
+    id: "word-builder-face-QK-1-K"
 - assertVisible:
-    text: "PUB"
+    text: "ILK"
 
 # CHECK confirms the word once the window opens. The opponent's 60-second payout delay keeps the
 # results overlay visible long enough to assert it before the next hand.
@@ -106,7 +106,7 @@ tags:
 - assertVisible:
     text: "SCOREBOARD"
 - assertVisible:
-    text: ".*PUB.*"
+    text: ".*ILK.*"
 - assertNotVisible:
     text: "The window closed"
 - tapOn:

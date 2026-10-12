@@ -115,20 +115,16 @@ describe("dealHand", () => {
     );
   });
 
-  it("cuts the shuffled bag at one fixed point, so a seed alone redraws the table", () => {
-    const playerCount = 4;
-    const shuffled = shuffle(createTileBag(), createRng(SEED));
-    const { privateTiles, community, rest } = dealHand({ seed: SEED, playerCount, specialTiles: NO_SPECIAL_TILES });
-    const privateTileCount = playerCount * PRIVATE_TILES_PER_PLAYER;
+  it("deals from a vowel/consonant marble bag: every 7 tiles from the top hold 3 vowels", () => {
+    for (const seed of [SEED, 1, 2, 42, 123456789]) {
+      const { privateTiles, community, rest } = dealHand({ seed, playerCount: 4, specialTiles: NO_SPECIAL_TILES });
+      const order = [...privateTiles.flat(), ...community, ...rest];
 
-    assert.deepEqual(privateTiles, [
-      shuffled.slice(0, PRIVATE_TILES_PER_PLAYER),
-      shuffled.slice(PRIVATE_TILES_PER_PLAYER, 2 * PRIVATE_TILES_PER_PLAYER),
-      shuffled.slice(2 * PRIVATE_TILES_PER_PLAYER, 3 * PRIVATE_TILES_PER_PLAYER),
-      shuffled.slice(3 * PRIVATE_TILES_PER_PLAYER, privateTileCount),
-    ]);
-    assert.deepEqual(community, shuffled.slice(privateTileCount, privateTileCount + COMMUNITY_TILE_COUNT));
-    assert.deepEqual(rest, shuffled.slice(privateTileCount + COMMUNITY_TILE_COUNT));
+      for (let from = 0; from < order.length; from += 7) {
+        const vowels = order.slice(from, from + 7).filter((tile) => "AEIOU".includes(tile.letter));
+        assert.equal(vowels.length, 3, `seed ${seed}, tiles ${from}–${from + 6}`);
+      }
+    }
   });
 
   it("hands back independent collections, so mutating one leaves the others alone", () => {

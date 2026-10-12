@@ -39,7 +39,7 @@ export const COMMUNITY_TILE_COUNT = 5;
  * @returns A new array holding the same tiles in a seeded random order; a bag of fewer
  *   than two tiles comes back as an equal copy, because there is nothing to reorder.
  */
-export function shuffle(bag: readonly Tile[], rng: () => number): Tile[] {
+export function shuffle<T>(bag: readonly T[], rng: () => number): T[] {
   const shuffled = bag.slice();
 
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
@@ -49,11 +49,39 @@ export function shuffle(bag: readonly Tile[], rng: () => number): Tile[] {
   return shuffled;
 }
 
+/** The bag's own vowel:consonant split, 42:56 = 3:4, as one round of the top-level marble bag. */
+const KIND_MARBLES = ["vowel", "vowel", "vowel", "consonant", "consonant", "consonant", "consonant"] as const;
+const VOWELS: ReadonlySet<string> = new Set(["A", "E", "I", "O", "U"]);
+
+/**
+ * Orders the bag as nested marble bags: a top bag of {@link KIND_MARBLES} picks vowel or
+ * consonant, refilled whenever it empties, and the tile comes off a shuffled vowel or
+ * consonant pile. Every tile still appears exactly once and the letter counts are unchanged,
+ * but every seven tiles from the top hold three vowels, so a hand rarely shows a board of all
+ * vowels or all consonants. A pile that runs dry hands its turns to the other.
+ */
+function marbleOrder(bag: readonly Tile[], rng: () => number): Tile[] {
+  const vowels = shuffle(bag.filter((tile) => VOWELS.has(tile.letter)), rng);
+  const consonants = shuffle(bag.filter((tile) => !VOWELS.has(tile.letter)), rng);
+  const order: Tile[] = [];
+  let marbles: string[] = [];
+
+  while (vowels.length > 0 || consonants.length > 0) {
+    if (marbles.length === 0) marbles = shuffle(KIND_MARBLES, rng);
+    const wantsVowel = marbles.pop() === "vowel";
+    const pile = (wantsVowel && vowels.length > 0) || consonants.length === 0 ? vowels : consonants;
+    const tile = pile.pop();
+    if (tile !== undefined) order.push(tile);
+  }
+
+  return order;
+}
+
 /**
  * Deals one hand from one seed: private tiles per player, then the community.
  *
- * The seats are served in order — seat 0 takes the first
- * {@link PRIVATE_TILES_PER_PLAYER} tiles of the shuffle, seat 1 the next two, and so on —
+ * The bag is ordered by {@link marbleOrder}, then the seats are served in order — seat 0 takes
+ * the first {@link PRIVATE_TILES_PER_PLAYER} tiles of that order, seat 1 the next two, and so on —
  * and the {@link COMMUNITY_TILE_COUNT} community tiles follow immediately after the last
  * seat, with everything left over going back as `rest`. No tile is ever dealt twice,
  * because the deal is a set of disjoint slices of one shuffled bag. Seats are positional
@@ -63,7 +91,7 @@ export function shuffle(bag: readonly Tile[], rng: () => number): Tile[] {
  * The cut is then handed to the table's special tiles: §10's choice tiles are placed into it
  * and §9's multipliers rolled onto it, from the same seeded generator (`./special-tiles`). A
  * table that plays none passes {@link NO_SPECIAL_TILES} and gets the bare cut back. `rest` is
- * the shuffle's remainder followed by the tiles the placements replaced, in the order they
+ * the order's remainder followed by the tiles the placements replaced, in the order they
  * were replaced — the deck a hand did not show.
  *
  * @param options The `seed` every participant replays, the number of seated players, and
@@ -95,7 +123,7 @@ export function dealHand({
   }
 
   const rng = createRng(seed);
-  const bag = shuffle(createTileBag(), rng);
+  const bag = marbleOrder(createTileBag(), rng);
   const privateTileCount = playerCount * PRIVATE_TILES_PER_PLAYER;
 
   // One contiguous run of the shuffled bag, cut three ways: hands, community, remainder.
