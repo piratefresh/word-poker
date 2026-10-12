@@ -13,6 +13,8 @@
  *
  * Set MAESTRO_BIN to pin one clean Maestro install (an overlayed install with stale JARs crashes
  * on driver install) and SMOKE_TIMEOUT_MS (default 900000) to bound the whole run.
+ * Add --web-opponent to play against a second Maestro UI instead of the scripted socket seat
+ * (STO-578). The browser creates Cross Platform Table first, then the device joins its room.
  */
 import { execFile, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdtempSync, openSync, readFileSync } from "node:fs";
@@ -22,14 +24,28 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const [platform, flow = ".maestro/native/online-hand.yaml"] = process.argv.slice(2);
+const [platform, ...args] = process.argv.slice(2);
+const webOpponent = args.includes("--web-opponent");
+const headless = args.includes("--headless");
+const flow = args.find((arg) => !arg.startsWith("--")) ??
+  (webOpponent ? ".maestro/native/cross-platform-hand.yaml" : ".maestro/native/online-hand.yaml");
 if (platform !== "android" && platform !== "ios") {
-  console.error("usage: node scripts/smoke-online-native.mjs android|ios [flow, relative to apps/mobile]");
+  console.error("usage: node scripts/smoke-online-native.mjs android|ios [flow, relative to apps/mobile] [--web-opponent] [--headless]");
+  process.exit(2);
+}
+if (platform === "ios" && process.platform !== "darwin") {
+  console.error("The local iOS smoke needs macOS and a booted iOS Simulator.");
   process.exit(2);
 }
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const isWindows = process.platform === "win32";
+const gamePort = Number(process.env.SMOKE_GAME_PORT ?? 2567);
+const metroPort = Number(process.env.SMOKE_METRO_PORT ?? 8081);
+if ([gamePort, metroPort].some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || gamePort === metroPort) {
+  console.error("SMOKE_GAME_PORT and SMOKE_METRO_PORT must be distinct ports between 1 and 65535.");
+  process.exit(2);
+}
 const logs = mkdtempSync(join(tmpdir(), "wordpoker-native-smoke-"));
 const children = [];
 console.log(`Logs: ${logs}`);
@@ -44,16 +60,18 @@ const timer = setTimeout(() => fail(`Smoke did not finish within ${timeoutMs / 1
 const env = {
   ...process.env,
   WORDPOKER_DETERMINISTIC_SEED: "1",
-  SEED: "409",
+  SEED: webOpponent ? "505" : "409",
   TABLE_NAME: "Smoke Table",
   BEAT_MS: "700",
-  GAME_URL: "ws://localhost:2567",
-  EXPO_PUBLIC_GAME_URL: "ws://localhost:2567",
+  PORT: String(gamePort),
+  GAME_URL: `ws://localhost:${gamePort}`,
+  EXPO_PUBLIC_GAME_URL: `ws://localhost:${gamePort}`,
   EXPO_PUBLIC_E2E_AUTH_BYPASS: "1",
   // Observed Maestro taps have exceeded the normal 42 s clock. The cause of those delays is
   // still under investigation. Long turns keep the diagnostic hand alive;
   // the payout hold keeps the results up for the flow to read.
-  WORDPOKER_SMOKE_ROOM: JSON.stringify({ turnDuration: 300_000, payoutDelay: 60_000 }),
+  WORDPOKER_SMOKE_ROOM: JSON.stringify({ seed: webOpponent ? 505 : 409, turnDuration: 300_000, payoutDelay: 60_000 }),
+  BROWSER: "none",
 };
 
 function start(name, command) {
@@ -135,7 +153,7 @@ const maestro =
   which("maestro", [join(homedir(), ".maestro", "bin", isWindows ? "maestro.bat" : "maestro")]);
 if (!maestro) fail("Maestro was not found on PATH or in ~/.maestro/bin (set MAESTRO_BIN to pick one).");
 
-for (const port of [2567, 8081]) {
+for (const port of [gamePort, metroPort]) {
   if (await listening(port)) fail(`Port ${port} is in use; stop the dev server / Metro first.`);
 }
 
@@ -163,18 +181,18 @@ if (platform === "android") {
   if (!/\tdevice\b/.test(deviceList))
     fail(`No Android device is connected and authorized:\n${deviceList}`);
   // The device's localhost is not this machine's; reverse both ports the app dials.
-  for (const port of [2567, 8081]) await adbCommand(["reverse", `tcp:${port}`, `tcp:${port}`]);
+  for (const port of [gamePort, metroPort]) await adbCommand(["reverse", `tcp:${port}`, `tcp:${port}`]);
 }
 
 start("server", "pnpm --filter @wordpoker/server exec tsx src/index.ts");
 // --clear: the EXPO_PUBLIC_ values above are inlined at transform time, so a cached bundle from a
 // normal dev session would still point at Colyseus Cloud and the sign-in guard.
-start("metro", "pnpm --filter @wordpoker/mobile exec expo start --dev-client --port 8081 --clear");
-await waitFor("Colyseus on 2567", () => listening(2567));
+start("metro", `pnpm --filter @wordpoker/mobile exec expo start --dev-client --port ${metroPort} --clear`);
+await waitFor(`Colyseus on ${gamePort}`, () => listening(gamePort));
 // node:http rather than fetch: polling Metro with fetch crashed Node 24 on Windows (0xC0000409).
 const metroRunning = () =>
   new Promise((resolve) => {
-    const request = get("http://127.0.0.1:8081/status", (response) => {
+    const request = get(`http://127.0.0.1:${metroPort}/status`, (response) => {
       let body = "";
       response.on("data", (chunk) => (body += chunk));
       response.on("end", () => resolve(body.includes("running")));
@@ -185,20 +203,58 @@ const metroRunning = () =>
       resolve(false);
     });
   });
-await waitFor("Metro on 8081", metroRunning);
+await waitFor(`Metro on ${metroPort}`, metroRunning);
 
-start("opponent", "pnpm --filter @wordpoker/server exec tsx scripts/smoke-opponent.ts");
+// The existing lobby watcher observes listings without occupying a third seat.
+let webRun;
 let roomId;
-await waitFor("the opponent's room", () => {
-  const log = existsSync(join(logs, "opponent.log")) ? readFileSync(join(logs, "opponent.log"), "utf8") : "";
-  roomId = log.match(/seated at .*table ([A-Za-z0-9_-]+) as /)?.[1];
-  return Boolean(roomId);
-}, 60);
+if (webOpponent) {
+  start("lobby-watch", "pnpm --filter @wordpoker/server exec tsx scripts/smoke-lobby-watch.ts");
+  await waitFor("the lobby watcher", () => readLog("lobby-watch").includes("watching the lobby"), 60);
+  webRun = runMaestro("web", ".maestro/cross-platform-hand.yaml", root,
+    ["-e", `WEB_URL=http://localhost:${metroPort}`, ...(headless ? ["--headless", "--screen-size", "1280x1000"] : [])]);
+  await waitFor("the browser to create Cross Platform Table", () => {
+    roomId = [...readLog("lobby-watch").matchAll(/table (\S+) "Cross Platform Table" clients=(\d+)/g)]
+      .filter((match) => Number(match[2]) === 1).at(-1)?.[1];
+    return Boolean(roomId);
+  }, 240);
+} else {
+  start("opponent", "pnpm --filter @wordpoker/server exec tsx scripts/smoke-opponent.ts");
+  await waitFor("the opponent's room", () => {
+    roomId = readLog("opponent").match(/seated at .*table ([A-Za-z0-9_-]+) as /)?.[1];
+    return Boolean(roomId);
+  }, 60);
+}
+
+function readLog(name) {
+  const path = join(logs, `${name}.log`);
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+function runMaestro(target, targetFlow, cwd, extraArgs) {
+  const out = openSync(join(logs, `${target}.log`), "a");
+  const argv = ["test", "--platform", target, targetFlow, "--test-output-dir", join(logs, target), ...extraArgs];
+  // .bat needs a shell on Windows. PowerShell literals preserve paths with spaces without
+  // interpolating Maestro's arguments as shell commands (Node's shell:true concatenates them).
+  const quote = (value) => `'${value.replaceAll("'", "''")}'`;
+  const command = `& ${[maestro, ...argv].map(quote).join(" ")}; exit $LASTEXITCODE`;
+  const child = spawn(isWindows ? "powershell.exe" : maestro,
+    isWindows ? ["-NoProfile", "-EncodedCommand", Buffer.from(command, "utf16le").toString("base64")] : argv,
+    { cwd, env, stdio: ["ignore", out, out], detached: !isWindows, windowsHide: true });
+  closeSync(out);
+  children.push(child);
+  child.on("error", (error) => fail(`Maestro ${target} failed to start: ${error.message}`));
+  // Attach before any setup waits: a failing browser must stop the device and services too.
+  return new Promise((resolve) => child.on("exit", (code) => {
+    if (!stopping && code !== 0) fail(`Maestro ${target} failed (${code}). See ${join(logs, `${target}.log`)}`);
+    resolve(code);
+  }));
+}
 
 // Cold-start the dev client straight onto this Metro. Launched any other way it reopens the last
 // Metro it used, which may be another machine's, with another game server baked in.
 const APP_ID = "com.wordpoker.wordpoker";
-const devLink = "exp+word-poker://expo-development-client/?url=" + encodeURIComponent("http://localhost:8081");
+const devLink = "exp+word-poker://expo-development-client/?url=" + encodeURIComponent(`http://localhost:${metroPort}`);
 if (platform === "android") {
   await adbCommand(["shell", "am", "force-stop", APP_ID]);
   await adbCommand(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", `"${devLink}"`, APP_ID]);
@@ -210,14 +266,10 @@ if (platform === "android") {
 
 console.log(`Running ${platform} smoke in room ${roomId}...`);
 // Track Maestro too, so cancellation, failures and the deadline stop its driver process tree.
-const run = spawn(
-  maestro,
-  ["test", "--platform", platform, flow, "-e", `ROOM_ID=${roomId}`, "-e", "ATTACH=1"],
-  { cwd: join(root, "apps", "mobile"), env, stdio: "inherit", shell: isWindows, detached: !isWindows },
-);
-children.push(run);
-run.on("error", (error) => fail(`Maestro failed to start: ${error.message}`));
-const status = await new Promise((resolve) => run.on("exit", (code) => resolve(code)));
+const run = runMaestro(platform, flow, join(root, "apps", "mobile"),
+  ["-e", `ROOM_ID=${roomId}`, "-e", "ATTACH=1"]);
+const statuses = await Promise.all([run, ...(webRun ? [webRun] : [])]);
+const status = statuses.every((code) => code === 0) ? 0 : 1;
 stopAll();
-console.log(status === 0 ? "Native online smoke passed." : `Native online smoke failed. Logs: ${logs}`);
+console.log(status === 0 ? `${webOpponent ? "Cross-platform" : "Native"} online smoke passed.` : `Online smoke failed. Logs: ${logs}`);
 process.exit(status ?? 1);

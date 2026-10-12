@@ -163,3 +163,37 @@ A cold boot restored a stalled Settings flow to ten consecutive passes of about 
 To cold-restart the emulator, use
 (`adb emu kill`, then relaunch it detached — never two qemu instances on one AVD).
 
+### Web versus native smoke (STO-578)
+
+Two real Maestro UI players share a seeded Colyseus room:
+
+```bash
+pnpm smoke:cross:android             # Windows or macOS; booted/USB Android device
+pnpm smoke:cross:ios                 # macOS; booted iOS Simulator
+pnpm smoke:cross:android --headless  # hide the web browser only
+pnpm smoke:cross:probe               # recheck the deal, taps, scores and payout without devices
+```
+
+Install a development build first (`pnpm android:device`, or `expo run:ios` from apps/mobile).
+Use one connected native target. Maestro (or `MAESTRO_BIN`), Java, and the web driver's matching
+Chrome/chromedriver must be installed. Stop services on ports 2567 and 8081 before running.
+Alternatively, set `SMOKE_GAME_PORT` and `SMOKE_METRO_PORT` to free ports; the runner wires both
+players to those ports and leaves existing development servers running.
+The native runner starts Colyseus and one Metro serving both platforms, uses Android port reversal
+or the iOS Simulator's shared localhost, and attaches the dev client to that Metro. This Metro sets
+the E2E auth bypass for both players, so no seeded auth user is required for this smoke.
+
+The web flow (`.maestro/cross-platform-hand.yaml`) creates Cross Platform Table through the lobby
+form with the default 500 buy-in and Classic mode. The existing lobby watcher takes no seat and
+reports the room ID; only then does the native flow (`apps/mobile/.maestro/native/cross-platform-hand.yaml`)
+join it. Both ready up, check/call through all four streets, draft their words before closing river
+betting, and confirm them. Seed 505 gives web JET (15 points) and native ETA (8 points); web wins
+the $20 pot (stacks 510 / 490). Both UIs assert two words played, the pot and winning score;
+the native UI also checks that its own card loses. The engine probe pins the exact
+tile IDs, turn order and payout; changes to the deal or scoring must update the flows with it.
+
+The runner succeeds only after both Maestro processes pass. A failure, Ctrl-C, or `SMOKE_TIMEOUT_MS`
+(default 15 minutes, including setup) stops the owned service and player process trees. Per-player
+logs, Maestro artifacts and result screenshots stay in the temporary directory printed at startup.
+This is a local smoke; it does not provision native builds or remote devices in CI.
+
