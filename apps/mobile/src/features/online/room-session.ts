@@ -26,7 +26,7 @@ import {
 } from "@wordpoker/contracts";
 import { useSyncExternalStore } from "react";
 
-import { gameClient } from "./game-client";
+import { authenticateTableClient, tableClient } from "./game-client";
 
 /** Colyseus's matchmaking codes, as named by its own error enum. */
 const MATCHMAKE_NO_HANDLER = 520;
@@ -143,6 +143,9 @@ function tableOf(state: unknown): TableSnapshot {
  */
 function joinFailure(error: unknown): string {
   const code = (error as { code?: unknown } | null)?.code;
+  if (code === 401) return "Sign in to join an online table.";
+  if (code === 503) return "Sign-in could not be verified. Try again.";
+  if (code === 409) return "Your account already has a seat at that table.";
   if (code === MATCHMAKE_INVALID_ROOM_ID) return "That table is full or has just closed.";
   if (code === MATCHMAKE_NO_HANDLER || code === MATCHMAKE_INVALID_CRITERIA) {
     return "That table isn't available. Try the list again.";
@@ -277,7 +280,8 @@ export async function createTable(options: GameRoomCreateOptions): Promise<strin
   publish({ status: "joining" });
 
   try {
-    const room = await gameClient.create(GAME_ROOM_NAME, options);
+    await authenticateTableClient();
+    const room = await tableClient.create(GAME_ROOM_NAME, options);
     hold(room, taken);
     return room.roomId;
   } catch (error) {
@@ -310,7 +314,8 @@ export async function joinTable(roomId: string): Promise<void> {
   await Promise.all(previous.map((room) => room.leave()));
 
   try {
-    const room = await gameClient.joinById(roomId);
+    await authenticateTableClient();
+    const room = await tableClient.joinById(roomId);
     hold(room, taken);
   } catch (error) {
     if (taken !== attempt) throw error;

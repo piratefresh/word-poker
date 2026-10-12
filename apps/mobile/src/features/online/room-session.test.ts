@@ -7,15 +7,16 @@
  */
 
 import { createTable, joinTable, leaveTable } from "./room-session";
+import { authenticateTableClient, tableClient } from "./game-client";
 
 jest.mock("./game-client", () => ({
-  gameClient: { create: jest.fn(), joinById: jest.fn() },
+  tableClient: { create: jest.fn(), joinById: jest.fn() },
+  authenticateTableClient: jest.fn(async () => {}),
 }));
 
-import { gameClient } from "./game-client";
 
-const create = gameClient.create as unknown as jest.Mock;
-const joinById = gameClient.joinById as unknown as jest.Mock;
+const create = tableClient.create as unknown as jest.Mock;
+const joinById = tableClient.joinById as unknown as jest.Mock;
 
 /** A room as the session holds it: the id it is addressed by, and the events it subscribes to. */
 interface HeldRoom {
@@ -41,6 +42,15 @@ beforeEach(async () => {
   await leaveTable();
   create.mockReset();
   joinById.mockReset();
+  jest.mocked(authenticateTableClient).mockReset().mockResolvedValue(undefined);
+});
+
+test("does not take a seat without a verified session", async () => {
+  jest.mocked(authenticateTableClient).mockRejectedValue(Object.assign(new Error("Sign in"), { code: 401 }));
+  await expect(joinTable("table-1")).rejects.toThrow("Sign in to join");
+  expect(joinById).not.toHaveBeenCalled();
+  await expect(createTable({ name: "Table", buyIn: 500, maxSeats: 2, powerUps: { deal: "off" } })).rejects.toThrow("Sign in");
+  expect(create).not.toHaveBeenCalled();
 });
 
 test("takes one seat when the same table is asked for twice before the first join lands", async () => {

@@ -23,6 +23,7 @@
  */
 
 import { Client } from "@colyseus/sdk";
+import { authenticateSmokeClient } from "./authenticate.js";
 
 import {
   GAME_EVENTS,
@@ -55,6 +56,8 @@ type State = {
 
 const dictionary = await loadDictionary();
 const client = new Client(GAME_URL);
+// One seat per account: the player's flow signs in as the shared E2E user.
+await authenticateSmokeClient(client, process.env.OPPONENT_EMAIL ?? "e2e-2@wordpoker.dev");
 const room = await client.create("game", {
   name: NAME,
   buyIn: 500,

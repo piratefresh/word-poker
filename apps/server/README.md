@@ -14,6 +14,25 @@ Then open http://localhost:2567 for the playground, or /monitor for the monitor.
 
 ## Structure
 
+Online tables require a valid Better Auth session. Set `AUTH_API_URL` to the Expo API origin
+(HTTPS in production; defaults to `http://localhost:8081` for development). The public lobby
+remains anonymous. Restart the Expo API server after changing its Better Auth plugins.
+An account holds at most one seat per table (a second join gets 409). The scripted smoke
+opponent signs in as the seeded `e2e-2@wordpoker.dev` (`OPPONENT_EMAIL` overrides it) so the
+player's flow can be `e2e@wordpoker.dev`. Load tests need `LOADTEST_SESSION_TOKENS`, one
+comma-separated session per client.
+
+The verifier needs an API that has Better Auth's `bearer()` plugin. A Metro started with
+`API_PROXY` forwards `/api/auth/*` to the hosted backend, so until that backend ships `bearer()`,
+table joins against it fail with 401. Run a local Expo API without `API_PROXY` and point
+`AUTH_API_URL` at it. Roll out in that order too: the Expo API with `bearer()` first, then this
+server with `AUTH_API_URL` set (without it, production joins fail with 503).
+
+With local Expo and Colyseus running, check real sign-in, table admission, and revocation:
+`pnpm --filter @wordpoker/server exec tsx scripts/smoke-auth.ts`.
+Disable `API_PROXY` on the test Expo instance so `/api/auth/*` runs the local code.
+`AUTH_API_URL` and `GAME_URL` can point this check at separate local test ports.
+
 - `src/index.ts`: entry point — leave it alone if you plan to deploy to Colyseus Cloud
 - `src/app.config.ts`: server configuration — rooms, HTTP routes, express middleware
 - `src/rooms/GameRoom.ts`: your room handler

@@ -1,4 +1,5 @@
 import assert from "assert";
+import { createServer } from "node:http";
 import type { Room as ClientRoom } from "@colyseus/sdk";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
 
@@ -123,11 +124,84 @@ function assertBoardDecodesOnce(room: { state: unknown }, clients: readonly Clie
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer<typeof appConfig>;
 
-  before(async () => colyseus = await boot(appConfig));
-  after(async () => colyseus.shutdown());
+  const originalAuthOrigin = process.env.AUTH_API_URL;
+  // A protocol fixture, not an auth bypass in application code: joins still call the real verifier.
+  let accountCount = 0;
+  const authServer = createServer((request, response) => {
+    const token = request.headers.authorization;
+    response.setHeader("content-type", "application/json");
+    // `test-session` verifies as a fresh account each join (one seat per account); the others are fixed.
+    const id = token === "Bearer test-session" ? `test-account-${(accountCount += 1)}`
+      : token === "Bearer second-session" ? "second-account"
+      : token === "Bearer same-session" ? "same-account"
+      : undefined;
+    if (id === undefined) {
+      response.end("null");
+      return;
+    }
+    response.end(JSON.stringify({
+      user: { id },
+      session: { expiresAt: new Date(Date.now() + 60000).toISOString() },
+    }));
+  });
+
+  before(async () => {
+    await new Promise<void>((resolve) => authServer.listen(0, "127.0.0.1", resolve));
+    const address = authServer.address();
+    assert.ok(address && typeof address !== "string");
+    process.env.AUTH_API_URL = `http://127.0.0.1:${address.port}`;
+    colyseus = await boot(appConfig);
+  });
+  after(async () => {
+    await colyseus.shutdown();
+    await new Promise<void>((resolve, reject) => authServer.close((error) => error ? reject(error) : resolve()));
+    if (originalAuthOrigin === undefined) delete process.env.AUTH_API_URL;
+    else process.env.AUTH_API_URL = originalAuthOrigin;
+  });
 
   beforeEach(async () => {
     await colyseus.cleanup();
+    colyseus.sdk.auth.token = "test-session";
+  });
+
+  describe("authenticated seats", () => {
+    it("rejects anonymous and forged joins before a seat is taken", async () => {
+      const room = await colyseus.createRoom("game", { name: "Auth", buyIn: 500, maxSeats: 2 });
+      colyseus.sdk.auth.token = "";
+      await assert.rejects(colyseus.connectTo(room, { userId: "test-account" }), (error: { code?: number }) => error.code === 401);
+      colyseus.sdk.auth.token = "forged-session";
+      await assert.rejects(colyseus.connectTo(room), (error: { code?: number }) => error.code === 401);
+      assert.equal(room.state.seats.size, 0);
+    });
+
+    it("retains verified account identity across reconnects and ignores supplied user IDs", async () => {
+      const room = await colyseus.createRoom("game", { name: "Auth reconnect", buyIn: 500, maxSeats: 2, reconnectSeconds: 2 });
+      const client = await colyseus.connectTo(room, { userId: "second-account" });
+      const userId = room["bindings"].get(client.sessionId)?.userId;
+      assert.match(userId ?? "", /^test-account-\d+$/);
+      const sessionId = client.sessionId;
+      client.reconnection.minUptime = 0;
+      client.reconnection.minDelay = 1;
+      client.reconnection.maxDelay = 5;
+      client.reconnection.backoff = () => 1;
+      const reconnected = new Promise<void>((resolve) => client.onReconnect(resolve));
+      colyseus.sdk.auth.token = "second-session";
+      client.connection.close();
+      await reconnected;
+      assert.equal(client.sessionId, sessionId);
+      assert.equal(room["bindings"].get(sessionId)?.userId, userId);
+      assert.equal(room["bindings"].get(sessionId)?.connected, true);
+      await client.leave();
+    });
+
+    it("refuses a second seat for an account already at the table", async () => {
+      const room = await colyseus.createRoom("game", { name: "Auth duplicate", buyIn: 500, maxSeats: 2 });
+      colyseus.sdk.auth.token = "same-session";
+      const first = await colyseus.connectTo(room);
+      await assert.rejects(colyseus.connectTo(room), (error: { code?: number }) => error.code === 409);
+      assert.equal(room.state.seats.size, 1);
+      await first.leave();
+    });
   });
 
   describe("authoritative hand", () => {
@@ -1143,7 +1217,9 @@ describe("GameRoom", () => {
 
     /** A lobby subscription, asked for the current list rather than waiting for the join push. */
     async function subscribe() {
+      colyseus.sdk.auth.token = "";
       const lobby = await colyseus.sdk.joinOrCreate("lobby");
+      colyseus.sdk.auth.token = "test-session";
       const followed = followLobby(lobby);
       lobby.send("filter");
       return { lobby, followed };
@@ -1473,6 +1549,7 @@ describe("GameRoom", () => {
         const { swap } = await useWild(table, actor);
         rolls.push({ offers, letter: swap.tile.letter });
         await colyseus.cleanup();
+        colyseus.sdk.auth.token = "test-session";
       }
       assert.deepStrictEqual(rolls[0], rolls[1]);
     });

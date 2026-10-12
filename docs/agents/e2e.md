@@ -86,6 +86,11 @@ it resets the password and keeps the user's id:
 node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
 ```
 
+The same script also seeds `e2e-2@wordpoker.dev`, `e2e-3@…` and `e2e-4@…` (same password). An online
+table seats an account only once, so multi-seat smokes give each seat its own account. The scripted
+opponent uses `e2e-2`, and four-seat seats P2–P4 use `e2e-2` to `e2e-4`. Choose the account with
+`-e TEST_USER_EMAIL=…` on any flow that runs `sign-in.yaml`.
+
 `.maestro/sign-in.yaml` signs in as that user through the real sign-in screen (safe to rerun: it signs out
 an existing session first, and always ends past the guard on the home screen). A headed run keeps the
 session in Maestro's Chrome profile; a headless run starts on a fresh profile every time, so flows that

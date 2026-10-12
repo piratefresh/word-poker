@@ -35,6 +35,13 @@ tags:
           optional: true
 # A link that lands while the bundle is still loading is dropped, so wait for the home screen.
 - extendedWaitUntil:
+    visible: "TAKE YOUR SEAT|Online Mode"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: _sign-in.yaml
+- extendedWaitUntil:
     visible: "Online Mode"
     timeout: 180000
 - openLink: wordpoker://online?room=${ROOM_ID}

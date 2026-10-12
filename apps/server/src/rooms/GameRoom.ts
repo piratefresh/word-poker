@@ -40,6 +40,7 @@ import {
   type ProjectionBinding,
 } from "./GameRoomProjection.js";
 import { GameRoomState } from "./schema/GameRoomState.js";
+import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
 /**
@@ -56,6 +57,8 @@ type TableConfig = GameTableConfig;
 
 interface SeatBinding {
   readonly playerId: string;
+  /** Better Auth account identity; kept server-side and stable during reconnect holds. */
+  readonly userId: string;
   readonly seat: number;
   client: Client;
   connected: boolean;
@@ -92,6 +95,10 @@ interface RoomKnobs {
 /** Colyseus lifecycle coordinator for one authoritative table. */
 export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMetadata }> {
   state = new GameRoomState();
+
+  static override async onAuth(token: string): Promise<OnlineAccount> {
+    return onlineAccount(token);
+  }
 
   private dictionary!: Dictionary;
   private table!: TableConfig;
@@ -263,9 +270,15 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.publishPhase();
   }
 
-  onJoin(client: Client, _options: unknown) {
+  onJoin(client: Client, _options: unknown, auth: OnlineAccount) {
     if (this.game !== null) {
       throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table is mid-hand; join the next hand");
+    }
+
+    // One seat per account: history membership, ranked play and buy-ins are per account.
+    // Held seats rejoin through reconnection, which does not run onJoin.
+    if ([...this.bindings.values()].some((binding) => binding.userId === auth.userId)) {
+      throw new ServerError(409, "that account is already seated at this table");
     }
 
     const seat = firstFreeSeat(this.bindings, this.maxClients);
@@ -273,10 +286,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table has no free seat");
     }
 
-    // Seats are anonymous: any client that joins becomes a seat keyed by its `sessionId`.
-    // There is no `onAuth`/identity until Epic B, so a seat is a connection.
+    // Engine actions keep using the connection id; history uses the verified account id.
     this.bindings.set(client.sessionId, {
       playerId: client.sessionId,
+      userId: auth.userId,
       seat,
       client,
       connected: true,
