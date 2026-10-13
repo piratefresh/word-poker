@@ -4,7 +4,7 @@
 # Same setup as online-hand.yaml (seed 409, a fresh smoke-opponent.ts room). The link is the invite's
 # own form (`/online?room=<id>`, lib/invite-link.ts). A signed-out browser is bounced to sign-in, where
 # "Play as guest" opens an anonymous Better Auth session, and the guard then lands the remembered table.
-# A profile that already holds a session skips the guest tap and joins straight through.
+# Needs a signed-out profile: the guest tap is required, so a profile that already holds a session fails here.
 #
 #   maestro test --platform web .maestro/online-guest-join.yaml -e ROOM_ID=the-id-printed-by-opponent
 url: http://localhost:8081/online?room=${ROOM_ID}
@@ -18,13 +18,8 @@ tags:
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
     timeout: 15000
-    optional: true
-- runFlow:
-    when:
-      visible: "TAKE YOUR SEAT"
-    commands:
-      - tapOn:
-          text: "Play as guest.*"
+- tapOn:
+    text: "Play as guest.*"
 
 - extendedWaitUntil:
     visible:
