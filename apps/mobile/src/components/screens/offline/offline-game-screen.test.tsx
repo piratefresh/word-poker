@@ -74,7 +74,7 @@ jest.mock("@/lib/quests-provider", () => ({
  * does not pin draws its own seed (`@/features/offline/offline-seed`), and a drawn seed is not knowable in
  * advance, so the draw is stood in for with {@link DRAWN_SEED}.
  */
-const SEED = 20_260_919;
+const SEED = 129;
 
 const HERO_TILES: readonly Tile[] = dealHand({ seed: SEED, playerCount: 4 }).privateTiles[0] ?? [];
 
@@ -267,9 +267,9 @@ describe("<OfflineGameScreen />", () => {
   });
 
   test("queues the hero behind a real CPU card and holds its flip until its own card clears", async () => {
-    mockSeedParam = "7";
+    mockSeedParam = "246";
     mockPowerParam = "wild";
-    const heroRack = dealHand({ seed: 7, playerCount: 4 }).privateTiles[0] ?? [];
+    const heroRack = dealHand({ seed: 246, playerCount: 4 }).privateTiles[0] ?? [];
     mockDictionary = testDictionary([heroRack.map((tile) => tile.letter).join("")]);
     const view = await renderTable();
     const live = () => {

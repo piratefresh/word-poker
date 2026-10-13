@@ -4,8 +4,7 @@
  * USB/emulator device adb can see) or `pnpm smoke:online:ios` (Mac, a booted Simulator).
  *
  * The device runs your development build (`pnpm android:device` / `expo run:ios` once) against a
- * Metro this runner starts with `EXPO_PUBLIC_E2E_AUTH_BYPASS=1` (sign-in is skipped; the flag only
- * lives in this Metro's bundle) and `EXPO_PUBLIC_GAME_URL=ws://localhost:2567`. Android reaches
+ * Metro this runner starts with real sign-in and `EXPO_PUBLIC_GAME_URL=ws://localhost:2567`. Android reaches
  * localhost through `adb reverse`; the iOS Simulator shares the Mac's. It then starts a seeded
  * Colyseus, the scripted opponent (`apps/server/scripts/smoke-opponent.ts`), and runs
  * `apps/mobile/.maestro/native/online-hand.yaml` with the opponent's room id. Logs land in the
@@ -66,11 +65,13 @@ const env = {
   PORT: String(gamePort),
   GAME_URL: `ws://localhost:${gamePort}`,
   EXPO_PUBLIC_GAME_URL: `ws://localhost:${gamePort}`,
-  EXPO_PUBLIC_E2E_AUTH_BYPASS: "1",
+  EXPO_PUBLIC_E2E_AUTH_BYPASS: "0",
+  AUTH_API_URL: `http://localhost:${metroPort}`,
+  EXPO_PUBLIC_AUTH_URL: `http://localhost:${metroPort}`,
   // Observed Maestro taps have exceeded the normal 42 s clock. The cause of those delays is
   // still under investigation. Long turns keep the diagnostic hand alive;
   // the payout hold keeps the results up for the flow to read.
-  WORDPOKER_SMOKE_ROOM: JSON.stringify({ seed: webOpponent ? 505 : 409, turnDuration: 300_000, payoutDelay: 60_000 }),
+  WORDPOKER_SMOKE_ROOM: JSON.stringify({ seed: webOpponent ? 505 : 409, turnDuration: 300_000 }),
   BROWSER: "none",
 };
 
@@ -212,7 +213,8 @@ if (webOpponent) {
   start("lobby-watch", "pnpm --filter @wordpoker/server exec tsx scripts/smoke-lobby-watch.ts");
   await waitFor("the lobby watcher", () => readLog("lobby-watch").includes("watching the lobby"), 60);
   webRun = runMaestro("web", ".maestro/cross-platform-hand.yaml", root,
-    ["-e", `WEB_URL=http://localhost:${metroPort}`, ...(headless ? ["--headless", "--screen-size", "1280x1000"] : [])]);
+    // One seat per account: the native seat is the shared E2E user, so the browser plays as the second.
+    ["-e", `WEB_URL=http://localhost:${metroPort}`, "-e", "TEST_USER_EMAIL=e2e-2@wordpoker.dev", ...(headless ? ["--headless", "--screen-size", "1280x1000"] : [])]);
   await waitFor("the browser to create Cross Platform Table", () => {
     roomId = [...readLog("lobby-watch").matchAll(/table (\S+) "Cross Platform Table" clients=(\d+)/g)]
       .filter((match) => Number(match[2]) === 1).at(-1)?.[1];

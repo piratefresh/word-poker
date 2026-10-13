@@ -8,6 +8,11 @@
   },
   "scripts": {
     "android:device": "pnpm --filter @wordpoker/mobile exec expo run:android --device",
+    "android:device:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_GAME_URL='local'; pnpm android:device\"",
+    "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
+    "deploy:colyseus": "npx @colyseus/cloud deploy",
+    "deploy:railway": "railway up --ci",
+    "deploy:all": "pnpm deploy:colyseus && pnpm deploy:railway",
     "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm kill:ports && pnpm --filter @wordpoker/mobile start",
     "kill:ports": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8081,8082 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; exit 0\"",

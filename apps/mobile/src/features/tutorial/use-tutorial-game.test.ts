@@ -26,11 +26,11 @@ jest.mock("@wordpoker/game-rules", () => {
 });
 
 /** The lesson's words, and the alternatives a player might build instead. */
-const dictionary = testDictionary(["BROWN", "BROWNE", "GONER", "ROB"]);
+const dictionary = testDictionary(["CLOTH", "CLOTHE", "OCTET", "LOT"]);
 const BEAT = duration.cpuBeat;
 /** Longer than any deadline the table has: the betting turn's and §19's window's. */
 const LONG_HOLD = 10 * Math.max(OFFLINE_TURN_MS, WORD_WINDOW_MS);
-const BROWN = ["B-2", "R-3", "O-5", "W-1", "N-5"].map((tileId) => ({ tileId }));
+const CLOTH = ["C-2", "L-1", "O-1", "T-3", "H-1"].map((tileId) => ({ tileId }));
 
 type Lesson = { current: TutorialGame };
 
@@ -128,7 +128,7 @@ describe("useTutorialGame (STO-507)", () => {
     await press(() => result.current.primary());
     await playUntilCard(result); // lesson-flop, once Jay has bet
     expect(result.current.game.phase).toBe("flop");
-    await press(() => result.current.setDraft(BROWN));
+    await press(() => result.current.setDraft(CLOTH));
     await nextUntil(result, "lesson-raise-amount");
     // The slider stops at the coached raise, and standing on it hands the card to RAISE.
     expect(result.current.game.betting.maxRaise).toBe(60);

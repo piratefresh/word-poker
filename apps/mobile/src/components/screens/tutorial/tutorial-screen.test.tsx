@@ -28,7 +28,7 @@ jest.mock("@/lib/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
 }));
 
-let mockDictionary: Dictionary | null = testDictionary(["BROWN", "GONER"]);
+let mockDictionary: Dictionary | null = testDictionary(["CLOTH", "OCTET"]);
 jest.mock("@/features/table/use-dictionary", () => ({
   useDictionary: () => mockDictionary,
 }));
@@ -37,7 +37,7 @@ const FELT_BOX = { nativeEvent: { layout: { width: 360, height: 320 } } };
 
 beforeEach(() => {
   jest.useFakeTimers();
-  mockDictionary = testDictionary(["BROWN", "GONER"]);
+  mockDictionary = testDictionary(["CLOTH", "OCTET"]);
 });
 
 afterEach(() => {

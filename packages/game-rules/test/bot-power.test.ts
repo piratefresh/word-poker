@@ -14,11 +14,11 @@ const PLAYERS = ["hero", "ellis", "jay", "mira"];
 const DICTIONARY = testDictionary(["AT", "QI", "RAT", "STAR"]);
 const OFFERS: readonly PowerUpId[] = ["vowel_magnet", "mulligan", "random_wild"];
 
-function draw(seed = 7): OfflineState {
+function draw(seed = 62): OfflineState {
   return startHand({ seed, players: PLAYERS, nowMs: NOW, dictionary: DICTIONARY, powerUps: { deal: "choose3" } });
 }
 
-function holding(seed = 7): OfflineState {
+function holding(seed = 62): OfflineState {
   let state = draw(seed);
   assert.ok(state.powers);
   for (const slot of state.powers.draw.slots) {
@@ -71,16 +71,16 @@ describe("offline bot powers (§44)", () => {
   it("pins reviewed picks for rack fit and the three seat personalities", () => {
     // Vowel-less racks favor Vowel Magnet; aggressive Jay also gives Wild more weight.
     for (const [seed, expected] of [
-      [7, ["mulligan", "random_wild", "mulligan"]],
-      [42, ["vowel_magnet", "random_wild", "mulligan"]],
-      [527, ["vowel_magnet", "vowel_magnet", "random_wild"]],
+      [62, ["mulligan", "random_wild", "mulligan"]],
+      [16, ["vowel_magnet", "random_wild", "mulligan"]],
+      [127, ["vowel_magnet", "vowel_magnet", "random_wild"]],
     ] as const) {
       assert.deepEqual(PLAYERS.slice(1).map((id) => chooseBotPower(draw(seed), id)), expected);
     }
   });
 
   it("picks only offered powers, deterministically, without mutation or hidden reads", () => {
-    for (const seed of [7, 42, 527]) {
+    for (const seed of [62, 16, 127]) {
       const state = draw(seed);
       const before = cloneState(state);
       for (let seat = 1; seat < 4; seat += 1) {
@@ -140,7 +140,7 @@ describe("offline bot powers (§44)", () => {
     const state = holding();
     const before = cloneState(state);
     const use = decideBotPowerUse(state, "mira", NOW);
-    assert.ok(use, "seed 7's weak Mira spends its Mulligan on a dead tile");
+    assert.ok(use, "seed 62's weak Mira spends its Mulligan on a dead tile");
     assert.equal(use.powerUpId, state.powers?.held.mira?.id);
     assert.ok(state.seats[3]?.privateTiles.some((tile) => tile.id === use.tileId));
     assert.deepEqual(decideBotPowerUse(state, "mira", state.endsAtMs - 1), use);
@@ -155,7 +155,7 @@ describe("offline bot powers (§44)", () => {
   it("obeys engine legality and the exact turn and word deadlines", () => {
     const state = holding();
     assert.ok(state.powers);
-    const classic = startHand({ seed: 7, players: PLAYERS, nowMs: NOW, dictionary: DICTIONARY });
+    const classic = startHand({ seed: 62, players: PLAYERS, nowMs: NOW, dictionary: DICTIONARY });
     const variants = [classic, draw(), { ...state, powers: { ...state.powers, held: {} } },
       { ...state, powers: { ...state.powers, held: { mira: { id: "mulligan" as const, used: true } } } },
       { ...state, toActIndex: 1 }, rack(state, 3, []),

@@ -4,25 +4,24 @@
 #
 #   maestro test --platform web .maestro/offline-wild-power.yaml
 #
-# Same seed as offline-wild-hand.yaml. For it the hero is dealt T-1 (a triple letter) and K-1,
-# is offered Vowel Magnet first, and Vowel Magnet's letter for seat 0 is E (`swapTile` in
+# Same seed as offline-wild-hand.yaml. For it the hero is dealt M-1 and H-2,
+# is offered Vowel Magnet first, and Vowel Magnet's letter for seat 0 is O (`swapTile` in
 # game-rules, a stream of its own). CPU swaps change their later line: Mira uses Mulligan then
-# raises to 60, Ellis uses Wild then folds, and Jay uses Vowel Magnet then calls. The
-# swap takes K-1's place in the strip as `power-0`, and T-1 + E spells TE: T tripled to 6 and E
-# 1, 7 points. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
+# raises to 60, Ellis folds, and Jay uses Vowel Magnet then calls. The
+# swap takes H-2's place in the strip as `power-0`, and M-1 + O spells MO: 5 points. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
 #
 # Selectors: the chip is `power-held`, the felt's confirm `power-confirm` (a DOM id on the web,
 # via `webTestID` for the chip; the prompt's buttons are GameButtons, which carry theirs). The
 # strip's tiles are `word-builder-tile-<id>`, and a powered tile's ⚡ is `<tile test id>-powered`.
 # Sign-in composes as the other offline flows do.
-url: http://localhost:8081/offline?seed=20260919&powers=wild
+url: http://localhost:8081/offline?seed=178&powers=wild
 name: Offline Wild hand — use the held power, build with the new tile
 tags:
   - web
   - offline
   - powers
 ---
-- openLink: http://localhost:8081/offline?seed=20260919&powers=wild
+- openLink: http://localhost:8081/offline?seed=178&powers=wild
 
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
@@ -32,7 +31,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline?seed=20260919&powers=wild
+- openLink: http://localhost:8081/offline?seed=178&powers=wild
 
 # The draw's clock is 10 s: tap the card as soon as it is up (see offline-wild-hand.yaml).
 - extendedWaitUntil:
@@ -68,9 +67,9 @@ tags:
     waitToSettleTimeoutMs: 0
 - assertVisible: "Tap one of your tiles to swap it"
 - tapOn:
-    id: "word-builder-tile-K-1"
+    id: "word-builder-tile-H-2"
     waitToSettleTimeoutMs: 0
-- assertVisible: "Discard K for a random vowel\\?"
+- assertVisible: "Discard H for a random vowel\\?"
 - tapOn:
     id: "power-confirm"
     waitToSettleTimeoutMs: 0
@@ -95,7 +94,7 @@ tags:
         - text: "YOU USED"
     timeout: 5000
 
-# The new tile flips over in K's place, and the chip is spent for the hand.
+# The new tile flips over in H's place, and the chip is spent for the hand.
 - extendedWaitUntil:
     visible:
       id: "word-builder-tile-power-0"
@@ -103,18 +102,18 @@ tags:
 - waitForAnimationToEnd:
     timeout: 500
 - assertNotVisible:
-    id: "word-builder-tile-K-1"
+    id: "word-builder-tile-H-2"
 - assertVisible: "USED"
 
-# The new letter builds and scores like any other: T-1 then the E in K's old place spells TE.
+# The new letter builds and scores like any other: M-1 then the O in H's old place spells MO.
 - tapOn:
-    id: "word-builder-tile-T-1"
+    id: "word-builder-tile-M-1"
     waitToSettleTimeoutMs: 0
 - tapOn:
     id: "word-builder-tile-power-0"
     waitToSettleTimeoutMs: 0
-- assertVisible: "TE"
-- assertVisible: "7 pts"
+- assertVisible: "MO"
+- assertVisible: "5 pts"
 
 # Using the power did not end the turn: the hero still owes the call.
 - assertVisible:
@@ -122,7 +121,7 @@ tags:
     containsDescendants:
       - text: "\\$60"
 
-# Play it out: the check-or-call answers every turn, and inside §19's window it locks TE in. The
+# Play it out: the check-or-call answers every turn, and inside §19's window it locks MO in. The
 # window puts no seat on the turn, so on the river the row is tapped whether or not the hero holds
 # it, as offline-hand.yaml does: a tap while a bot holds the table lands on a disabled control.
 - repeat:
@@ -145,7 +144,7 @@ tags:
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 10000
-# The hero's card carries the confirmed TE, and the swapped tile shows the table its ⚡.
+# The hero's card carries the confirmed MO, and the swapped tile shows the table its ⚡.
 - assertNotVisible:
     text: "The window closed"
 - assertVisible:

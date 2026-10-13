@@ -1,6 +1,6 @@
 # The same seed 409 online hand as .maestro/online-hand.yaml, on a device.
 #
-# Build/install with the e2e-test profile. Its auth bypass only skips sign-in; the app still needs a
+# Build/install a development client with real sign-in. The app needs a
 # reachable Colyseus server, a seed-enabled server, and the opponent script below. Set
 # EXPO_PUBLIC_GAME_URL in the build to an address the device can reach (not localhost on the device).
 # Start the opponent and pass the room id printed by smoke-opponent.ts:
@@ -9,13 +9,13 @@
 #   eas build --platform android --profile e2e-test
 #   maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
 #
-# The device seat is seat 1 at seed 409: rack Z, P, O/U, E/I, I, Y, B; it builds the dictionary
-# word PUB from P, U on the O/U choice tile, and B. A different seed fails at the tile selectors.
+# The device seat is seat 1 at seed 409: rack I, S/L; board Q/K, W, N, B, U; it builds the dictionary
+# word ILK from I, L on the S/L choice tile, and K on the Q/K choice tile. A different seed fails at the tile selectors.
 #
 # A development build instead (scripts/smoke-online-native.mjs): the runner opens the dev client on
 # its own Metro first and passes ATTACH=1, so the flow attaches to that running app, not relaunch it.
 appId: com.wordpoker.wordpoker
-name: Online hand - join, call the blind, build PUB and read results
+name: Online hand - join, call the blind, build ILK and read results
 tags:
   - native
   - online
@@ -87,19 +87,19 @@ tags:
 # Draft while the river betting clock is still running. Drafting is legal throughout the hand,
 # and slow Maestro tile taps must not consume the shared 60-second word window.
 - tapOn:
-    id: "word-builder-tile-P-1"
+    id: "word-builder-tile-I-2"
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
 - tapOn:
-    id: "word-builder-face-OU-1-U"
+    id: "word-builder-face-SL-1-L"
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
 - tapOn:
-    id: "word-builder-tile-B-1"
+    id: "word-builder-face-QK-1-K"
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
 - assertVisible:
-    text: "PUB"
+    text: "ILK"
 
 # Close the river betting round, then confirm the draft from the same control.
 - tapOn:
@@ -140,7 +140,7 @@ tags:
 - assertVisible:
     text: "SCOREBOARD"
 - assertVisible:
-    text: ".*PUB.*"
+    text: ".*ILK.*"
 - assertNotVisible:
     text: "The window closed"
 - tapOn:
