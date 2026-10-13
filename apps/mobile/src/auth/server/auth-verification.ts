@@ -8,7 +8,8 @@
  * Signing in never waits on verification; only the grant does.
  */
 
-import { WELCOME_GRANT } from "@wordpoker/contracts";
+import { GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP, WELCOME_GRANT } from "@wordpoker/contracts";
+import { countPlayedHands } from "@wordpoker/db";
 import { grantWelcome } from "@wordpoker/economy";
 
 import { sendEmail, verifyEmailEmail } from "./email";
@@ -43,7 +44,10 @@ export async function sendVerificationEmail({ user, url }: { user: VerifiedUser;
  */
 export async function afterEmailVerification(user: VerifiedUser): Promise<void> {
   try {
-    const result = await grantWelcome(user.id);
+    // Hands a guest played before registering (moved over by `adoptGuestHistory`) earn a bonus.
+    const hands = await countPlayedHands(user.id);
+    const bonus = Math.min(hands * GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP);
+    const result = await grantWelcome(user.id, {}, bonus);
     if (!result.applied && result.reason === "pending") {
       console.warn(`[welcome-grant] ${user.id}: RevenueCat unreachable; the grant is pending`);
     }

@@ -3,11 +3,13 @@
  * the welcome grant without ever failing the verification itself.
  */
 
+import { countPlayedHands } from "@wordpoker/db";
 import { grantWelcome } from "@wordpoker/economy";
 
 import { afterEmailVerification, sendVerificationEmail } from "./auth-verification";
 import { sendEmail } from "./email";
 
+jest.mock("@wordpoker/db", () => ({ countPlayedHands: jest.fn(async () => 0) }));
 jest.mock("@wordpoker/economy", () => ({ grantWelcome: jest.fn() }));
 jest.mock("./email", () => ({
   ...jest.requireActual("./email"),
@@ -34,7 +36,18 @@ describe("afterEmailVerification", () => {
 
     await afterEmailVerification(USER);
 
-    expect(grant).toHaveBeenCalledWith("user_1");
+    expect(grant).toHaveBeenCalledWith("user_1", {}, 0);
+  });
+
+  test("adds a bonus for the hands played as a guest, capped", async () => {
+    grant.mockResolvedValue({ applied: true, balance: 5300 });
+    jest.mocked(countPlayedHands).mockResolvedValueOnce(3);
+    await afterEmailVerification(USER);
+    expect(grant).toHaveBeenLastCalledWith("user_1", {}, 300);
+
+    jest.mocked(countPlayedHands).mockResolvedValueOnce(50);
+    await afterEmailVerification(USER);
+    expect(grant).toHaveBeenLastCalledWith("user_1", {}, 1000);
   });
 
   test("never throws when the grant fails", async () => {

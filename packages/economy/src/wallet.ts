@@ -124,8 +124,13 @@ export function getCoinBalance(userId: string, deps: Pick<WalletDeps, "client"> 
 }
 
 /** The once-per-player welcome grant, paid when the player verifies their email. */
-export function grantWelcome(userId: string, deps: WalletDeps = {}): Promise<WalletChangeResult> {
-  return applyWalletChange(userId, "welcome", WELCOME_GRANT, {}, deps);
+export function grantWelcome(
+  userId: string,
+  deps: WalletDeps = {},
+  bonus = 0,
+): Promise<WalletChangeResult> {
+  // The bonus rides the welcome row, so the once-only index covers it too.
+  return applyWalletChange(userId, "welcome", WELCOME_GRANT + bonus, {}, deps);
 }
 
 /**

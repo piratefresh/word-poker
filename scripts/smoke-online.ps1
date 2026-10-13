@@ -2,7 +2,8 @@
 #   -Wild      the power-ups variant (STO-500): a Wild room at seed 518 and .maestro/online-wild-hand.yaml,
 #              and the run fails if the opponent heard the swapped tile or never heard the use.
 #   -Guest     a signed-out browser opens the invite link and plays as a guest (STO-581):
-#              seed 409 and .maestro/online-guest-join.yaml.
+#              seed 409 and .maestro/online-guest-join.yaml, through to the results
+#              screen's offer of an account.
 #   -Headless  --headless --screen-size 1280x1000, as the four-seat runner takes it.
 [CmdletBinding()]
 param([switch]$Wild, [switch]$Guest, [switch]$Headless)
