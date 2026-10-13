@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
-import { createContext, useCallback, useContext, useState } from "react";
-import { StyleSheet, View, type ReactNode } from "react-native";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 import Animated, {
   useAnimatedProps,
   useAnimatedStyle,

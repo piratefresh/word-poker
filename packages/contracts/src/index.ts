@@ -176,3 +176,4 @@ export {
   type PrivateSeatState,
   type PrivateWordState,
 } from "./online";
+export { historyHand, isHistoryCursor, isHistoryHand, isHistoryPage, type HistoryHand, type HistoryPage } from "./history-view";

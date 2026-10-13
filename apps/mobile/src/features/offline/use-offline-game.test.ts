@@ -186,6 +186,27 @@ beforeEach(() => {
   jest.useFakeTimers();
 });
 
+test("holds the exact settlement after a disk failure and permits the next deal only after retry commits", async () => {
+  const capture = jest.fn().mockRejectedValueOnce(new Error("disk unavailable")).mockResolvedValue(undefined);
+  const { result } = await renderHook(() => useOfflineGame({
+    seed: SEED, dictionary: testDictionary(), turnDurationMs: 1,
+    history: { ownerId: "account-a", capture },
+  }));
+  for (let step = 0; step < 12 && !result.current.historyError; step += 1) await beat();
+  expect(capture).toHaveBeenCalledTimes(1);
+  expect(result.current.historyError).toBe("disk unavailable");
+  expect(result.current.game.phase).not.toBe("payout");
+  const heldId = result.current.game.id;
+  await act(async () => { result.current.newGame(); result.current.deal(); });
+  expect(result.current.game.id).toBe(heldId);
+  await act(async () => result.current.retryHistory());
+  expect(capture).toHaveBeenCalledTimes(2);
+  expect(capture.mock.calls[1][0]).toBe(capture.mock.calls[0][0]);
+  expect(result.current.game.phase).toBe("payout");
+  await act(async () => result.current.deal());
+  expect(result.current.results).toBeNull();
+});
+
 afterEach(() => {
   jest.useRealTimers();
 });

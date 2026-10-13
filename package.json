@@ -8,8 +8,9 @@
   },
   "scripts": {
     "android:device": "pnpm --filter @wordpoker/mobile exec expo run:android --device",
-    "android:device:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_GAME_URL='local'; pnpm android:device\"",
-    "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
+    "android:device:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm android:device\"",
+    "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
+    "dev:history": "node --env-file=apps/mobile/.env scripts/dev-history.mjs",
     "deploy:colyseus": "npx @colyseus/cloud deploy",
     "deploy:railway": "railway up --ci",
     "deploy:all": "pnpm deploy:colyseus && pnpm deploy:railway",

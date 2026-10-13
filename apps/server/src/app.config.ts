@@ -36,6 +36,7 @@ const MONITOR_COLUMNS: MonitorOptions["columns"] = [
  * Import your Room files
  */
 import { GameRoom } from "./rooms/GameRoom.js";
+import { HistoryService } from "./history/history-service.js";
 
 /**
  * The listable table. `enableRealtimeListing()` is what makes Colyseus push this room's joins,
@@ -46,6 +47,26 @@ const game = defineRoom(GameRoom).enableRealtimeListing();
 
 const server = defineServer({
   database,
+  beforeListen: async () => {
+    const history = await HistoryService.fromEnv();
+    if (history === null) return;
+    let running = false;
+    const recover = async () => {
+      if (running) return;
+      running = true;
+      try {
+        await history.recoverPending();
+      } catch (error) {
+        console.error("history: settlement recovery failed; retained entries will retry", error);
+      } finally {
+        running = false;
+      }
+    };
+    await recover();
+    const timer = setInterval(() => { void recover(); }, 10_000);
+    timer.unref();
+    server.onBeforeShutdown(() => { clearInterval(timer); });
+  },
 
   /**
    * Define your room handlers:

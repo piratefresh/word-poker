@@ -40,7 +40,7 @@ import { fullWidth } from "@/lib/full-width";
 import { useQuests } from "@/lib/quests-provider";
 
 type ModeKey =
-  "tutorial" | "online" | "friend" | "offline" | "leaderboard" | "store" | "quests";
+  "tutorial" | "online" | "friend" | "offline" | "leaderboard" | "store" | "quests" | "history";
 
 /**
  * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
@@ -52,7 +52,7 @@ function coinStoreEnabled(): boolean {
 
 type Variant = ModeVariant & { href: Href };
 
-type Mode = ModeCardProps & {
+type Mode = Omit<ModeCardProps, "width"> & {
   key: ModeKey;
   /** The mode's screen. Modes without one still only mark intent. */
   href?: Href;
@@ -61,6 +61,7 @@ type Mode = ModeCardProps & {
 };
 
 const MODES: Mode[] = [
+
   {
     key: "tutorial",
     href: "/tutorial",
@@ -113,6 +114,10 @@ const MODES: Mode[] = [
         testID: "offline-wild",
       },
     ],
+  },
+  {
+    key: "history", href: "/history", glyph: "📖", label: "Game History",
+    description: "Your sessions, words & results", tone: "warm",
   },
   {
     key: "leaderboard",

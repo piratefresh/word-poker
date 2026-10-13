@@ -85,3 +85,6 @@ hs_err_pid*.log
 sentry-wizard-installation-error-*.log
 /.claude/worktrees/
 /.colyseus-cloud.json
+# Server settlement journal and local runtime state
+/apps/server/data/
+.history-settlements/

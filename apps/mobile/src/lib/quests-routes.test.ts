@@ -172,21 +172,21 @@ describe("POST /api/quests", () => {
 
   test("passes a well-formed claim through and answers its result", async () => {
     getSession.mockResolvedValue(VERIFIED);
-    claim.mockResolvedValue({ completed: ["win-word-2"], duplicate: false });
+    claim.mockResolvedValue({ completed: ["win-word-2"], duplicate: false, xp: 10, level: 1 });
 
     const response = await POST(request("POST", CLAIM));
 
     expect(response.status).toBe(200);
     expect(claim).toHaveBeenCalledWith("user_1", CLAIM);
-    await expect(response.json()).resolves.toEqual({ completed: ["win-word-2"], duplicate: false });
+    await expect(response.json()).resolves.toEqual({ completed: ["win-word-2"], duplicate: false, xp: 10, level: 1 });
   });
 
   test("answers duplicate: true for a repeated hand token", async () => {
     getSession.mockResolvedValue(VERIFIED);
-    claim.mockResolvedValue({ completed: [], duplicate: true });
+    claim.mockResolvedValue({ completed: [], duplicate: true, xp: 10, level: 1 });
 
     const response = await POST(request("POST", CLAIM));
 
-    await expect(response.json()).resolves.toEqual({ completed: [], duplicate: true });
+    await expect(response.json()).resolves.toEqual({ completed: [], duplicate: true, xp: 10, level: 1 });
   });
 });

@@ -25,7 +25,7 @@ function devGameURL(): string {
 }
 
 // `local` (set by `pnpm start:local`) overrides a cloud URL in .env without editing it.
-const configuredURL = process.env.EXPO_PUBLIC_GAME_URL;
+const configuredURL = process.env.EXPO_PUBLIC_LOCAL_API === "1" ? "local" : process.env.EXPO_PUBLIC_GAME_URL;
 const gameServerURL = configuredURL && configuredURL !== "local" ? configuredURL : devGameURL();
 
 export const gameClient = new Client(gameServerURL);
