@@ -1,4 +1,4 @@
-import { pinnedPowerUps, pinnedSeed } from "./offline-seed";
+import { pinnedPowerUps, pinnedSeed, pinnedTurnMs } from "./offline-seed";
 
 describe("pinnedSeed", () => {
   test("reads the seed a URL names", () => {
@@ -19,6 +19,14 @@ describe("pinnedSeed", () => {
 
   test("is no pin when the URL names something that is not a number", () => {
     expect(pinnedSeed("not-a-seed")).toBeUndefined();
+  });
+});
+
+describe("pinnedTurnMs", () => {
+  test("reads the clock a URL names, and ignores anything that is not a positive number", () => {
+    expect(pinnedTurnMs("300000")).toBe(300_000);
+    expect(pinnedTurnMs(["5000", "9"])).toBe(5_000);
+    for (const bad of [undefined, "", "0", "-1", "soon"]) expect(pinnedTurnMs(bad)).toBeUndefined();
   });
 });
 

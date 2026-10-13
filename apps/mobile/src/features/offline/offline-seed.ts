@@ -41,6 +41,17 @@ export function pinnedSeed(param: string | string[] | undefined): number | undef
 }
 
 /**
+ * The turn clock a URL asks for (`/offline?turn=300000`, in ms), or `undefined` for the table's
+ * own. A device flow's taps can each take longer than the normal clock allows, so it asks for
+ * a longer one. Offline play is unranked, so a longer clock costs nothing.
+ */
+export function pinnedTurnMs(param: string | string[] | undefined): number | undefined {
+  const raw = (Array.isArray(param) ? param[0] : param)?.trim();
+  const ms = raw ? Number(raw) : NaN;
+  return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+}
+
+/**
  * The power-up deal mode a URL asks for (`/offline?powers=wild`, §40): `wild` is the Wild table,
  * `choose3`, and anything else — no param, an unknown one — is Classic, so `/offline?seed=…`
  * plays exactly the table it always has. It sits beside the seed because the two together name

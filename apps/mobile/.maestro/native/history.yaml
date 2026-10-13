@@ -5,16 +5,91 @@ tags:
   - native
   - history
 ---
-- launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH === 'undefined'}
+    commands:
+      - launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH !== 'undefined'}
+    commands:
+      # The runner opened the dev client on its Metro; relaunching would drop that URL.
+      # The dev menu's first-run sheet sits over the app until dismissed.
+      - tapOn:
+          text: "Continue"
+          optional: true
+      - runFlow:
+          when:
+            visible: "Open React Native dev menu"
+          commands:
+            - back
+# A fresh Metro compiles the auth route on first use, so the session check can take minutes.
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT|Offline Mode"
+    timeout: 300000
 - runFlow:
     when:
       visible: "TAKE YOUR SEAT"
     file: _sign-in.yaml
-- runFlow: offline-hand.yaml
+
+# Development Metro serves routes and the dictionary as lazy chunks, so open the table once while
+# online; once loaded they stay in memory for the offline hand.
+# Pop the warm-up table before opening history. A deep link pushes another screen and leaves
+# the old table's timer running; its eventual payout modal can cover the actual test hand.
+- openLink: wordpoker://offline?seed=7578&turn=300000
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 90000
+- back
+- extendedWaitUntil:
+    visible: "Offline Mode"
+    timeout: 30000
 - openLink: wordpoker://history
 - extendedWaitUntil:
-    visible: "View session"
+    visible: "GAME HISTORY"
     timeout: 30000
+- back
+- extendedWaitUntil:
+    visible: "Offline Mode"
+    timeout: 30000
+
+# Offline: the runner removes the game and API reverse mappings while airplane mode is on.
+# Metro's separate asset connection stays up; auth and history cannot upload through it.
+- setAirplaneMode: enabled
+- runFlow:
+    file: offline-hand.yaml
+- openLink: wordpoker://history
+- extendedWaitUntil:
+    visible: "Pending sync"
+    timeout: 30000
+
+# The hand must survive a kill before connectivity returns, then upload on the cold start.
+- killApp
+- setAirplaneMode: disabled
+# Give the runner's loop (every 3 s) time to restore the reverse mapping.
+- extendedWaitUntil:
+    visible: "never shown, only a pause"
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      true: ${typeof ATTACH === 'undefined'}
+    commands:
+      - launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH !== 'undefined'}
+    commands:
+      - openLink: ${DEV_LINK}
+- extendedWaitUntil:
+    visible: "Offline Mode"
+    timeout: 300000
+- openLink: wordpoker://history
+- extendedWaitUntil:
+    visible: "Verified · Unranked offline"
+    timeout: 60000
+- assertNotVisible: "Pending sync"
 - tapOn:
     text: "View session"
     index: 0
@@ -26,7 +101,7 @@ tags:
     index: 0
 - assertVisible: "HAND #1"
 - assertVisible:
-    text: "Verified · Unranked offline|Pending sync · Unranked offline"
+    text: "Verified · Unranked offline"
 - scrollUntilVisible:
     element:
       text: "ACTION LOG"

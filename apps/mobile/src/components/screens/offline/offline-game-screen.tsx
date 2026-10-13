@@ -39,7 +39,7 @@ import {
   spacing,
   type,
 } from "@/constants/theme";
-import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/features/offline/offline-seed";
+import { pinnedPowerUps, pinnedSeed, pinnedTurnMs, randomSeed } from "@/features/offline/offline-seed";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
@@ -110,7 +110,7 @@ function OfflineTable({
   turnDurationMs?: number;
 }) {
   const history = useHistory();
-  const params = useLocalSearchParams<{ seed?: string; powers?: string }>();
+  const params = useLocalSearchParams<{ seed?: string; powers?: string; turn?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
@@ -138,7 +138,7 @@ function OfflineTable({
     newGame,
     historyError,
     retryHistory,
-  } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps,
+  } = useOfflineGame({ seed, dictionary, turnDurationMs: turnDurationMs ?? pinnedTurnMs(params.turn), powerUps,
     history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
   });
   const payout = game.phase === "payout";

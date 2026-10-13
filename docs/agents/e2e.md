@@ -28,9 +28,28 @@ worker failed to bundle on this Windows setup, so the browser uses its native tr
 
 `.maestro/history.yaml` extends the web offline hand through history. The native equivalent is
 `apps/mobile/.maestro/native/history.yaml` and requires a real signed-in development build;
-the auth-bypass E2E build has no account to own history. The native flow still needs a connected
-device. Native cached sessions remain readable on network failure; uploads always revalidate the
+the auth-bypass E2E build has no account to own history. Run it on Android with
+`node scripts/smoke-online-native.mjs android .maestro/native/history.yaml`: it signs in, plays
+the offline hand in airplane mode, sees it pending, kills the app, turns airplane mode off, cold
+starts and waits for the hand to verify. Airplane mode does not cut `adb reverse`, so the runner
+removes the game and API mappings while it is on. Native cached sessions remain readable on network failure; uploads always revalidate the
 account and use its captured bearer credential, so a cookie switch cannot mix history partitions.
+
+The runner starts Android with airplane mode off so a failed offline run cannot prevent the next
+Metro load. For the Android history flow it gives the device API a separate port (Metro's port + 1,
+or `SMOKE_DEVICE_API_PORT`), reversed to the same Metro host port. The bundle's auth and history
+URLs use this API port. Airplane mode removes that mapping and the game mapping, preserving
+Metro's asset connection and other tools' mappings. This prevents development-only Rive asset
+errors from covering CALL without leaving the history upload URL reachable. Every 3 s the runner
+checks the mappings and repairs missing ones when airplane mode is off; it does not rebind healthy
+connections. The native hand follows the seeded streets explicitly, so a fold-out
+fails at the next street instead of waiting forever for RIVER.
+History's React Native lists keep Expo UI hosts attached until their native height is measured,
+and the hosts fill the row width while matching only content height. Clipping these initially
+zero-height hosts left a blank native list even when SQLite had the completed hand.
+The table's clock and Rive art keep animating; native taps request a 500 ms settle budget and use
+explicit state assertions. This is not a hard command deadline: Maestro can still block inside
+an accessibility hierarchy read longer than that budget.
 
 ## End-to-end (web)
 
@@ -198,6 +217,62 @@ A cold boot restored a stalled Settings flow to ten consecutive passes of about 
 2026-10-09; this demonstrates an environment contribution, not a fix for app input latency.
 To cold-restart the emulator, use
 (`adb emu kill`, then relaunch it detached — never two qemu instances on one AVD).
+
+On this Windows workstation, `adb -s emulator-5554 emu avd name` identifies `Pixel_7_Edited`.
+Its registration is `~/.android/avd/Pixel_7_Edited.ini`; read its `path=` instead of assuming
+the earlier copy to another drive is still active. On 2026-10-13 the verified AVD was copied to
+`M:\Android\avd\Pixel_7_Edited.avd` and the registration updated. User data, encryption keys,
+the SD card, configuration, and snapshot passed checksum verification; the relocated copy
+booted with the installed app intact. Registration and configuration backups are beside the AVD
+as `Pixel_7_Edited.registration.before-relocation.ini` and `Pixel_7_Edited.config.before-software.ini`.
+After `adb emu kill`, wait for both
+`emulator.exe` and `qemu-system-x86_64.exe` to exit, then launch without loading or saving snapshots:
+
+```powershell
+Start-Process -FilePath "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -ArgumentList @('-avd', 'Pixel_7_Edited', '-no-snapshot', '-gpu', 'host', '-netdelay', 'none', '-netspeed', 'full') -WindowStyle Hidden
+```
+
+The AVD's storage drive and graphics backend are independent; the M: copy uses hardware
+graphics and a cold boot. Windows recorded a QEMU crash in NVIDIA's `nvoglv64.dll` during
+the history flow's app restart on 2026-10-13 while C: was nearly full. Moving the AVD does
+not establish that the driver issue is fixed; verify the restart in the full history flow.
+Automatic `-gpu software` selected Lavapipe and also crashed QEMU, with an unknown faulting
+module. An explicit `-gpu swiftshader -feature -Vulkan` booted, but its flow was stopped
+because opening the table took minutes. Neither software attempt is a verified recovery.
+The hardware-rendered M: AVD then passed the full native history flow on 2026-10-13
+(`wordpoker-native-smoke-5tBD0N`): river bet/raise/call, ZIG for 14 points, payout, offline
+Pending sync, app kill, reconnect, verified upload, saved hand, and action log. After runner
+cleanup, `adb devices` took 35 ms and two `dumpsys meminfo` calls took 669/639 ms; no app or
+Maestro process remained. The emulator stayed running with airplane mode disabled, and no
+QEMU crash event was recorded during that run.
+
+The runner stops the Android app and Maestro instrumentation before stopping Metro. Leaving the
+dev client open after Metro exits produced repeated reverse-port connection failures in
+`%TEMP%\adb.log` and stalled even `adb devices`. On 2026-10-13 a temporary listener on host
+8081 restored the same ADB server's response in 232 ms, without another emulator boot.
+If this happens outside the runner, restore Metro long enough to force-stop the app, then stop
+Metro. If ADB still cannot respond, stop the host `adb.exe` process before starting a fresh server.
+Stop `dev.mobile.maestro` and `dev.mobile.maestro.test` with `adb shell am force-stop` while
+no other Maestro run is active. Check a short Settings flow before rerunning the hand.
+Temporary `takeScreenshot` paths must be relative to Maestro's output directory; absolute
+scratchpad paths fail under Maestro 2.10. Draft before the final river call so slow tile taps
+do not consume the shared 60-second word window, then dismiss XP/celebration before results.
+The history warm-up must pop the offline screen with Back before loading history, then pop
+history back to home. Deep-linking away keeps the warm-up table mounted; its timeout payout
+modal can cover a later hand and make that hand appear to have folded out.
+
+On 2026-10-13 the PATH install contained both `maestro-cli-2.6.1.jar` and
+`maestro-cli-2.10.0.jar`; even a Settings flow failed with `NoSuchMethodError` in driver setup.
+A separate, clean 2.10.0 extract passed the Settings probe in about 12 s. Check for a second
+Maestro MCP process before running the CLI; its owning app may restart it after it is killed.
+Also check host disk space when the emulator disappears: this AVD refused to cold-boot with
+less than 1 GB free on C:. Copying the AVD to a drive with space restored booting.
+
+The Android runner now initializes the driver while the app is stopped, then opens the dev-client
+link inside a generated wrapper flow. It starts its ADB mapping observer only after the home screen
+has loaded. A history run on API 36 still blocked in Maestro's `viewHierarchy` RPC and
+auto-folded before the first call; clean Maestro 2.7 did not remove the delays. Restart ADB between attempts if even `adb devices` stops responding; never run
+`uiautomator dump` concurrently with Maestro's instrumentation.
 
 ### Web versus native smoke (STO-578)
 
