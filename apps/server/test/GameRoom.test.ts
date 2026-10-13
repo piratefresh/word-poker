@@ -1,5 +1,9 @@
 import assert from "assert";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import type { Room as ClientRoom } from "@colyseus/sdk";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
 
@@ -29,6 +33,8 @@ import {
   bestStripWord,
   toEngineAction,
 } from "../scripts/four-seat-scenario.js";
+import { closeOrm, getOrm, pgConnectionString } from "@wordpoker/db";
+import { Client as PgClient } from "pg";
 import appConfig from "../src/app.config.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
@@ -197,8 +203,18 @@ describe("GameRoom", () => {
       const room = await colyseus.createRoom("game", { name: "Auth duplicate", buyIn: 500, maxSeats: 2 });
       colyseus.sdk.auth.token = "same-session";
       const first = await colyseus.connectTo(room);
-      await assert.rejects(colyseus.connectTo(room), (error: { code?: number }) => error.code === 409);
+      await assert.rejects(colyseus.connectTo(room), (error: { code?: number }) => error.code === 4400);
       assert.equal(room.state.seats.size, 1);
+      await first.leave();
+    });
+
+    it("refuses a seat at another table for an account already seated elsewhere", async () => {
+      const a = await colyseus.createRoom("game", { name: "Table A", buyIn: 500, maxSeats: 2 });
+      const b = await colyseus.createRoom("game", { name: "Table B", buyIn: 500, maxSeats: 2 });
+      colyseus.sdk.auth.token = "same-session";
+      const first = await colyseus.connectTo(a);
+      await assert.rejects(colyseus.connectTo(b), (error: { code?: number }) => error.code === 4400);
+      assert.equal(b.state.seats.size, 0);
       await first.leave();
     });
   });
@@ -1645,6 +1661,244 @@ describe("GameRoom", () => {
         assert.strictEqual(held.powerUpId, first);
         assert.strictEqual(last<PrivateSeatState>(inbox, GAME_EVENTS.privateState)?.power?.draw, null);
       }
+    });
+  });
+
+  // STO-455: every settled hand is recorded durably, with verified seat owners, before the
+  // room can move past it. These tests run last on purpose: they point the room server's own
+  // history env at a throwaway database, and the rooms earlier in the suite were created
+  // without it (unrecorded, as a dev server without the env runs).
+  describe("history recording (STO-455)", () => {
+    const serverUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+    const journalDirOriginal = process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
+    let journalDir: string;
+    const historyUrlOriginal = process.env.WORDPOKER_HISTORY_DATABASE_URL;
+    let admin: PgClient | undefined;
+    let historyUrl: string | undefined;
+    const databases: string[] = [];
+
+    before(async function (this: Mocha.Context) {
+      if (serverUrl === undefined) this.skip();
+      this.timeout(30_000);
+
+      admin = new PgClient({ connectionString: pgConnectionString(serverUrl) });
+      await admin.connect();
+
+      const database = `wordpoker_test_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      await admin.query(`create database "${database}"`);
+      databases.push(database);
+      const url = new URL(pgConnectionString(serverUrl));
+      url.pathname = `/${database}`;
+      historyUrl = url.toString();
+
+      journalDir = await mkdtemp(join(tmpdir(), "room-history-"));
+      process.env.WORDPOKER_HISTORY_JOURNAL_DIR = journalDir;
+      process.env.WORDPOKER_HISTORY_DATABASE_URL = historyUrl;
+      const orm = await getOrm(historyUrl);
+      await orm.migrator.up();
+    });
+
+    after(async function (this: Mocha.Context) {
+      if (admin === undefined) return;
+      this.timeout(30_000);
+
+      if (historyUrlOriginal === undefined) delete process.env.WORDPOKER_HISTORY_DATABASE_URL;
+      else process.env.WORDPOKER_HISTORY_DATABASE_URL = historyUrlOriginal;
+      await closeOrm();
+      for (const database of databases) {
+        await admin.query(`drop database if exists "${database}" with (force)`);
+      }
+      await admin.end();
+      await rm(journalDir, { recursive: true, force: true });
+      if (journalDirOriginal === undefined) delete process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
+      else process.env.WORDPOKER_HISTORY_JOURNAL_DIR = journalDirOriginal;
+    });
+
+    /** The room's private session id: what its recorded hands are stored under. */
+    function sessionIdOf(room: { state: { phase: string } }): string {
+      return (room as unknown as { sessionId: string }).sessionId;
+    }
+
+    it("records a settled online hand once, with verified owners, and only then advances", async function (this: Mocha.Context) {
+      this.timeout(20_000);
+      assert.ok(historyUrl);
+      const room = await colyseus.createRoom("game", { name: "History Fold", buyIn: 500, maxSeats: 2, tickMs: 5 });
+      const clients: ClientRoom[] = [];
+      for (let seat = 0; seat < 2; seat += 1) clients.push(await colyseus.connectTo(room));
+      await readyUp(room, clients);
+
+      // The small blind (seat 0, the first to act heads-up) folds the hand away.
+      clients[0].send(GAME_MESSAGES.betting, { type: "fold" });
+      for (let patch = 0; patch < 40 && room.state.phase !== "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, "payout");
+
+      // Every seat puts the results away: the room may only take the hand back once the
+      // record is in the database, so this waits out the write, not just the ticks.
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 600 && room.state.phase === "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, WAITING_PHASE, "the room advances once the hand is durable");
+
+      const db = (await getOrm(historyUrl)).em.getConnection();
+      const [hand] = await db.execute<{ id: string; ranked: boolean; mode: string }[]>(
+        `select "id", "ranked", "mode" from "game_hand" where "session_id" = ?`,
+        [sessionIdOf(room)],
+      );
+      assert.ok(hand, "the settled hand is recorded");
+      assert.strictEqual(hand.ranked, true);
+      assert.strictEqual(hand.mode, "online");
+
+      const seats = await db.execute<{ user_id: string | null }[]>(
+        `select "user_id" from "hand_seat" where "hand_id" = ? order by "seat"`,
+        [hand.id],
+      );
+      // Seat rows carry the verified account of each binding, in seat order.
+      const bindings = (room as unknown as {
+        bindings: Map<string, { seat: number; userId: string }>;
+      }).bindings;
+      const bySeat = [...bindings.values()].sort((a, b) => a.seat - b.seat);
+      assert.deepStrictEqual(
+        seats.map((seat) => seat.user_id),
+        bySeat.map((binding) => binding.userId),
+      );
+      assert.ok(seats[0]?.user_id && seats[1]?.user_id, "both seats carry their verified accounts");
+      assert.notStrictEqual(seats[0]?.user_id, seats[1]?.user_id);
+
+      const actions = await db.execute<{ sequence: number; source: string }[]>(
+        `select "sequence", "source" from "hand_action" where "hand_id" = ? order by "sequence"`,
+        [hand.id],
+      );
+      assert.deepStrictEqual(actions.map((action) => action.source), ["player"], "the fold is the log");
+
+      const [count] = await db.execute<{ count: string }[]>(
+        `select count(*) as count from "game_hand" where "session_id" = ?`,
+        [sessionIdOf(room)],
+      );
+      assert.strictEqual(Number(count?.count), 1, "exactly one record for the hand");
+    });
+
+    it("records fresh hand sequences in distinct sessions after a lineup change", async function (this: Mocha.Context) {
+      this.timeout(20_000);
+      assert.ok(historyUrl);
+      const room = await colyseus.createRoom("game", { name: "History Lineup", buyIn: 500, maxSeats: 3, tickMs: 5 });
+      const clients = [await colyseus.connectTo(room), await colyseus.connectTo(room)];
+      await readyUp(room, clients);
+      const firstSession = sessionIdOf(room);
+      clients[0].send(GAME_MESSAGES.betting, { type: "fold" });
+      for (let patch = 0; patch < 40 && room.state.phase !== "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, "payout");
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 600 && room.state.phase === "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+
+      clients.push(await colyseus.connectTo(room));
+      await readyUp(room, clients);
+      const secondSession = sessionIdOf(room);
+      assert.notStrictEqual(secondSession, firstSession);
+      for (let folds = 0; folds < 2; folds += 1) {
+        const acting = clients.find((client) => room.state.seats.get(client.sessionId)?.seat === room.state.toActSeat);
+        assert.ok(acting);
+        acting.send(GAME_MESSAGES.betting, { type: "fold" });
+        await room.waitForNextPatch();
+      }
+      for (let patch = 0; patch < 40 && room.state.phase !== "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, "payout");
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 600 && room.state.phase === "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+
+      const db = (await getOrm(historyUrl)).em.getConnection();
+      const sessions = await db.execute<{ id: string }[]>(
+        `select "id" from "game_session" where "id" in (?, ?)`, [firstSession, secondSession],
+      );
+      assert.strictEqual(sessions.length, 2);
+      const hands = await db.execute<{ hand_no: number }[]>(
+        `select "hand_no" from "game_hand" where "session_id" in (?, ?)`, [firstSession, secondSession],
+      );
+      assert.deepStrictEqual(hands.map((hand) => hand.hand_no), [1, 1]);
+    });
+
+    it("records a timeout-driven settlement with the clock as the action's source", async function (this: Mocha.Context) {
+      this.timeout(20_000);
+      assert.ok(historyUrl);
+      const room = await colyseus.createRoom("game", {
+        name: "History Timeout",
+        buyIn: 500,
+        maxSeats: 2,
+        tickMs: 5,
+        turnDuration: 30,
+      });
+      const clients: ClientRoom[] = [];
+      for (let seat = 0; seat < 2; seat += 1) clients.push(await colyseus.connectTo(room));
+      await readyUp(room, clients);
+
+      // Nobody acts: the room's clock folds the small blind, which settles the hand.
+      for (let patch = 0; patch < 100 && room.state.phase !== "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, "payout", "the turn clock folds the hand away");
+
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 600 && room.state.phase === "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+
+      const db = (await getOrm(historyUrl)).em.getConnection();
+      const [hand] = await db.execute<{ id: string }[]>(
+        `select "id" from "game_hand" where "session_id" = ?`,
+        [sessionIdOf(room)],
+      );
+      assert.ok(hand);
+      const actions = await db.execute<{ source: string }[]>(
+        `select "source" from "hand_action" where "hand_id" = ? order by "sequence"`,
+        [hand.id],
+      );
+      assert.deepStrictEqual(actions.map((action) => action.source), ["timeout"]);
+    });
+
+    it("does not advance past a settlement the database will not take", async function (this: Mocha.Context) {
+      this.timeout(30_000);
+      assert.ok(admin && historyUrl);
+
+      // A second throwaway that exists but was never migrated: the connection works, the
+      // write fails fast and deterministically, and the retry backs off — no network games.
+      const database = `wordpoker_test_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      await admin.query(`create database "${database}"`);
+      databases.push(database);
+      const url = new URL(historyUrl);
+      url.pathname = `/${database}`;
+      await closeOrm();
+      process.env.WORDPOKER_HISTORY_DATABASE_URL = url.toString();
+
+      const room = await colyseus.createRoom("game", { name: "History Outage", buyIn: 500, maxSeats: 2, tickMs: 5 });
+      const clients: ClientRoom[] = [];
+      for (let seat = 0; seat < 2; seat += 1) clients.push(await colyseus.connectTo(room));
+      await readyUp(room, clients);
+      clients[0].send(GAME_MESSAGES.betting, { type: "fold" });
+      for (let patch = 0; patch < 40 && room.state.phase !== "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, "payout");
+
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 200 && room.state.phase === "payout"; patch += 1) {
+        await room.waitForNextPatch();
+      }
+      assert.strictEqual(room.state.phase, "payout", "the room holds the settled hand: it is not durable");
+
+      const orm = await getOrm(url.toString());
+      const [count] = await orm.em.getConnection().execute<{ count: string }[]>(
+        `select count(*) as count from information_schema.tables where table_name = 'game_hand' and table_schema = 'public'`,
+      );
+      assert.strictEqual(Number(count?.count), 0, "nothing was written to the unmigrated database");
+
+      // The hold does not release on its own — that is the point — so the test takes the room
+      // down itself: disposal runs the bounded drain here, and the suite's shutdown stays fast.
+      await (room as unknown as { disconnect(): Promise<void> }).disconnect();
     });
   });
 });

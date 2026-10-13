@@ -23,6 +23,8 @@ export interface HandRecordSeat {
 }
 
 export interface HandRecordConfig {
+  /** Display metadata; replay does not depend on the room's title. */
+  readonly tableName?: string;
   readonly smallBlind: number;
   readonly bigBlind: number;
   readonly turnDurationMs: number;
@@ -159,6 +161,7 @@ export function isHandRecord(value: unknown): value is HandRecord {
       !integer(value.config.bigBlind) || value.config.bigBlind < value.config.smallBlind ||
       !integer(value.config.turnDurationMs, HAND_RECORD_MAX_DURATION_MS) || value.config.turnDurationMs === 0 ||
       typeof value.config.autoSubmitDrafts !== "boolean" || !isPowerUpDealMode(value.config.powerUpDeal)) return false;
+  if (value.config.tableName !== undefined && !text(value.config.tableName, 64)) return false;
   if (!Array.isArray(value.seats) || value.seats.length < MIN_SEATS || value.seats.length > MAX_SEATS ||
       !integer(value.dealerSeat, value.seats.length - 1)) return false;
   const seatIds = new Set<string>();

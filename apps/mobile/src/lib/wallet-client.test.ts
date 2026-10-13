@@ -39,7 +39,7 @@ describe("fetchWallet", () => {
   });
 
   test("sends no cookie header when there is no session", async () => {
-    jest.mocked(authClient.getCookie).mockReturnValueOnce("");
+    jest.mocked(authClient.getCookie).mockResolvedValueOnce("");
     fetchMock.mockResolvedValue(reply(401, { error: "Sign in to see your coins." }));
 
     await expect(fetchWallet()).rejects.toBeInstanceOf(WalletAuthError);

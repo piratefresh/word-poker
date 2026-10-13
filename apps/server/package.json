@@ -25,8 +25,10 @@
     "@colyseus/testing": "^0.18.5",
     "@types/express": "^5.0.6",
     "@types/mocha": "^10.0.1",
+    "@types/pg": "^8.23.1",
     "esbuild": "^0.28.2",
     "mocha": "^11.7.5",
+    "pg": "^8.23.0",
     "rimraf": "^5.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.4"
@@ -38,6 +40,7 @@
     "@colyseus/schema": "^5.0.14",
     "@colyseus/tools": "^0.18.1",
     "@wordpoker/contracts": "workspace:*",
+    "@wordpoker/db": "workspace:*",
     "@wordpoker/game-rules": "workspace:*",
     "colyseus": "^0.18.2",
     "express": "^5.2.1"

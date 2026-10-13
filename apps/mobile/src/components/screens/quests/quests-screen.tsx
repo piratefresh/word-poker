@@ -22,7 +22,7 @@ import { STREAK_REWARDS } from "@wordpoker/contracts";
 import { QUEST_CATALOG } from "@wordpoker/game-rules";
 import { router } from "expo-router";
 import { useEffect, type ReactElement } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, Text as RNText } from "react-native";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
@@ -147,8 +147,8 @@ function StreakStrip({ current }: { current: number }): ReactElement {
           style={[pipStyles.pip, index === todayIndex && pipStyles.pipToday]}
           testID={`quest-streak-pip-${index + 1}`}
         >
-          <Text style={pipStyles.day}>{index + 1}</Text>
-          <Text style={pipStyles.reward}>{`+${reward}`}</Text>
+          <RNText style={pipStyles.day}>{index + 1}</RNText>
+          <RNText style={pipStyles.reward}>{`+${reward}`}</RNText>
         </View>
       ))}
     </View>

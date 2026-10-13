@@ -42,6 +42,7 @@ import {
 import { pinnedPowerUps, pinnedSeed, randomSeed } from "@/features/offline/offline-seed";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
+import { useHistory } from "@/lib/history/history-provider";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -108,6 +109,7 @@ function OfflineTable({
   dictionary: Dictionary;
   turnDurationMs?: number;
 }) {
+  const history = useHistory();
   const params = useLocalSearchParams<{ seed?: string; powers?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
@@ -134,7 +136,11 @@ function OfflineTable({
     endChipFlight,
     sessionOver,
     newGame,
-  } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps });
+    historyError,
+    retryHistory,
+  } = useOfflineGame({ seed, dictionary, turnDurationMs, powerUps,
+    history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
+  });
   const payout = game.phase === "payout";
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
@@ -263,6 +269,16 @@ function OfflineTable({
         <ResultsScreen onDeal={deal} onExit={leaveTable} snapshot={results} />
       ) : null}
       {sessionOver && xp.hero === null ? <SessionOver game={game} onNewGame={restart} /> : null}
+      {historyError ? (
+        <Modal transparent visible>
+          <View style={styles.overlayBackdrop}>
+            <View style={styles.overlay}>
+              <Text style={styles.overlaySeat}>{historyError}</Text>
+              <GameButton label="RETRY SAVE" onPress={retryHistory} testID="retry-history-save" />
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </WordBuilder>
   );
 }

@@ -47,9 +47,9 @@ export class QuestClaimRejectedError extends Error {
   }
 }
 
-function sessionInit(): RequestInit {
+export async function sessionInit(): Promise<RequestInit> {
   if (Platform.OS === "web") return { credentials: "include" };
-  const cookie = authClient.getCookie();
+  const cookie = await authClient.getCookie();
 
   return { credentials: "omit", headers: cookie ? { cookie } : {} };
 }
@@ -68,7 +68,7 @@ async function failure(response: Response): Promise<Error> {
 
 /** The signed-in player's coins, and whether their welcome is claimed. Rejects with `WalletAuthError` on a 401. */
 export async function fetchWallet(): Promise<WalletResponse> {
-  const response = await fetch(`${apiBaseURL}/api/wallet`, sessionInit());
+  const response = await fetch(`${apiBaseURL}/api/wallet`, await sessionInit());
   if (response.status === 401) throw new WalletAuthError();
   if (!response.ok) throw await failure(response);
 
@@ -103,7 +103,7 @@ async function questFailure(response: Response): Promise<Error> {
 
 /** The signed-in player's streak and quest progress. Rejects with `WalletAuthError`/`WalletUnverifiedError`. */
 export async function fetchQuestState(): Promise<QuestStateResponse> {
-  const response = await fetch(`${apiBaseURL}/api/quests`, sessionInit());
+  const response = await fetch(`${apiBaseURL}/api/quests`, await sessionInit());
   if (response.status === 401) throw new WalletAuthError();
   if (!response.ok) throw await questFailure(response);
 
@@ -115,10 +115,11 @@ export async function fetchQuestState(): Promise<QuestStateResponse> {
 
 /** Reports one settled hand's quest facts, once per `handToken` — a retry is safe. */
 export async function sendQuestHandClaim(claim: QuestHandClaim): Promise<QuestClaimResponse> {
+  const init = await sessionInit();
   const response = await fetch(`${apiBaseURL}/api/quests`, {
-    ...sessionInit(),
+    ...init,
     method: "POST",
-    headers: { ...sessionInit().headers, "content-type": "application/json" },
+    headers: { ...init.headers, "content-type": "application/json" },
     body: JSON.stringify(claim),
   });
   if (response.status === 401) throw new WalletAuthError();

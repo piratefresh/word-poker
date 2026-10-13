@@ -1,0 +1,35 @@
+# A signed-in development build with real auth. The E2E auth-bypass build has no history owner.
+appId: com.wordpoker.wordpoker
+name: Completed hand is readable from saved native history
+tags:
+  - native
+  - history
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: _sign-in.yaml
+- runFlow: offline-hand.yaml
+- openLink: wordpoker://history
+- extendedWaitUntil:
+    visible: "View session"
+    timeout: 30000
+- tapOn:
+    text: "View session"
+    index: 0
+- extendedWaitUntil:
+    visible: "View hand"
+    timeout: 30000
+- tapOn:
+    text: "View hand"
+    index: 0
+- assertVisible: "HAND #1"
+- assertVisible:
+    text: "Verified · Unranked offline|Pending sync · Unranked offline"
+- scrollUntilVisible:
+    element:
+      text: "ACTION LOG"
+    direction: DOWN
+    timeout: 10000
+- assertVisible: "ACTION LOG"
