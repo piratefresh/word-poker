@@ -2,6 +2,36 @@
 
 Maestro flows (web and native), the online smokes, and the shared E2E user.
 
+## History testing
+
+History testing needs auth and history routes from this checkout, plus the room server's history
+database and settlement journal. Apply the additive migration, then run the two servers in separate
+terminals:
+
+```bash
+pnpm --filter @wordpoker/db db:migrate
+pnpm dev:history
+pnpm start:local
+```
+
+`dev:history` uses `apps/mobile/.env`'s database, verifies online seats at `http://localhost:8081`,
+and retains uncommitted settlements in `.history-settlements/`. `start:local` disables `API_PROXY`
+and pins the game connection to the local server even when the API reloads its environment. In
+production, configure the room server's `WORDPOKER_HISTORY_DATABASE_URL` and mount a persistent
+`WORDPOKER_HISTORY_JOURNAL_DIR`; see `apps/server/.env.example`.
+
+Play a completed online or offline hand and open **Game History** on home. The list groups hands
+by room/session and shows words, scores, pots and chip changes. Offline records stay pending until
+the API verifies and accepts them. The public reader hides replay seeds, opponents' private drafts
+and unrevealed racks. The local store uses SQLite on native and IndexedDB on web; SDK 57's SQLite
+worker failed to bundle on this Windows setup, so the browser uses its native transactional store.
+
+`.maestro/history.yaml` extends the web offline hand through history. The native equivalent is
+`apps/mobile/.maestro/native/history.yaml` and requires a real signed-in development build;
+the auth-bypass E2E build has no account to own history. The native flow still needs a connected
+device. Native cached sessions remain readable on network failure; uploads always revalidate the
+account and use its captured bearer credential, so a cookie switch cannot mix history partitions.
+
 ## End-to-end (web)
 
 UI flows live in `.maestro/` and drive the Expo web build through Maestro's Chromium:
@@ -41,6 +71,12 @@ on matching versions. The existing mobile/server env files and seeded E2E user a
 
 The opponent creates Smoke Table, calls when it owes, and keeps results open until the player leaves. The flow
 signs in when needed, builds ILK, checks the results overlay, and leaves the table.
+
+`pnpm smoke:online:guest` (STO-581) is the same runner with `.maestro/online-guest-join.yaml`: the
+browser opens the invite link (`/online?room=<id>`), taps "Play as guest" on the sign-in screen
+(Better Auth's anonymous plugin, so the auth database needs the `isAnonymous` migration), checks
+the invite sheet names the same table, readies up and waits for the deal. A profile that is already
+signed in skips the guest tap.
 
 The Wild variant (STO-500) is the same runner with power-ups on:
 

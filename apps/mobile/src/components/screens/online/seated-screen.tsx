@@ -152,7 +152,7 @@ export function SeatedScreen() {
   // own card, then swaps to the felt.
   const felt = table !== undefined && room !== null && dictionary !== null;
   const body = felt ? (
-    <OnlineFelt dictionary={dictionary} onLeave={leave} room={room} />
+    <OnlineFelt dictionary={dictionary} onLeave={leave} room={room} roomId={roomId} />
   ) : table !== undefined ? (
     <TableFace leaving={leaving} onLeave={leave} table={table} />
   ) : session.status === "error" ? (

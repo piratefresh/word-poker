@@ -52,6 +52,8 @@ export {
   COIN_CURRENCY,
   COIN_PACK_IDS,
   WALLET_EVENT_KINDS,
+  GUEST_HAND_BONUS,
+  GUEST_HAND_BONUS_CAP,
   WELCOME_GRANT,
   isCoinCatalog,
   isCoinPackId,
@@ -174,3 +176,4 @@ export {
   type PrivateSeatState,
   type PrivateWordState,
 } from "./online";
+export { historyHand, isHistoryCursor, isHistoryHand, isHistoryPage, type HistoryHand, type HistoryPage } from "./history-view";

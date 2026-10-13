@@ -1,0 +1,97 @@
+# One-command Windows runner from the repo root: pnpm smoke:online:guest
+# A friend with no account opens an invite link and sits down as a guest (STO-581).
+#
+# Same setup as online-hand.yaml (seed 409, a fresh smoke-opponent.ts room). The link is the invite's
+# own form (`/online?room=<id>`, lib/invite-link.ts). A signed-out browser opens an
+# anonymous Better Auth session on its own (no tap), and the guard then lands the remembered table.
+# Needs a signed-out profile: a profile that already holds a session never becomes a guest.
+#
+#   maestro test --platform web .maestro/online-guest-join.yaml -e ROOM_ID=the-id-printed-by-opponent
+url: http://localhost:8081/online?room=${ROOM_ID}
+name: Online guest - open an invite link, sit down as a guest, play a hand and get offered an account
+tags:
+  - web
+  - online
+---
+- openLink: http://localhost:8081/online?room=${ROOM_ID}
+
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- assertVisible:
+    text: "YOU"
+
+# The waiting room carries the invite; its link names this same table.
+- tapOn:
+    id: "action-invite"
+- extendedWaitUntil:
+    visible:
+      id: "invite-link"
+    timeout: 10000
+- assertVisible:
+    text: ".*/online\\?room=${ROOM_ID}"
+- tapOn:
+    id: "invite-close"
+
+- tapOn:
+    id: "action-ready"
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 30000
+
+# Play the same hand as online-hand.yaml (seed 409, browser is seat 1): check to the river, build BUN, check to payout.
+- repeat:
+    while:
+      notVisible:
+        text: "RIVER"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|RIVER"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "word-builder-tile-B-2"
+    timeout: 20000
+- tapOn:
+    id: "word-builder-tile-B-2"
+- tapOn:
+    id: "word-builder-tile-U-3"
+- tapOn:
+    id: "word-builder-tile-N-5"
+- repeat:
+    while:
+      notVisible:
+        text: "PAYOUT"
+    commands:
+      - tapOn:
+          id: "action-check-call"
+      - waitForAnimationToEnd
+# The XP overlay comes first; the results screen, and the offer with it, follow its Continue.
+- extendedWaitUntil:
+    visible: "CONTINUE"
+    timeout: 30000
+    optional: true
+- runFlow:
+    when:
+      visible: "CONTINUE"
+    commands:
+      - tapOn: "CONTINUE"
+
+# A guest is offered an account at their first results screen; accepting lands on sign-up, which
+# a guest session can still reach.
+- extendedWaitUntil:
+    visible: "Save your progress?"
+    timeout: 10000
+- tapOn: "CREATE ACCOUNT"
+- extendedWaitUntil:
+    visible: "Take your seat."
+    timeout: 10000

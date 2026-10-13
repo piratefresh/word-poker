@@ -1,6 +1,7 @@
 import "./finalization-registry-polyfill"; // must run before @colyseus/sdk evaluates
 import { Client } from "@colyseus/sdk";
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
 
 /** The Colyseus server runs on this port beside the Expo dev server. */
@@ -14,12 +15,17 @@ const GAME_SERVER_PORT = 2567;
  * `EXPO_PUBLIC_GAME_URL` at the deployed server. Mirrors src/auth/client/auth-client.ts.
  */
 function devGameURL(): string {
-  const host = Constants.expoConfig?.hostUri?.split(":")[0];
+  // A browser reaches the game server wherever the page came from — a friend's phone on the LAN
+  // opening an invite link (STO-581) included.
+  const host =
+    Platform.OS === "web" && typeof window !== "undefined" && window.location.hostname
+      ? window.location.hostname
+      : Constants.expoConfig?.hostUri?.split(":")[0];
   return host ? `ws://${host}:${GAME_SERVER_PORT}` : `ws://localhost:${GAME_SERVER_PORT}`;
 }
 
 // `local` (set by `pnpm start:local`) overrides a cloud URL in .env without editing it.
-const configuredURL = process.env.EXPO_PUBLIC_GAME_URL;
+const configuredURL = process.env.EXPO_PUBLIC_LOCAL_API === "1" ? "local" : process.env.EXPO_PUBLIC_GAME_URL;
 const gameServerURL = configuredURL && configuredURL !== "local" ? configuredURL : devGameURL();
 
 export const gameClient = new Client(gameServerURL);

@@ -141,6 +141,7 @@ describe(
           "Migration20261004120000_wallet_event",
           "Migration20261005120000_quests",
           "Migration20261006120000_xp_levels",
+          "Migration20261012120000_game_history",
         ],
         "the migrations are pending again",
       );

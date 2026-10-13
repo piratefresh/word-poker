@@ -1,9 +1,12 @@
 # Windows local runner: pnpm smoke:online [-Wild] [-Headless]
 #   -Wild      the power-ups variant (STO-500): a Wild room at seed 518 and .maestro/online-wild-hand.yaml,
 #              and the run fails if the opponent heard the swapped tile or never heard the use.
+#   -Guest     a signed-out browser opens the invite link and plays as a guest (STO-581):
+#              seed 409 and .maestro/online-guest-join.yaml, through to the results
+#              screen's offer of an account.
 #   -Headless  --headless --screen-size 1280x1000, as the four-seat runner takes it.
 [CmdletBinding()]
-param([switch]$Wild, [switch]$Headless)
+param([switch]$Wild, [switch]$Guest, [switch]$Headless)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -23,6 +26,10 @@ try {
     $env:SEED = '518'
     $env:WORDPOKER_SMOKE_ROOM = '{"powerUps":{"deal":"choose3"}}'
     $flow = '.maestro/online-wild-hand.yaml'
+  } elseif ($Guest) {
+    $env:SEED = '409'
+    Remove-Item Env:WORDPOKER_SMOKE_ROOM -ErrorAction SilentlyContinue
+    $flow = '.maestro/online-guest-join.yaml'
   } else {
     $env:SEED = '409'
     Remove-Item Env:WORDPOKER_SMOKE_ROOM -ErrorAction SilentlyContinue

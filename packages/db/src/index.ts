@@ -29,6 +29,7 @@ export {
   type WalletEventStatus,
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
+export { pgConnectionString } from "../mikro-orm.config";
 export {
   GameSession, GameHand, HandSeat, HandAction,
   type GameSessionRow, type GameHandRow, type HandSeatRow, type HandActionRow,
@@ -44,6 +45,7 @@ export {
   type QuestProgressMap,
   type QuestProgressRecord,
 } from "./quests";
+export { adoptGuestHistory, countPlayedHands } from "./guest";
 export {
   hasWelcomeEvent,
   openWalletEvent,
@@ -91,3 +93,5 @@ export async function saveResultsRating(
 
   return rating.id;
 }
+export { saveHistoryHand, handRecordDigest, HandRecordConflictError } from "./history";
+export { readHistoryHands, readHistoryHand } from "./history-read";

@@ -16,7 +16,8 @@ jest.mock("@/features/online/room-session", () => ({
 // expo-router reaches a navigation package Jest cannot parse, and the router is the one thing
 // this screen's taps are allowed to reach.
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn() },
+  router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn(), setParams: jest.fn() },
+  useLocalSearchParams: jest.fn(() => ({})),
 }));
 
 // The session is what the masthead's avatar is drawn from; the lobby reads nothing else of it.
@@ -28,7 +29,7 @@ jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
 );
 
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import { gameClient } from "@/features/online/game-client";
 import { createTable, joinTable, useActiveRoomId } from "@/features/online/room-session";
@@ -515,6 +516,15 @@ test("leaves the room the way it arrived, and falls back to the menu when it arr
   (router.canGoBack as unknown as jest.Mock).mockReturnValue(false);
   await fireEvent.press(view.getByTestId("parlor-back"));
   expect(router.replace).toHaveBeenCalledWith("/");
+});
+
+test("opens the create sheet when home sent a friend table, and drops the ask", async () => {
+  // Home's "Play a Friend" (STO-581) is the lobby with its create sheet already open.
+  (useLocalSearchParams as unknown as jest.Mock).mockReturnValueOnce({ create: "1" });
+  const { view } = await openLobby();
+
+  expect(view.getByTestId("create-table-sheet").props.isPresented).toBe(true);
+  expect(router.setParams).toHaveBeenCalledWith({ create: undefined });
 });
 
 test("refuses an over-long table name before it spends a round trip", async () => {

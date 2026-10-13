@@ -32,6 +32,10 @@ export type WalletEventKind = (typeof WALLET_EVENT_KINDS)[number];
 /** The coins a player is granted, once, when they verify their email. */
 export const WELCOME_GRANT = 5000;
 
+/** A guest who registers is paid this much per hand they played, up to the cap, on top of the welcome grant. */
+export const GUEST_HAND_BONUS = 100;
+export const GUEST_HAND_BONUS_CAP = 1000;
+
 /** `GET /api/wallet`: the signed-in player's balance. */
 export interface WalletResponse {
   readonly coins: number;

@@ -12,6 +12,9 @@ import { POWER_USED_BEATS } from "@/components/powers/power-used";
 
 
 import { OfflineGameScreen } from "./offline-game-screen";
+jest.mock("@/lib/history/history-provider", () => ({
+  useHistory: () => ({ ownerId: null, capture: jest.fn() }),
+}));
 
 // Keep the Continue interaction real while omitting Rive's native renderer.
 jest.mock("@/components/screens/results/simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
@@ -473,6 +476,8 @@ describe("<OfflineGameScreen />", () => {
   test("shows the session's end-state over the felt, and New game restarts it", async () => {
     const newGame = jest.fn();
     const over: OfflineGame = {
+      historyError: null,
+      retryHistory: jest.fn(),
       game: {
         ...FOUR_PLAYER_FLOP_FIXTURE,
         id: "offline-9-payout-done",

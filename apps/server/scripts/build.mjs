@@ -21,6 +21,11 @@ const manifest = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
 
+// Workspace source is inlined, but its third-party dependencies must remain Node modules too.
+const dbManifest = JSON.parse(
+  await readFile(new URL("../../../packages/db/package.json", import.meta.url), "utf8"),
+);
+
 await build({
   absWorkingDir: fileURLToPath(new URL("..", import.meta.url)),
   entryPoints: ["src/index.ts"],
@@ -29,7 +34,7 @@ await build({
   platform: "node",
   format: "esm",
   target: "node22",
-  external: Object.keys(manifest.dependencies ?? {}).filter(
+  external: Object.keys({ ...manifest.dependencies, ...dbManifest.dependencies }).filter(
     (name) => !name.startsWith("@wordpoker/"),
   ),
   logLevel: "info",
