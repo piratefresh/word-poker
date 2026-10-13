@@ -40,7 +40,7 @@ import { fullWidth } from "@/lib/full-width";
 import { useQuests } from "@/lib/quests-provider";
 
 type ModeKey =
-  "tutorial" | "online" | "offline" | "leaderboard" | "store" | "quests";
+  "tutorial" | "online" | "friend" | "offline" | "leaderboard" | "store" | "quests";
 
 /**
  * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
@@ -76,6 +76,14 @@ const MODES: Mode[] = [
     glyph: "🌐",
     label: "Online Mode",
     description: "Play live opponents",
+  },
+  {
+    key: "friend",
+    // The lobby opens its create sheet; the dealt table carries the invite (STO-581).
+    href: { pathname: "/online", params: { create: "1" } },
+    glyph: "👥",
+    label: "Play a Friend",
+    description: "Deal a table, invite by QR or link",
   },
   {
     key: "offline",
@@ -185,7 +193,8 @@ export function HomeScreen() {
             <TileLogo onIdleChange={setLogoIdle} width={contentWidth} />
           </RNHostView>
 
-          {session?.user && !session.user.emailVerified ? (
+          {/* A guest's placeholder address can't be verified; they make an account to claim one. */}
+          {session?.user && !session.user.emailVerified && !session.user.isAnonymous ? (
             <VerifyEmailCard email={session.user.email} testID="home-verify" />
           ) : null}
 
@@ -271,7 +280,7 @@ export function HomeScreen() {
               <Text textStyle={signedInText}>Signed in as</Text>
               <Spacer flexible />
               <Text textStyle={signedInText}>
-                {session?.user.email ?? "Unknown player"}
+                {session?.user.isAnonymous ? "Guest" : (session?.user.email ?? "Unknown player")}
               </Text>
             </Row>
             <Button

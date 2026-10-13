@@ -1,0 +1,52 @@
+# One-command Windows runner from the repo root: pnpm smoke:online:guest
+# A friend with no account opens an invite link and sits down as a guest (STO-581).
+#
+# Same setup as online-hand.yaml (seed 409, a fresh smoke-opponent.ts room). The link is the invite's
+# own form (`/online?room=<id>`, lib/invite-link.ts). A signed-out browser is bounced to sign-in, where
+# "Play as guest" opens an anonymous Better Auth session, and the guard then lands the remembered table.
+# A profile that already holds a session skips the guest tap and joins straight through.
+#
+#   maestro test --platform web .maestro/online-guest-join.yaml -e ROOM_ID=the-id-printed-by-opponent
+url: http://localhost:8081/online?room=${ROOM_ID}
+name: Online guest - open an invite link, play as guest, sit down and deal
+tags:
+  - web
+  - online
+---
+- openLink: http://localhost:8081/online?room=${ROOM_ID}
+
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    commands:
+      - tapOn:
+          text: "Play as guest.*"
+
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 30000
+- assertVisible:
+    text: "YOU"
+
+# The waiting room carries the invite; its link names this same table.
+- tapOn:
+    id: "action-invite"
+- extendedWaitUntil:
+    visible:
+      id: "invite-link"
+    timeout: 10000
+- assertVisible:
+    text: ".*/online\\?room=${ROOM_ID}"
+- tapOn:
+    id: "invite-close"
+
+- tapOn:
+    id: "action-ready"
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 30000
