@@ -14,8 +14,8 @@
 
 import type { Constructor } from "@mikro-orm/core";
 import type { Migration } from "@mikro-orm/migrations";
-import { Migration20261013130000_friends } from "./Migration20261013130000_friends";
-export { Migration20261013130000_friends } from "./Migration20261013130000_friends";
+import { Migration20261013140000_friends } from "./Migration20261013140000_friends";
+export { Migration20261013140000_friends } from "./Migration20261013140000_friends";
 
 import { Migration20260921030429_results_rating } from "./Migration20260921030429_results_rating";
 import { Migration20261004120000_wallet_event } from "./Migration20261004120000_wallet_event";
@@ -23,6 +23,7 @@ import { Migration20261005120000_quests } from "./Migration20261005120000_quests
 import { Migration20261006120000_xp_levels } from "./Migration20261006120000_xp_levels";
 import { Migration20261012120000_game_history } from "./Migration20261012120000_game_history";
 import { Migration20261013120000_anonymous_user } from "./Migration20261013120000_anonymous_user";
+import { Migration20261013130000_hand_seat_adopted_from } from "./Migration20261013130000_hand_seat_adopted_from";
 
 export { Migration20260921030429_results_rating } from "./Migration20260921030429_results_rating";
 export { Migration20261004120000_wallet_event } from "./Migration20261004120000_wallet_event";
@@ -30,6 +31,7 @@ export { Migration20261005120000_quests } from "./Migration20261005120000_quests
 export { Migration20261006120000_xp_levels } from "./Migration20261006120000_xp_levels";
 export { Migration20261012120000_game_history } from "./Migration20261012120000_game_history";
 export { Migration20261013120000_anonymous_user } from "./Migration20261013120000_anonymous_user";
+export { Migration20261013130000_hand_seat_adopted_from } from "./Migration20261013130000_hand_seat_adopted_from";
 
 /** Every migration this package has, oldest first. */
 export const migrations: Constructor<Migration>[] = [
@@ -39,5 +41,6 @@ export const migrations: Constructor<Migration>[] = [
   Migration20261006120000_xp_levels,
   Migration20261012120000_game_history,
   Migration20261013120000_anonymous_user,
-  Migration20261013130000_friends,
+  Migration20261013130000_hand_seat_adopted_from,
+  Migration20261013140000_friends,
 ];

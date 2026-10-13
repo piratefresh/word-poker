@@ -59,6 +59,8 @@ export const HandSeat = defineEntity({
     seat: p.integer().primary(),
     playerId: p.text(),
     userId: p.text().nullable(),
+    /** The guest account this seat was played under, when it was moved to a registered one. */
+    adoptedFrom: p.text().nullable(),
     name: p.text(),
     initialStack: p.bigint("number"),
   }),

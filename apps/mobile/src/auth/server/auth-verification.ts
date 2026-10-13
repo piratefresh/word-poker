@@ -44,8 +44,12 @@ export async function sendVerificationEmail({ user, url }: { user: VerifiedUser;
  */
 export async function afterEmailVerification(user: VerifiedUser): Promise<void> {
   try {
-    // Hands a guest played before registering (moved over by `adoptGuestHistory`) earn a bonus.
-    const hands = await countPlayedHands(user.id);
+    // Hands a guest played before registering (moved over by `adoptGuestHistory`) earn a bonus. A
+    // failed count costs the bonus, never the base grant.
+    const hands = await countPlayedHands(user.id).catch((error: unknown) => {
+      console.error(`[welcome-grant] ${user.id}: could not count guest hands:`, error);
+      return 0;
+    });
     const bonus = Math.min(hands * GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP);
     const result = await grantWelcome(user.id, {}, bonus);
     if (!result.applied && result.reason === "pending") {

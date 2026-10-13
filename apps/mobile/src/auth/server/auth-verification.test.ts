@@ -50,6 +50,15 @@ describe("afterEmailVerification", () => {
     expect(grant).toHaveBeenLastCalledWith("user_1", {}, 1000);
   });
 
+  test("still pays the base grant when the hand count fails", async () => {
+    grant.mockResolvedValue({ applied: true, balance: 5000 });
+    jest.mocked(countPlayedHands).mockRejectedValueOnce(new Error("database down"));
+
+    await afterEmailVerification(USER);
+
+    expect(grant).toHaveBeenLastCalledWith("user_1", {}, 0);
+  });
+
   test("never throws when the grant fails", async () => {
     grant.mockRejectedValue(new Error("database down"));
 

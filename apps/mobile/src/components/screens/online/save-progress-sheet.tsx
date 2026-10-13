@@ -25,7 +25,7 @@ export function SaveProgressSheet({ visible, onClose }: { visible: boolean; onCl
         <View style={styles.sheet}>
           <Text style={styles.title}>Save your progress?</Text>
           <Text style={styles.body}>
-            Make a free account to keep your coins and come back to your table.
+            Make a free account to keep the hands you've played and start with a coin bonus.
           </Text>
           <GoldButton
             label="CREATE ACCOUNT"

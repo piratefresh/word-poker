@@ -21,15 +21,22 @@ export async function adoptGuestHistory(
 ): Promise<void> {
   const db = (options.orm ?? (await getOrm())).em.getConnection();
 
-  await db.execute(`update "hand_seat" set "user_id" = ? where "user_id" = ?`, [userId, guestId]);
-  await db.execute(`update "game_session" set "owner_id" = ? where "owner_id" = ?`, [userId, guestId]);
+  // One statement, so the two moves land together or not at all. `adopted_from` marks the seats
+  // that were a guest's, which is what the welcome bonus counts.
+  await db.execute(
+    `with seats as (
+       update "hand_seat" set "user_id" = ?, "adopted_from" = ? where "user_id" = ?
+     )
+     update "game_session" set "owner_id" = ? where "owner_id" = ?`,
+    [userId, guestId, guestId, userId, guestId],
+  );
 }
 
-/** How many hands this account has sat in. */
+/** How many hands this account played as a guest before registering. */
 export async function countPlayedHands(userId: string, options: DbOptions = {}): Promise<number> {
   const db = (options.orm ?? (await getOrm())).em.getConnection();
   const [row] = await db.execute<{ n: string }[]>(
-    `select count(*) as n from "hand_seat" where "user_id" = ?`,
+    `select count(*) as n from "hand_seat" where "user_id" = ? and "adopted_from" is not null`,
     [userId],
   );
 

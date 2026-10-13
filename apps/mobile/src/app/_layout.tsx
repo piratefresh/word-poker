@@ -22,7 +22,7 @@ import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
 import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -168,6 +168,16 @@ function DeepLinks({
   const [initialDestination, setInitialDestination] =
     useState<Destination | null>(null);
 
+  // A friend arriving by invite link has no account and should not need one: a link that names a
+  // table opens a guest session on its own (STO-581), whether it launched the app or arrived while
+  // it was open. One try per launch; if it fails, the sign-in screen's "Play as guest" is still there.
+  const guestTried = useRef(false);
+  const playAsGuest = useCallback(() => {
+    if (guestTried.current) return;
+    guestTried.current = true;
+    void authClient.signIn.anonymous().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!launchRead.current) {
       launchRead.current = true;
@@ -188,9 +198,10 @@ function DeepLinks({
         return;
       }
       rememberDestination(destination);
+      if (!session && destination.pathname !== "/friends") playAsGuest();
     });
     return () => arriving.remove();
-  }, [account, session]);
+  }, [account, session, playAsGuest]);
 
   // Signed out, the seat is not a seat: the guarded routes are unreachable until someone signs in
   // again, so the device gives the table up rather than leaving the server counting a player who
@@ -200,15 +211,9 @@ function DeepLinks({
     void leaveTable();
   }, [session]);
 
-  // A friend arriving by invite link has no account and should not need one: a link that names a
-  // table opens a guest session on its own (STO-581). One try per launch; if it fails, the
-  // sign-in screen's "Play as guest" is still there.
-  const guestTried = useRef(false);
   useEffect(() => {
-    if (session || guestTried.current || initialDestination === null || initialDestination.pathname === "/friends") return;
-    guestTried.current = true;
-    void authClient.signIn.anonymous().catch(() => {});
-  }, [initialDestination, session]);
+    if (!session && initialDestination !== null && initialDestination.pathname !== "/friends") playAsGuest();
+  }, [initialDestination, session, playAsGuest]);
 
   // Signed in: land on whatever link was waiting for a session, once. The launch URL is kept in
   // state until it resolves, so auth can finish before Linking answers without losing the route.
