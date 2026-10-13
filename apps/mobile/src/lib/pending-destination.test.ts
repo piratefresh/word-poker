@@ -1,6 +1,13 @@
 import { destinationFromURL, rememberDestination, takeDestination } from "./pending-destination";
 
 describe("a link's destination", () => {
+  test("holds web and native friend links as an explicit add card", () => {
+    for (const url of ["https://play.wordpoker.dev/friend/ABCD2345", "wordpoker://friend/ABCD2345", "wordpoker:///friend/ABCD2345"]) {
+      expect(destinationFromURL(url)).toEqual({ pathname: "/friends", params: { add: "ABCD2345" } });
+    }
+    expect(destinationFromURL("wordpoker://friend/ABCI2345")).toBeNull();
+    expect(destinationFromURL("https://play.wordpoker.dev/friend/ABCD2345/extra")).toBeNull();
+  });
   test("is the table a lobby link names", () => {
     expect(destinationFromURL("wordpoker://online?room=abc123")).toEqual({
       pathname: "/online/[roomId]",

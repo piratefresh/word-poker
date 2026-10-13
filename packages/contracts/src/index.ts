@@ -176,3 +176,4 @@ export {
   type PrivateSeatState,
   type PrivateWordState,
 } from "./online";
+export * from "./friends";

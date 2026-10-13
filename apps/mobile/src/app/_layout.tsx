@@ -104,7 +104,7 @@ export function RootLayout() {
   if ((isPending && !E2E_AUTH_BYPASS) || !fontsLoaded) return null;
 
   return (
-    <DeepLinks session={!!session}>
+    <DeepLinks session={!!session} account={!!session && !session.user.isAnonymous}>
       <GestureHandlerRootView style={styles.root}>
         <ThemeProvider value={DarkTheme}>
           <QuestsProvider>
@@ -119,6 +119,8 @@ export function RootLayout() {
                 <Stack.Screen name="tutorial" />
                 <Stack.Screen name="offline" />
                 <Stack.Screen name="online" />
+                <Stack.Screen name="friends" />
+                <Stack.Screen name="friend/[code]" />
                 <Stack.Screen name="online/[roomId]" />
               </Stack.Protected>
               {/* Outside the guards: the emailed reset link may land while a stale
@@ -148,9 +150,11 @@ const WEB_LAUNCH_URL = typeof document === "undefined" ? null : document.URL;
 
 function DeepLinks({
   session,
+  account,
   children,
 }: {
   session: boolean;
+  account: boolean;
   children: ReactNode;
 }) {
   // The launch URL is the app's own; only the first run may read it, or a later session change
@@ -175,14 +179,14 @@ function DeepLinks({
     const arriving = Linking.addEventListener("url", ({ url }) => {
       const destination = destinationFromURL(url);
       if (!destination) return;
-      if (session) {
+      if (session && (destination.pathname !== "/friends" || account)) {
         router.replace(destination);
         return;
       }
       rememberDestination(destination);
     });
     return () => arriving.remove();
-  }, [session]);
+  }, [account, session]);
 
   // Signed out, the seat is not a seat: the guarded routes are unreachable until someone signs in
   // again, so the device gives the table up rather than leaving the server counting a player who
@@ -197,7 +201,7 @@ function DeepLinks({
   // sign-in screen's "Play as guest" is still there.
   const guestTried = useRef(false);
   useEffect(() => {
-    if (session || guestTried.current || initialDestination === null) return;
+    if (session || guestTried.current || initialDestination === null || initialDestination.pathname === "/friends") return;
     guestTried.current = true;
     void authClient.signIn.anonymous().catch(() => {});
   }, [initialDestination, session]);
@@ -205,12 +209,16 @@ function DeepLinks({
   // Signed in: land on whatever link was waiting for a session, once. The launch URL is kept in
   // state until it resolves, so auth can finish before Linking answers without losing the route.
   useEffect(() => {
-    if (!session || initialConsumed.current) return;
-    const destination = takeDestination() ?? initialDestination;
+    if (!session) return;
+    const destination = takeDestination() ?? (initialConsumed.current ? null : initialDestination);
     if (!destination) return;
+    if (destination.pathname === "/friends" && !account) {
+      rememberDestination(destination);
+      return;
+    }
     initialConsumed.current = true;
     router.replace(destination);
-  }, [initialDestination, session]);
+  }, [account, initialDestination, session]);
 
   return children;
 }

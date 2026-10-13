@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import { Client, CloseCode, ErrorCode, Room, ServerError } from "colyseus";
 import {
   GAME_EVENTS,
+  FRIEND_REQUEST_MESSAGES,
   GAME_MESSAGES,
   WAITING_PHASE,
   isGameMessagePayload,
@@ -41,6 +42,8 @@ import {
 } from "./GameRoomProjection.js";
 import { GameRoomState } from "./schema/GameRoomState.js";
 import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
+import { requestFriend } from "@wordpoker/db";
+import { serverOrm } from "../database.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
 /** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
@@ -124,6 +127,20 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   }
 
   messages = {
+    [GAME_MESSAGES.befriend]: async (client: Client, payload: unknown) => {
+      if (!isGameMessagePayload("befriend", payload) || !this.isAtTable(client)) return;
+      const sender = this.bindings.get(client.sessionId);
+      const target = this.bindings.get(payload.playerId);
+      if (!sender || !target?.present || sender === target) return;
+      let message = "Friends aren't available right now. Try again.";
+      try {
+        const orm = await serverOrm();
+        if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
+      } catch {
+        // A database outage must not interrupt the hand or expose account details.
+      }
+      client.send(GAME_EVENTS.befriendResult, { playerId: payload.playerId, message });
+    },
     [GAME_MESSAGES.betting]: (client: Client, payload: unknown) => {
       if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.betting, payload)) return;
 

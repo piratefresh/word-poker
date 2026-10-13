@@ -407,9 +407,21 @@ importers:
       '@colyseus/tools':
         specifier: ^0.18.1
         version: 0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1)
+      '@mikro-orm/core':
+        specifier: ^7.2.0
+        version: 7.2.0
+      '@mikro-orm/migrations':
+        specifier: ^7.2.0
+        version: 7.2.0(@mikro-orm/core@7.2.0)
+      '@mikro-orm/postgresql':
+        specifier: ^7.2.0
+        version: 7.2.0(@mikro-orm/core@7.2.0)
       '@wordpoker/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@wordpoker/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@wordpoker/game-rules':
         specifier: workspace:*
         version: link:../../packages/game-rules
@@ -419,6 +431,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@8.1.1)
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
     devDependencies:
       '@colyseus/loadtest':
         specifier: ^0.18.1

@@ -8,13 +8,18 @@
 
 import { MikroORM } from "@mikro-orm/postgresql";
 
-import config from "../mikro-orm.config";
+import config, { pgConnectionString } from "../mikro-orm.config";
 
 let orm: Promise<MikroORM> | undefined;
 
 /** The process's one ORM instance, connected on first use. */
-export function getOrm(): Promise<MikroORM> {
-  orm ??= MikroORM.init(config);
+export function getOrm(url?: string): Promise<MikroORM> {
+  orm ??= MikroORM.init(url ? {
+    ...config, clientUrl: url, driverOptions: { connectionString: pgConnectionString(url) },
+  } : config).catch((error) => {
+    orm = undefined;
+    throw error;
+  });
 
   return orm;
 }

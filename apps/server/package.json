@@ -32,14 +32,19 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
+    "@mikro-orm/core": "^7.2.0",
+    "@mikro-orm/migrations": "^7.2.0",
+    "@mikro-orm/postgresql": "^7.2.0",
     "@colyseus/admin": "^0.18.6",
     "@colyseus/auth": "^0.18.4",
     "@colyseus/database": "^0.18.4",
     "@colyseus/schema": "^5.0.14",
     "@colyseus/tools": "^0.18.1",
     "@wordpoker/contracts": "workspace:*",
+    "@wordpoker/db": "workspace:*",
     "@wordpoker/game-rules": "workspace:*",
     "colyseus": "^0.18.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.23.0"
   }
 }

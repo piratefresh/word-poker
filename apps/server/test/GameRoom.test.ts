@@ -30,6 +30,9 @@ import {
   toEngineAction,
 } from "../scripts/four-seat-scenario.js";
 import appConfig from "../src/app.config.js";
+import { Client as PgClient } from "pg";
+import { closeOrm, friendList } from "@wordpoker/db";
+import { createRunTarget, openRunOrm, serverUrl } from "../../../packages/db/test/run-target.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
 // this gate. The suite boots unseeded rooms too, so only tests that pin a seed need it on.
@@ -164,6 +167,49 @@ describe("GameRoom", () => {
   });
 
   describe("authenticated seats", () => {
+    it("requests friends using only server-owned seat account IDs", async function (this: Mocha.Context) {
+      if (!serverUrl) this.skip();
+      const originalDatabase = process.env.WORDPOKER_DATABASE_URL;
+      const admin = new PgClient({ connectionString: serverUrl });
+      await admin.connect();
+      const target = await createRunTarget(admin, "room-friends");
+      const orm = await openRunOrm(target);
+      try {
+        await orm.migrator.up();
+        const url = new URL(target.url);
+        if (target.schema) url.searchParams.set("options", `-c search_path=${target.schema}`);
+        process.env.WORDPOKER_DATABASE_URL = url.toString();
+        const room = await colyseus.createRoom("game", { name: "Friends", buyIn: 500, maxSeats: 2 });
+        const first = await colyseus.connectTo(room);
+        const second = await colyseus.connectTo(room);
+        const firstId = room["bindings"].get(first.sessionId)?.userId;
+        const secondId = room["bindings"].get(second.sessionId)?.userId;
+        assert.ok(firstId && secondId);
+        await orm.em.getConnection().execute(`insert into "user" (id, name) values (?, 'Ada'), (?, 'Bea')`, [firstId, secondId]);
+        const inbox: unknown[] = [];
+        const off = first.onMessage(GAME_EVENTS.befriendResult, (payload) => inbox.push(payload));
+        const binding = room["bindings"].get(first.sessionId);
+        assert.ok(binding);
+        await room.messages.befriend(binding.client, { playerId: "not-at-table", userId: secondId });
+        assert.equal(inbox.length, 0);
+        const reply = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
+        first.send(GAME_MESSAGES.befriend, { playerId: second.sessionId, userId: "forged" });
+        assert.deepEqual(await reply, { playerId: second.sessionId, message: "Friend request sent" });
+        assert.deepEqual((await friendList(firstId, { orm })).outgoing, [{ userId: secondId, name: "Bea" }]);
+        assert.deepEqual((await friendList(secondId, { orm })).incoming, [{ userId: firstId, name: "Ada" }]);
+        off();
+        await first.leave();
+        await second.leave();
+      } finally {
+        await closeOrm();
+        await orm.close(true);
+        await target.drop(admin);
+        await admin.end();
+        if (originalDatabase === undefined) delete process.env.WORDPOKER_DATABASE_URL;
+        else process.env.WORDPOKER_DATABASE_URL = originalDatabase;
+      }
+    });
+
     it("rejects anonymous and forged joins before a seat is taken", async () => {
       const room = await colyseus.createRoom("game", { name: "Auth", buyIn: 500, maxSeats: 2 });
       colyseus.sdk.auth.token = "";

@@ -92,3 +92,4 @@ export async function saveResultsRating(
 
   return rating.id;
 }
+export { friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";

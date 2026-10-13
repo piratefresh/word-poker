@@ -70,8 +70,8 @@ export async function createRunTarget(client: Client, label: string): Promise<Ru
  * list, the migration path and its glob are exactly what `db:migrate` uses, so a suite fails if any
  * of them stops discovering a migration.
  */
-export function openRunOrm(target: RunTarget): Promise<MikroORM> {
-  return MikroORM.init({
+export async function openRunOrm(target: RunTarget): Promise<MikroORM> {
+  const orm = await MikroORM.init({
     ...config,
     clientUrl: target.url,
     driverOptions: {
@@ -81,4 +81,7 @@ export function openRunOrm(target: RunTarget): Promise<MikroORM> {
       ...(target.schema ? { options: `-c search_path=${target.schema}` } : {}),
     },
   });
+  // Better Auth creates this table before the package's isAnonymous migration in production.
+  await orm.em.getConnection().execute(`create table "user" (id text primary key, name text not null)`);
+  return orm;
 }
