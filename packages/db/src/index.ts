@@ -45,6 +45,7 @@ export {
   type QuestProgressMap,
   type QuestProgressRecord,
 } from "./quests";
+export { adoptGuestHistory, countPlayedHands } from "./guest";
 export {
   hasWelcomeEvent,
   openWalletEvent,

@@ -38,6 +38,7 @@ import {
   swapFlipOf,
   usePowerTargeting,
 } from "@/components/powers";
+import { authClient } from "@/auth/client/auth-client";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
@@ -67,6 +68,7 @@ import {
 import { useBalanceView } from "@/lib/use-balance-view";
 
 import { InviteSheet } from "./invite-sheet";
+import { SaveProgressSheet } from "./save-progress-sheet";
 
 export function OnlineFelt({
   room,
@@ -117,6 +119,9 @@ export function OnlineFelt({
     useSimpleWinCelebration(results);
   const connection = useRoomConnection(room);
   const [inviting, setInviting] = useState(false);
+  // A guest is asked once, at the first results screen, whether to keep what they played.
+  const { data: session } = authClient.useSession();
+  const [saveDismissed, setSaveDismissed] = useState(false);
 
   // One quest claim per hand (STO-525), and the XP overlay a lost showdown opens on it (STO-573):
   // `powers` is non-null only at a Wild table (`use-online-game.ts`), so it doubles as the
@@ -232,10 +237,12 @@ export function OnlineFelt({
       </WordBuilder>
     );
 
+  const showingResults = waiting === null && results !== null && !celebratingWin && xp.hero === null;
+
   return (
     <View style={styles.root}>
       {body}
-      {waiting === null && results !== null && !celebratingWin && xp.hero === null ? (
+      {showingResults ? (
         <ResultsScreen
           onDeal={() => {
             room.send(GAME_MESSAGES.resultsSeen);
@@ -245,6 +252,10 @@ export function OnlineFelt({
           snapshot={results}
         />
       ) : null}
+      <SaveProgressSheet
+        onClose={() => setSaveDismissed(true)}
+        visible={!saveDismissed && showingResults && !!session?.user.isAnonymous}
+      />
       {reconnecting ? <ReconnectingBanner /> : null}
       {roomId === undefined ? null : (
         <InviteSheet onClose={() => setInviting(false)} roomId={roomId} visible={inviting} />

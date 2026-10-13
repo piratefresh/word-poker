@@ -1,6 +1,7 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { anonymous, bearer } from "better-auth/plugins";
+import { adoptGuestHistory } from "@wordpoker/db";
 import { config } from "dotenv";
 import { Pool } from "pg";
 
@@ -91,7 +92,15 @@ export const auth = betterAuth({
   ],
   // Anonymous: a friend invited by link plays as a guest with a real session (STO-581), since
   // GameRoom.onAuth seats sessions, not devices. Guests never verify, so they never touch the Wallet.
-  plugins: [expo(), bearer(), anonymous()],
+  plugins: [
+    expo(),
+    bearer(),
+    // Registering from a guest session: Better Auth deletes the guest, so its hands move first.
+    anonymous({
+      onLinkAccount: ({ anonymousUser, newUser }) =>
+        adoptGuestHistory(anonymousUser.user.id, newUser.user.id),
+    }),
+  ],
   // Verifying pays the Wallet's welcome grant (STO-346); signing in does not wait on it.
   emailVerification: {
     sendOnSignUp: true,

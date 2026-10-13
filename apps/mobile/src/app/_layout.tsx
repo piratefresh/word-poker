@@ -22,7 +22,7 @@ import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
 import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -78,6 +78,8 @@ export function RootLayout() {
   // E2E builds have no auth server and no account: the guard takes their word for it instead
   // of holding the table behind a session nothing can start (`src/lib/e2e.ts`).
   const authed = E2E_AUTH_BYPASS || !!session;
+  // A guest can still reach sign-up: the results screen offers to turn the guest into an account.
+  const showAuth = !authed || !!session?.user.isAnonymous;
 
   // The design system asks for these families by name (`fonts.*`), so they have to
   // be registered before the first frame paints.
@@ -109,7 +111,7 @@ export function RootLayout() {
           <QuestsProvider>
             <HistoryProvider>
               <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Protected guard={!authed}>
+                <Stack.Protected guard={showAuth}>
                   <Stack.Screen name="sign-in" />
                   <Stack.Screen name="sign-up" />
                   <Stack.Screen name="forgot-password" />
@@ -144,6 +146,10 @@ export function RootLayout() {
  * (`pending-destination`) until there is a session to land it with. Nothing is navigated to that
  * the guard would immediately throw away.
  */
+// On web the guard has already bounced a signed-out visitor to /sign-in by the time an effect asks
+// Linking for the launch URL, so the invite is read here, before the router renders.
+const WEB_LAUNCH_URL = typeof document === "undefined" ? null : document.URL;
+
 function DeepLinks({
   session,
   children,
@@ -158,12 +164,22 @@ function DeepLinks({
   const [initialDestination, setInitialDestination] =
     useState<Destination | null>(null);
 
+  // A friend arriving by invite link has no account and should not need one: a link that names a
+  // table opens a guest session on its own (STO-581), whether it launched the app or arrived while
+  // it was open. One try per launch; if it fails, the sign-in screen's "Play as guest" is still there.
+  const guestTried = useRef(false);
+  const playAsGuest = useCallback(() => {
+    if (guestTried.current) return;
+    guestTried.current = true;
+    void authClient.signIn.anonymous().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!launchRead.current) {
       launchRead.current = true;
       // Do not cancel this promise when auth changes: a signed-out launch can resolve after the
       // user signs in, and the current session must decide whether it is routed or remembered.
-      void Linking.getInitialURL()
+      void (WEB_LAUNCH_URL !== null ? Promise.resolve(WEB_LAUNCH_URL) : Linking.getInitialURL())
         .then((url) => setInitialDestination(destinationFromURL(url) ?? null))
         .catch(() => {});
     }
@@ -178,9 +194,10 @@ function DeepLinks({
         return;
       }
       rememberDestination(destination);
+      playAsGuest();
     });
     return () => arriving.remove();
-  }, [session]);
+  }, [session, playAsGuest]);
 
   // Signed out, the seat is not a seat: the guarded routes are unreachable until someone signs in
   // again, so the device gives the table up rather than leaving the server counting a player who
@@ -189,6 +206,10 @@ function DeepLinks({
     if (session) return;
     void leaveTable();
   }, [session]);
+
+  useEffect(() => {
+    if (!session && !initialConsumed.current && initialDestination !== null) playAsGuest();
+  }, [initialDestination, session, playAsGuest]);
 
   // Signed in: land on whatever link was waiting for a session, once. The launch URL is kept in
   // state until it resolves, so auth can finish before Linking answers without losing the route.
