@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  HandRecord,
   OfflineAction,
   PlayerId,
   PowerUpDealMode,
@@ -64,6 +65,7 @@ import type { WordDraft } from "@/components/word-builder";
 import { colors, duration, palette } from "@/constants/theme";
 import { feltControls, heroView, isUnbuildable, type HeroPerspective } from "@/features/table/hero-view";
 import { randomSeed } from "./offline-seed";
+import { OfflineHandRecorder } from "@/lib/history/hand-recorder";
 import type { PowerView } from "@/features/table/power-view";
 
 /** The hero always sits in this seat; the bots fill the rest. */
@@ -108,6 +110,8 @@ export interface OfflineSession {
 }
 
 export interface OfflineGame {
+  historyError: string | null;
+  retryHistory: () => void;
   /** The mapped state: exactly what `GameScreen` renders. */
   game: GameScreenState;
   /**
@@ -206,6 +210,7 @@ export function useOfflineGame({
   turnDurationMs,
   powerUps,
   session,
+  history,
 }: {
   /**
    * The seed the whole session replays from: this hand, and every hand after it, since the
@@ -230,6 +235,7 @@ export function useOfflineGame({
   powerUps?: PowerUpDealMode;
   /** The tutorial's table; absent for ordinary offline play. */
   session?: OfflineSession;
+  history?: { ownerId: string; capture: (record: HandRecord) => Promise<void> };
 }): OfflineGame {
   // The session is read through a ref by the timers and the seam, like the state: a timer answers
   // the table — and the clock — as they stand when it fires.
@@ -240,14 +246,26 @@ export function useOfflineGame({
   const now = useCallback(() => sessionRef.current?.now() ?? Date.now(), []);
   const held = session?.held ?? false;
 
-  const [state, setState] = useState<OfflineState>(() =>
+  const [opened] = useState(() => {
+    const startedAtMs = session?.now() ?? Date.now();
+    const initial =
     session !== undefined ? session.open(session.now()) :
     // The deal leaves the first turn to the seat clockwise from the button — a bot on this
     // roster — and that turn is taken on the same beat as every other one: the table is dealt
     // with a seat thinking, not with the opening already played out. At a Wild table the Power
     // Draw holds that turn back until it closes.
-    openTable({ seed, dictionary, turnDurationMs, powerUps }),
-  );
+    openTable({ seed, dictionary, turnDurationMs, powerUps, nowMs: startedAtMs });
+    return { initial, startedAtMs };
+  });
+  const [state, setState] = useState<OfflineState>(opened.initial);
+  const [recorder] = useState(() => history && !session
+    ? new OfflineHandRecorder(opened.initial, opened.startedAtMs, history.ownerId) : null);
+  const recorderRef = useRef(recorder);
+  const saving = useRef(false);
+  const retrySave = useRef<(() => void) | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const historyRef = useRef(history);
+  useEffect(() => { historyRef.current = history; }, [history]);
   const [refusal, setRefusal] = useState<WordRejectionReason | null>(null);
 
   // The hero's word is built the whole hand, not only inside §19's window, so its draft lives
@@ -280,6 +298,7 @@ export function useOfflineGame({
    */
   const commit = useCallback((previous: OfflineState, next: OfflineState) => {
     if (next === previous) return;
+    stateRef.current = next;
     setState(next);
     setFlights((live) => reconcileFlights(live, previous, next));
   }, []);
@@ -339,6 +358,7 @@ export function useOfflineGame({
    */
   const act = useCallback(
     (action: OfflineAction, at?: number): boolean => {
+      if (saving.current) return false;
       const nowMs = at ?? now();
       // Read through the ref rather than through a render's closure: an action lands on the table
       // as it stands, whoever asked for it.
@@ -347,6 +367,26 @@ export function useOfflineGame({
         const gate = sessionRef.current?.reduce;
         const next = gate === undefined ? reduce(current, action, nowMs) : gate(current, action, nowMs);
         if (next === null) return false;
+        const record = recorderRef.current?.transition(current, next, action, nowMs);
+        if (record && historyRef.current) {
+          // Persist before exposing payout or permitting another deal. A failed write holds
+          // this exact immutable settlement for retry, including when timers fire again.
+          saving.current = true;
+          const capture = historyRef.current.capture;
+          const save = () => {
+            setHistoryError(null);
+            void capture(record).then(() => {
+              retrySave.current = null;
+              commit(current, next);
+              saving.current = false;
+            }, (error: unknown) => {
+              setHistoryError(error instanceof Error ? error.message : "Your hand could not be saved.");
+            });
+          };
+          retrySave.current = save;
+          save();
+          return true;
+        }
         noteSeatAction(current, action);
         const used = powerUsedBy(current, action);
         if (used !== null) setPowerEvents((live) => [...live, used]);
@@ -424,6 +464,7 @@ export function useOfflineGame({
    * the session's first hand, as it always did; every later session is drawn.
    */
   const newGame = useCallback(() => {
+    if (saving.current) return;
     setHeroDraft([]);
     setRefusal(null);
     // A restart deals hand 1 again, and the felt is emptied here, where the restart commits, the
@@ -434,10 +475,11 @@ export function useOfflineGame({
     setSeatActions([]);
     setPowerEvents([]);
     const table = sessionRef.current;
-    commit(
-      stateRef.current,
-      table !== undefined ? table.open(now()) : openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps }),
-    );
+    const nowMs = now();
+    const next = table !== undefined ? table.open(nowMs) : openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps, nowMs });
+    const owner = historyRef.current;
+    recorderRef.current = owner && !table ? new OfflineHandRecorder(next, nowMs, owner.ownerId) : null;
+    commit(stateRef.current, next);
   }, [commit, dictionary, now, powerUps, turnDurationMs]);
 
   /**
@@ -643,6 +685,8 @@ export function useOfflineGame({
   );
 
   return {
+    historyError,
+    retryHistory: () => retrySave.current?.(),
     game,
     words: view.words,
     wordCheck: view.wordCheck,
@@ -730,16 +774,18 @@ function openTable({
   dictionary,
   turnDurationMs,
   powerUps,
+  nowMs = Date.now(),
 }: {
   seed: number;
   dictionary: Dictionary;
   turnDurationMs: number | undefined;
   powerUps: PowerUpDealMode | undefined;
+  nowMs?: number;
 }): OfflineState {
   return startHand({
     seed,
     players: ROSTER.map((player) => player.id),
-    nowMs: Date.now(),
+    nowMs,
     dictionary,
     stakes: DEFAULT_STAKES,
     turnDurationMs,

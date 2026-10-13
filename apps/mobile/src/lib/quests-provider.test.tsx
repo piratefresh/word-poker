@@ -100,7 +100,7 @@ describe("QuestsProvider", () => {
   });
 
   test("shows the streak banner when the read credits today, and dismiss clears it", async () => {
-    questState.mockResolvedValue({ streak: { current: 3, creditedToday: 100 }, quests: [] });
+    questState.mockResolvedValue({ ...EMPTY_STATE, streak: { current: 3, creditedToday: 100 }, quests: [] });
     signedIn();
     const { result } = await hook();
 

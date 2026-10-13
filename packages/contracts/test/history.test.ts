@@ -5,6 +5,10 @@ import {
   HAND_RECORD_MAX_BYTES,
   POWER_UP_IDS,
   isHandRecord,
+  historyHand,
+  isHistoryHand,
+  isHistoryPage,
+  isHistoryCursor,
   parseHandRecord,
   type HandRecord,
   type RecordedHandAction,
@@ -77,11 +81,32 @@ describe("hand record boundary", () => {
     })) }));
   });
 
+  it("projects room titles and hides account identities, private drafts and unrevealed racks", () => {
+    const input = record();
+    const hand = historyHand({
+      ...input, config: { ...input.config, tableName: "Sunset" },
+      seats: input.seats.map((seat) => ({ ...seat, name: seat.userId ?? seat.name })),
+      summary: { ...input.summary, seats: input.summary.seats.map((seat) => ({
+        ...seat, privateTiles: [{ id: `rack-${seat.playerId}`, letter: "A", points: 1 }],
+      })) },
+    }, "server-id", "hero");
+    assert.ok(isHistoryHand(hand));
+    assert.equal(hand.tableName, "Sunset");
+    assert.equal(hand.seats[0]?.name, "You");
+    assert.equal(hand.summary.seats[1]?.privateTiles.length, 0);
+    assert.ok(!("seed" in hand));
+    assert.ok(isHistoryPage({ hands: [hand], cursor: "h1:7", hasMore: false }));
+    assert.equal(isHistoryPage({ hands: Array(51).fill(hand), cursor: "h1:7", hasMore: true }), false);
+    assert.equal(isHistoryCursor("h1:9223372036854775808"), false);
+    assert.equal(isHistoryCursor("h1:7"), true);
+  });
+
   it("rejects invalid identities, versions, bounds, seat references and ordering", () => {
     const base = record();
     const invalid: unknown[] = [
       null, { ...base, version: 2 }, { ...base, sessionId: "not-a-uuid" }, { ...base, ranked: true },
       { ...base, handNo: 0 }, { ...base, seed: NaN }, { ...base, dealerSeat: 2 },
+      { ...base, config: { ...base.config, tableName: "" } },
       { ...base, endedAtMs: 999 }, { ...base, dictionaryFingerprint: "unknown" },
       { ...base, seats: [base.seats[0], base.seats[0]] }, { ...base, seats: Array(5).fill(base.seats[0]) },
       { ...base, actions: Array(HAND_RECORD_MAX_ACTIONS + 1).fill(base.actions[0]) },

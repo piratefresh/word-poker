@@ -1,6 +1,7 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 
-import { Client, CloseCode, ErrorCode, Room, ServerError } from "colyseus";
+import { Client, CloseCode, ErrorCode, Room, ServerError, definePlugins } from "colyseus";
+import { UniqueSessionPlugin } from "colyseus/plugins/unique-session";
 import {
   GAME_EVENTS,
   GAME_MESSAGES,
@@ -40,6 +41,8 @@ import {
   type ProjectionBinding,
 } from "./GameRoomProjection.js";
 import { GameRoomState } from "./schema/GameRoomState.js";
+import { HistoryService } from "../history/history-service.js";
+import { SettlementRecorder } from "../history/settlement-recorder.js";
 import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
@@ -90,8 +93,13 @@ interface RoomKnobs {
 export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMetadata }> {
   state = new GameRoomState();
 
-  static override async onAuth(token: string): Promise<OnlineAccount> {
-    return onlineAccount(token);
+  /** One table per account: the plugin reads `auth.userId` from `onAuth` and rejects with 4400. */
+  plugins = definePlugins({ unique: new UniqueSessionPlugin({ max: 1 }) });
+
+  // `id` is the key Colyseus's session tracker indexes (the plugin reads it back from the same index).
+  static override async onAuth(token: string): Promise<OnlineAccount & { readonly id: string }> {
+    const account = await onlineAccount(token);
+    return { ...account, id: account.userId };
   }
 
   private dictionary!: Dictionary;
@@ -107,6 +115,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private awaitingReady = false;
   /** Power commands already answered, by `${playerId}:${actionId}`. Pruned as hands go by. */
   private readonly powerLedger = new Map<string, PowerLedgerEntry>();
+  /** The session every hand this room records belongs to (STO-453: minted once at creation). */
+  private readonly sessionId = randomUUID();
+  /** STO-455: holds every settlement until it is durable, and gates the room's advancement. */
+  private settlements!: SettlementRecorder;
 
   private get game() {
     return this.awaitingReady ? null : this.engine?.state ?? null;
@@ -251,13 +263,31 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       this.tickMs = knobs.tickMs;
     }
 
-    this.engine = new AuthoritativeGame({
+    const history = await HistoryService.fromEnv();
+    if (history === null) {
+      console.log("history: WORDPOKER_HISTORY_DATABASE_URL is not set; hands at this table are not recorded");
+    }
+    this.settlements = new SettlementRecorder({
+      build: (settled) =>
+        engine.handRecord(settled, {
+          sessionId: this.sessionId,
+          tableName: this.table.name,
+          userIdFor: (playerId) => this.bindings.get(playerId)?.userId ?? null,
+        }),
+      write: history,
+      now: () => this.now(),
+      log: (message, error) => console.error(message, error),
+    });
+
+    const engine = new AuthoritativeGame({
       seed: this.seed,
       dictionary: this.dictionary,
       blinds: { smallBlind: this.table.smallBlind, bigBlind: this.table.bigBlind },
       turnDurationMs: this.turnDuration,
       powerUps: this.table.powerUps,
+      onSettled: (hand) => this.settlements.observe(hand),
     });
+    this.engine = engine;
     this.setTimestep(() => this.onTick(), this.tickMs);
     this.project();
     this.publishPhase();
@@ -268,18 +298,13 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table is mid-hand; join the next hand");
     }
 
-    // One seat per account: history membership, ranked play and buy-ins are per account.
-    // Held seats rejoin through reconnection, which does not run onJoin.
-    if ([...this.bindings.values()].some((binding) => binding.userId === auth.userId)) {
-      throw new ServerError(409, "that account is already seated at this table");
-    }
-
     const seat = firstFreeSeat(this.bindings, this.maxClients);
     if (seat === null) {
       throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table has no free seat");
     }
 
-    // A changed lineup starts from the held stacks, rather than the previous hand's seats.
+    // A changed lineup starts from the held stacks, rather than the previous hand's seats. The
+    // settled hand is already durable when finishResults exposes the waiting room.
     if (this.awaitingReady) {
       this.authoritative.clear();
       this.awaitingReady = false;
@@ -335,6 +360,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     binding.present = false;
 
     if (this.game === null) {
+      // Waiting is exposed only after persistence, so no async gap can race another join/deal.
       this.authoritative.clear();
       this.awaitingReady = false;
       this.bindings.delete(client.sessionId);
@@ -357,7 +383,25 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
   /** Nobody left at the table (reconnect holds included): close the room instead of idling. */
   private closeIfEmpty() {
-    if (this.presentBindings().length === 0) void this.disconnect();
+    if (this.presentBindings().length === 0) void this.drainAndDisconnect();
+  }
+
+  /**
+   * STO-455's last hold: a room with nobody in it still does not go away until its settlements
+   * are durable. Seats may rejoin while the drain runs, so emptiness is asked again after it.
+   */
+  private async drainAndDisconnect(): Promise<void> {
+    await this.settlements.idle();
+    if (this.presentBindings().length === 0) await this.disconnect();
+  }
+
+  /** Shutdown bounds the DB drain; the next process recovers journaled records. */
+  override onDispose(): Promise<void> {
+    const giveUp = new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 5_000);
+      timer.unref?.();
+    });
+    return Promise.race([this.settlements?.idle() ?? Promise.resolve(), giveUp]);
   }
 
   /**
@@ -366,6 +410,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
    */
   private startWhenReady() {
     if (this.game !== null) return;
+    // A hand whose record is still undurable is not done with: the deal waits (STO-455).
+    if (this.settlements.pending) return;
     const present = this.presentBindings();
     if (present.length < MIN_PLAYERS) return;
     if (!present.every((binding) => binding.ready && binding.connected)) return;
@@ -462,9 +508,11 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       // Never write synced state here unconditionally: every write is a patch, and a patch every
       // tick re-renders every client's felt 20×/s. `state.now` moves with `project()` instead.
       const now = this.now();
+      // STO-455: a failed history write is retried here, off the interactive action path, while
+      // the holds below keep the room from advancing past the undurable settlement.
+      this.settlements.tick();
       const game = this.game;
       if (game === null) return;
-
       // §44: nobody is on the clock while the Power Draw is open; its own clock is the deadline.
       const draw = game.powers?.draw;
       if (draw?.status === "open") {
@@ -533,6 +581,9 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private finishResults(): void {
     const game = this.game;
     if (game === null || game.phase !== "payout") return;
+    // The paid-out hand is not finished with the table until its record is durable: every seat
+    // has seen the results, but the tick keeps asking until history has them (STO-455).
+    if (this.settlements.pending) return;
     this.syncStacks();
     const present = this.presentBindings();
     // A seat that left takes the table back to the waiting room; the rest play on only once they

@@ -1,0 +1,30 @@
+# Start with pnpm dev:history and pnpm start:local. Requires the seeded E2E accounts.
+url: http://localhost:8081
+name: Completed offline hand appears in durable history
+tags:
+  - web
+  - history
+---
+- runFlow: offline-hand.yaml
+- openLink: http://localhost:8081/history
+- extendedWaitUntil:
+    visible: "View session"
+    timeout: 30000
+- tapOn:
+    text: "View session"
+    index: 0
+- extendedWaitUntil:
+    visible: "View hand"
+    timeout: 30000
+- tapOn:
+    text: "View hand"
+    index: 0
+- assertVisible: "HAND #1"
+- assertVisible:
+    text: "Verified · Unranked offline|Pending sync · Unranked offline"
+- scrollUntilVisible:
+    element:
+      text: "ACTION LOG"
+    direction: DOWN
+    timeout: 10000
+- assertVisible: "ACTION LOG"
