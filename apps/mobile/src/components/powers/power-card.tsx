@@ -18,6 +18,7 @@ export const POWER_CARD_ASPECT = 7 / 5;
 const WHOLE_CARD_ART: Readonly<Record<string, number>> = {
   "blank-tile": require("../../../assets/images/ui/card/power-blank-tile.webp"),
   spotlight: require("../../../assets/images/ui/card/power-spotlight.webp"),
+  "river-review": require("../../../assets/images/ui/card/power-river-review.webp"),
 };
 
 /**

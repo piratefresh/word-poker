@@ -25,6 +25,7 @@ export function chooseBotPower(state: OfflineState, botId: PlayerId): PowerUpId 
     // ponytail: CPUs never play a blank's letter and never aim Spotlight; give them a plan if they look dumb.
     blank_tile: 0.5,
     spotlight: 0,
+    river_review: 0.5,
   };
   let roll = createRng(botDecisionSeed(view, "power-pick"))() *
     slot.offers.reduce((sum, offer) => sum + weights[offer], 0);
@@ -44,7 +45,7 @@ export function decideBotPowerUse(
   if (!canUsePower(state, botId, nowMs)) return null;
   const seat = state.seats.findIndex((candidate) => candidate.id === botId);
   const held = state.powers?.held[botId];
-  if (seat < 0 || held === undefined || POWER_UPS[held.id].family === "spotlight") return null;
+  if (seat < 0 || held === undefined || POWER_UPS[held.id].family === "spotlight" || POWER_UPS[held.id].family === "review") return null;
   const view = observeBot(state, seat, state.betting ?? { currentBet: 0, lastRaiseSize: 0 });
   if (view.privateTiles.length === 0) return null;
   const best = evaluateBestWord({ available: [...view.privateTiles, ...view.board], dictionary: view.dictionary });

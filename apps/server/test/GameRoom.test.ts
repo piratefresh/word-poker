@@ -1447,6 +1447,32 @@ describe("GameRoom", () => {
       return { use, target, swap };
     }
 
+    it("shows River Review to its holder alone once the hand pays out", async () => {
+      const table = await wildTable(4_990);
+      const [holder, other] = table.clients;
+      holder!.send(GAME_MESSAGES.pickPower, { actionId: "pick-rr", handId: 1, powerUpId: "river_review" });
+      other!.send(GAME_MESSAGES.pickPower, { actionId: "pick-wild", handId: 1, powerUpId: "random_wild" });
+      await until(() => table.room.state.toActSeat >= 0, "pre-flop to start");
+      const actor = table.clients.find(
+        (client) => table.room.state.seats.get(client.sessionId)?.seat === table.room.state.toActSeat,
+      )!;
+      actor.send(GAME_MESSAGES.betting, { type: "fold" });
+
+      const review = await until(
+        () => last<PrivateSeatState>(table.inboxOf(holder!), GAME_EVENTS.privateState)?.power?.review,
+        "the holder's review",
+      );
+      assert.ok(review.length > 0 && review.length <= 3, "at most three words");
+      assert.ok(review.every((entry, index) => index === 0 || review[index - 1]!.score >= entry.score));
+      const state = last<PrivateSeatState>(table.inboxOf(holder!), GAME_EVENTS.privateState)!;
+      assert.strictEqual(state.power?.held?.used, true, "the chip reads Used");
+      assert.strictEqual(
+        last<PrivateSeatState>(table.inboxOf(other!), GAME_EVENTS.privateState)?.power?.review,
+        undefined,
+        "the other seat is told nothing",
+      );
+    });
+
     it("deals each seat its own three offers, privately, and holds the turn until the draw closes", async () => {
       const table = await wildTable(4_990);
 

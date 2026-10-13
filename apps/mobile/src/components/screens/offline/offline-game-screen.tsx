@@ -17,6 +17,7 @@ import { FREE_PLAY } from "@/components/hud";
 import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
+import { reviewOf } from "@/components/screens/results/river-review";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
@@ -260,7 +261,12 @@ function OfflineTable({
         useful thing left to say once the hero has busted (ADR 0002).
       */}
       {payout && !sessionOver && results !== null && !celebratingWin && xp.hero === null ? (
-        <ResultsScreen onDeal={deal} onExit={leaveTable} snapshot={results} />
+        <ResultsScreen
+          onDeal={deal}
+          onExit={leaveTable}
+          review={reviewOf(powers?.review, game)}
+          snapshot={results}
+        />
       ) : null}
       {sessionOver && xp.hero === null ? <SessionOver game={game} onNewGame={restart} /> : null}
     </WordBuilder>

@@ -917,9 +917,8 @@ describe("reduce — §44's held power", () => {
     assert.ok(state.powers);
     for (const slot of state.powers.draw.slots) {
       if (slot.picked !== null) continue;
-      const powerUpId = slot.offers[0];
-      assert.ok(powerUpId);
-      state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId }, NOW + 1);
+      // Every power is offered, so the CPUs take the one a swap test can act on.
+      state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId: "random_wild" }, NOW + 1);
     }
     return state;
   }

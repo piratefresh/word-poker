@@ -850,7 +850,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     const first = await run();
     expect(await run()).toEqual(first);
     // Seed 7's picks, pinned: Wild for Ellis and Mira, Vowel Magnet for Jay.
-    expect(first).toEqual([["ellis", "random_wild"], ["jay", "vowel_magnet"], ["mira", "random_wild"]]);
+    expect(first).toEqual([["ellis", "blank_tile"], ["jay", "vowel_magnet"], ["mira", "vowel_magnet"]]);
   });
 
   test("preserves a late hero pick and one bot pick when the shared draw deadline supplies the rest", async () => {
@@ -873,9 +873,9 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     for (let step = 0; step < 3; step += 1) await beat();
     const before = result.current.game;
     await beat();
-    const event = { handId: 1, seat: 3, name: "Mira", mine: false, powerUpId: "random_wild", street: "preflop" } as const;
+    const event = { handId: 1, seat: 3, name: "Mira", mine: false, powerUpId: "vowel_magnet", street: "preflop" } as const;
     expect(result.current.powers?.used).toEqual([event]);
-    expect(result.current.game.players[3]?.powerTag).toBe("WILD");
+    expect(result.current.game.players[3]?.powerTag).toBe("VOWEL");
     expect(result.current.game.players[3]?.status).toBe("thinking");
     expect(result.current.game.pot).toBe(before.pot);
     expect(result.current.game.betting).toEqual(before.betting);
@@ -891,7 +891,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     expect(next?.endsAtMs).toBe(deadline);
     expect(next?.powers?.held.mira?.used).toBe(true);
     expect(result.current.game.pot).toBeGreaterThan(before.pot);
-    expect(result.current.game.players[3]?.powerTag).toBe("WILD");
+    expect(result.current.game.players[3]?.powerTag).toBe("VOWEL");
     expect(result.current.game.players[3]?.status).toBe("call");
     expect(JSON.stringify(result.current.game)).not.toContain("power-3");
     await act(async () => result.current.endPowerUsed(event));

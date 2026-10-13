@@ -8,7 +8,7 @@
  */
 
 /** Every power a table can deal, in the order the catalog lists them. */
-export const POWER_UP_IDS = ["random_wild", "vowel_magnet", "blank_tile", "spotlight"] as const;
+export const POWER_UP_IDS = ["random_wild", "vowel_magnet", "blank_tile", "spotlight", "river_review"] as const;
 
 /** One power's stable id — what a command names and an event reports. */
 export type PowerUpId = (typeof POWER_UP_IDS)[number];
@@ -17,8 +17,9 @@ export type PowerUpId = (typeof POWER_UP_IDS)[number];
  * How a power acts, so the engine dispatches on the family rather than on each id. `swapTile`:
  * discard one private tile, receive a plain one (§44, Swapping a Tile). `blankTile` is a swap whose
  * new tile is a blank. `spotlight` targets a dealt community tile and doubles it for everyone.
+ * `review` is never used: the seat that holds it is shown its best words once the hand pays out.
  */
-export type PowerUpFamily = "swapTile" | "blankTile" | "spotlight";
+export type PowerUpFamily = "swapTile" | "blankTile" | "spotlight" | "review";
 
 /**
  * When a held power may be used. `ownTurnOrWordWindow`: on the seat's own betting turn before it
@@ -98,6 +99,18 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     weight: 8,
     window: "ownTurnOrWordWindow",
     family: "spotlight",
+    hostile: false,
+  },
+  river_review: {
+    id: "river_review",
+    title: "River Review",
+    description: "After the hand, see the 3 best words you could have played.",
+    receives: "a review",
+    tag: "REVIEW",
+    icon: "river-review",
+    weight: 6,
+    window: "ownTurnOrWordWindow",
+    family: "review",
     hostile: false,
   },
 };

@@ -71,7 +71,7 @@ describe("offline bot powers (§44)", () => {
   it("pins reviewed picks for rack fit and the three seat personalities", () => {
     // Vowel-less racks favor Vowel Magnet; aggressive Jay also gives Wild more weight.
     for (const [seed, expected] of [
-      [62, ["blank_tile", "vowel_magnet", "blank_tile"]],
+      [62, ["random_wild", "vowel_magnet", "random_wild"]],
       [16, ["vowel_magnet", "vowel_magnet", "vowel_magnet"]],
       [127, ["vowel_magnet", "random_wild", "random_wild"]],
     ] as const) {

@@ -24,7 +24,7 @@ describe("POWER_UPS", () => {
     }
   });
 
-  it("keeps the pool so far: Wild Tile, Vowel Magnet, Blank Tile and Spotlight", () => {
+  it("keeps the pool so far: Wild Tile, Vowel Magnet, Blank Tile, Spotlight and River Review", () => {
     assert.deepStrictEqual(
       POWER_UP_IDS.map((id) => {
         const { title, tag, weight, window, family, hostile } = POWER_UPS[id];
@@ -65,6 +65,15 @@ describe("POWER_UPS", () => {
           weight: 8,
           window: "ownTurnOrWordWindow",
           family: "spotlight",
+          hostile: false,
+        },
+        {
+          id: "river_review",
+          title: "River Review",
+          tag: "REVIEW",
+          weight: 6,
+          window: "ownTurnOrWordWindow",
+          family: "review",
           hostile: false,
         },
       ],

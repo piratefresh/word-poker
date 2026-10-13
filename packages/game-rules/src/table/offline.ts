@@ -568,6 +568,8 @@ function powerUseRefusal(
   const held = powers.held[playerId];
   if (seat === undefined || held === undefined || held.id !== powerUpId) return "not-held";
   if (held.used) return "already-used";
+  // River Review is never used: it reads out at the payout, so no window is ever open for it.
+  if (POWER_UPS[powerUpId].family === "review") return "outside-window";
 
   return powerWindowRefusal(state, seatIndex, playerId, nowMs);
 }

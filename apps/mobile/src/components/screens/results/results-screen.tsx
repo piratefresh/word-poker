@@ -40,6 +40,7 @@ import { RatingCard } from "./rating-card";
 import { ResultCard } from "./result-card";
 import { ResultsActions } from "./results-actions";
 import { ResultsHeader } from "./results-header";
+import { RiverReview, type RiverReviewProps } from "./river-review";
 import { ResultsHeadlineView } from "./results-headline";
 import type { ResultsSnapshot } from "./results-types";
 
@@ -48,12 +49,14 @@ export interface ResultsScreenProps {
   readonly snapshot: ResultsSnapshot;
   /** Leaves for the next hand (the engine's own `deal`). */
   readonly replay?: { readonly requested: number; readonly total: number };
+  /** River Review (§44), for the seat that holds it: drawn under the scoreboard. */
+  readonly review?: RiverReviewProps;
   readonly onDeal: () => void;
   /** Leaves the table for the home tabs — what the back control shares. */
   readonly onExit: () => void;
 }
 
-export function ResultsScreen({ snapshot, replay, onDeal, onExit }: ResultsScreenProps): ReactElement {
+export function ResultsScreen({ snapshot, replay, review, onDeal, onExit }: ResultsScreenProps): ReactElement {
   const insets = useSafeAreaInsets();
   // Frozen here, once: the surface renders the hand it was opened on, whatever the table does
   // next (STO-380's acceptance criterion, and the reason this is a `useState` and not a prop).
@@ -121,6 +124,8 @@ export function ResultsScreen({ snapshot, replay, onDeal, onExit }: ResultsScree
                 />
               ))}
             </View>
+
+            {review === undefined ? null : <RiverReview {...review} />}
 
             {/* The quests this hand completed (STO-525); nothing renders when none did, so
                 `.maestro/offline-hand.yaml` sees the same screen it always has. */}

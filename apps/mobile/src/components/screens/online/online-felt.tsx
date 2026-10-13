@@ -39,6 +39,7 @@ import {
   usePowerTargeting,
 } from "@/components/powers";
 import { GameScreen } from "@/components/screens/game/game-screen";
+import { reviewOf } from "@/components/screens/results/river-review";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
@@ -230,6 +231,7 @@ export function OnlineFelt({
           }}
           onExit={onLeave}
           replay={replay ?? undefined}
+          review={reviewOf(powers?.review, game)}
           snapshot={results}
         />
       ) : null}

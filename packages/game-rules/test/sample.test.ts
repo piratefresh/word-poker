@@ -28,8 +28,8 @@ describe("weightedSampleWithoutReplacement", () => {
   it("keeps the pinned Power Draw for seed 409's first seat", () => {
     const rng = createRng(mixSeed(409, 0, "offer"));
     assert.deepEqual(weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, 3, rng), [
+      "river_review",
       "spotlight",
-      "blank_tile",
       "random_wild",
     ]);
   });

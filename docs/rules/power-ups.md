@@ -72,6 +72,8 @@ differs.
 | Vowel Magnet | VOWEL | A, E, I, O or U, each equally likely | 8 |
 | Blank Tile | BLANK | No letter yet: the seat names one A–Z for the blank when it plays it | 8 |
 
+Spotlight and River Review are not in this family; they have their own sections below.
+
 The tag is what the seat's nameplate prints when the power is used (see Visibility).
 
 ## Blank Tile
@@ -93,6 +95,19 @@ Spotlight does not swap a tile. The seat picks **one dealt community tile** and 
 - Every seat sees the tile's 2× badge, and the table is told who lit which letter: "Jay
   spotlighted the A". Nothing about the seat's own rack is revealed.
 - CPU seats never use Spotlight.
+
+## River Review
+
+River Review is never used. A seat that holds it is shown, once the hand pays out, the **three
+highest-scoring distinct words** it could have played from its two private tiles and the five
+community tiles, best first, each with its score (§7). It is shown whether or not the seat folded,
+and Spotlight's double counts. Its own tiles are drawn gold and the table's cream; the best word is
+highlighted.
+
+- Private: only the holder sees it, with the hand's results. Nothing carries into the next hand.
+- The power reads **Used** once the hand has paid out. It has no activation window, and a use is
+  refused.
+- CPU seats may keep it, and never see anything. Blank tiles are not searched (a blank scores 0).
 
 ## Swapping a Tile
 

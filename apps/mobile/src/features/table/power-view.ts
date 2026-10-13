@@ -17,6 +17,7 @@ import type {
   PowerUpSettings,
   PowerUsedEvent,
   PrivatePowerSwap,
+  RiverReviewWord,
 } from "@wordpoker/contracts";
 
 /**
@@ -56,6 +57,8 @@ export interface PowerView {
   readonly held: { readonly id: PowerUpId; readonly used: boolean; readonly usable: boolean } | null;
   /** What the hero's swap did, once it has used one: the flip reads it. Private to the hero. */
   readonly swap: PrivatePowerSwap | null;
+  /** River Review, once the hand has paid out: the hero's best words, best first. Private to the hero. */
+  readonly review: readonly RiverReviewWord[] | null;
   /**
    * The public "power used" events of this hand the felt has not shown yet, oldest first: the
    * center-of-felt card plays them in order and reports each one back when it clears.

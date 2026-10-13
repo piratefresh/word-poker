@@ -172,6 +172,7 @@ export {
   type PrivatePowerDraw,
   type PrivatePowerState,
   type PrivatePowerSwap,
+  type RiverReviewWord,
   type PrivateSeatState,
   type PrivateWordState,
 } from "./online";
