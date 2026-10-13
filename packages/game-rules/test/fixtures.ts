@@ -18,13 +18,13 @@ export const TEST_WORDS = ["AA", "QI", "STRONG", "MONSTER"] as const;
  * The list is sorted here because the artifact contract is a strictly ascending list, and a
  * test should not have to spell its words in order to be valid.
  */
-export function testDictionary(words: readonly string[]): Dictionary {
+export function testDictionary(words: readonly string[], sha256 = "test fixture"): Dictionary {
   const sorted = [...words].sort();
 
   return createDictionary({
     id: "en_US-large",
     label: DICTIONARIES["en_US-large"].label,
-    source: { file: "test fixture", sha256: "test fixture", lines: sorted.length },
+    source: { file: "test fixture", sha256, lines: sorted.length },
     count: sorted.length,
     words: sorted,
   });
