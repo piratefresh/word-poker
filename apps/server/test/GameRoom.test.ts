@@ -1780,6 +1780,47 @@ describe("GameRoom", () => {
       assert.strictEqual(Number(count?.count), 1, "exactly one record for the hand");
     });
 
+    it("records fresh hand sequences in distinct sessions after a lineup change", async function (this: Mocha.Context) {
+      this.timeout(20_000);
+      assert.ok(historyUrl);
+      const room = await colyseus.createRoom("game", { name: "History Lineup", buyIn: 500, maxSeats: 3, tickMs: 5 });
+      const clients = [await colyseus.connectTo(room), await colyseus.connectTo(room)];
+      await readyUp(room, clients);
+      const firstSession = sessionIdOf(room);
+      clients[0].send(GAME_MESSAGES.betting, { type: "fold" });
+      for (let patch = 0; patch < 40 && room.state.phase !== "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, "payout");
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 600 && room.state.phase === "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+
+      clients.push(await colyseus.connectTo(room));
+      await readyUp(room, clients);
+      const secondSession = sessionIdOf(room);
+      assert.notStrictEqual(secondSession, firstSession);
+      for (let folds = 0; folds < 2; folds += 1) {
+        const acting = clients.find((client) => room.state.seats.get(client.sessionId)?.seat === room.state.toActSeat);
+        assert.ok(acting);
+        acting.send(GAME_MESSAGES.betting, { type: "fold" });
+        await room.waitForNextPatch();
+      }
+      for (let patch = 0; patch < 40 && room.state.phase !== "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, "payout");
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      for (let patch = 0; patch < 600 && room.state.phase === "payout"; patch += 1) await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+
+      const db = (await getOrm(historyUrl)).em.getConnection();
+      const sessions = await db.execute<{ id: string }[]>(
+        `select "id" from "game_session" where "id" in (?, ?)`, [firstSession, secondSession],
+      );
+      assert.strictEqual(sessions.length, 2);
+      const hands = await db.execute<{ hand_no: number }[]>(
+        `select "hand_no" from "game_hand" where "session_id" in (?, ?)`, [firstSession, secondSession],
+      );
+      assert.deepStrictEqual(hands.map((hand) => hand.hand_no), [1, 1]);
+    });
+
     it("records a timeout-driven settlement with the clock as the action's source", async function (this: Mocha.Context) {
       this.timeout(20_000);
       assert.ok(historyUrl);

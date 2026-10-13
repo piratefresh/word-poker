@@ -377,6 +377,10 @@ export function useOfflineGame({
             setHistoryError(null);
             void capture(record).then(() => {
               retrySave.current = null;
+              noteSeatAction(current, action);
+              const used = powerUsedBy(current, action);
+              if (used !== null) setPowerEvents((live) => [...live, used]);
+              setRefusal(null);
               commit(current, next);
               saving.current = false;
             }, (error: unknown) => {

@@ -115,8 +115,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private awaitingReady = false;
   /** Power commands already answered, by `${playerId}:${actionId}`. Pruned as hands go by. */
   private readonly powerLedger = new Map<string, PowerLedgerEntry>();
-  /** The session every hand this room records belongs to (STO-453: minted once at creation). */
-  private readonly sessionId = randomUUID();
+  /** The history session for the engine's current hand sequence (STO-453). */
+  private sessionId = randomUUID();
   /** STO-455: holds every settlement until it is durable, and gates the room's advancement. */
   private settlements!: SettlementRecorder;
 
@@ -448,6 +448,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         return;
       }
     } else {
+      this.sessionId = randomUUID();
       this.authoritative.start(players, this.now(), 0);
     }
     for (const binding of this.bindings.values()) {

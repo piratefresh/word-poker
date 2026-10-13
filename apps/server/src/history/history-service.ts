@@ -42,7 +42,13 @@ export class HistoryService implements HistoryWriter {
 
   /** Recovery needs no surviving room or connected client. Failed entries remain on disk. */
   async recoverPending(): Promise<void> {
-    for (const record of this.journal?.records() ?? []) await this.recordHand(record);
+    for (const record of this.journal?.records() ?? []) {
+      try {
+        await this.recordHand(record);
+      } catch (error) {
+        console.error(`history: recovery of hand ${record.handNo} (session ${record.sessionId}) failed`, error);
+      }
+    }
   }
 
   async recordHand(record: HandRecord): Promise<"recorded" | "duplicate"> {

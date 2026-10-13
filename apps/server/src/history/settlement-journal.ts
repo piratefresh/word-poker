@@ -22,11 +22,17 @@ export class SettlementJournal {
   }
 
   records(): HandRecord[] {
-    return readdirSync(this.directory).filter((name) => name.endsWith(".json")).map((name) => {
-      const record: unknown = JSON.parse(readFileSync(join(this.directory, name), "utf8"));
-      if (!isHandRecord(record)) throw new Error(`invalid settlement journal entry: ${name}`);
-      return record;
-    });
+    const records: HandRecord[] = [];
+    for (const name of readdirSync(this.directory).filter((name) => name.endsWith(".json"))) {
+      try {
+        const record: unknown = JSON.parse(readFileSync(join(this.directory, name), "utf8"));
+        if (!isHandRecord(record)) throw new Error(`invalid settlement journal entry: ${name}`);
+        records.push(record);
+      } catch (error) {
+        console.error(`history: reading settlement journal entry ${name} failed`, error);
+      }
+    }
+    return records;
   }
 
   acknowledge(record: HandRecord): void {

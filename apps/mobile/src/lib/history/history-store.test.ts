@@ -64,3 +64,31 @@ test("an ambiguous upload stays pending, and switching accounts never sends its 
   await expect(syncHistory("a", () => {})).rejects.toThrow("Sign in to this account");
   expect(fetchMock).not.toHaveBeenCalled();
 });
+
+test("a non-JSON permanent rejection does not block later uploads or the history pull", async () => {
+  const accepted = settled();
+  const rejected = { ...settled(), endedAtMs: accepted.endedAtMs + 1 };
+  await captureHistoryHand("a", rejected);
+  await captureHistoryHand("a", accepted);
+  const fetchMock = jest.fn()
+    .mockResolvedValueOnce({ ok: false, status: 413, json: async () => { throw new SyntaxError("HTML response"); } })
+    .mockResolvedValueOnce({ ok: true, json: async () => historyHand(accepted, accepted.sessionId, "hero") })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ hands: [], cursor: null, hasMore: false }) });
+  global.fetch = fetchMock;
+  await syncHistory("a", () => {});
+  const rows = await localHistory("a");
+  expect(rows.find((row) => row.hand.sessionId === rejected.sessionId)).toMatchObject({
+    status: "rejected", error: "Hand upload failed.", attempts: 1,
+  });
+  expect(rows.find((row) => row.hand.sessionId === accepted.sessionId)?.status).toBe("synced");
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+test("a non-JSON gateway failure remains retryable with the upload error", async () => {
+  await captureHistoryHand("a", settled());
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: false, status: 502, json: async () => { throw new SyntaxError("HTML response"); },
+  });
+  await expect(syncHistory("a", () => {})).rejects.toThrow("Hand upload failed.");
+  expect((await localHistory("a"))[0]).toMatchObject({ status: "pending", error: "Hand upload failed.", attempts: 1 });
+});

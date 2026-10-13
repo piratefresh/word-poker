@@ -11,7 +11,7 @@
  * in `after`. Skipped entirely when no server is configured.
  */
 import assert from "assert";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SettlementJournal } from "../src/history/settlement-journal.js";
@@ -66,6 +66,22 @@ function record(overrides: Partial<HandRecord> = {}): HandRecord {
     ...overrides,
   };
 }
+
+describe("SettlementJournal", () => {
+  it("reads valid settlements even when other journal entries are corrupt or invalid", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "history-corrupt-"));
+    try {
+      const journal = new SettlementJournal(directory);
+      const hand = record();
+      journal.capture(hand);
+      await writeFile(join(directory, "000-corrupt.json"), "{");
+      await writeFile(join(directory, "001-invalid.json"), "{}");
+      assert.deepStrictEqual(journal.records(), [hand]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("HistoryService (STO-455)", function () {
 
@@ -184,6 +200,27 @@ describe("HistoryService (STO-455)", function () {
         [pending.sessionId, committed.sessionId],
       );
       assert.strictEqual(Number(row?.count), 2);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("recovers later entries after a conflicting journal record and retains the conflict", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "history-conflict-"));
+    try {
+      const journal = new SettlementJournal(directory);
+      journal.capture(record());
+      journal.capture(record());
+      const [conflicting, pending] = journal.records();
+      await service.recordHand({ ...conflicting, seed: conflicting.seed + 1 });
+      const restarted = new HistoryService(await getOrm(historyUrl), journal);
+      await restarted.recoverPending();
+      assert.deepStrictEqual(journal.records(), [conflicting]);
+      const [row] = await (await getOrm(historyUrl)).em.getConnection().execute<{ count: string }[]>(
+        `select count(*) as count from "game_hand" where "session_id" = ?`,
+        [pending.sessionId],
+      );
+      assert.strictEqual(Number(row?.count), 1);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

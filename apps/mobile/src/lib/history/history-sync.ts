@@ -35,7 +35,7 @@ async function run(ownerId: string, changed: () => void): Promise<void> {
     if (row.status !== "pending" || !row.record || row.retryAtMs > Date.now()) continue;
     try {
       const response = await request(ownerId, "", row.record);
-      const body: unknown = await response.json();
+      const body: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         const error = typeof body === "object" && body && "error" in body ? String(body.error) : "Hand upload failed.";
         await historyRetry(ownerId, localHistoryId(row.hand), error, [400, 409, 413, 422].includes(response.status), row.attempts + 1);
