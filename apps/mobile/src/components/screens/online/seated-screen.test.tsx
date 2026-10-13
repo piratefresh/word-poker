@@ -34,6 +34,7 @@ const mockDismissTo = jest.fn();
 
 // `useActiveRoomId` is the seat the session holds — the session's `seated` room, or none. The
 // screen asks it before joining, so a test seated at the routed room must not see a join.
+jest.mock("@/components/screens/results/simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
 jest.mock("@/features/online/room-session", () => ({
   joinTable: (roomId: string) => mockJoinTable(roomId),
   leaveTable: () => mockLeaveTable(),

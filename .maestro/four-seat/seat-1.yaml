@@ -6,13 +6,13 @@
 #
 #   pnpm --filter @wordpoker/server exec tsx scripts/probe-four-seat.ts
 #
-# Probe for seed 4111 (WORDPOKER_SMOKE_ROOM supplies it; 500 buy-in, blinds 5/10):
-#   Hand 1  board A/I L E A A     P1 R U (folds)   P2 D/T X -> DX 11   P3 Y I -> YALE 9
-#           P4 O A -> ILEA 5      P2 wins; pot 120; stacks 500 / 580 / 460 / 460
-#   Hand 2  board A X D R O/U     P1 R R/N -> RX 12   P2 T O -> TAX 13   P3 K A/I -> AX 10
-#           P4 T D (folds)        P2 wins; pots 40 + 1350 + side 20; P3 busts
-#   Hand 3  board E/I A L I K     P1 A R -> ARAK 9   P2 T/S W -> TWEAK 16   P4 G C -> CALK 12
-#           P3 sits out and leaves; P2 wins; the leave returns the table to waiting
+# Probe for seed 98 (WORDPOKER_SMOKE_ROOM supplies it; 500 buy-in, blinds 5/10):
+#   Hand 1  board A R E/I Y F     P1 I D (folds)   P2 J/H R/N -> JAY 14   P3 A N -> NARY 10
+#           P4 E A -> ERY 8       P2 wins; pot 120; stacks 500 / 580 / 460 / 460
+#   Hand 2  board N I D A A/I     P1 S S -> NIDI 7   P2 H E -> HEIDI 16   P3 O Q -> QI 11
+#           P4 D/T Z (folds)      P2 wins; pots 40 + 1350 + side 20; P3 busts
+#   Hand 3  board I E L E/I U     P1 A C -> ACLU 10   P2 X N -> XL 12   P4 D Z/X -> DZ 16
+#           P3 sits out and leaves; P4 wins; the leave returns the table to waiting
 #   Hand 4  P1, P2 and P4 ready again and the table deals 3-handed.
 #
 # Words are tapped in strip order (rack, then board): a tap never moves a tile. Tiles are taken by
@@ -37,9 +37,12 @@ tags:
     env: { ACTION: fold }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "1", WORD: DX }
+    env: { HAND: "1", WORD: JAY }
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
 
-# Hand 2: limp, call P3's shove, bet the flop into the side pot, check it down, spell RX.
+# Hand 2: limp, call P3's shove, bet the flop into the side pot, check it down, spell NIDI.
 - runFlow:
     file: _act.yaml
     env: { ACTION: check-call }
@@ -57,17 +60,24 @@ tags:
     env: { ACTION: check-call }
 - runFlow: _river.yaml
 - tapOn:
-    id: "word-builder-face-RN-1-R"
+    id: "word-builder-tile-N-1"
 - tapOn:
-    id: "word-builder-tile-X-1"
+    id: "word-builder-tile-I-6"
+- tapOn:
+    id: "word-builder-tile-D-4"
+- tapOn:
+    id: "word-builder-face-AI-1-I"
 - runFlow:
     file: _confirm.yaml
-    env: { HAND: "2", WORD: RX }
+    env: { HAND: "2", WORD: NIDI }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "2", WORD: TAX }
+    env: { HAND: "2", WORD: HEIDI }
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
 
-# Hand 3: the small blind completes, checks it down, spells ARAK.
+# Hand 3: the small blind completes, checks it down, spells ACLU.
 - runFlow:
     file: _act.yaml
     env: { ACTION: check-call }
@@ -82,19 +92,19 @@ tags:
     env: { ACTION: check-call }
 - runFlow: _river.yaml
 - tapOn:
-    id: "word-builder-tile-A-7"
+    id: "word-builder-tile-A-6"
 - tapOn:
-    id: "word-builder-tile-R-4"
+    id: "word-builder-tile-C-1"
 - tapOn:
-    id: "word-builder-tile-A-9"
+    id: "word-builder-tile-L-1"
 - tapOn:
-    id: "word-builder-tile-K-1"
+    id: "word-builder-tile-U-1"
 - runFlow:
     file: _confirm.yaml
-    env: { HAND: "3", WORD: ARAK }
+    env: { HAND: "3", WORD: ACLU }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "3", WORD: TWEAK }
+    env: { HAND: "3", WORD: DZ }
 
 # P3 left: back to the waiting room, the three seats ready up, and hand 4 deals 3-handed.
 - runFlow:

@@ -43,6 +43,8 @@ export const SeatState = schema({
   sittingOut: t.boolean().default(false),
   actedThisRound: t.boolean().default(false),
   ready: t.boolean().default(false),
+  seenResults: t.boolean().default(false),
+  present: t.boolean().default(true),
 }, "SeatState");
 export type SeatState = SchemaType<typeof SeatState>;
 

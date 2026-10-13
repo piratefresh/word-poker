@@ -43,13 +43,6 @@ import { GameRoomState } from "./schema/GameRoomState.js";
 import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
-/**
- * How long a paid-out hand stays on the felt before the room deals again: the clients present the
- * results over it (STO-430), and a hold shorter than a read would deal the next hand, and start
- * its turn clock, behind a scoreboard nobody has finished.
- */
-const DEFAULT_PAYOUT_DELAY_MS = 8_000;
-const HOLD_RECHECK_MS = 1_000;
 /** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
 const MIN_PLAYERS = 2;
 
@@ -66,6 +59,8 @@ interface SeatBinding {
   tableStack: number;
   /** Said ready in the waiting room. Cleared every time the table goes back to waiting. */
   ready: boolean;
+  /** Put away the paid-out hand's results. Cleared whenever the table is off its payout. */
+  seenResults: boolean;
 }
 
 /**
@@ -85,7 +80,6 @@ interface PowerLedgerEntry {
 
 interface RoomKnobs {
   seed?: unknown;
-  payoutDelay?: unknown;
   turnDuration?: unknown;
   reconnectSeconds?: unknown;
   tickMs?: unknown;
@@ -108,14 +102,14 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private seed = 1;
   private turnDuration = OFFLINE_TURN_MS;
   private reconnectSeconds = DEFAULT_RECONNECT_SECONDS;
-  private payoutDelay = DEFAULT_PAYOUT_DELAY_MS;
   private tickMs = 50;
-  private payoutReadyAtMs: number | null = null;
+  /** Keep the settled engine hand for the next deal while projecting the ready screen. */
+  private awaitingReady = false;
   /** Power commands already answered, by `${playerId}:${actionId}`. Pruned as hands go by. */
   private readonly powerLedger = new Map<string, PowerLedgerEntry>();
 
   private get game() {
-    return this.engine?.state ?? null;
+    return this.awaitingReady ? null : this.engine?.state ?? null;
   }
 
   private get authoritative(): AuthoritativeGame {
@@ -179,6 +173,12 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       );
     },
     [GAME_MESSAGES.ready]: (client: Client, payload: unknown) => this.onReady(client, payload),
+    [GAME_MESSAGES.resultsSeen]: (client: Client) => {
+      const binding = this.bindings.get(client.sessionId);
+      if (binding === undefined || !binding.present || !binding.connected || this.game?.phase !== "payout") return;
+      binding.seenResults = true;
+      this.project();
+    },
     [GAME_MESSAGES.pickPower]: (client: Client, payload: unknown) => {
       if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.pickPower, payload)) return;
       this.powerCommand(client, "pickPower", payload);
@@ -195,7 +195,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     if (binding === undefined || !binding.present || !binding.connected) return;
     if (!this.isPayload(GAME_MESSAGES.ready, payload)) return;
     // Once a hand is dealt the question is settled; a late toggle changes nothing.
-    if (this.game !== null) return;
+    if (this.game !== null && !(this.game.phase === "payout" && binding.seenResults)) return;
 
     binding.ready = payload.ready;
     this.project();
@@ -232,13 +232,6 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       this.seed = knobs.seed;
     } else {
       this.seed = randomSeed();
-    }
-    if (
-      typeof knobs.payoutDelay === "number" &&
-      Number.isFinite(knobs.payoutDelay) &&
-      knobs.payoutDelay >= 0
-    ) {
-      this.payoutDelay = knobs.payoutDelay;
     }
     if (
       typeof knobs.turnDuration === "number" &&
@@ -286,6 +279,12 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table has no free seat");
     }
 
+    // A changed lineup starts from the held stacks, rather than the previous hand's seats.
+    if (this.awaitingReady) {
+      this.authoritative.clear();
+      this.awaitingReady = false;
+    }
+
     // Engine actions keep using the connection id; history uses the verified account id.
     this.bindings.set(client.sessionId, {
       playerId: client.sessionId,
@@ -296,6 +295,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       present: true,
       tableStack: this.table.buyIn,
       ready: false,
+      seenResults: false,
     });
     this.project();
     this.sendPrivateStateLater(client);
@@ -324,6 +324,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     binding.connected = true;
     this.project();
     this.sendPrivateState(client);
+    this.startWhenReady();
   }
 
   onLeave(client: Client, _code: CloseCode) {
@@ -334,11 +335,14 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     binding.present = false;
 
     if (this.game === null) {
+      this.authoritative.clear();
+      this.awaitingReady = false;
       this.bindings.delete(client.sessionId);
       this.project();
       this.publishPhase();
       // The seat that left may have been the last one the rest were waiting on.
       this.startWhenReady();
+      this.closeIfEmpty();
       return;
     }
 
@@ -348,6 +352,12 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     // deadline folds it if it is still to act when its clock runs out (§29, ADR 0006).
     this.authoritative.foldDepartedSeat(client.sessionId, this.now());
     this.project();
+    this.closeIfEmpty();
+  }
+
+  /** Nobody left at the table (reconnect holds included): close the room instead of idling. */
+  private closeIfEmpty() {
+    if (this.presentBindings().length === 0) void this.disconnect();
   }
 
   /**
@@ -359,32 +369,50 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     const present = this.presentBindings();
     if (present.length < MIN_PLAYERS) return;
     if (!present.every((binding) => binding.ready && binding.connected)) return;
-    this.startFirstHand();
+    this.startHand();
   }
 
   /** Back to the waiting room: everyone says ready again before the next deal. */
-  private returnToWaiting() {
-    this.authoritative.clear();
+  private returnToWaiting(preserveHand = false) {
+    if (!preserveHand) this.authoritative.clear();
+    this.awaitingReady = preserveHand;
     this.powerLedger.clear();
     for (const [playerId, binding] of this.bindings) {
       if (!binding.present) this.bindings.delete(playerId);
-      else binding.ready = false;
+      else {
+        if (!preserveHand) binding.ready = false;
+        binding.seenResults = false;
+      }
     }
     this.project();
     this.publishPhase();
     this.sendPrivateStates();
   }
 
-  private startFirstHand() {
+  private startHand() {
     const players: AuthoritativePlayer[] = this.presentBindings().map((binding) => ({
       playerId: binding.playerId,
       stack: binding.tableStack,
     }));
-    this.authoritative.start(players, this.now(), 0);
+    if (this.awaitingReady) {
+      this.awaitingReady = false;
+      this.authoritative.dealNext(this.now());
+      if (this.game?.sessionOver === true) {
+        this.returnToWaiting();
+        return;
+      }
+    } else {
+      this.authoritative.start(players, this.now(), 0);
+    }
+    for (const binding of this.bindings.values()) {
+      binding.ready = false;
+      binding.seenResults = false;
+    }
     this.syncStacks();
     this.project();
     this.publishPhase();
     this.sendPrivateStatesLater();
+    this.prunePowerLedger();
     this.clock.setTimeout(() => this.sendPowerDraws(), 0);
   }
 
@@ -437,8 +465,6 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       const game = this.game;
       if (game === null) return;
 
-      if (game.phase !== "payout") this.payoutReadyAtMs = null;
-
       // §44: nobody is on the clock while the Power Draw is open; its own clock is the deadline.
       const draw = game.powers?.draw;
       if (draw?.status === "open") {
@@ -456,9 +482,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         return;
       }
 
-      if (game.phase === "payout") {
-        if (this.payoutReadyAtMs === null) this.payoutReadyAtMs = now + this.payoutDelay;
-        else if (now >= this.payoutReadyAtMs) this.startNextHandOrWait();
+      if (game.phase === "payout" && this.presentBindings().every((binding) => binding.seenResults)) {
+        this.finishResults();
       }
     } catch (error) {
       console.error("room tick failed", error);
@@ -505,7 +530,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     }
   }
 
-  private startNextHandOrWait(): void {
+  private finishResults(): void {
     const game = this.game;
     if (game === null || game.phase !== "payout") return;
     this.syncStacks();
@@ -516,26 +541,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       this.returnToWaiting();
       return;
     }
-    if (!present.every((binding) => binding.connected)) {
-      // §29's hold spans the gap between hands too: a dropped seat keeps its seat and stack, so
-      // the table waits for it to come back or for its hold to expire (onLeave then takes the
-      // under-full path above) instead of dealing hands it will only fold away.
-      this.payoutReadyAtMs = this.now() + HOLD_RECHECK_MS;
-      return;
-    }
-    this.authoritative.dealNext(this.now());
-    if (this.game?.sessionOver === true) {
-      // §27/§28: a busted seat re-buys or leaves between hands, and the wallet is Epic B's — so
-      // the room holds each seat's ended stack and waits rather than dealing a hand nobody can pay.
-      this.returnToWaiting();
-      return;
-    }
-    this.syncStacks();
-    this.project();
-    this.publishPhase();
-    this.sendPrivateStates();
-    this.prunePowerLedger();
-    this.sendPowerDraws();
+    this.returnToWaiting(true);
+    this.startWhenReady();
   }
 
   /**
@@ -744,6 +751,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       connected: binding.connected,
       tableStack: binding.tableStack,
       ready: binding.ready,
+      seenResults: binding.seenResults,
+      present: binding.present,
     }));
   }
 

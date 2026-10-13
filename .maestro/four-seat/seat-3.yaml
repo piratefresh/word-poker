@@ -12,7 +12,7 @@ tags:
     file: _ready.yaml
     env: { SEATS: "4" }
 
-# Hand 1: the big blind calls the re-raise and the flop bet, checks it down, spells YALE, loses.
+# Hand 1: the big blind calls the re-raise and the flop bet, checks it down, spells NARY, loses.
 - runFlow:
     file: _act.yaml
     env: { ACTION: check-call }
@@ -27,19 +27,22 @@ tags:
     env: { ACTION: check-call }
 - runFlow: _river.yaml
 - tapOn:
-    id: "word-builder-tile-Y-1"
+    id: "word-builder-tile-N-3"
 - tapOn:
-    id: "word-builder-face-AI-1-A"
+    id: "word-builder-tile-A-4"
 - tapOn:
-    id: "word-builder-tile-L-4"
+    id: "word-builder-tile-R-3"
 - tapOn:
-    id: "word-builder-tile-E-5"
+    id: "word-builder-tile-Y-2"
 - runFlow:
     file: _confirm.yaml
-    env: { HAND: "1", WORD: YALE }
+    env: { HAND: "1", WORD: NARY }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "1", WORD: DX }
+    env: { HAND: "1", WORD: JAY }
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
 
 # Hand 2: the small blind shoves its 460. P1 and P2 bet on past it, into a side pot it cannot win.
 - runFlow: _all-in.yaml
@@ -48,15 +51,18 @@ tags:
     timeout: 150000
 - runFlow: _river.yaml
 - tapOn:
-    id: "word-builder-face-AI-1-A"
+    id: "word-builder-tile-Q-1"
 - tapOn:
-    id: "word-builder-tile-X-1"
+    id: "word-builder-tile-I-6"
 - runFlow:
     file: _confirm.yaml
-    env: { HAND: "2", WORD: AX }
+    env: { HAND: "2", WORD: QI }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "2", WORD: TAX }
+    env: { HAND: "2", WORD: HEIDI }
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
 
 # Hand 3 is dealt without it: the seat reads BUSTED, sees the hand start, and leaves the table.
 - extendedWaitUntil:

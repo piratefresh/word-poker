@@ -1,5 +1,4 @@
-import { fireEvent, render, type RenderResult } from "@testing-library/react-native";
-import { Modal } from "react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { resultsEntrance } from "@/constants/theme";
@@ -150,17 +149,26 @@ describe("<ResultsScreen />", () => {
 });
 
 describe("<ResultsActions />", () => {
+  test("updates the replay count while keeping the scoreboard frozen", async () => {
+    const snapshot = snapshotFixture({ pot: 80 });
+    const onDeal = jest.fn();
+    const view = await render(<ResultsScreen snapshot={snapshot} onDeal={onDeal} onExit={jest.fn()} replay={{ requested: 0, total: 4 }} />);
+    expect(view.getByTestId("results-deal")).toHaveTextContent("PLAY ANOTHER 0/4");
+    await view.rerender(<ResultsScreen snapshot={snapshotFixture({ pot: 240 })} onDeal={onDeal} onExit={jest.fn()} replay={{ requested: 1, total: 4 }} />);
+    expect(view.getByTestId("results-deal")).toHaveTextContent("PLAY ANOTHER 1/4");
+    expect(view.getByTestId("results-deal").props.accessibilityLabel).toContain("1 of 4 players");
+    expect(view.queryByText("$240", { includeHiddenElements: true })).toBeNull();
+    await fireEvent.press(view.getByTestId("results-deal"));
+    expect(onDeal).toHaveBeenCalledTimes(1);
+  });
+
   /** The row on its own, so the gate can be held on either side of the sequence settling. */
   async function renderActions(ready: boolean) {
     const onDeal = jest.fn();
-    const view = await render(
-      <ResultsActions
-        clock={useSharedValue(1)}
-        onDeal={onDeal}
-        onExit={jest.fn()}
-        ready={ready}
-      />,
-    );
+    function Actions() {
+      return <ResultsActions clock={useSharedValue(1)} onDeal={onDeal} onExit={jest.fn()} ready={ready} />;
+    }
+    const view = await render(<Actions />);
     return { view, onDeal };
   }
 

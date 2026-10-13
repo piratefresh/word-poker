@@ -14,6 +14,7 @@ import { POWER_USED_BEATS } from "@/components/powers/power-used";
 import { OfflineGameScreen } from "./offline-game-screen";
 
 // Keep the Continue interaction real while omitting Rive's native renderer.
+jest.mock("@/components/screens/results/simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
 jest.mock("@/components/screens/results/simple-win-result-rive", () => ({
   SimpleWinResultRive: () => null,
 }));

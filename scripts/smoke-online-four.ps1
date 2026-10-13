@@ -29,7 +29,7 @@ try {
   Write-Host "Logs: $logDirectory"
   # The lobby form cannot send a seed; the server takes the smoke's knobs from here instead.
   # Keep in step with FOUR_SEAT_ROOM in apps/server/scripts/four-seat-scenario.ts.
-  $env:WORDPOKER_SMOKE_ROOM = '{"seed":4111,"payoutDelay":20000,"turnDuration":120000}'
+  $env:WORDPOKER_SMOKE_ROOM = '{"seed":98,"turnDuration":120000}'
   Start-SmokeServers
 
   $null = Start-SmokeProcess 'lobby-watch' 'pnpm --filter @wordpoker/server exec tsx scripts/smoke-lobby-watch.ts'

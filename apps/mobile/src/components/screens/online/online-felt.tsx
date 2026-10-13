@@ -11,10 +11,11 @@
  * The room deals once every seat has (two at least), and the row turns into the betting controls.
  *
  * Authority is the server's: every control here dispatches to the room and waits for the
- * broadcast to reflect it. There is no deal and no new-game — the room deals the next hand on its
- * own clock. At payout the felt presents the same results surface the offline table does, off
- * the room's own reveal (STO-430): DEAL ANOTHER only closes it, since the deal is the room's,
- * and the next deal closes it anyway. Leaving goes through the session so the seat is released,
+ * broadcast to reflect it. At payout the felt presents the same results surface the offline
+ * table does, off the room's own reveal (STO-430). PLAY ANOTHER shows the live replay count
+ * and moves just that player to I'M READY. Others keep their scores open until they choose
+ * to continue too; the server waits for every remaining seat to leave results and ready up.
+ * Leaving goes through the session so the seat is released,
  * then back to the lobby.
  *
  * At a Wild table (§44) the felt carries the same power surfaces as the offline table — the Power
@@ -23,9 +24,10 @@
  */
 
 import { router } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { GAME_MESSAGES } from "@wordpoker/contracts";
 import type { Dictionary } from "@wordpoker/game-rules";
 
 import {
@@ -77,6 +79,7 @@ export function OnlineFelt({
   const {
     game,
     results,
+    replay,
     words,
     wordCheck,
     waiting,
@@ -105,9 +108,6 @@ export function OnlineFelt({
   const choosing = power.targeting.stage === "picking";
   const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
-  // The hand whose results the seat has put away: the room keeps the payout on the felt until it
-  // deals again, so a dismissed hand must not reopen on the next patch.
-  const [dismissed, setDismissed] = useState<number | null>(null);
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
   const connection = useRoomConnection(room);
@@ -223,10 +223,13 @@ export function OnlineFelt({
   return (
     <View style={styles.root}>
       {body}
-      {results !== null && results.hand !== dismissed && !celebratingWin && xp.hero === null ? (
+      {waiting === null && results !== null && !celebratingWin && xp.hero === null ? (
         <ResultsScreen
-          onDeal={() => setDismissed(results.hand)}
+          onDeal={() => {
+            room.send(GAME_MESSAGES.resultsSeen);
+          }}
           onExit={onLeave}
+          replay={replay ?? undefined}
           snapshot={results}
         />
       ) : null}

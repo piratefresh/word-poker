@@ -1,5 +1,5 @@
 # Subflow: read hand HAND's results, check the winning WORD is on the scoreboard, and put the
-# overlay away. The room deals the next hand on its own after the smoke's 20-second payout.
+# overlay away. Each player then readies up before the next hand.
 #
 # The wait is long on purpose: four browsers play one table, one seat at a time, and a hand runs
 # its four streets through all of them before it pays out — a street costs the room whole seconds
@@ -15,5 +15,5 @@ name: Four-seat - results
 - assertVisible:
     text: ".*${WORD}.*"
 - tapOn:
-    id: "Deal another hand"
+    id: "Play another hand, [0-9]+ of [0-9]+ players want to play again"
 - waitForAnimationToEnd

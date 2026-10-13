@@ -188,11 +188,17 @@ have sat down, around an empty felt. Where the betting controls will be, the pla
 control: **I'M READY** (tapping again takes it back, **NOT READY**).
 
 - Each seat's nameplate shows **READY** once that player has said so.
-- The first hand is dealt when **every** seated player is ready and at least **2** are seated.
+- Each hand is dealt when **every** seated player is ready and at least **2** are seated.
   The table does not wait to fill its seat cap.
 - One seat that is not ready holds the deal. So does a seat that has disconnected.
 - If the table goes back to waiting (a player leaves between hands, or the session ends),
   every player says ready again before the next deal.
+
+Online results stay open until that player clicks **PLAY ANOTHER** or leaves the table.
+The button shows how many seated players chose to continue (for example, **PLAY ANOTHER 1/4**).
+Clicking it takes that player to **I'M READY**, while others may keep reading their scores.
+The next hand waits until every remaining player has left results and explicitly said ready.
+A player may ready up while others are still reading; that readiness is retained.
 
 ## Blinds
 

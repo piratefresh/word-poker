@@ -1,7 +1,7 @@
 /**
  * results-actions.tsx — the two ways out of the results screen.
  *
- * `DEAL ANOTHER` is the gold primary and the only deal left on the table: the felt's payout
+ * `PLAY ANOTHER` (online) or `DEAL ANOTHER` (offline) is the gold primary and the only deal left on the table: the felt's payout
  * band used to carry one, and this replaced it (STO-379 decision 4). It is inert until the
  * entrance's clock settles, because the sequence is still landing on the numbers the primary
  * is asking the seat to leave behind — and it deals exactly once, so a double tap cannot take
@@ -37,11 +37,12 @@ export interface ResultsActionsProps {
   readonly clock: SharedValue<number>;
   /** Whether the sequence has settled — the primary's own gate. */
   readonly ready: boolean;
+  readonly replay?: { readonly requested: number; readonly total: number };
   readonly onDeal: () => void;
   readonly onExit: () => void;
 }
 
-export function ResultsActions({ clock, ready, onDeal, onExit }: ResultsActionsProps): ReactElement {
+export function ResultsActions({ clock, ready, replay, onDeal, onExit }: ResultsActionsProps): ReactElement {
   const enter = useAnimatedStyle(() => ({
     opacity: beatProgress(clock, resultsEntrance.cta, resultsEntrance.ctaIn),
   }));
@@ -49,7 +50,7 @@ export function ResultsActions({ clock, ready, onDeal, onExit }: ResultsActionsP
   return (
     <Animated.View style={[styles.row, enter]}>
       <Pressable
-        accessibilityLabel="Deal another hand"
+        accessibilityLabel={replay ? `Play another hand, ${replay.requested} of ${replay.total} players want to play again` : "Deal another hand"}
         accessibilityRole="button"
         // A disabled control is a fact about the screen, not only about its paint: the state
         // goes to the accessibility tree as well as to the fill.
@@ -69,7 +70,7 @@ export function ResultsActions({ clock, ready, onDeal, onExit }: ResultsActionsP
           start={{ x: 0.5, y: 0 }}
           style={styles.primaryFill}>
           <View pointerEvents="none" style={styles.primaryInset} />
-          <Text style={styles.primaryLabel}>DEAL ANOTHER</Text>
+          <Text style={styles.primaryLabel}>{replay ? "PLAY ANOTHER" : "DEAL ANOTHER"}{replay ? ` ${replay.requested}/${replay.total}` : ""}</Text>
         </LinearGradient>
       </Pressable>
 

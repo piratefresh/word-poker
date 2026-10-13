@@ -9,6 +9,7 @@ import { TutorialScreen } from "./tutorial-screen";
 
 // The same stand-ins the offline table's suite uses: a safe area with no native views, a router
 // Jest can parse, and the one reduced-motion hook the reanimated mock lacks.
+jest.mock("@/components/screens/results/simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
 );

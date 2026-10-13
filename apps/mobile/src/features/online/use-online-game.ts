@@ -104,9 +104,11 @@ export interface OnlineGame {
   game: GameScreenState | null;
   /**
    * The settled hand as the results screen renders it, or null off the payout (STO-430). The
-   * room holds its payout a few seconds before it deals again; the next deal clears this.
+   * room holds its payout until every remaining player chooses Play another.
    */
   results: ResultsSnapshot | null;
+  /** Players who chose Play another, out of the seats still at the table. */
+  replay: { requested: number; total: number } | null;
   /** §19's window as the builder reads it, or null outside it. In the builder's own vocabulary. */
   words: WordDraft | null;
   /** The hero's private quota and latest explicit dictionary result. */
@@ -114,7 +116,7 @@ export interface OnlineGame {
   /** The table's phase, including the waiting room the felt has no hand for. */
   phase: RoomPhase;
   /**
-   * The table before its first deal, or null once a hand is live: how many of its seats have said
+   * The table before a deal, including a hero who has left results: how many seats have said
    * ready, and whether the hero is one of them. `game` still draws the felt while it waits.
    */
   waiting: { ready: number; seated: number; heroReady: boolean } | null;
@@ -186,6 +188,8 @@ interface SeatView {
   sittingOut: boolean;
   actedThisRound: boolean;
   ready: boolean;
+  seenResults: boolean;
+  present: boolean;
 }
 
 interface WordSlotView {
@@ -638,10 +642,12 @@ export function useOnlineGame({
     [room],
   );
   const waiting = useMemo(() => {
-    if (view === null || view.phase !== WAITING_PHASE) return null;
+    if (view === null) return null;
+    const heroLeftResults = view.phase === "payout" && view.seats.some((seat) => seat.playerId === heroId && seat.seenResults);
+    if (view.phase !== WAITING_PHASE && !heroLeftResults) return null;
     return {
       ready: view.seats.filter((seat) => seat.ready).length,
-      seated: view.seats.length,
+      seated: view.seats.filter((seat) => seat.present).length,
       heroReady: view.seats.some((seat) => seat.playerId === heroId && seat.ready),
     };
   }, [heroId, view]);
@@ -649,6 +655,10 @@ export function useOnlineGame({
   return {
     game,
     results,
+    replay: view?.phase === "payout" ? {
+      requested: view.seats.filter((seat) => seat.present && seat.seenResults).length,
+      total: view.seats.filter((seat) => seat.present).length,
+    } : null,
     // No hand, no word: the waiting felt draws the table with nothing to build.
     words: waiting === null ? (hero?.words ?? null) : null,
     wordCheck:
@@ -704,7 +714,8 @@ function perspectiveOf(
   dictionary: Dictionary,
   powerEvents: readonly PowerUsedEvent[] = [],
 ): HeroPerspective | null {
-  const waiting = view.phase === WAITING_PHASE;
+  const waiting = view.phase === WAITING_PHASE ||
+    (view.phase === "payout" && view.seats.some((seat) => seat.playerId === heroId && seat.seenResults));
   const phase = waiting ? "preflop" : roundPhaseOf(view.phase);
   if (phase === null) return null;
 
@@ -714,10 +725,10 @@ function perspectiveOf(
     return {
       id: seat.playerId,
       stack: seat.tableStack,
-      committedRound: seat.committedRound,
-      committedHand: seat.committedHand,
-      folded: seat.folded,
-      allIn: seat.allIn,
+      committedRound: waiting ? 0 : seat.committedRound,
+      committedHand: waiting ? 0 : seat.committedHand,
+      folded: !waiting && seat.folded,
+      allIn: !waiting && seat.allIn,
       sittingOut: seat.sittingOut,
       actedThisRound: seat.actedThisRound,
       place: (seat.seat - heroSeat + view.maxSeats) % view.maxSeats,
@@ -765,13 +776,13 @@ function perspectiveOf(
     // floor is `currentBet + max(lastRaiseSize, bigBlind)`, so passing it as `lastRaiseSize`
     // reproduces the same floor the server used.
     round:
-      view.betting === null
+      waiting || view.betting === null
         ? null
         : { currentBet: view.betting.currentBet, lastRaiseSize: view.betting.minRaise },
     blinds: { smallBlind: view.blinds.smallBlind, bigBlind: view.betting?.bigBlind ?? view.blinds.bigBlind },
-    community: view.community,
-    privateTiles: priv?.rack ?? [],
-    available: availableFor(priv, view),
+    community: waiting ? [] : view.community,
+    privateTiles: waiting ? [] : priv?.rack ?? [],
+    available: waiting ? [] : availableFor(priv, view),
     word: {
       open: view.word?.status === "open",
       hero: heroWord === undefined || heroWord === "none" ? null : heroWord,
@@ -781,8 +792,8 @@ function perspectiveOf(
       checksRemaining: 0,
       result: null,
     },
-    result: view.result,
-    sidePots: view.pots.slice(1),
+    result: waiting ? null : view.result,
+    sidePots: waiting ? [] : view.pots.slice(1),
     // The server owns the session's end (§27/§28); the online felt plays on until it says so.
     sessionOver: false,
     dictionary,
@@ -927,6 +938,8 @@ function decodeSeats(seats: unknown): readonly SeatView[] {
       sittingOut: value.sittingOut === true,
       actedThisRound: value.actedThisRound === true,
       ready: value.ready === true,
+      seenResults: value.seenResults === true,
+      present: value.present !== false,
     });
   }
   return out;

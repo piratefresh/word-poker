@@ -39,8 +39,8 @@ process.env.WORDPOKER_DETERMINISTIC_SEED = "1";
 const PINNED_408 = {
   winnerSeat: 0,
   standings: [
-    { word: "DOLOR", score: 11 },
-    { word: "LOUR", score: 10 },
+    { word: "RAIDERS", score: 22 },
+    { word: "ERASER", score: 10 },
   ],
 };
 
@@ -123,7 +123,6 @@ function assertBoardDecodesOnce(room: { state: unknown }, clients: readonly Clie
  */
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer<typeof appConfig>;
-
   const originalAuthOrigin = process.env.AUTH_API_URL;
   // A protocol fixture, not an auth bypass in application code: joins still call the real verifier.
   let accountCount = 0;
@@ -205,6 +204,45 @@ describe("GameRoom", () => {
   });
 
   describe("authoritative hand", () => {
+    it("keeps results until each player chooses play another, then waits for readiness", async () => {
+      const room = await colyseus.createRoom("game", {
+        name: "Results readiness", buyIn: 500, maxSeats: 2, seed: 123,
+        payoutDelay: 10, tickMs: 5,
+      });
+      const clients = [await colyseus.connectTo(room), await colyseus.connectTo(room)];
+      await readyUp(room, clients);
+      const dealer = room.state.dealerSeat;
+      const actorId = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
+      const actor = clients.find((client) => client.sessionId === actorId);
+      assert.ok(actor);
+      actor.send(GAME_MESSAGES.betting, { type: "fold" });
+      await room.waitForNextPatch();
+      for (let tick = 0; tick < 60; tick += 1) await room.waitForNextTimestep();
+      assert.strictEqual(room.state.phase, "payout", "results never expire automatically");
+      const stacks = [...room.state.seats.values()].map((seat) => seat.tableStack);
+      clients[0]!.send(GAME_MESSAGES.resultsSeen);
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.phase, "payout", "the other player can keep reading");
+      assert.strictEqual([...room.state.seats.values()].filter((seat) => seat.seenResults).length, 1);
+      clients[0]!.send(GAME_MESSAGES.ready, { ready: true });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.seats.get(clients[0]!.sessionId)?.ready, true);
+      clients[1]!.send(GAME_MESSAGES.ready, { ready: true });
+      await room.waitForNextTimestep();
+      assert.strictEqual(room.state.seats.get(clients[1]!.sessionId)?.ready, false, "reading players cannot be readied");
+      clients[1]!.send(GAME_MESSAGES.resultsSeen);
+      for (let tick = 0; tick < 40 && room.state.phase === "payout"; tick += 1) await room.waitForNextTimestep();
+      assert.strictEqual(room.state.phase, WAITING_PHASE);
+      assert.strictEqual(room.state.seats.get(clients[0]!.sessionId)?.ready, true, "early readiness is retained");
+      assert.deepStrictEqual([...room.state.seats.values()].map((seat) => seat.tableStack), stacks);
+      assert.strictEqual(room.state.turnDeadline, 0);
+      await readyUp(room, clients);
+      assert.strictEqual(room.state.phase, "preflop");
+      assert.strictEqual(room.state.handCount, 2);
+      assert.notStrictEqual(room.state.dealerSeat, dealer);
+      assert.ok([...room.state.seats.values()].every((seat) => !seat.ready && !seat.seenResults));
+    });
+
     it("waits for a full table, deals private racks, and settles a hand", async () => {
       const room = await colyseus.createRoom("game", {
         name: "Hand test",
@@ -499,6 +537,11 @@ describe("GameRoom", () => {
       const pots: number[][] = [];
       for (const [handIndex, hand] of FOUR_SEAT_SCRIPT.entries()) {
         const handNumber = handIndex + 1;
+        if (handIndex > 0) {
+          for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+          await until(() => room.state.phase === WAITING_PHASE, `hand ${handNumber} waits for readiness`);
+          await readyUp(room, clients);
+        }
         await until(() => room.state.handCount === handNumber && room.state.phase === "preflop", `hand ${handNumber} deals`);
         if (handIndex === 2) {
           assert.strictEqual(room.state.seats.get(clients[2]!.sessionId)?.sittingOut, true, "the bust sits hand 3 out");
@@ -537,13 +580,14 @@ describe("GameRoom", () => {
       }
       assert.deepStrictEqual(rejections, [], "every scripted action and word is accepted");
       assert.deepStrictEqual(words, [
-        ["DX", "YALE", "ILEA"],
-        ["TAX", "RX", "AX"],
-        ["TWEAK", "CALK", "ARAK"],
+        ["JAY", "NARY", "ERY"],
+        ["HEIDI", "QI", "NIDI"],
+        ["DZ", "XL", "ACLU"],
       ]);
       assert.deepStrictEqual(pots, [[120], [40, 1350, 20], [30]]);
 
-      // P3 left: the payout sends the table back to waiting, and the three left say ready again.
+      // P3 left: the remaining seats leave results, then ready up again.
+      for (const client of [clients[0]!, clients[1]!, clients[3]!]) client.send(GAME_MESSAGES.resultsSeen);
       await until(() => room.state.phase === WAITING_PHASE, "the leave returns the table to waiting");
       assert.strictEqual(room.state.seats.size, 3);
       const stayed = [clients[0]!, clients[1]!, clients[3]!];
@@ -953,7 +997,8 @@ describe("GameRoom", () => {
       assert.equal(room.state.phase, "payout", "the hand settles at payout");
       assert.strictEqual(room.state.turnDeadline, 0, "no betting turn is open at payout");
 
-      // The next rollover finds one seat with all the chips: no hand is dealt, and the room
+      for (const client of clients) client.send(GAME_MESSAGES.resultsSeen);
+      // Once everyone leaves results, no hand is dealt, and the room
       // holds both seats and their ended stacks instead of dealing a hand nobody can pay.
       for (let tick = 0; tick < 60 && room.state.phase !== "waiting"; tick += 1) {
         await room.waitForNextTimestep();
@@ -1005,16 +1050,16 @@ describe("GameRoom", () => {
       const previousGate = process.env.WORDPOKER_DETERMINISTIC_SEED;
       const previousKnobs = process.env.WORDPOKER_SMOKE_ROOM;
       process.env.WORDPOKER_SMOKE_ROOM = JSON.stringify({ seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 });
-      type Knobs = { seed: number; payoutDelay: number; turnDuration: number };
+      type Knobs = { seed: number; turnDuration: number };
       const knobsOf = (room: unknown) => {
-        const { seed, payoutDelay, turnDuration } = room as Knobs;
-        return { seed, payoutDelay, turnDuration };
+        const { seed, turnDuration } = room as Knobs;
+        return { seed, turnDuration };
       };
       try {
         const lobbyForm = await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 4 });
         assert.deepStrictEqual(
           knobsOf(lobbyForm),
-          { seed: 4040, payoutDelay: 20_000, turnDuration: 120_000 },
+          { seed: 4040, turnDuration: 120_000 },
           "a create that names no knobs takes the env's",
         );
 
@@ -1027,14 +1072,13 @@ describe("GameRoom", () => {
         });
         assert.deepStrictEqual(
           knobsOf(explicit),
-          { seed: 7, payoutDelay: 50, turnDuration: 120_000 },
+          { seed: 7, turnDuration: 120_000 },
           "knobs the create names win over the env's",
         );
 
         delete process.env.WORDPOKER_DETERMINISTIC_SEED;
         const ungated = knobsOf(await colyseus.createRoom("game", { name: "Env knobs", buyIn: 500, maxSeats: 4 }));
         assert.notStrictEqual(ungated.turnDuration, 120_000, "without the gate the env is ignored");
-        assert.notStrictEqual(ungated.payoutDelay, 20_000, "without the gate the env is ignored");
       } finally {
         if (previousGate === undefined) delete process.env.WORDPOKER_DETERMINISTIC_SEED;
         else process.env.WORDPOKER_DETERMINISTIC_SEED = previousGate;

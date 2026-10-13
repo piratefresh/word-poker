@@ -47,12 +47,13 @@ export interface ResultsScreenProps {
   /** The settled hand, mapped once by `buildResultsSnapshot`. */
   readonly snapshot: ResultsSnapshot;
   /** Leaves for the next hand (the engine's own `deal`). */
+  readonly replay?: { readonly requested: number; readonly total: number };
   readonly onDeal: () => void;
   /** Leaves the table for the home tabs — what the back control shares. */
   readonly onExit: () => void;
 }
 
-export function ResultsScreen({ snapshot, onDeal, onExit }: ResultsScreenProps): ReactElement {
+export function ResultsScreen({ snapshot, replay, onDeal, onExit }: ResultsScreenProps): ReactElement {
   const insets = useSafeAreaInsets();
   // Frozen here, once: the surface renders the hand it was opened on, whatever the table does
   // next (STO-380's acceptance criterion, and the reason this is a `useState` and not a prop).
@@ -91,6 +92,7 @@ export function ResultsScreen({ snapshot, onDeal, onExit }: ResultsScreenProps):
                 onDeal={onDeal}
                 onExit={onExit}
                 ready={ready}
+                replay={replay}
               />
             </View>
 

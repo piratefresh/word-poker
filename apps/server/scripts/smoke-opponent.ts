@@ -40,8 +40,6 @@ const SEED = Number(process.env.SEED ?? 409);
 const GAME_URL = process.env.GAME_URL ?? "ws://localhost:2567";
 /** A human-readable pause before each of this seat's actions, so a headed run can be watched. */
 const BEAT_MS = Number(process.env.BEAT_MS ?? 700);
-/** Keeps HAND #1 results on screen for the browser flow to assert. */
-const PAYOUT_DELAY_MS = 60_000;
 
 type Seat = { seat: number; playerId: string; committedThisRound: number; ready: boolean };
 type State = {
@@ -63,7 +61,6 @@ const room = await client.create("game", {
   buyIn: 500,
   maxSeats: 2,
   seed: SEED,
-  payoutDelay: PAYOUT_DELAY_MS,
 });
 console.log(`seated at "${NAME}" (seed ${SEED}) — table ${room.roomId} as ${room.sessionId}`);
 
