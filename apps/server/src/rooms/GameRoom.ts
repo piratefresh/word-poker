@@ -51,6 +51,7 @@ import { serverOrm } from "../database.js";
 const DEFAULT_RECONNECT_SECONDS = 180;
 /** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
 const MIN_PLAYERS = 2;
+const SEAT_GONE_MESSAGE = "That player has left the table.";
 
 type TableConfig = GameTableConfig;
 
@@ -109,6 +110,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private table!: TableConfig;
   private engine?: AuthoritativeGame;
   private readonly bindings = new Map<string, SeatBinding>();
+  /** Sessions with a befriend request in flight; overlapping ones are dropped. */
+  private readonly befriending = new Set<string>();
   private readonly projection = new GameRoomProjection(this.state);
   private seed = 1;
   private turnDuration = OFFLINE_TURN_MS;
@@ -144,19 +147,26 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       if (this.game !== null) return;
       const sender = this.bindings.get(client.sessionId);
       const target = this.bindings.get(payload.playerId);
-      if (!sender || !target?.present || sender === target) return;
+      if (!sender || sender === target || this.befriending.has(client.sessionId)) return;
+      const reply = (message: string) =>
+        client.send(GAME_EVENTS.befriendResult, { playerId: payload.playerId, message });
+      if (!target?.present) return reply(SEAT_GONE_MESSAGE);
+      this.befriending.add(client.sessionId);
       let message = "Friends aren't available right now. Try again.";
       try {
         // Persistent account changes require a current session, even on a surviving socket.
         const account = await onlineAccount(client.auth?.token);
         if (account.userId !== sender.userId) throw new Error("The seat's account no longer matches its session");
         const orm = await serverOrm();
-        if (this.game !== null || !this.isAtTable(client) || !target.present) return;
-        if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
+        if (this.game !== null || !this.isAtTable(client)) return;
+        if (!target.present) message = SEAT_GONE_MESSAGE;
+        else if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
       } catch {
         // A service outage must not interrupt the hand or expose account details.
+      } finally {
+        this.befriending.delete(client.sessionId);
       }
-      client.send(GAME_EVENTS.befriendResult, { playerId: payload.playerId, message });
+      reply(message);
     },
     [GAME_MESSAGES.betting]: (client: Client, payload: unknown) => {
       if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.betting, payload)) return;
