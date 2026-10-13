@@ -22,7 +22,7 @@ function json(body: unknown, status: number): Response {
 /** `200 { coins, welcomed }`, `401` without a session, `502` when RevenueCat cannot be read. */
 export async function GET(request: Request): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return json({ error: "Sign in to see your coins." }, 401);
+  if (!session || session.user.isAnonymous) return json({ error: "Sign in to see your coins." }, 401);
 
   const userId = session.user.id;
 

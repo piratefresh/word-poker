@@ -21,8 +21,8 @@
  * take.
  */
 
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -66,7 +66,13 @@ export function LobbyScreen() {
   const { coins } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  // Home's "Play a Friend" arrives with `create=1`: open the sheet once, then drop the param so a
+  // back-and-forth doesn't reopen it.
+  const { create } = useLocalSearchParams<{ create?: string }>();
+  const [creating, setCreating] = useState(create === "1");
+  useEffect(() => {
+    if (create === "1") router.setParams({ create: undefined });
+  }, [create]);
 
   const { featured, others, stats } = parlorView(rooms, activeRoomId, coins);
   const joiningRoom =
@@ -144,7 +150,11 @@ export function LobbyScreen() {
         testID="lobby-scroll"
       >
         <ParlorNav
-          me={session?.user.name?.trim() || session?.user.email}
+          me={
+            session?.user.isAnonymous
+              ? "Guest"
+              : session?.user.name?.trim() || session?.user.email
+          }
           onBack={back}
         />
 

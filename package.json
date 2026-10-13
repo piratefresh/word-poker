@@ -21,6 +21,7 @@
     "build": "pnpm --filter @wordpoker/server build",
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",
     "smoke:online:wild": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Wild",
+    "smoke:online:guest": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Guest",
     "smoke:online:four": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online-four.ps1",
     "smoke:online:android": "node scripts/smoke-online-native.mjs android",
     "smoke:online:ios": "node scripts/smoke-online-native.mjs ios",
