@@ -1,6 +1,6 @@
 # One-command Windows runner from the repo root: pnpm smoke:online:wild (STO-500)
 # The online Wild hand: a live room with power-ups on, an automated opponent, and the browser
-# using Random Wild on its own turn, building a word with the new tile, and reading the results.
+# using Wild Tile on its own turn, building a word with the new tile, and reading the results.
 #
 # The runner starts the server with WORDPOKER_DETERMINISTIC_SEED=1 and
 # WORDPOKER_SMOKE_ROOM={"powerUps":{"deal":"choose3"}}, so the opponent's create (which names no
@@ -9,7 +9,7 @@
 #   maestro test --platform web .maestro/online-wild-hand.yaml -e ROOM_ID=the-id-printed-by-opponent
 #
 # Probe for seed 518 (`scripts/probe-wild-smoke.ts`; the browser is seat 1): the browser holds A-1
-# and E-11, every power is offered (the catalog holds three), and Random Wild's letter for seat 1
+# and E-11, every power is offered (the catalog holds two for now), and Wild Tile's letter for seat 1
 # is F. Discarding A-1 puts `power-1` in A's place, and power-1 then E-11 spells FE from the rack
 # alone. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
 #
@@ -17,7 +17,7 @@
 # and the result card's ⚡ are matched by test-id pattern (Maestro ids are regular expressions).
 # The opponent checks the other half — what the table hears — and the runner fails on its log.
 url: http://localhost:8081/online
-name: Online Wild hand - pick, use Random Wild, build FE and read results
+name: Online Wild hand - pick, use Wild Tile, build FE and read results
 tags:
   - web
   - online

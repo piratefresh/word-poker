@@ -300,7 +300,7 @@ export function useOnlineGame({
   // of the hand it was dealt for — until then the seat holds nothing.
   const priv = received !== null && received.hand === view?.handCount ? received : null;
   const [draftPlays, setHeroDraft] = useState<readonly TilePlay[]>([]);
-  // A power can swap a played tile out of the rack (mulligan, magnet, wild): the draft keeps only
+  // A power can swap a played tile out of the rack (magnet, wild): the draft keeps only
   // tiles the seat still holds, or every later edit is refused as "not in your tiles".
   const available = useMemo(() => availableFor(priv, view), [priv, view]);
   const heroDraft = useMemo(() => {

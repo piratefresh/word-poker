@@ -85,7 +85,7 @@ pnpm smoke:online:wild            # headed; add -Headless for --headless --scree
 ```
 
 It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 518 and runs `.maestro/online-wild-hand.yaml`.
-The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds FE
+The browser picks Wild Tile, uses it on its first turn, sees the "power used" card, and builds FE
 with the new tile. The opponent keeps its first offer and never uses it. It logs the public use it
 hears, and it logs `LEAK:` if a swapped tile reaches it before the reveal. The runner fails on
 either. After changing the deal, the catalog or the letter stream, re-probe with

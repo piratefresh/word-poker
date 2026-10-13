@@ -88,7 +88,7 @@ describe("the Power Draw", () => {
   it("stays open until every seat has picked, then closes early", () => {
     const draw = openDraw(SEATS, SEED, NOW);
     const heroPick = offersOf(draw, "hero")[1];
-    const ellisPick = offersOf(draw, "ellis")[2];
+    const ellisPick = offersOf(draw, "ellis").at(-1);
     assert.ok(heroPick && ellisPick);
 
     const once = pickPower(draw, "hero", heroPick, NOW + 1);
@@ -104,7 +104,7 @@ describe("the Power Draw", () => {
 
   it("gives a seat that never picked its first offer when the clock runs out", () => {
     const draw = openDraw(SEATS, SEED, NOW);
-    const heroPick = offersOf(draw, "hero")[2];
+    const heroPick = offersOf(draw, "hero").at(-1);
     assert.ok(heroPick);
 
     const closed = timeoutDraw(pickPower(draw, "hero", heroPick, NOW + 1), ENDS_AT);
@@ -127,10 +127,10 @@ describe("the Power Draw", () => {
 
   it("refuses a power the seat was not offered, and a seat with no slot", () => {
     const draw = openDraw(SEATS, SEED, NOW);
-    const offered = { ...draw, slots: draw.slots.map((slot) => ({ ...slot, offers: ["mulligan" as const] })) };
+    const offered = { ...draw, slots: draw.slots.map((slot) => ({ ...slot, offers: ["vowel_magnet" as const] })) };
 
     assert.throws(() => pickPower(offered, "hero", "random_wild", NOW + 1), refusal("not-offered"));
-    assert.throws(() => pickPower(draw, "jay", "mulligan", NOW + 1), refusal("not-in-draw"));
+    assert.throws(() => pickPower(draw, "jay", "random_wild", NOW + 1), refusal("not-in-draw"));
   });
 
   it("refuses a pick at the deadline or after the draw has closed", () => {

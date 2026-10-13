@@ -45,7 +45,7 @@ describe("<PowerHeldChip />", () => {
 
     const chip = screen.getByTestId("power-held");
     expect(chip.props.accessibilityLabel).toBe(
-      "Random Wild: Swap one of your tiles for a random letter.",
+      "Wild Tile: Swap one of your tiles for a random letter.",
     );
     expect(chip.props.accessibilityState).toMatchObject({
       disabled: false,
@@ -151,14 +151,30 @@ describe("<PowerUsePrompt />", () => {
       <PowerUsePrompt
         onCancel={jest.fn()}
         onConfirm={jest.fn()}
-        power="mulligan"
+        power="vowel_magnet"
         targeting={{ stage: "confirming", tile: TILE_QK }}
       />,
     );
 
     expect(
-      screen.getByText("Discard Q/K for the next tile in the bag?"),
+      screen.getByText("Discard Q/K for a random vowel?"),
     ).toBeTruthy();
+  });
+
+  test("warns that a bonus tile's bonus will be lost, and only then", async () => {
+    const prompt = (tile: Tile) => (
+      <PowerUsePrompt
+        onCancel={jest.fn()}
+        onConfirm={jest.fn()}
+        power="vowel_magnet"
+        targeting={{ stage: "confirming", tile }}
+      />
+    );
+    const bonus = await render(prompt({ ...TILE_A, multiplier: "double-letter" }));
+    expect(bonus.getByText("This tile's bonus will be lost")).toBeTruthy();
+
+    const plain = await render(prompt(TILE_A));
+    expect(plain.queryByText("This tile's bonus will be lost")).toBeNull();
   });
 });
 

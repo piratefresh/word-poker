@@ -8,7 +8,7 @@
  */
 
 /** Every power a table can deal, in the order the catalog lists them. */
-export const POWER_UP_IDS = ["random_wild", "vowel_magnet", "mulligan"] as const;
+export const POWER_UP_IDS = ["random_wild", "vowel_magnet"] as const;
 
 /** One power's stable id — what a command names and an event reports. */
 export type PowerUpId = (typeof POWER_UP_IDS)[number];
@@ -53,7 +53,7 @@ export interface PowerUpDefinition<Id extends PowerUpId = PowerUpId> {
 export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = {
   random_wild: {
     id: "random_wild",
-    title: "Random Wild",
+    title: "Wild Tile",
     description: "Swap one of your tiles for a random letter.",
     receives: "a random letter",
     tag: "WILD",
@@ -75,18 +75,6 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     family: "swapTile",
     hostile: false,
   },
-  mulligan: {
-    id: "mulligan",
-    title: "Mulligan",
-    description: "Swap one of your tiles for the next tile in the bag.",
-    receives: "the next tile in the bag",
-    tag: "MULLIGAN",
-    icon: "mulligan",
-    weight: 8,
-    window: "ownTurnOrWordWindow",
-    family: "swapTile",
-    hostile: false,
-  },
 };
 
 /** Whether an untrusted value names a power in the catalog. */
@@ -94,8 +82,8 @@ export function isPowerUpId(value: unknown): value is PowerUpId {
   return (POWER_UP_IDS as readonly unknown[]).includes(value);
 }
 
-/** How many powers the Power Draw offers each seat (§44). */
-export const POWER_DRAW_OFFER_COUNT = 3;
+/** How many powers the Power Draw offers each seat (§44): every power in the catalog. */
+export const POWER_DRAW_OFFER_COUNT = POWER_UP_IDS.length;
 
 /** The Power Draw's shared clock (§44): a constant to tune after playtests. */
 export const POWER_DRAW_MS = 10_000;

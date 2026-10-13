@@ -285,7 +285,7 @@ describe("<OfflineGameScreen />", () => {
     await act(async () => live().pickPower("random_wild"));
     for (let step = 0; step < 4; step += 1) await beat();
     expect(within(view.getByTestId("power-used")).getByText("MIRA USED")).toBeOnTheScreen();
-    expect(view.getByTestId("seat-power-tag-mira")).toHaveTextContent("MULLIGAN");
+    expect(view.getByTestId("seat-power-tag-mira")).toHaveTextContent("WILD");
     expect(stripTiles(view)).not.toContain("power-3");
     await beat();
     expect(view.getByText("YOUR TURN")).toBeOnTheScreen();

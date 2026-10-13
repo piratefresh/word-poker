@@ -870,8 +870,8 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     }
     const first = await run();
     expect(await run()).toEqual(first);
-    // Seed 7's weak racks choose Mulligan for Ellis/Mira; Jay's aggressive style chooses Wild.
-    expect(first).toEqual([["ellis", "mulligan"], ["jay", "random_wild"], ["mira", "mulligan"]]);
+    // Seed 7's weak racks choose Vowel Magnet for Ellis; Jay and Mira choose Wild.
+    expect(first).toEqual([["ellis", "vowel_magnet"], ["jay", "random_wild"], ["mira", "random_wild"]]);
   });
 
   test("preserves a late hero pick and one bot pick when the shared draw deadline supplies the rest", async () => {
@@ -894,9 +894,9 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     for (let step = 0; step < 3; step += 1) await beat();
     const before = result.current.game;
     await beat();
-    const event = { handId: 1, seat: 3, name: "Mira", mine: false, powerUpId: "mulligan", street: "preflop" } as const;
+    const event = { handId: 1, seat: 3, name: "Mira", mine: false, powerUpId: "random_wild", street: "preflop" } as const;
     expect(result.current.powers?.used).toEqual([event]);
-    expect(result.current.game.players[3]?.powerTag).toBe("MULLIGAN");
+    expect(result.current.game.players[3]?.powerTag).toBe("WILD");
     expect(result.current.game.players[3]?.status).toBe("thinking");
     expect(result.current.game.pot).toBe(before.pot);
     expect(result.current.game.betting).toEqual(before.betting);
@@ -912,7 +912,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     expect(next?.endsAtMs).toBe(deadline);
     expect(next?.powers?.held.mira?.used).toBe(true);
     expect(result.current.game.pot).toBeGreaterThan(before.pot);
-    expect(result.current.game.players[3]?.powerTag).toBe("MULLIGAN");
+    expect(result.current.game.players[3]?.powerTag).toBe("WILD");
     expect(result.current.game.players[3]?.status).toBe("call");
     expect(JSON.stringify(result.current.game)).not.toContain("power-3");
     await act(async () => result.current.endPowerUsed(event));
@@ -921,14 +921,14 @@ describe("useOfflineGame — the Wild table (§44)", () => {
 
   test("an all-in wordless bot uses in the word window and confirms the new word on a later beat", async () => {
     const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
-    // Seed 211: Ellis holds R + S/L; Mulligan replaces R with I, making IS from a wordless rack/board.
+    // Seed 211: Ellis holds R + T/S over a board with two Es; Vowel Magnet rolls the third E, making EEE from a wordless rack/board.
     jest.mocked(startHand).mockImplementationOnce((options) => actual.startHand({ ...options,
       players: ["hero", "ellis"], stacks: [{ playerId: "hero", stack: 10 }, { playerId: "ellis", stack: 20 }],
     }));
-    const dictionary = testDictionary(["IS"]);
+    const dictionary = testDictionary(["EEE"]);
     const hook = await renderHook(() => useOfflineGame({ seed: 211, dictionary, powerUps: "choose3" }));
     const result = hook.result as Table;
-    await pick(result, "mulligan");
+    await pick(result, "vowel_magnet");
     await beat();
     expect(result.current.words?.confirmable).toBe(true);
     const before = result.current.game;
@@ -940,7 +940,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     if (state === undefined) throw new Error("the real policy was called");
     expect(chooseOfflineWord({ available: availableTiles(state, 1), dictionary })).toBeNull();
     expect(result.current.powers?.used).toEqual([
-      { handId: 1, seat: 1, name: "Ellis", mine: false, powerUpId: "mulligan", street: "river" },
+      { handId: 1, seat: 1, name: "Ellis", mine: false, powerUpId: "vowel_magnet", street: "river" },
     ]);
     expect(result.current.game.pot).toBe(before.pot);
     expect(result.current.results).toBeNull();
@@ -956,7 +956,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
       wordCheck: result.current.wordCheck })).not.toContain("power-1");
     await act(async () => jest.advanceTimersByTime(WORD_WINDOW_MS));
     const ellis = result.current.results?.seats.find((seat) => seat.playerId === "ellis");
-    expect(ellis?.word).toBe("IS");
+    expect(ellis?.word).toBe("EEE");
     expect(ellis?.tiles.some((tile) => tile.id === "power-1")).toBe(true);
     expect(ellis?.tiles.some((tile) => tile.id === replaced)).toBe(false);
   });
@@ -969,7 +969,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     const dictionary = testDictionary(["ZZZZZZZ"]);
     const hook = await renderHook(() => useOfflineGame({ seed: 0, dictionary, powerUps: "choose3" }));
     const result = hook.result as Table;
-    await pick(result, "mulligan");
+    await pick(result, "vowel_magnet");
     for (let step = 0; step < 3; step += 1) await beat();
     const calls = jest.mocked(decideBotPowerUse).mock.calls.length;
     expect(calls).toBe(2); // One use, then one unsuccessful word beat from the swapped rack.
@@ -1004,12 +1004,12 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     const result = await wildTable();
     const deadline = result.current.powers?.draw?.endsAtMs;
     if (deadline === undefined) throw new Error("the draw has no clock");
-    await pick(result, "mulligan");
+    await pick(result, "vowel_magnet");
     const clock = jest.spyOn(Date, "now").mockReturnValue(deadline);
     await beat();
     clock.mockRestore();
     expect(chooseBotPower).not.toHaveBeenCalled();
-    expect(result.current.powers?.draw?.picked).toBe("mulligan");
+    expect(result.current.powers?.draw?.picked).toBe("vowel_magnet");
     await act(async () => jest.advanceTimersByTime(POWER_DRAW_MS - BEAT_MS + 25));
     expect(result.current.powers?.draw).toBeNull();
     expect(chooseBotPower).not.toHaveBeenCalled();
@@ -1021,7 +1021,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
       turnDurationMs: BEAT_MS + 10,
     }));
     const result = await wildTable();
-    await pick(result, "mulligan");
+    await pick(result, "vowel_magnet");
     for (let step = 0; step < 4; step += 1) await beat();
     expect(result.current.powers?.used[0]?.name).toBe("Mira");
     expect(result.current.game.pot).toBe(BLINDS_POSTED);

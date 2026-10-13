@@ -17,7 +17,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 
-import type { PowerUpId } from "@wordpoker/contracts";
+import { POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
 
 import { colors, fonts, palette } from "@/constants/theme";
 import type { PowerView } from "@/features/table/power-view";
@@ -33,6 +33,8 @@ export { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION } from "./power-draw-motion";
 const { entrance, exit: EXIT, reduced: REDUCED } = POWER_DRAW_MOTION;
 
 const MAX_CARD_WIDTH = 150;
+/** How long "Time's up. You got …" stays on the felt after the kept card has flown. */
+const TIME_UP_NOTE_MS = 2_000;
 /** The room the heading and the hint take above and below the row, and the region's margin. */
 const HEADING_HEIGHT = 32;
 const HINT_HEIGHT = 40;
@@ -133,6 +135,16 @@ export function PowerDrawReveal({
   }, [key, keptKnown, reduceMotion]);
   const exited = shown !== null && exitedKey === shown.key;
 
+  // The clock ran out on a seat that never tapped: the table gave it a card, and it is told which.
+  const timedOut = closed && tapped === null && kept !== null;
+  const [noteDoneKey, setNoteDoneKey] = useState<string | null>(null);
+  const noting = timedOut && exited && noteDoneKey !== key;
+  useEffect(() => {
+    if (!noting || key === null) return;
+    const timer = setTimeout(() => setNoteDoneKey(key), TIME_UP_NOTE_MS);
+    return () => clearTimeout(timer);
+  }, [noting, key]);
+
   // The window is announced once, when it opens: what to do, and how long there is to do it.
   const opensEndingAtMs = shown?.endsAtMs ?? null;
   useEffect(() => {
@@ -141,7 +153,15 @@ export function PowerDrawReveal({
     AccessibilityInfo.announceForAccessibility(`Pick a power, ${seconds} seconds`);
   }, [opensEndingAtMs]);
 
-  if (shown === null || key === null || (closed && exited)) return null;
+  if (shown === null || key === null) return null;
+  if (closed && exited) {
+    if (!noting || kept === null) return null;
+    return (
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.note]}>
+        <Hint reduceMotion={reduceMotion} testID="power-draw-timeup" text={`Time's up. You got ${POWER_UPS[kept].title}.`} />
+      </View>
+    );
+  }
 
   const count = shown.offers.length;
   const cardHeight = cardWidth * POWER_CARD_ASPECT;
@@ -365,6 +385,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { height: 0, width: 0 },
     textShadowRadius: 10,
   },
+  note: { alignItems: "center", justifyContent: "center" },
   anchor: { height: 0, position: "absolute", width: 0 },
   row: { alignItems: "center", flexDirection: "row", height: "100%", justifyContent: "center" },
   hintSlot: { alignItems: "center", height: HINT_HEIGHT, justifyContent: "center" },

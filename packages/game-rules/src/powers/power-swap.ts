@@ -2,18 +2,18 @@
  * power-swap.ts — §44's Swap a Private Tile family (`docs/rules/power-ups.md`): the tile a v1 power
  * hands a seat in place of the private tile it discards.
  *
- * Every v1 power is this family, and they differ only in where the new letter comes from. The
+ * Every v1 power is this family, and they differ only in which letters the new tile rolls from. The
  * module owns that and nothing else: which letter, and the plain tile it becomes. Whether the
  * seat may use its power right now — its turn, §19's window, a fold — and what the swap does to
  * the seat's rack and draft belong to the hand (`offline.ts`).
  *
  * A rolled letter comes from a stream of its own, `mixSeed(dealSeed, seat, "letter")`, never from
- * the deal's generator, and it is the stream's first roll; Mulligan's comes from the rest of the
- * bag at the seat's own index. Either way a seat's letter is fixed the moment the hand is dealt:
- * it is the same whichever street the power is used on, and a retried use cannot roll again.
+ * the deal's generator, and it is the stream's first roll, so a seat's letter is fixed the moment
+ * the hand is dealt: it is the same whichever street the power is used on, and a retried use
+ * cannot roll again.
  */
 
-import type { LetterTile, PowerUpId, Tile } from "@wordpoker/contracts";
+import type { LetterTile, PowerUpId } from "@wordpoker/contracts";
 
 import { OfflineActionError } from "../core/errors";
 import { LETTER_VALUES, type Letter } from "../tiles/letters";
@@ -26,8 +26,7 @@ const ALPHABET = Object.keys(LETTER_VALUES) as Letter[];
 const VOWELS: readonly Letter[] = ["A", "E", "I", "O", "U"];
 
 /**
- * The letters each power draws from uniformly. Mulligan is absent: it takes a tile from the rest
- * of the hand's bag instead of rolling a letter.
+ * The letters each power draws from uniformly.
  */
 export const SWAP_LETTERS: Readonly<Partial<Record<PowerUpId, readonly Letter[]>>> = {
   random_wild: ALPHABET,
@@ -38,11 +37,6 @@ export const SWAP_LETTERS: Readonly<Partial<Record<PowerUpId, readonly Letter[]>
 export interface SwapSource {
   readonly dealSeed: number;
   readonly seat: number;
-  /**
-   * What the hand's deal left in the bag, in shuffled order after the community tiles
-   * (`dealHand`'s `rest`). Only Mulligan reads it, so it is asked for rather than handed in.
-   */
-  readonly restOfBag: () => readonly Tile[];
 }
 
 /**
@@ -65,16 +59,9 @@ export function isSwappedTileId(tileId: string): boolean {
 /**
  * The plain tile a swap power hands the seat: its letter at §6's value, no multiplier, never a
  * choice tile, and nothing inherited from the tile it replaces.
- *
- * Mulligan's letter is the bag tile at the seat's own index in the rest of the bag: the deal laid
- * out every private and community tile up front, so that tile is one nobody else can be dealt,
- * and each seat's is a different one whatever order the seats use their powers in. Only its
- * letter is kept — the tile is rebuilt plain, under the swap's own id.
- *
- * @throws {OfflineActionError} When the bag has no tile left at the seat's index.
  */
 export function swapTile(powerUpId: PowerUpId, source: SwapSource): LetterTile {
-  const letter = powerUpId === "mulligan" ? bagLetter(source) : rolledLetter(powerUpId, source);
+  const letter = rolledLetter(powerUpId, source);
 
   return { id: swappedTileId(source.seat), letter, points: LETTER_VALUES[letter] };
 }
@@ -92,19 +79,3 @@ function rolledLetter(powerUpId: PowerUpId, { dealSeed, seat }: SwapSource): Let
   return letters[Math.floor(roll * letters.length)] ?? "E";
 }
 
-/** Mulligan's letter: the seat's own tile in the rest of the hand's bag. */
-function bagLetter({ seat, restOfBag }: SwapSource): Letter {
-  const tile = restOfBag()[seat];
-  if (tile === undefined) {
-    throw new OfflineActionError(`the bag has no tile left for seat ${seat}'s Mulligan`);
-  }
-  if (!isLetter(tile.letter)) {
-    throw new OfflineActionError(`bag tile ${tile.id} prints no letter of §6's table`);
-  }
-
-  return tile.letter;
-}
-
-function isLetter(value: string): value is Letter {
-  return Object.hasOwn(LETTER_VALUES, value);
-}
