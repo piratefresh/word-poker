@@ -1,4 +1,4 @@
-import type { PlayerId, PowerUpId } from "@wordpoker/contracts";
+import { POWER_UPS, type PlayerId, type PowerUpId } from "@wordpoker/contracts";
 
 import { botDecisionSeed, observeBot } from "./bot-observation";
 import { botProfile } from "./bot-profile";
@@ -22,6 +22,9 @@ export function chooseBotPower(state: OfflineState, botId: PlayerId): PowerUpId 
   const weights: Record<PowerUpId, number> = {
     vowel_magnet: vowels === 0 ? 4 : vowels === 1 ? 2 : 1,
     random_wild: 0.5 + botProfile(slot.seat).aggression,
+    // ponytail: CPUs never play a blank's letter and never aim Spotlight; give them a plan if they look dumb.
+    blank_tile: 0.5,
+    spotlight: 0,
   };
   let roll = createRng(botDecisionSeed(view, "power-pick"))() *
     slot.offers.reduce((sum, offer) => sum + weights[offer], 0);
@@ -41,7 +44,7 @@ export function decideBotPowerUse(
   if (!canUsePower(state, botId, nowMs)) return null;
   const seat = state.seats.findIndex((candidate) => candidate.id === botId);
   const held = state.powers?.held[botId];
-  if (seat < 0 || held === undefined) return null;
+  if (seat < 0 || held === undefined || POWER_UPS[held.id].family === "spotlight") return null;
   const view = observeBot(state, seat, state.betting ?? { currentBet: 0, lastRaiseSize: 0 });
   if (view.privateTiles.length === 0) return null;
   const best = evaluateBestWord({ available: [...view.privateTiles, ...view.board], dictionary: view.dictionary });

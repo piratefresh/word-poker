@@ -70,8 +70,29 @@ differs.
 | ----- | --- | --------------------- | ----------: |
 | Wild Tile | WILD | Any letter A–Z, each equally likely | 10 |
 | Vowel Magnet | VOWEL | A, E, I, O or U, each equally likely | 8 |
+| Blank Tile | BLANK | No letter yet: the seat names one A–Z for the blank when it plays it | 8 |
 
 The tag is what the seat's nameplate prints when the power is used (see Visibility).
+
+## Blank Tile
+
+Blank Tile is a swap whose new tile is a **blank**: it prints "?" and is worth **0**. The seat
+names the letter it plays as — any one of A–Z — when it puts the blank in its word, and may change
+that letter until the word is confirmed. The blank carries no multiplier, so it scores 0 even in a
+word whose other tiles are doubled. CPU seats never play a blank's letter.
+
+## Spotlight
+
+Spotlight does not swap a tile. The seat picks **one dealt community tile** and it scores
+**double** (a Double Letter, §9) for every seat this hand.
+
+- Only on the **flop or the turn**, in the seat's own betting turn window; not before the flop,
+  not on the river, and not in §19's window.
+- The tile must already be face up, must not already carry a 2x or 3x, and must be a community
+  tile — never a private one.
+- Every seat sees the tile's 2× badge, and the table is told who lit which letter: "Jay
+  spotlighted the A". Nothing about the seat's own rack is revealed.
+- CPU seats never use Spotlight.
 
 ## Swapping a Tile
 

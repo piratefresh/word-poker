@@ -70,6 +70,7 @@ interface SeatBinding {
  */
 type PowerOutcome =
   | { readonly kind: "picked" }
+  | { readonly kind: "spotlit" }
   | { readonly kind: "swapped"; readonly swap: PrivatePowerSwap }
   | { readonly kind: "refused"; readonly event: GameRejectionEvent };
 
@@ -595,7 +596,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     const outcome = this.runPower(client, message, payload);
     this.powerLedger.set(key, { hand, outcome });
     // A pick that landed has already sent every seat its private state; nothing more to say.
-    if (outcome.kind !== "picked") this.answerPower(client, outcome);
+    if (outcome.kind !== "picked" && outcome.kind !== "spotlit") this.answerPower(client, outcome);
   }
 
   private runPower(
@@ -638,8 +639,22 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     if (message === "pickPower") return { kind: "picked" };
 
     const after = this.game;
-    const swap = after === null ? null : privatePowerSwap(after, playerId);
     const binding = this.bindingFor(playerId);
+    const spotlight = after?.powers?.held[playerId]?.spotlight;
+    if (spotlight !== undefined && after !== null && binding !== undefined && street !== "payout") {
+      // Spotlight is public in full: the table lit a community tile, and every seat is told which.
+      const lit: PowerUsedEvent = {
+        handId: after.hand,
+        seat: binding.seat,
+        powerUpId: payload.powerUpId,
+        street,
+        tileId: spotlight.tileId,
+        letter: spotlight.letter,
+      };
+      this.broadcast(GAME_EVENTS.powerUsed, lit);
+      return { kind: "spotlit" };
+    }
+    const swap = after === null ? null : privatePowerSwap(after, playerId);
     if (swap === null || binding === undefined || street === "payout") {
       throw new Error("a power use landed without a swap to report");
     }

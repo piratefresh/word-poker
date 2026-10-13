@@ -89,18 +89,21 @@ export function PowerUsePrompt({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const spotlight = power !== null && POWER_UPS[power].family === "spotlight";
   const question =
     power !== null && targeting.stage === "confirming"
-      ? `Discard ${tileLetters(targeting.tile)} for ${POWER_UPS[power].receives}?`
+      ? spotlight
+        ? `Spotlight the ${tileLetters(targeting.tile)}? It scores double for everyone.`
+        : `Discard ${tileLetters(targeting.tile)} for ${POWER_UPS[power].receives}?`
       : null;
   const stage = power === null ? "idle" : targeting.stage;
   // A swap hands back a plain tile, so a 2x/3x tile loses its bonus (§44).
-  const bonusLost = targeting.stage === "confirming" && targeting.tile.multiplier !== undefined;
+  const bonusLost = !spotlight && targeting.stage === "confirming" && targeting.tile.multiplier !== undefined;
 
   // Each stage says itself once: the rack is waiting, or the felt is asking.
   useEffect(() => {
-    if (stage === "picking") AccessibilityInfo.announceForAccessibility("Choose one of your tiles to swap");
-  }, [stage]);
+    if (stage === "picking") AccessibilityInfo.announceForAccessibility(spotlight ? "Choose a table tile" : "Choose one of your tiles to swap");
+  }, [stage, spotlight]);
   useEffect(() => {
     if (question !== null) AccessibilityInfo.announceForAccessibility(question);
   }, [question]);
@@ -119,7 +122,7 @@ export function PowerUsePrompt({
       {question === null ? (
         <View pointerEvents="box-none" style={styles.hintRow}>
           <View style={styles.panel}>
-            <Text style={styles.hint}>Tap one of your tiles to swap it</Text>
+            <Text style={styles.hint}>{spotlight ? "Tap a table tile to spotlight it" : "Tap one of your tiles to swap it"}</Text>
             <GameButton compact label="CANCEL" onPress={onCancel} testID="power-cancel" />
           </View>
         </View>
@@ -132,7 +135,7 @@ export function PowerUsePrompt({
             <View style={styles.actions}>
               <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" />
               <GameButton
-                label="SWAP"
+                label={spotlight ? "SPOTLIGHT" : "SWAP"}
                 onPress={onConfirm}
                 style={styles.action}
                 testID="power-confirm"

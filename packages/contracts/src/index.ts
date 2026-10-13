@@ -79,6 +79,7 @@ export {
   type QuestStateResponse,
 } from "./quests";
 export type {
+  BlankTile,
   ChoiceTile,
   LetterMultiplier,
   LetterTile,

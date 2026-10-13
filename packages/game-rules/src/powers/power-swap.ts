@@ -13,7 +13,7 @@
  * cannot roll again.
  */
 
-import type { LetterTile, PowerUpId } from "@wordpoker/contracts";
+import type { BlankTile, LetterTile, PowerUpId } from "@wordpoker/contracts";
 
 import { OfflineActionError } from "../core/errors";
 import { LETTER_VALUES, type Letter } from "../tiles/letters";
@@ -60,7 +60,9 @@ export function isSwappedTileId(tileId: string): boolean {
  * The plain tile a swap power hands the seat: its letter at §6's value, no multiplier, never a
  * choice tile, and nothing inherited from the tile it replaces.
  */
-export function swapTile(powerUpId: PowerUpId, source: SwapSource): LetterTile {
+export function swapTile(powerUpId: PowerUpId, source: SwapSource): LetterTile | BlankTile {
+  if (powerUpId === "blank_tile") return { id: swappedTileId(source.seat), letter: "?", points: 0, blank: true };
+
   const letter = rolledLetter(powerUpId, source);
 
   return { id: swappedTileId(source.seat), letter, points: LETTER_VALUES[letter] };

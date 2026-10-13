@@ -849,8 +849,8 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     }
     const first = await run();
     expect(await run()).toEqual(first);
-    // Seed 7's weak racks choose Vowel Magnet for Ellis; Jay and Mira choose Wild.
-    expect(first).toEqual([["ellis", "vowel_magnet"], ["jay", "random_wild"], ["mira", "random_wild"]]);
+    // Seed 7's picks, pinned: Wild for Ellis and Mira, Vowel Magnet for Jay.
+    expect(first).toEqual([["ellis", "random_wild"], ["jay", "vowel_magnet"], ["mira", "random_wild"]]);
   });
 
   test("preserves a late hero pick and one bot pick when the shared draw deadline supplies the rest", async () => {

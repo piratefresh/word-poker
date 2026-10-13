@@ -105,8 +105,7 @@ export function OnlineFelt({
   const goToSignIn = useCallback(() => router.push("/sign-in"), []);
   // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
   const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
-  const choosing = power.targeting.stage === "picking";
-  const flip = swapFlipOf(powers?.swap, power.discarded);
+    const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
@@ -131,6 +130,7 @@ export function OnlineFelt({
         <GameScreen
           balance={balance}
           game={game}
+          onPickCommunityTile={power.tablePick}
           onBack={onLeave}
           onBalancePress={goToSignIn}
           waiting={{
@@ -153,7 +153,7 @@ export function OnlineFelt({
         reason={words?.reason ?? null}
         score={words?.score ?? null}
         word={words?.word ?? ""}
-        onPickTile={choosing ? power.pick : undefined}
+        onPickTile={power.ownPick}
         // The new letter turns over once the felt's "power used" card for the hero's own use has
         // cleared (§44, Visibility): the table sees the use first, and only the hero the result.
         swapFlip={flip === null ? null : { ...flip, revealed: !ownCardShowing }}

@@ -8,16 +8,17 @@
  */
 
 /** Every power a table can deal, in the order the catalog lists them. */
-export const POWER_UP_IDS = ["random_wild", "vowel_magnet"] as const;
+export const POWER_UP_IDS = ["random_wild", "vowel_magnet", "blank_tile", "spotlight"] as const;
 
 /** One power's stable id — what a command names and an event reports. */
 export type PowerUpId = (typeof POWER_UP_IDS)[number];
 
 /**
- * How a power acts, so the engine dispatches on the family rather than on each id. The v1 powers
- * are all `swapTile`: discard one private tile, receive a plain one (§44, Swapping a Tile).
+ * How a power acts, so the engine dispatches on the family rather than on each id. `swapTile`:
+ * discard one private tile, receive a plain one (§44, Swapping a Tile). `blankTile` is a swap whose
+ * new tile is a blank. `spotlight` targets a dealt community tile and doubles it for everyone.
  */
-export type PowerUpFamily = "swapTile";
+export type PowerUpFamily = "swapTile" | "blankTile" | "spotlight";
 
 /**
  * When a held power may be used. `ownTurnOrWordWindow`: on the seat's own betting turn before it
@@ -75,6 +76,30 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     family: "swapTile",
     hostile: false,
   },
+  blank_tile: {
+    id: "blank_tile",
+    title: "Blank Tile",
+    description: "Make one of your tiles any letter. It scores 0.",
+    receives: "a blank tile",
+    tag: "BLANK",
+    icon: "blank-tile",
+    weight: 8,
+    window: "ownTurnOrWordWindow",
+    family: "blankTile",
+    hostile: false,
+  },
+  spotlight: {
+    id: "spotlight",
+    title: "Spotlight",
+    description: "Pick one table tile. It scores double for everyone this hand.",
+    receives: "a double",
+    tag: "SPOTLIGHT",
+    icon: "spotlight",
+    weight: 8,
+    window: "ownTurnOrWordWindow",
+    family: "spotlight",
+    hostile: false,
+  },
 };
 
 /** Whether an untrusted value names a power in the catalog. */
@@ -119,6 +144,10 @@ export const POWER_REJECTION_REASONS = [
   "word-confirmed",
   /** The swap names a tile that is not one of the seat's private tiles. */
   "not-your-tile",
+  /** Spotlight names a tile that is not a dealt community tile. */
+  "not-a-table-tile",
+  /** Spotlight names a tile that already carries a 2x or 3x bonus. */
+  "already-bonus",
 ] as const;
 
 /** Why a power action was refused. */

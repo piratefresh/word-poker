@@ -18,6 +18,7 @@ import {
   POWER_DRAW_OFFER_COUNT,
   POWER_UP_IDS,
   POWER_UPS,
+  type BlankTile,
   type LetterTile,
   type PlayerId,
   type PowerUpId,
@@ -68,7 +69,9 @@ export interface HeldPower {
    * its place. The new tile's id is how showdown marks the tile as swapped (the ⚡); the
    * discarded tile is never shown, so only its id is kept, for the owner's private result.
    */
-  readonly swap?: { readonly discardedTileId: string; readonly tile: LetterTile };
+  readonly swap?: { readonly discardedTileId: string; readonly tile: LetterTile | BlankTile };
+  /** What Spotlight did once used: the community tile it doubled, and what that tile prints. */
+  readonly spotlight?: { readonly tileId: string; readonly letter: string };
 }
 
 /**

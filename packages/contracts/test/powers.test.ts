@@ -24,7 +24,7 @@ describe("POWER_UPS", () => {
     }
   });
 
-  it("keeps the pool so far: two friendly tile swaps with 10 / 8 weights", () => {
+  it("keeps the pool so far: Wild Tile, Vowel Magnet, Blank Tile and Spotlight", () => {
     assert.deepStrictEqual(
       POWER_UP_IDS.map((id) => {
         const { title, tag, weight, window, family, hostile } = POWER_UPS[id];
@@ -47,6 +47,24 @@ describe("POWER_UPS", () => {
           weight: 8,
           window: "ownTurnOrWordWindow",
           family: "swapTile",
+          hostile: false,
+        },
+        {
+          id: "blank_tile",
+          title: "Blank Tile",
+          tag: "BLANK",
+          weight: 8,
+          window: "ownTurnOrWordWindow",
+          family: "blankTile",
+          hostile: false,
+        },
+        {
+          id: "spotlight",
+          title: "Spotlight",
+          tag: "SPOTLIGHT",
+          weight: 8,
+          window: "ownTurnOrWordWindow",
+          family: "spotlight",
           hostile: false,
         },
       ],
@@ -82,6 +100,8 @@ describe("POWER_REJECTION_REASONS", () => {
       "folded",
       "word-confirmed",
       "not-your-tile",
+      "not-a-table-tile",
+      "already-bonus",
     ]);
   });
 });

@@ -561,4 +561,19 @@ describe("<WordBuilder /> and a held power (§44)", () => {
     ).toBe("A, 1 point, tap to play it");
     expect(view.queryByTestId("word-builder-tile-power-0-powered", { includeHiddenElements: true })).toBeNull();
   });
+
+  test("a blank in the word opens an A–Z picker, and the pick plays the blank as that letter", async () => {
+    const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
+    const { view, onDraft } = await renderBuilder({ privateTiles: [blank, PRIVATE_TILES[1]!] });
+    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
+
+    const inWord = await renderBuilder({
+      privateTiles: [blank, PRIVATE_TILES[1]!],
+      plays: [{ tileId: "power-0" }],
+    });
+    expect(inWord.view.getByTestId("word-builder-blank-picker")).toBeTruthy();
+    await fireEvent.press(inWord.view.getByTestId("word-builder-blank-Q"));
+    expect(inWord.onDraft).toHaveBeenCalledWith([{ tileId: "power-0", chosenFace: "Q" }]);
+    expect(onDraft).not.toHaveBeenCalled();
+  });
 });

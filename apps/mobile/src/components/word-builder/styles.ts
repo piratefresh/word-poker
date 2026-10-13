@@ -216,6 +216,8 @@ export const styles = StyleSheet.create({
     borderColor: colors.gold,
   },
   chipSpent: { opacity: opacity.disabled },
+  // The blank's A–Z row, wrapped above the tray.
+  blankPicker: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center", paddingBottom: spacing.xs },
   chipFace: {
     color: colors.textBright,
     fontFamily: fonts.monoBold,

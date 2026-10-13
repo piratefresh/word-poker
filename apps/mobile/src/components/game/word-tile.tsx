@@ -190,7 +190,9 @@ function secondFace(tile: TileData): string | null {
  * the other letter left to the chips under the rack. Null when no face is named — both letters
  * keep printing — and on a single-letter tile, which has only the one.
  */
+/** A blank (§44) plays any letter the seat names; until it names one it prints its "?". */
 function playedFace(tile: TileData, chosenFace: string | undefined): string | null {
+  if ("blank" in tile) return chosenFace !== undefined && /^[A-Z]$/.test(chosenFace) ? chosenFace : null;
   const second = secondFace(tile);
   if (second === null || chosenFace === undefined) return null;
   return chosenFace === tile.letter || chosenFace === second ? chosenFace : null;
