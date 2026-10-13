@@ -1,6 +1,6 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
-import { bearer } from "better-auth/plugins";
+import { anonymous, bearer } from "better-auth/plugins";
 import { config } from "dotenv";
 import { Pool } from "pg";
 
@@ -89,7 +89,9 @@ export const auth = betterAuth({
         ]
       : []),
   ],
-  plugins: [expo(), bearer()],
+  // Anonymous: a friend invited by link plays as a guest with a real session (STO-581), since
+  // GameRoom.onAuth seats sessions, not devices. Guests never verify, so they never touch the Wallet.
+  plugins: [expo(), bearer(), anonymous()],
   // Verifying pays the Wallet's welcome grant (STO-346); signing in does not wait on it.
   emailVerification: {
     sendOnSignUp: true,

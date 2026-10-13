@@ -82,6 +82,20 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   };
 
+  const playAsGuest = async () => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const { error: authError } = await authClient.signIn.anonymous();
+      if (authError) setError(authError.message ?? "Something went wrong. Please try again.");
+    } catch {
+      setError(NETWORK_ERROR);
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
     <AuthShell greeting={copy.greeting} sub={copy.sub}>
       {mode === "sign-up" && (
@@ -136,6 +150,12 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
         onPress={() => router.push(copy.footerHref)}
         text={copy.footer}
       />
+
+      {/* A friend opening an invite link has no account: an anonymous session seats them
+          (STO-581), and the guard then lands the table the link named. */}
+      {mode === "sign-in" && (
+        <FooterLine cta="Play as guest" onPress={playAsGuest} text="No account?" />
+      )}
     </AuthShell>
   );
 }

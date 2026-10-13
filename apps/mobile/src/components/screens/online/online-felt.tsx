@@ -24,7 +24,7 @@
  */
 
 import { router } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { GAME_MESSAGES } from "@wordpoker/contracts";
@@ -66,12 +66,17 @@ import {
 } from "@/features/online/use-room-connection";
 import { useBalanceView } from "@/lib/use-balance-view";
 
+import { InviteSheet } from "./invite-sheet";
+
 export function OnlineFelt({
   room,
+  roomId,
   dictionary,
   onLeave,
 }: {
   room: GameRoomLike & RoomConnectionLike;
+  /** The table's id, for the waiting room's invite (STO-581). */
+  roomId?: string;
   dictionary: Dictionary;
   /** Release the seat and leave the table — the felt's own way out (§3). */
   onLeave: () => void;
@@ -111,6 +116,7 @@ export function OnlineFelt({
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
   const connection = useRoomConnection(room);
+  const [inviting, setInviting] = useState(false);
 
   // One quest claim per hand (STO-525), and the XP overlay a lost showdown opens on it (STO-573):
   // `powers` is non-null only at a Wild table (`use-online-game.ts`), so it doubles as the
@@ -135,7 +141,13 @@ export function OnlineFelt({
           onBalancePress={goToSignIn}
           waiting={{
             stamp: "WAITING FOR PLAYERS",
-            controls: <ReadyControls {...waiting} onReady={setReady} />,
+            controls: (
+              <ReadyControls
+                {...waiting}
+                onInvite={roomId === undefined ? undefined : () => setInviting(true)}
+                onReady={setReady}
+              />
+            ),
           }}
         />
       </View>
@@ -234,24 +246,30 @@ export function OnlineFelt({
         />
       ) : null}
       {reconnecting ? <ReconnectingBanner /> : null}
+      {roomId === undefined ? null : (
+        <InviteSheet onClose={() => setInviting(false)} roomId={roomId} visible={inviting} />
+      )}
     </View>
   );
 }
 
 /**
  * The waiting room's action row: how many seats are ready, and the hero's own toggle. A seat that
- * said ready can take it back until the deal — the button reads as the thing a tap will do.
+ * said ready can take it back until the deal — the button reads as the thing a tap will do. The
+ * invite lives here too: the server seats nobody mid-hand, so the waiting room is when it works.
  */
 function ReadyControls({
   ready,
   seated,
   heroReady,
   onReady,
+  onInvite,
 }: {
   ready: number;
   seated: number;
   heroReady: boolean;
   onReady: (ready: boolean) => void;
+  onInvite?: () => void;
 }) {
   const status =
     seated < 2
@@ -270,6 +288,15 @@ function ReadyControls({
           testID="action-ready"
           variant={heroReady ? "dark" : "gold"}
         />
+        {onInvite === undefined ? null : (
+          <GameButton
+            label="INVITE A FRIEND"
+            onPress={onInvite}
+            style={styles.readyButton}
+            testID="action-invite"
+            variant="dark"
+          />
+        )}
       </View>
     </View>
   );
@@ -315,7 +342,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textAlign: "center",
   },
-  readyRow: { flexDirection: "row" },
+  readyRow: { flexDirection: "row", gap: spacing.xs },
   readyButton: { flex: 1 },
   bannerText: {
     color: colors.goldHi,

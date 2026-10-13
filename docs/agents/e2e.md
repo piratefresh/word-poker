@@ -42,6 +42,12 @@ on matching versions. The existing mobile/server env files and seeded E2E user a
 The opponent creates Smoke Table, calls when it owes, and keeps results open until the player leaves. The flow
 signs in when needed, builds ILK, checks the results overlay, and leaves the table.
 
+`pnpm smoke:online:guest` (STO-581) is the same runner with `.maestro/online-guest-join.yaml`: the
+browser opens the invite link (`/online?room=<id>`), taps "Play as guest" on the sign-in screen
+(Better Auth's anonymous plugin, so the auth database needs the `isAnonymous` migration), checks
+the invite sheet names the same table, readies up and waits for the deal. A profile that is already
+signed in skips the guest tap.
+
 The Wild variant (STO-500) is the same runner with power-ups on:
 
 ```powershell
