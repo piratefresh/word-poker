@@ -50,8 +50,9 @@ if ([gamePort, metroPort].some((port) => !Number.isInteger(port) || port < 1 || 
   console.error("SMOKE_GAME_PORT and SMOKE_METRO_PORT must be distinct ports between 1 and 65535.");
   process.exit(2);
 }
-if (!Number.isInteger(deviceApiPort) || deviceApiPort < 1 || deviceApiPort > 65535 || deviceApiPort === gamePort) {
-  console.error("SMOKE_DEVICE_API_PORT must be a valid port distinct from the game port.");
+if (!Number.isInteger(deviceApiPort) || deviceApiPort < 1 || deviceApiPort > 65535 || deviceApiPort === gamePort ||
+    (platform === "android" && flow === ".maestro/native/history.yaml" && deviceApiPort === metroPort)) {
+  console.error("SMOKE_DEVICE_API_PORT must be a valid port distinct from the game port and, for Android history, the Metro port.");
   process.exit(2);
 }
 const logs = mkdtempSync(join(tmpdir(), "wordpoker-native-smoke-"));
