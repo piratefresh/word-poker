@@ -158,8 +158,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         const account = await onlineAccount(client.auth?.token);
         if (account.userId !== sender.userId) throw new Error("The seat's account no longer matches its session");
         const orm = await serverOrm();
-        if (this.game !== null || !this.isAtTable(client)) return;
-        if (!target.present) message = SEAT_GONE_MESSAGE;
+        // A hand dealt or a seat gone during the awaits still answers, so the sheet clears its pending state.
+        if (this.game !== null || !this.isAtTable(client)) {
+          // keep the default "unavailable" message
+        } else if (!target.present) message = SEAT_GONE_MESSAGE;
         else if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
       } catch {
         // A service outage must not interrupt the hand or expose account details.
