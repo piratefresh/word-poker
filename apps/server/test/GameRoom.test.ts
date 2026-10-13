@@ -133,7 +133,10 @@ describe("GameRoom", () => {
   const originalAuthOrigin = process.env.AUTH_API_URL;
   // A protocol fixture, not an auth bypass in application code: joins still call the real verifier.
   let accountCount = 0;
+  let sessionChecks = 0;
+  const revokedTokens = new Set<string>();
   const authServer = createServer((request, response) => {
+    sessionChecks += 1;
     const token = request.headers.authorization;
     response.setHeader("content-type", "application/json");
     // `test-session` verifies as a fresh account each join (one seat per account); the others are fixed.
@@ -141,7 +144,7 @@ describe("GameRoom", () => {
       : token === "Bearer second-session" ? "second-account"
       : token === "Bearer same-session" ? "same-account"
       : undefined;
-    if (id === undefined) {
+    if (id === undefined || revokedTokens.has(token ?? "")) {
       response.end("null");
       return;
     }
@@ -167,10 +170,57 @@ describe("GameRoom", () => {
 
   beforeEach(async () => {
     await colyseus.cleanup();
+    revokedTokens.clear();
     colyseus.sdk.auth.token = "test-session";
   });
 
   describe("authenticated seats", () => {
+    it("revalidates the session before a waiting-room friendship write", async () => {
+      const room = await colyseus.createRoom("game", { name: "Revoked friends", buyIn: 500, maxSeats: 2 });
+      colyseus.sdk.auth.token = "same-session";
+      const first = await colyseus.connectTo(room);
+      colyseus.sdk.auth.token = "second-session";
+      const second = await colyseus.connectTo(room);
+      const binding = room["bindings"].get(first.sessionId);
+      assert.ok(binding);
+      const checksBefore = sessionChecks;
+      revokedTokens.add("Bearer same-session");
+      const reply = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
+      await room.messages.befriend(binding.client, { playerId: second.sessionId });
+      assert.equal(sessionChecks, checksBefore + 1);
+      assert.deepEqual(await reply, {
+        playerId: second.sessionId,
+        message: "Friends aren't available right now. Try again.",
+      });
+    });
+
+    it("ignores friend requests during play and payout", async () => {
+      const room = await colyseus.createRoom("game", { name: "Friends during play", buyIn: 500, maxSeats: 2 });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      await readyUp(room, [first, second]);
+      assert.equal(room.state.phase, "preflop");
+      const binding = room["bindings"].get(first.sessionId);
+      assert.ok(binding);
+      const send = binding.client.send;
+      let replies = 0;
+      try {
+        binding.client.send = (type) => { if (type === GAME_EVENTS.befriendResult) replies += 1; };
+        await room.messages.befriend(binding.client, { playerId: second.sessionId });
+        assert.equal(replies, 0);
+
+        const actorId = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
+        const actor = room["bindings"].get(actorId ?? "");
+        assert.ok(actor);
+        room.messages.betting(actor.client, { type: "fold" });
+        assert.equal(room.state.phase, "payout");
+        await room.messages.befriend(binding.client, { playerId: second.sessionId });
+        assert.equal(replies, 0);
+      } finally {
+        binding.client.send = send;
+      }
+    });
+
     it("requests friends using only server-owned seat account IDs", async function (this: Mocha.Context) {
       if (!serverUrl) this.skip();
       const originalDatabase = process.env.WORDPOKER_DATABASE_URL;
@@ -184,7 +234,9 @@ describe("GameRoom", () => {
         if (target.schema) url.searchParams.set("options", `-c search_path=${target.schema}`);
         const room = await colyseus.createRoom("game", { name: "Friends", buyIn: 500, maxSeats: 2 });
         process.env.WORDPOKER_DATABASE_URL = url.toString();
+        colyseus.sdk.auth.token = "same-session";
         const first = await colyseus.connectTo(room);
+        colyseus.sdk.auth.token = "second-session";
         const second = await colyseus.connectTo(room);
         const firstId = room["bindings"].get(first.sessionId)?.userId;
         const secondId = room["bindings"].get(second.sessionId)?.userId;
@@ -196,6 +248,16 @@ describe("GameRoom", () => {
         assert.ok(binding);
         await room.messages.befriend(binding.client, { playerId: "not-at-table", userId: secondId });
         assert.equal(inbox.length, 0);
+        revokedTokens.add("Bearer same-session");
+        const refused = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
+        first.send(GAME_MESSAGES.befriend, { playerId: second.sessionId });
+        assert.deepEqual(await refused, {
+          playerId: second.sessionId,
+          message: "Friends aren't available right now. Try again.",
+        });
+        assert.deepEqual((await friendList(firstId, { orm })).outgoing, []);
+        assert.deepEqual((await friendList(secondId, { orm })).incoming, []);
+        revokedTokens.delete("Bearer same-session");
         const reply = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
         first.send(GAME_MESSAGES.befriend, { playerId: second.sessionId, userId: "forged" });
         assert.deepEqual(await reply, { playerId: second.sessionId, message: "Friend request sent" });

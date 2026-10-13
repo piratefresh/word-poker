@@ -100,9 +100,9 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   plugins = definePlugins({ unique: new UniqueSessionPlugin({ max: 1 }) });
 
   // `id` is the key Colyseus's session tracker indexes (the plugin reads it back from the same index).
-  static override async onAuth(token: string): Promise<OnlineAccount & { readonly id: string }> {
+  static override async onAuth(token: string): Promise<OnlineAccount & { readonly id: string; readonly token: string }> {
     const account = await onlineAccount(token);
-    return { ...account, id: account.userId };
+    return { ...account, id: account.userId, token };
   }
 
   private dictionary!: Dictionary;
@@ -141,15 +141,20 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   messages = {
     [GAME_MESSAGES.befriend]: async (client: Client, payload: unknown) => {
       if (!isGameMessagePayload("befriend", payload) || !this.isAtTable(client)) return;
+      if (this.game !== null) return;
       const sender = this.bindings.get(client.sessionId);
       const target = this.bindings.get(payload.playerId);
       if (!sender || !target?.present || sender === target) return;
       let message = "Friends aren't available right now. Try again.";
       try {
+        // Persistent account changes require a current session, even on a surviving socket.
+        const account = await onlineAccount(client.auth?.token);
+        if (account.userId !== sender.userId) throw new Error("The seat's account no longer matches its session");
         const orm = await serverOrm();
+        if (this.game !== null || !this.isAtTable(client) || !target.present) return;
         if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
       } catch {
-        // A database outage must not interrupt the hand or expose account details.
+        // A service outage must not interrupt the hand or expose account details.
       }
       client.send(GAME_EVENTS.befriendResult, { playerId: payload.playerId, message });
     },

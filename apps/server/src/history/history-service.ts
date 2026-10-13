@@ -29,6 +29,9 @@ export class HistoryService implements HistoryWriter {
    * says so once at creation — production sets it; nothing falls back to `DATABASE_URL`.
    */
   static async fromEnv(): Promise<HistoryService | null> {
+    if (!process.env[HISTORY_DATABASE_URL] && process.env.WORDPOKER_HISTORY_DATABASE_URL) {
+      throw new Error("WORDPOKER_HISTORY_DATABASE_URL was renamed to WORDPOKER_DATABASE_URL");
+    }
     if (!process.env[HISTORY_DATABASE_URL]) return null;
 
     const directory = process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
