@@ -39,22 +39,22 @@
 # while a bot holds it.
 #
 # The pinned seed's personality-policy line (also asserted by game-rules/test/bot.test.ts):
-# mira raises preflop to 60, called around; the flop checks through. On the turn Mira bets
-# 160, the hero and Ellis call, and Jay folds. The river checks to the hero with pot 720.
-# The hero opens for 20, Ellis calls, Mira raises to 340, and the hero calls the remaining 320.
-# Ellis calls the raise too; pot 1,740 opens the word window. The hero's T/S tiles are unchanged.
+# mira raises preflop to 40, called around; the flop checks through. On the turn Mira bets
+# 100, the hero and Ellis call, and Jay folds. The river checks to the hero with pot 460.
+# The hero opens for 20, Ellis calls, Mira raises to 480, and the hero calls the remaining 460.
+# Ellis calls the raise too; pot 1,900 opens the word window. The hero's Z/A tiles are unchanged.
 #
 # The felt reaches its row by `id:` rather than by text. Its controls carry test ids
 # (`action-check-call` walks the round and, inside §19's window, is the confirm), because the
 # seat nameplates print CHECK and CALL as status too and a text selector for a control can
 # land on a seat instead — see the selector note in the native flow.
-url: http://localhost:8081/offline?seed=20260919
+url: http://localhost:8081/offline?seed=7578
 name: Offline hand — bet, build a word and pay out
 tags:
   - web
   - offline
 ---
-- openLink: http://localhost:8081/offline?seed=20260919
+- openLink: http://localhost:8081/offline?seed=7578
 
 # If the guard bounced a fresh profile to the sign-in screen, sign in as the
 # E2E user and come back to the table. The wait is optional: a profile that is
@@ -67,7 +67,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline?seed=20260919
+- openLink: http://localhost:8081/offline?seed=7578
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
@@ -77,16 +77,16 @@ tags:
     text: "COMMUNITY · 0/5"
 
 # The blinds are posted before the deal, and the seat clockwise from the big blind opens the
-# round a beat later: mira raises the blind to 60, and the row states the call that leaves the
+# round a beat later: mira raises the blind to 40, and the row states the call that leaves the
 # hero owing — the engine's number, not a placeholder. The control prints its label and its
 # amount as two nodes, so a selector reaches the amount through the control's own test id
-# (`containsDescendants`) rather than through text that reads "CALL $60" in one piece. This is the
+# (`containsDescendants`) rather than through text that reads "CALL $40" in one piece. This is the
 # seed's line, so a changed seed or table configuration fails here, loudly.
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
       containsDescendants:
-        - text: "\\$60"
+        - text: "\\$40"
     timeout: 20000
 
 # Play the hero's turns to the river. Each pass waits for the hero to hold the table — the
@@ -124,19 +124,19 @@ tags:
     containsDescendants:
       - text: "\\$20"
 - assertVisible:
-    text: "\\$720"
+    text: "\\$460"
 - tapOn:
     id: "action-wager"
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
       containsDescendants:
-        - text: "\\$320"
+        - text: "\\$460"
     timeout: 20000
 - tapOn:
     id: "action-check-call"
 - extendedWaitUntil:
-    visible: "\\$1,740"
+    visible: "\\$1,900"
     timeout: 20000
 - assertNotVisible:
     id: "action-wager"
@@ -149,23 +149,25 @@ tags:
 # strip of tiles the seat sorts — is what the flow builds its word through. The phase stays
 # the river while the window is open.
 #
-# Build the word out of two tiles the strip holds for this seed. The strip's tiles carry test
+# Build the word out of three tiles the strip holds for this seed. The strip's tiles carry test
 # ids and the felt's copies of them carry none — those draw the state alone — so by its id a tap
 # can only land in the strip. A tap toggles a tile where it lies, so the word is the played
-# tiles read left to right, not the order they were tapped: S-1 sits right of T-2 in this
-# deal's strip, and the draft spells TS.
+# tiles read left to right, not the order they were tapped: Z-1, I-9 and G-1 sit in that
+# order in this deal's strip, and the draft spells ZIG.
 #
-# Those two are the deal's own for the seed the URL pins — T-2 and S-1, 2 points each — so a
+# Those three are the deal's own for the seed the URL pins — Z-1, I-9 and G-1 — so a
 # changed seed or table configuration fails here, loudly, instead of silently playing some other
-# word; §7 makes their word 4 points.
+# word; their word is 14 points.
 - tapOn:
-    id: "word-builder-tile-S-1"
+    id: "word-builder-tile-Z-1"
 - tapOn:
-    id: "word-builder-tile-T-2"
+    id: "word-builder-tile-I-9"
+- tapOn:
+    id: "word-builder-tile-G-1"
 - assertVisible:
-    text: "TS"
+    text: "ZIG"
 - assertVisible:
-    text: "4 pts"
+    text: "14 pts"
 
 # Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
 # exactly as it was — which is the whole point of shuffling while a word is being built. The
@@ -173,9 +175,9 @@ tags:
 - tapOn:
     id: "word-builder-shuffle"
 - assertVisible:
-    text: "TS"
+    text: "ZIG"
 - assertVisible:
-    text: "4 pts"
+    text: "14 pts"
 
 # §19's window turns the check into the confirm: the word as it stands is locked in, and no
 # second control row carries a confirm of its own. The row's control is tapped until the hand pays

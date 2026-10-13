@@ -1,5 +1,5 @@
 # Windows local runner: pnpm smoke:online:four [-Headless]
-# Four browsers, four Maestro processes, one seeded session (STO-483). The script lives in
+# Four browsers, four Maestro processes, four seeded accounts (STO-483; one seat per account). The script lives in
 # apps/server/scripts/four-seat-scenario.ts; each seat's taps in .maestro/four-seat/seat-N.yaml.
 [CmdletBinding()]
 param([switch]$Headless)
@@ -29,7 +29,7 @@ try {
   Write-Host "Logs: $logDirectory"
   # The lobby form cannot send a seed; the server takes the smoke's knobs from here instead.
   # Keep in step with FOUR_SEAT_ROOM in apps/server/scripts/four-seat-scenario.ts.
-  $env:WORDPOKER_SMOKE_ROOM = '{"seed":4111,"payoutDelay":20000,"turnDuration":120000}'
+  $env:WORDPOKER_SMOKE_ROOM = '{"seed":98,"turnDuration":120000}'
   Start-SmokeServers
 
   $null = Start-SmokeProcess 'lobby-watch' 'pnpm --filter @wordpoker/server exec tsx scripts/smoke-lobby-watch.ts'
@@ -48,7 +48,9 @@ try {
     $flow = ".maestro/four-seat/seat-$seat.yaml"
     $output = Join-Path $logDirectory "seat-$seat-output"
     $roomArg = if ($roomId) { "-e 'ROOM_ID=$roomId'" } else { "" }
-    $seats += Start-SmokeProcess "seat-$seat" "& '$maestro' test --platform web $display '$flow' --test-output-dir '$output' $roomArg" -Task
+    # One seat per account: P1 is the shared E2E user, P2-P4 the extra seeded seats.
+    $email = if ($seat -eq 1) { 'e2e@wordpoker.dev' } else { "e2e-$seat@wordpoker.dev" }
+    $seats += Start-SmokeProcess "seat-$seat" "& '$maestro' test --platform web $display '$flow' --test-output-dir '$output' -e 'TEST_USER_EMAIL=$email' $roomArg" -Task
     # Staggered: the next browser joins only once this one holds its seat, so join order is
     # seat order and every browser is dealt the rack its flow spells.
     Wait-SmokeReady "P$seat to take its seat" {

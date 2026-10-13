@@ -4,7 +4,7 @@
  * Two tours, as the MVP had (four-in-a-row `wordPokerTours`): the **helper** tour the felt's
  * "How to play" opens over any hand, and the **lesson** — the guided first hand (STO-251), whose
  * steps follow the scripted deal in `@wordpoker/game-rules`' tutorial. The MVP's copy taught a
- * different deal (STRONG, a server-held showdown); this is rewritten against seed 34's hand.
+ * different deal (STRONG, a server-held showdown); this is rewritten against seed 999's hand.
  *
  * Targets are the `CoachTarget` ids `GameScreen` marks: `community`, `table`, `rack`, `raise`
  * (the slider's row), `actions` (the whole action row), and `check` and `wager` (one button each,
@@ -123,7 +123,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "B",
     title: "Your tiles",
     body:
-      "W and B are your private tiles — only you see them. The W is gold-marked: it scores " +
+      "H and L are your private tiles — only you see them. The H is gold-marked: it scores " +
       "double. Shared letters join them as the board opens.",
     target: "rack",
     side: "top",
@@ -146,7 +146,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "D",
     title: "The flop",
     body:
-      "Three shared letters: N, R and O. With your W and B that spells BROWN. Tap tiles to put " +
+      "Three shared letters: O, C and T. With your H and L that spells CLOTH. Tap tiles to put " +
       "them in your word and drag them into order — you can build all hand long.",
     target: "rack",
     side: "top",
@@ -203,8 +203,8 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "I",
     title: "Spell your word",
     body:
-      "The Word Window is open. Tap B, R, O, W and N to put them in your word, and drag them " +
-      "into that order: it reads left to right. CHECK unlocks once your rack spells BROWN.",
+      "The Word Window is open. Tap C, L, O, T and H to put them in your word, and drag them " +
+      "into that order: it reads left to right. CHECK unlocks once your rack spells CLOTH.",
     target: "rack",
     side: "top",
     advance: "action",
@@ -213,6 +213,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     holds: true,
     // Recorded off `/dev-word-demo` on the web build: the lesson's own tiles, tapped and dragged
     // into BROWN. Re-record it there when the strip's look or the deal changes.
+    // TODO(STO-579): the deal is now seed 999's CLOTH; this GIF still shows seed 34's BROWN.
     media: {
       // Relative, not `@/assets`: Jest maps `@/` to `src/` alone.
       source: require("../../../assets/images/tutorial/spell-word.gif"),
@@ -225,7 +226,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "J",
     title: "Lock in your word",
     body:
-      "Your rack spells BROWN. Tap CHECK to lock it in. A locked word is final — even if it " +
+      "Your rack spells CLOTH. Tap CHECK to lock it in. A locked word is final — even if it " +
       "isn't in the dictionary.",
     target: "check",
     side: "top",
@@ -237,7 +238,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "K",
     title: "Showdown",
     body:
-      "BROWN scores 22: B 4, R 2×2, O 1×2, W 5×2, N 2. When Jay locks in, the best word takes " +
+      "CLOTH scores 19: C 4, L 2, O 1, T 2, H 5×2. When Jay locks in, the best word takes " +
       "the pot.",
     advance: "next",
     checkpoint: "window-jay-word",

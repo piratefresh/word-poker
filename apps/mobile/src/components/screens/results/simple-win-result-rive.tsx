@@ -2,16 +2,15 @@ import {
   Fit,
   RiveView,
   useRive,
-  useRiveFile,
   useViewModelInstance,
+  type RiveFile,
 } from "@rive-app/react-native";
 import { useEffect, useState, type ReactElement } from "react";
 import { StyleSheet } from "react-native";
 
 import type { ResultsSnapshot } from "./results-types";
 import { getSimpleWinBindings } from "./simple-win-bindings";
-
-const RIVE_FILE = require("../../../../assets/rive/simplewinscreen.riv");
+import { loadSimpleWinFile } from "./simple-win-preload";
 
 export function SimpleWinResultRive({
   snapshot,
@@ -20,7 +19,18 @@ export function SimpleWinResultRive({
   snapshot: ResultsSnapshot;
   reducedMotion: boolean;
 }): ReactElement | null {
-  const { error, riveFile } = useRiveFile(RIVE_FILE);
+  const [riveFile, setRiveFile] = useState<RiveFile | null>(null);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadSimpleWinFile().then(
+      (loaded) => live && setRiveFile(loaded),
+      () => live && setError(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
   const { instance, error: bindingError } = useViewModelInstance(riveFile, {
     async: true,
     viewModelName: "SimpleWin",

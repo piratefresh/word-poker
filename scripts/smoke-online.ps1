@@ -1,5 +1,5 @@
 # Windows local runner: pnpm smoke:online [-Wild] [-Headless]
-#   -Wild      the power-ups variant (STO-500): a Wild room at seed 527 and .maestro/online-wild-hand.yaml,
+#   -Wild      the power-ups variant (STO-500): a Wild room at seed 518 and .maestro/online-wild-hand.yaml,
 #              and the run fails if the opponent heard the swapped tile or never heard the use.
 #   -Headless  --headless --screen-size 1280x1000, as the four-seat runner takes it.
 [CmdletBinding()]
@@ -20,7 +20,7 @@ try {
   $env:BEAT_MS = '700'
   if ($Wild) {
     # The opponent's create names no power-up setting, so the server's smoke knob makes it Wild.
-    $env:SEED = '527'
+    $env:SEED = '518'
     $env:WORDPOKER_SMOKE_ROOM = '{"powerUps":{"deal":"choose3"}}'
     $flow = '.maestro/online-wild-hand.yaml'
   } else {

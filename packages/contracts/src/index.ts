@@ -123,6 +123,22 @@ export {
 export type { PlayerId } from "./players";
 export type { OfflineAction } from "./actions";
 export {
+  HAND_RECORD_VERSION,
+  HAND_RECORD_MAX_BYTES,
+  HAND_RECORD_MAX_ACTIONS,
+  HAND_RECORD_MAX_DURATION_MS,
+  isHandRecord,
+  parseHandRecord,
+  type HistoryMode,
+  type RecordedHandAction,
+  type HandRecord,
+  type HandRecordAction,
+  type HandRecordConfig,
+  type HandRecordSeat,
+  type HandRecordStanding,
+  type HandRecordSummary,
+} from "./history";
+export {
   GAME_EVENTS,
   GAME_MESSAGES,
   POWER_ACTION_ID_MAX_LENGTH,

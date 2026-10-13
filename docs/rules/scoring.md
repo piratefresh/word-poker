@@ -21,8 +21,16 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 ## Tile Bag Distribution
 
 The bag the engine deals from holds **98 single-letter tiles** in the standard English
-distribution. Counts below are what the engine builds; the bag is shuffled with an injected
-seed, so the same seed deals the same hand.
+distribution. Counts below are what the engine builds; the bag is dealt through nested
+vowel/consonant marble bags rather than a plain shuffle, driven by an injected seed, so the same
+seed deals the same hand.
+
+**Marble bags.** A top bag of seven marbles — three vowel, four consonant, the bag's own 42:56
+= 3:4 split (A, E, I, O, U are vowels; Y counts as a consonant) — decides whether the next tile is
+a vowel or a consonant, and refills whenever it empties. The tile itself comes off that kind's own
+shuffled pile. Every tile is still dealt once and the letter counts are unchanged, but every seven
+tiles from the top of the order hold exactly three vowels, so a hand rarely shows a board of all
+vowels or all consonants.
 
 | Tile | Letters | Count | Points | Notes                                                                |
 | ---- | ------- | ----: | -----: | -------------------------------------------------------------------- |

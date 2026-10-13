@@ -8,10 +8,10 @@
  * adds is the script: the moves the lesson expects, in order, each a checkpoint that names its
  * actor and the table it expects to find.
  *
- * Seed 34 seats four — the offline table's own roster — with the hero on the button holding W²
- * and B. Pre-flop Mira, first to act, folds, and the hero owes the big blind and calls; the flop
- * (N R² O²) already spells BROWN, Jay bets into it and the hero raises; the turn and the river
- * are checked through. In §19's window the hero confirms BROWN (22) and Jay GONER (12), so the
+ * Seed 999 seats four — the offline table's own roster — with the hero on the button holding H²
+ * and L. Pre-flop Mira, first to act, folds, and the hero owes the big blind and calls; the flop
+ * (O C T) already spells CLOTH, Jay bets into it and the hero raises; the turn and the river
+ * are checked through. In §19's window the hero confirms CLOTH (19) and Jay OCTET (10), so the
  * coached win is the engine's own scoring. A player who builds something else keeps whatever
  * that word actually scores.
  *
@@ -38,23 +38,23 @@ export const TUTORIAL_PLAYERS = ["hero", "ellis", "jay", "mira"] as const;
 export const TUTORIAL_HERO: PlayerId = "hero";
 
 /** The probed seed the lesson is dealt from (`scripts/probe-tutorial.ts`). */
-export const TUTORIAL_SEED = 34;
+export const TUTORIAL_SEED = 999;
 
 /**
  * Which version of the lesson this is. A change to the seed, the seats or the script is a new
  * lesson, and the app's remembered completion (STO-511) is keyed by it.
  */
-export const TUTORIAL_VERSION = 1;
+export const TUTORIAL_VERSION = 2;
 
-/** The hero's coached word: B R O W N, there from the flop. */
-export const TUTORIAL_TARGET_WORD = "BROWN";
+/** The hero's coached word: C L O T H, there from the flop. */
+export const TUTORIAL_TARGET_WORD = "CLOTH";
 const TARGET_SUBMISSION: WordSubmission = {
-  plays: [{ tileId: "B-2" }, { tileId: "R-3" }, { tileId: "O-5" }, { tileId: "W-1" }, { tileId: "N-5" }],
+  plays: [{ tileId: "C-2" }, { tileId: "L-1" }, { tileId: "O-1" }, { tileId: "T-3" }, { tileId: "H-1" }],
 };
 
-/** Jay's word: GONER — not Jay's best, a word a new player can read at the reveal. */
+/** Jay's word: OCTET — a word a new player can read at the reveal. */
 const JAY_SUBMISSION: WordSubmission = {
-  plays: [{ tileId: "G-3" }, { tileId: "O-5" }, { tileId: "N-5" }, { tileId: "E-10" }, { tileId: "R-5" }],
+  plays: [{ tileId: "O-1" }, { tileId: "C-2" }, { tileId: "T-3" }, { tileId: "E-9" }, { tileId: "T-1" }],
 };
 
 /** The raise-to the lesson coaches on the flop, over Jay's 20. */

@@ -134,6 +134,29 @@ async function mount(room: FakeRoom): Promise<Handle> {
 }
 
 describe("useOnlineGame", () => {
+  test("counts replay requests live and moves only the hero who left results to readiness", async () => {
+    const state = (heroSeen = false, opponentSeen = false, departed = false) => liveState({
+      phase: "payout", betting: { active: false }, toActSeat: -1,
+      seats: new Map([
+        [HERO, seat(HERO, 0, { seenResults: heroSeen, ready: heroSeen })],
+        [OPPONENT, seat(OPPONENT, 1, { seenResults: opponentSeen, present: !departed })],
+      ]),
+    });
+    const room = makeRoom(HERO, state());
+    const handle = await mount(room);
+    expect(handle.current.replay).toEqual({ requested: 0, total: 2 });
+    expect(handle.current.waiting).toBeNull();
+    await act(async () => room.emitState(state(false, true)));
+    expect(handle.current.replay).toEqual({ requested: 1, total: 2 });
+    expect(handle.current.waiting).toBeNull();
+    await act(async () => room.emitState(state(true, false)));
+    expect(handle.current.waiting).toEqual({ ready: 1, seated: 2, heroReady: true });
+    expect(handle.current.game?.privateTiles).toEqual([]);
+    expect(handle.current.game?.community.every((tile) => tile === null)).toBe(true);
+    await act(async () => room.emitState(state(true, true, true)));
+    expect(handle.current.replay).toEqual({ requested: 1, total: 1 });
+  });
+
   test.each(["waiting", "preflop"])("keeps a second-joining hero at the bottom during %s", async (phase) => {
     const room = makeRoom(HERO, liveState({
       phase,

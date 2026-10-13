@@ -31,10 +31,10 @@ before(async () => {
 });
 
 const word = (...ids: string[]): WordSubmission => ({ plays: ids.map((tileId) => ({ tileId })) });
-const BROWN = word("B-2", "R-3", "O-5", "W-1", "N-5");
-const BROWNE = word("B-2", "R-3", "O-5", "W-1", "N-5", "E-10");
-const ROB = word("R-3", "O-5", "B-2");
-const NWORB = word("N-5", "W-1", "O-5", "R-3", "B-2");
+const CLOTH = word("C-2", "L-1", "O-1", "T-3", "H-1");
+const CLOTHE = word("C-2", "L-1", "O-1", "T-3", "H-1", "E-9");
+const LOT = word("L-1", "O-1", "T-3");
+const HTOLC = word("H-1", "T-3", "O-1", "L-1", "C-2");
 
 /** The hero's coached move at a checkpoint, with the word it confirms swappable. */
 function heroAction(step: TutorialStep, submission: WordSubmission): OfflineAction {
@@ -57,7 +57,7 @@ function playTo(stepId: string, nowMs = NOW): TutorialRun {
     const checkpoint = tutorialCheckpoint(run, nowMs);
     assert.equal(checkpoint.status, "on-script", JSON.stringify(checkpoint));
     assert.ok(checkpoint.status === "on-script");
-    const action = nextScriptedAction(run, nowMs) ?? heroAction(checkpoint.step, BROWN);
+    const action = nextScriptedAction(run, nowMs) ?? heroAction(checkpoint.step, CLOTH);
     const applied = applyTutorialAction(run, action, nowMs);
     assert.ok(applied.ok, JSON.stringify(applied));
     run = applied.run;
@@ -75,7 +75,7 @@ interface Visit {
  * Plays the lesson to its end, one beat per action, and records each checkpoint as it is met.
  * The bots' moves come only from `nextScriptedAction`; each beat applies exactly one.
  */
-function replay(heroWord: WordSubmission = BROWN): { run: TutorialRun; visits: Visit[] } {
+function replay(heroWord: WordSubmission = CLOTH): { run: TutorialRun; visits: Visit[] } {
   let run = startTutorial({ dictionary, nowMs: NOW });
   let now = NOW;
   const visits: Visit[] = [];
@@ -115,10 +115,10 @@ describe("tutorial scenario (STO-271)", () => {
       [["hero", 1000, 0], ["ellis", 990, 10], ["jay", 980, 20], ["mira", 1000, 0]],
     );
     assert.deepEqual(state.seats[0]?.privateTiles.map((tile) => [tile.letter, tile.multiplier ?? null]), [
-      ["W", "double-letter"],
-      ["B", null],
+      ["H", "double-letter"],
+      ["L", null],
     ]);
-    assert.equal(state.community.map((tile) => tile.letter).join(""), "NROEE");
+    assert.equal(state.community.map((tile) => tile.letter).join(""), "OCTEI");
   });
 
   it("authors only words the shipped dictionary takes from the seat's own tiles", () => {
@@ -126,19 +126,19 @@ describe("tutorial scenario (STO-271)", () => {
     const judge = (seat: number, submission: WordSubmission) =>
       evaluateWord({ available: availableTiles(state, seat), submission, dictionary });
 
-    const target = judge(0, BROWN);
+    const target = judge(0, CLOTH);
     assert.ok(target.valid);
     assert.equal(target.word, TUTORIAL_TARGET_WORD);
-    // The coached word uses both private tiles, and only the flop besides (N R O are the first three).
-    assert.ok(["W-1", "B-2"].every((id) => BROWN.plays.some((play) => play.tileId === id)));
-    const flop = new Set(["W-1", "B-2", ...state.community.slice(0, 3).map((tile) => tile.id)]);
-    assert.ok(BROWN.plays.every((play) => flop.has(play.tileId)));
+    // The coached word uses both private tiles, and only the flop besides (O C T are the first three).
+    assert.ok(["H-1", "L-1"].every((id) => CLOTH.plays.some((play) => play.tileId === id)));
+    const flop = new Set(["H-1", "L-1", ...state.community.slice(0, 3).map((tile) => tile.id)]);
+    assert.ok(CLOTH.plays.every((play) => flop.has(play.tileId)));
 
     const jay = TUTORIAL_SCRIPT.find((step) => step.id === "window-jay-word");
     assert.ok(jay && "action" in jay && jay.action.type === "confirmWord");
     const goner = judge(2, jay.action.submission);
     assert.ok(goner.valid);
-    assert.equal(goner.word, "GONER");
+    assert.equal(goner.word, "OCTET");
   });
 
   it("replays blinds, a call, a raise-to, a later check, every street and the window to the real payout", () => {
@@ -173,7 +173,7 @@ describe("tutorial scenario (STO-271)", () => {
     assert.equal(result.winner, TUTORIAL_HERO);
     assert.deepEqual(
       result.standings.map((row) => [row.playerId, row.word, row.reason, row.score]),
-      [["hero", "BROWN", null, 22], ["jay", "GONER", null, 12]],
+      [["hero", "CLOTH", null, 19], ["jay", "OCTET", null, 10]],
     );
     assert.deepEqual(state.seats.map((seat) => [seat.id, seat.stack]), [
       ["hero", 1100],
@@ -188,19 +188,19 @@ describe("tutorial scenario (STO-271)", () => {
   });
 
   it("keeps the actual result of a word the lesson did not coach", () => {
-    const longer = replay(BROWNE).run.state.result;
+    const longer = replay(CLOTHE).run.state.result;
     assert.ok(longer);
     assert.equal(longer.winner, TUTORIAL_HERO);
-    assert.equal(longer.standings[0]?.word, "BROWNE");
-    assert.equal(longer.standings[0]?.score, 23);
+    assert.equal(longer.standings[0]?.word, "CLOTHE");
+    assert.equal(longer.standings[0]?.score, 20);
 
-    const short = replay(ROB).run;
-    assert.equal(short.state.result?.winner, "jay", "ROB (10) loses to GONER (12)");
+    const short = replay(LOT).run;
+    assert.equal(short.state.result?.winner, "jay", "LOT loses to OCTET (10)");
     assert.equal(short.state.seats.find((seat) => seat.id === "jay")?.stack, 1100);
   });
 
   it("locks in a buildable dictionary miss and scores it 0", () => {
-    const { state } = replay(NWORB).run;
+    const { state } = replay(HTOLC).run;
     const heroRow = state.result?.standings.find((row) => row.playerId === TUTORIAL_HERO);
     assert.equal(heroRow?.word, null);
     assert.equal(heroRow?.reason, "not-in-dictionary");
@@ -273,7 +273,7 @@ describe("tutorial scenario (STO-271)", () => {
     const run = startTutorial({ dictionary, nowMs: NOW });
     const checked = applyTutorialAction(
       run,
-      { type: "checkWord", playerId: TUTORIAL_HERO, submission: word("B-2", "R-3", "O-5", "W-1") },
+      { type: "checkWord", playerId: TUTORIAL_HERO, submission: word("C-2", "L-1", "O-1", "T-3") },
       NOW,
     );
     assert.ok(checked.ok);

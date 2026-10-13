@@ -32,7 +32,7 @@ export function resultsHeadline({ seats, revealed }: CopyInput): ResultsHeadline
     return {
       lead: `${winners[0]?.name ?? ""} takes`,
       emphasis: "the pot",
-      subline: `${upper(winners[0]?.name ?? "")} · EVERYONE FOLDED`,
+      subline: `${upper(winners[0]?.name ?? "")} · WON, EVERYONE ELSE FOLDED`,
     };
   }
 

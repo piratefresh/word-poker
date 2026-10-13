@@ -23,6 +23,7 @@
  */
 
 import { Client } from "@colyseus/sdk";
+import { authenticateSmokeClient } from "./authenticate.js";
 
 import {
   GAME_EVENTS,
@@ -39,8 +40,6 @@ const SEED = Number(process.env.SEED ?? 409);
 const GAME_URL = process.env.GAME_URL ?? "ws://localhost:2567";
 /** A human-readable pause before each of this seat's actions, so a headed run can be watched. */
 const BEAT_MS = Number(process.env.BEAT_MS ?? 700);
-/** Keeps HAND #1 results on screen for the browser flow to assert. */
-const PAYOUT_DELAY_MS = 60_000;
 
 type Seat = { seat: number; playerId: string; committedThisRound: number; ready: boolean };
 type State = {
@@ -55,12 +54,13 @@ type State = {
 
 const dictionary = await loadDictionary();
 const client = new Client(GAME_URL);
+// One seat per account: the player's flow signs in as the shared E2E user.
+await authenticateSmokeClient(client, process.env.OPPONENT_EMAIL ?? "e2e-2@wordpoker.dev");
 const room = await client.create("game", {
   name: NAME,
   buyIn: 500,
   maxSeats: 2,
   seed: SEED,
-  payoutDelay: PAYOUT_DELAY_MS,
 });
 console.log(`seated at "${NAME}" (seed ${SEED}) — table ${room.roomId} as ${room.sessionId}`);
 

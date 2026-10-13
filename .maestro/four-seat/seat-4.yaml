@@ -12,7 +12,7 @@ tags:
     file: _ready.yaml
     env: { SEATS: "4" }
 
-# Hand 1: under the gun raises, calls P2's re-raise and flop bet, checks it down, spells ILEA.
+# Hand 1: under the gun raises, calls P2's re-raise and flop bet, checks it down, spells ERY.
 - runFlow:
     file: _act.yaml
     env: { ACTION: wager }
@@ -30,19 +30,20 @@ tags:
     env: { ACTION: check-call }
 - runFlow: _river.yaml
 - tapOn:
-    id: "word-builder-face-AI-1-I"
-- tapOn:
-    id: "word-builder-tile-L-4"
-- tapOn:
     id: "word-builder-tile-E-5"
 - tapOn:
-    id: "word-builder-tile-A-5"
+    id: "word-builder-tile-R-3"
+- tapOn:
+    id: "word-builder-tile-Y-2"
 - runFlow:
     file: _confirm.yaml
-    env: { HAND: "1", WORD: ILEA }
+    env: { HAND: "1", WORD: ERY }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "1", WORD: DX }
+    env: { HAND: "1", WORD: JAY }
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
 
 # Hand 2: the big blind folds to P3's shove.
 - runFlow:
@@ -50,9 +51,12 @@ tags:
     env: { ACTION: fold }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "2", WORD: TAX }
+    env: { HAND: "2", WORD: HEIDI }
+- runFlow:
+    file: _ready.yaml
+    env: { SEATS: "4" }
 
-# Hand 3: the button limps, checks it down, spells CALK.
+# Hand 3: the button limps, checks it down, spells DZ.
 - runFlow:
     file: _act.yaml
     env: { ACTION: check-call }
@@ -67,19 +71,15 @@ tags:
     env: { ACTION: check-call }
 - runFlow: _river.yaml
 - tapOn:
-    id: "word-builder-tile-C-1"
+    id: "word-builder-tile-D-4"
 - tapOn:
-    id: "word-builder-tile-A-9"
-- tapOn:
-    id: "word-builder-tile-L-3"
-- tapOn:
-    id: "word-builder-tile-K-1"
+    id: "word-builder-face-ZX-1-Z"
 - runFlow:
     file: _confirm.yaml
-    env: { HAND: "3", WORD: CALK }
+    env: { HAND: "3", WORD: DZ }
 - runFlow:
     file: _results.yaml
-    env: { HAND: "3", WORD: TWEAK }
+    env: { HAND: "3", WORD: DZ }
 
 - runFlow:
     file: _ready.yaml

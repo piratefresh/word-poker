@@ -1,6 +1,7 @@
 import "./finalization-registry-polyfill"; // must run before @colyseus/sdk evaluates
 import { Client } from "@colyseus/sdk";
 import Constants from "expo-constants";
+import { authClient } from "@/auth/client/auth-client";
 
 /** The Colyseus server runs on this port beside the Expo dev server. */
 const GAME_SERVER_PORT = 2567;
@@ -17,6 +18,20 @@ function devGameURL(): string {
   return host ? `ws://${host}:${GAME_SERVER_PORT}` : `ws://localhost:${GAME_SERVER_PORT}`;
 }
 
-const gameServerURL = process.env.EXPO_PUBLIC_GAME_URL ?? devGameURL();
+// `local` (set by `pnpm start:local`) overrides a cloud URL in .env without editing it.
+const configuredURL = process.env.EXPO_PUBLIC_GAME_URL;
+const gameServerURL = configuredURL && configuredURL !== "local" ? configuredURL : devGameURL();
 
 export const gameClient = new Client(gameServerURL);
+
+/** Table credentials stay off the public lobby connection and are never persisted here. */
+export const tableClient = new Client(gameServerURL);
+
+export async function authenticateTableClient(): Promise<void> {
+  tableClient.auth.token = "";
+  const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } });
+  if (error || !data?.session.token) {
+    throw Object.assign(new Error("Sign in to join an online table."), { code: 401 });
+  }
+  tableClient.auth.token = data.session.token;
+}

@@ -19,16 +19,16 @@
 #
 # Non-UI agents don't need this flow; the same credentials work over HTTP:
 #   POST /api/auth/sign-in/email {"email": ..., "password": ...}
-url: http://localhost:8081/sign-in
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-in"
 name: Sign in as the E2E test user
 tags:
   - web
   - auth
-env:
-  TEST_USER_EMAIL: e2e@wordpoker.dev
-  TEST_USER_PASSWORD: wordpoker-e2e
 ---
-- openLink: http://localhost:8081/sign-in
+# One seat per account at a table: `-e TEST_USER_EMAIL=e2e-2@wordpoker.dev` signs in as another
+# seeded seat (scripts/seed-test-user.mjs). Without it, the shared E2E user.
+- evalScript: "${output.email = typeof TEST_USER_EMAIL === 'undefined' ? 'e2e@wordpoker.dev' : TEST_USER_EMAIL}"
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-in"
 
 # The app hides everything until the first session check resolves, so give it a
 # beat before deciding which screen we're on.
@@ -69,12 +69,12 @@ env:
     timeout: 30000
 - tapOn:
     text: "Email"
-- inputText: ${TEST_USER_EMAIL}
+- inputText: ${output.email}
 - tapOn:
     css: input[type=password]
     below:
       text: "EMAIL OR HANDLE"
-- inputText: ${TEST_USER_PASSWORD}
+- inputText: wordpoker-e2e
 - tapOn:
     text: "Sign in"
 
@@ -88,4 +88,4 @@ env:
 - assertVisible:
     text: "Signed in as"
 - assertVisible:
-    text: ${TEST_USER_EMAIL}
+    text: ${output.email}

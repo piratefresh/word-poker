@@ -1,0 +1,119 @@
+# STO-578: pnpm smoke:cross:android (or smoke:cross:ios on macOS).
+# Browser is seat 0, native is seat 1. Seed 505, buy-in 500, blinds 5/10.
+# JET (web, 15 points) beats ETA (native, 8); web wins the $20 pot.
+# Probe selectors and payout with pnpm smoke:cross:probe.
+url: ${WEB_URL}/online
+name: Cross-platform web - create, play against native, verify payout
+tags: [web, online, cross-platform]
+---
+- openLink: ${WEB_URL}/online
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT|Deal a new table"
+    timeout: 180000
+# Always: a session left in this profile may be the native seat's account (one seat per account).
+- runFlow: sign-in.yaml
+- openLink: ${WEB_URL}/online
+- extendedWaitUntil:
+    visible: "Deal a new table"
+    timeout: 180000
+- tapOn: "Deal a new table"
+- tapOn:
+    id: "Table name"
+- inputText: "Cross Platform Table"
+- tapOn: "Create"
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 60000
+
+# The runner reads the lobby listing and only then starts the native flow in this room.
+- extendedWaitUntil:
+    visible: "[0-9] of 2 ready.*"
+    timeout: 300000
+- tapOn:
+    id: "action-ready"
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 180000
+- evalScript: ${output.street = 0}
+- repeat:
+    times: 3
+    commands:
+      - extendedWaitUntil:
+          visible: ${['PREFLOP', 'FLOP', 'TURN'][output.street]}
+          timeout: 180000
+      - extendedWaitUntil:
+          visible: "YOUR TURN"
+          timeout: 180000
+      - tapOn:
+          id: "action-check-call"
+      - extendedWaitUntil:
+          visible: ${['FLOP', 'TURN', 'RIVER'][output.street]}
+          timeout: 180000
+      - evalScript: ${output.street += 1}
+
+# Draft before closing the river, keeping slow native tile taps out of the 60s word window.
+- extendedWaitUntil:
+    visible:
+      id: "Community 5/5"
+    timeout: 30000
+- tapOn:
+    id: "word-builder-tile-J-1"
+- tapOn:
+    id: "word-builder-tile-E-12"
+- tapOn:
+    id: "word-builder-tile-T-1"
+- assertVisible: "JET"
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    # The native player drafts three tiles on its river turn; wait for the room's whole clock.
+    timeout: 300000
+- tapOn:
+    id: "action-check-call"
+- extendedWaitUntil:
+    visible:
+      id: "action-fold"
+      enabled: false
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "action-check-call"
+      enabled: true
+    timeout: 30000
+- tapOn:
+    id: "action-check-call"
+- extendedWaitUntil:
+    visible:
+      id: "xp-result-continue|simple-win-continue|Back to the main menu"
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: "xp-result-continue|simple-win-continue"
+    commands:
+      - tapOn:
+          id: "xp-result-continue|simple-win-continue"
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 60000
+- assertVisible: "SCOREBOARD"
+- assertVisible: "2 PLAYERS · 0 FOLDS · 2 WORDS PLAYED"
+- assertVisible:
+    id: ".*takes the pot, \\$20 pot, .*JET · 15 PTS"
+- assertVisible:
+    id: "result-card-.*"
+    index: 0
+    containsDescendants:
+      - text: "JET"
+      - text: "15"
+      - text: ".*\\(you\\)"
+- assertVisible:
+    id: "result-card-.*"
+    index: 1
+    containsDescendants:
+      - text: "ETA"
+      - text: "8"
+- assertNotVisible: "The window closed"
+- takeScreenshot: cross-platform-web-results
+- tapOn:
+    id: "Back to the main menu"

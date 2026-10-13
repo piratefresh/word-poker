@@ -629,7 +629,7 @@ function SortableStrip({
 
   return (
     <>
-      {data.map((datum) => (
+      {data.map((datum, index) => (
         <DragTile
           activeId={activeId}
           count={count}
@@ -639,6 +639,7 @@ function SortableStrip({
           onDragStart={onDragStart}
           onDrop={settle}
           onToggle={onToggle}
+          place={index}
           positions={positions}
           rack={rack}
           step={step}
@@ -655,6 +656,7 @@ function SortableStrip({
 function DragTile({
   datum,
   count,
+  place,
   rack,
   step,
   positions,
@@ -666,6 +668,8 @@ function DragTile({
 }: {
   datum: StripDatum;
   count: number;
+  /** The place the strip was seeded with; it remounts on a new order, so this is `positions[id]`. */
+  place: number;
   rack: RackGeometry;
   /** How far apart the places sit, as the room the rack was given allows. */
   step: number;
@@ -677,7 +681,9 @@ function DragTile({
   onDrop: (order: Record<string, number>) => void;
 }): JSX.Element {
   const id = datum.id;
-  const left = useSharedValue((positions.get()[id] ?? 0) * step);
+  // Seeded from the prop, not `positions.get()`: reading a shared value during render stalls the
+  // JS thread on Android (one dev warning per tile per render), which starved the room's updates.
+  const left = useSharedValue(place * step);
   const dragBase = useSharedValue(0);
 
   // A tile the seat is not holding springs to whatever place it now sits in — this is the

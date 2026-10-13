@@ -8,6 +8,11 @@
   },
   "scripts": {
     "android:device": "pnpm --filter @wordpoker/mobile exec expo run:android --device",
+    "android:device:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_GAME_URL='local'; pnpm android:device\"",
+    "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
+    "deploy:colyseus": "npx @colyseus/cloud deploy",
+    "deploy:railway": "railway up --ci",
+    "deploy:all": "pnpm deploy:colyseus && pnpm deploy:railway",
     "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm kill:ports && pnpm --filter @wordpoker/mobile start",
     "kill:ports": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8081,8082 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; exit 0\"",
@@ -18,6 +23,9 @@
     "smoke:online:four": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online-four.ps1",
     "smoke:online:android": "node scripts/smoke-online-native.mjs android",
     "smoke:online:ios": "node scripts/smoke-online-native.mjs ios",
+    "smoke:cross:android": "node scripts/smoke-online-native.mjs android --web-opponent",
+    "smoke:cross:ios": "node scripts/smoke-online-native.mjs ios --web-opponent",
+    "smoke:cross:probe": "pnpm --filter @wordpoker/server exec tsx scripts/probe-cross-platform.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "dictionary:prepare": "pnpm --filter @wordpoker/game-rules dictionary:prepare"

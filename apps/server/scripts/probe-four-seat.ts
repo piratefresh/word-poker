@@ -43,6 +43,7 @@ export function playFourSeatSession(seed: number, dictionary: Dictionary): HandT
     dictionary,
     blinds: blindsFor(FOUR_SEAT_BUY_IN),
     turnDurationMs: 120_000,
+    powerUps: { deal: "off" },
   });
   let now = 0;
   game.start(

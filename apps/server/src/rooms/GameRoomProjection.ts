@@ -32,6 +32,8 @@ export interface ProjectionBinding {
   readonly connected: boolean;
   readonly tableStack: number;
   readonly ready: boolean;
+  readonly seenResults: boolean;
+  readonly present: boolean;
 }
 
 export interface GameRoomProjectionInput {
@@ -130,6 +132,8 @@ export class GameRoomProjection {
       seat.sittingOut = engineSeat?.sittingOut ?? false;
       seat.actedThisRound = engineSeat?.actedThisRound ?? false;
       seat.ready = binding.ready;
+      seat.seenResults = binding.seenResults;
+      seat.present = binding.present;
       this.state.seats.set(binding.playerId, seat);
     }
   }

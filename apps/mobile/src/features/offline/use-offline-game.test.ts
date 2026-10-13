@@ -33,7 +33,7 @@ jest.mock("@wordpoker/game-rules", () => {
   return { ...actual, startHand: jest.fn(actual.startHand), chooseBotPower: jest.fn(actual.chooseBotPower), decideBotPowerUse: jest.fn(actual.decideBotPowerUse) };
 });
 
-const SEED = 7;
+const SEED = 246;
 /** A seed whose first bot raises: the hero starts preflop facing a raise over the big blind. */
 const BETTING_SEED = 20_260_919;
 const SEATS = 4;
@@ -453,7 +453,7 @@ describe("useOfflineGame — the CPU's beat", () => {
 
     // A check moves no chips and leaves no flag on the seat: the nameplate is the only place it
     // can be read.
-    expect(statuses(result).slice(1)).toEqual(["fold", "check", "fold"]);
+    expect(statuses(result).slice(1)).toEqual(["check", "check", "check"]);
 
     // The hero's check closes the street. A street nobody has acted on yet is what the pills
     // show, so the words from the last one do not survive into it — not the bots' and not the
@@ -900,12 +900,12 @@ describe("useOfflineGame — the Wild table (§44)", () => {
 
   test("an all-in wordless bot uses in the word window and confirms the new word on a later beat", async () => {
     const actual = jest.requireActual<typeof import("@wordpoker/game-rules")>("@wordpoker/game-rules");
-    // Seed 0: Ellis holds R + S/L; Mulligan replaces R with I, making IS from a wordless rack/board.
+    // Seed 211: Ellis holds R + S/L; Mulligan replaces R with I, making IS from a wordless rack/board.
     jest.mocked(startHand).mockImplementationOnce((options) => actual.startHand({ ...options,
       players: ["hero", "ellis"], stacks: [{ playerId: "hero", stack: 10 }, { playerId: "ellis", stack: 20 }],
     }));
     const dictionary = testDictionary(["IS"]);
-    const hook = await renderHook(() => useOfflineGame({ seed: 0, dictionary, powerUps: "choose3" }));
+    const hook = await renderHook(() => useOfflineGame({ seed: 211, dictionary, powerUps: "choose3" }));
     const result = hook.result as Table;
     await pick(result, "mulligan");
     await beat();
@@ -913,6 +913,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     const before = result.current.game;
     await beat();
     const [state, id] = jest.mocked(decideBotPowerUse).mock.calls[0] ?? [];
+    const replaced = (jest.mocked(decideBotPowerUse).mock.results[0]?.value as { tileId?: string } | null)?.tileId;
     expect(id).toBe("ellis");
     expect(state?.seats[1]?.allIn).toBe(true);
     if (state === undefined) throw new Error("the real policy was called");
@@ -936,7 +937,7 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     const ellis = result.current.results?.seats.find((seat) => seat.playerId === "ellis");
     expect(ellis?.word).toBe("IS");
     expect(ellis?.tiles.some((tile) => tile.id === "power-1")).toBe(true);
-    expect(ellis?.tiles.some((tile) => tile.id === "R-3")).toBe(false);
+    expect(ellis?.tiles.some((tile) => tile.id === replaced)).toBe(false);
   });
 
   test("a wordless window stops scheduling policy searches when no bot can make a move", async () => {

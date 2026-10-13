@@ -1,0 +1,126 @@
+# STO-578: run through pnpm smoke:cross:android or smoke:cross:ios.
+# The runner attaches the development client to its Metro before this flow starts.
+# Seat 1 at seed 505 builds ETA (8); browser seat 0 builds JET (15) and wins $20.
+appId: com.wordpoker.wordpoker
+name: Cross-platform native - join web, play ETA, verify payout
+tags: [native, online, cross-platform]
+---
+- tapOn:
+    text: "Continue"
+    optional: true
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT|Online Mode"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: _sign-in.yaml
+- extendedWaitUntil:
+    visible: "Online Mode"
+    timeout: 180000
+- openLink: wordpoker://online?room=${ROOM_ID}
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "action-ready"
+      enabled: true
+    timeout: 60000
+- tapOn:
+    id: "action-ready"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 30000
+- evalScript: ${output.street = 0}
+- repeat:
+    times: 3
+    commands:
+      - extendedWaitUntil:
+          visible: ${['PREFLOP', 'FLOP', 'TURN'][output.street]}
+          timeout: 180000
+      - extendedWaitUntil:
+          visible: "YOUR TURN"
+          timeout: 180000
+      - tapOn:
+          id: "action-check-call"
+          waitToSettleTimeoutMs: 500
+          retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: ${['FLOP', 'TURN', 'RIVER'][output.street]}
+          timeout: 180000
+      - evalScript: ${output.street += 1}
+
+# Draft before closing river betting, keeping slow taps out of the shared word window.
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 180000
+- tapOn:
+    id: "word-builder-tile-E-12"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- tapOn:
+    id: "word-builder-tile-T-1"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- tapOn:
+    id: "word-builder-tile-A-4"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- assertVisible: "ETA"
+- tapOn:
+    id: "action-check-call"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "action-fold"
+      enabled: false
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "action-check-call"
+      enabled: true
+    timeout: 30000
+- tapOn:
+    id: "action-check-call"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "xp-result-continue|simple-win-continue|results-back"
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: "xp-result-continue|simple-win-continue"
+    commands:
+      - tapOn:
+          id: "xp-result-continue|simple-win-continue"
+          waitToSettleTimeoutMs: 500
+          retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 60000
+- assertVisible: "2 PLAYERS · 0 FOLDS · 2 WORDS PLAYED"
+- assertVisible: ".*takes the pot, \\$20 pot, .*JET · 15 PTS"
+- assertNotVisible: "The window closed"
+- scrollUntilVisible:
+    element:
+      text: ".*JET, 15 points.*takes the pot"
+    direction: DOWN
+    timeout: 60000
+- assertNotVisible: ".*\\(you\\).*takes the pot"
+- scrollUntilVisible:
+    element:
+      text: ".*\\(you\\), ETA, 8 points.*"
+    direction: DOWN
+    timeout: 60000
+- takeScreenshot: cross-platform-native-results
+- tapOn:
+    id: "results-back"
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false

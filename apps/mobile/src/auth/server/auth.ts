@@ -1,5 +1,6 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
+import { bearer } from "better-auth/plugins";
 import { config } from "dotenv";
 import { Pool } from "pg";
 
@@ -88,7 +89,7 @@ export const auth = betterAuth({
         ]
       : []),
   ],
-  plugins: [expo()],
+  plugins: [expo(), bearer()],
   // Verifying pays the Wallet's welcome grant (STO-346); signing in does not wait on it.
   emailVerification: {
     sendOnSignUp: true,

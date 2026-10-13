@@ -15,3 +15,7 @@ export {
 export { QuestHandLog, type QuestHandLogRow } from "./quest-hand-log";
 export { QuestProgress, type QuestProgressRow } from "./quest-progress";
 export { PlayerProgress, type PlayerProgressRow } from "./player-progress";
+export {
+  GameSession, GameHand, HandSeat, HandAction,
+  type GameSessionRow, type GameHandRow, type HandSeatRow, type HandActionRow,
+} from "./game-history";

@@ -9,6 +9,7 @@ import { TutorialScreen } from "./tutorial-screen";
 
 // The same stand-ins the offline table's suite uses: a safe area with no native views, a router
 // Jest can parse, and the one reduced-motion hook the reanimated mock lacks.
+jest.mock("@/components/screens/results/simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
 );
@@ -27,7 +28,7 @@ jest.mock("@/lib/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
 }));
 
-let mockDictionary: Dictionary | null = testDictionary(["BROWN", "GONER"]);
+let mockDictionary: Dictionary | null = testDictionary(["CLOTH", "OCTET"]);
 jest.mock("@/features/table/use-dictionary", () => ({
   useDictionary: () => mockDictionary,
 }));
@@ -36,7 +37,7 @@ const FELT_BOX = { nativeEvent: { layout: { width: 360, height: 320 } } };
 
 beforeEach(() => {
   jest.useFakeTimers();
-  mockDictionary = testDictionary(["BROWN", "GONER"]);
+  mockDictionary = testDictionary(["CLOTH", "OCTET"]);
 });
 
 afterEach(() => {

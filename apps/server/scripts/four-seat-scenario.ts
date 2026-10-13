@@ -26,13 +26,12 @@ import type { OfflineAction, Tile, TilePlay, WordSubmission } from "@wordpoker/c
 import { bettingBounds, evaluateWord, scoreWord, type Dictionary, type OfflineState } from "@wordpoker/game-rules";
 
 /** The seed the probe pinned: the deal under which the script's outcomes hold. */
-export const FOUR_SEAT_SEED = 4111;
+export const FOUR_SEAT_SEED = 98;
 
 /** The room knobs the runner hands the server as `WORDPOKER_SMOKE_ROOM`. */
 export const FOUR_SEAT_ROOM = {
   seed: FOUR_SEAT_SEED,
   // Long enough for four browsers to read the results before the next deal.
-  payoutDelay: 20_000,
   // A slow machine running four Chromes must not time a seat out of its scripted turn.
   turnDuration: 120_000,
 } as const;

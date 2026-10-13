@@ -4,6 +4,8 @@ import { seatFixture, snapshotFixture } from "./results-fixtures";
 import type { ResultsSnapshot } from "./results-types";
 import { useSimpleWinCelebration } from "./use-simple-win-celebration";
 
+jest.mock("./simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
+
 test.each([false, true])("celebrates a local win with revealed=%s until Continue", async (revealed) => {
   const snapshot = snapshotFixture({
     revealed,

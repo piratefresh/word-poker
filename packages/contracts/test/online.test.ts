@@ -25,6 +25,7 @@ describe("online message vocabulary", () => {
       draftWord: "draftWord",
       confirmWord: "confirmWord",
       ready: "ready",
+      resultsSeen: "resultsSeen",
       pickPower: "pickPower",
       usePowerUp: "usePowerUp",
     });
@@ -55,6 +56,8 @@ describe("online message vocabulary", () => {
     assert.ok(!isOnlineWordAction({ submission: { plays: [] }, playerId: "forged" }));
     assert.ok(!isOnlineWordAction({ submission: { plays: [{ tileId: "" }] } }));
 
+    assert.ok(isGameMessagePayload("resultsSeen", undefined));
+    assert.ok(!isGameMessagePayload("resultsSeen", { playerId: "forged" }));
     assert.ok(isGameMessagePayload("betting", { type: "check" }));
     assert.ok(isGameMessagePayload("draftWord", { submission: { plays: [] } }));
     assert.ok(!isGameMessagePayload("confirmWord", { plays: [] }));

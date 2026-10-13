@@ -39,8 +39,8 @@ Maestro must be on PATH or installed at ~/.maestro/bin/maestro.bat; keep Chrome 
 on matching versions. The existing mobile/server env files and seeded E2E user are still required
 (see below). This runner is local and Windows-only.
 
-The opponent creates Smoke Table, calls when it owes, and holds results for 60 seconds. The flow
-signs in when needed, builds PUB, checks the results overlay, and leaves the table.
+The opponent creates Smoke Table, calls when it owes, and keeps results open until the player leaves. The flow
+signs in when needed, builds ILK, checks the results overlay, and leaves the table.
 
 The Wild variant (STO-500) is the same runner with power-ups on:
 
@@ -48,8 +48,8 @@ The Wild variant (STO-500) is the same runner with power-ups on:
 pnpm smoke:online:wild            # headed; add -Headless for --headless --screen-size 1280x1000
 ```
 
-It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 527 and runs `.maestro/online-wild-hand.yaml`.
-The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds OX
+It sets `WORDPOKER_SMOKE_ROOM` to a Wild room at seed 518 and runs `.maestro/online-wild-hand.yaml`.
+The browser picks Random Wild, uses it on its first turn, sees the "power used" card, and builds FE
 with the new tile. The opponent keeps its first offer and never uses it. It logs the public use it
 hears, and it logs `LEAK:` if a swapped tile reaches it before the reveal. The runner fails on
 either. After changing the deal, the catalog or the letter stream, re-probe with
@@ -67,7 +67,7 @@ words at showdown. In hand 2 a short stack shoves into a side pot, loses and bus
 busted seat sits out and leaves, which sends the table back to waiting. The three seats left ready
 up again, and hand 4 deals 3-handed. P1 creates "Four Table" through the real lobby form, so the
 seed cannot come from the create. Instead the runner sets `WORDPOKER_SMOKE_ROOM` (JSON room knobs:
-seed, payout delay, turn clock, and `powerUps` — §40's Classic/Wild, validated like a create's own), which the server merges under a create's own options, and only
+seed, turn clock, and `powerUps` — §40's Classic/Wild, validated like a create's own), which the server merges under a create's own options, and only
 behind `WORDPOKER_DETERMINISTIC_SEED=1`. A lobby watcher that takes no seat
 (`apps/server/scripts/smoke-lobby-watch.ts`) tells the runner when each browser has sat down, and
 the runner starts the next one only then, so join order is seat order. The script lives in
@@ -85,6 +85,11 @@ it resets the password and keeps the user's id:
 ```bash
 node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
 ```
+
+The same script also seeds `e2e-2@wordpoker.dev`, `e2e-3@…` and `e2e-4@…` (same password). An online
+table seats an account only once, so multi-seat smokes give each seat its own account. The scripted
+opponent and the cross-platform browser seat use `e2e-2`, and four-seat seats P2–P4 use `e2e-2`
+to `e2e-4`. Choose the account with `-e TEST_USER_EMAIL=…` on any flow that runs `sign-in.yaml`.
 
 `.maestro/sign-in.yaml` signs in as that user through the real sign-in screen (safe to rerun: it signs out
 an existing session first, and always ends past the guard on the home screen). A headed run keeps the
@@ -134,9 +139,9 @@ those services.
 
 ### Online device smoke
 
-apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with the e2e-test app build and a ROOM_ID deep link. The auth bypass only skips sign-in. The device still needs a Colyseus server started with WORDPOKER_DETERMINISTIC_SEED=1, reachable through EXPO_PUBLIC_GAME_URL, and a separate smoke-opponent.ts process. Run the flow from apps/mobile and pass the room id printed by the opponent:
+apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with a signed-in development build and a ROOM_ID deep link. Online joins require a real Better Auth session; the offline E2E auth bypass cannot authenticate a table. The device needs reachable Expo auth and Colyseus servers, a seeded E2E user, WORDPOKER_DETERMINISTIC_SEED=1, and a separate smoke-opponent.ts process. The flow signs in when needed. Run it from apps/mobile with the room id printed by the opponent:
 
-    eas build --platform android --profile e2e-test
+    pnpm android:device
     maestro test --platform android .maestro/native/online-hand.yaml -e ROOM_ID=the-id-printed-by-smoke-opponent
 
 Set EXPO_PUBLIC_GAME_URL at build time to an address the device can reach; localhost on the device is not the development machine. Keep this device flow manual and out of CI until its server and opponent are provisioned.
@@ -145,7 +150,7 @@ The local runner automates that wiring on one machine (Windows or macOS):
 
     node scripts/smoke-online-native.mjs android
 
-It starts the seeded Colyseus, Metro (`--clear`, auth bypass, local game URL), the scripted
+It starts the seeded Colyseus, Metro (`--clear`, real sign-in, local auth and game URLs), the scripted
 opponent, cold-starts the dev client on its Metro, and runs the flow with `ATTACH=1`. Every ADB
 call is bounded and asynchronous — a hung `adb` has wedged whole runs — and `SMOKE_TIMEOUT_MS`
 (default 900000) starts before setup. Cancellation and timeout stop Maestro and the service
@@ -157,4 +162,38 @@ A cold boot restored a stalled Settings flow to ten consecutive passes of about 
 2026-10-09; this demonstrates an environment contribution, not a fix for app input latency.
 To cold-restart the emulator, use
 (`adb emu kill`, then relaunch it detached — never two qemu instances on one AVD).
+
+### Web versus native smoke (STO-578)
+
+Two real Maestro UI players share a seeded Colyseus room:
+
+```bash
+pnpm smoke:cross:android             # Windows or macOS; booted/USB Android device
+pnpm smoke:cross:ios                 # macOS; booted iOS Simulator
+pnpm smoke:cross:android --headless  # hide the web browser only
+pnpm smoke:cross:probe               # recheck the deal, taps, scores and payout without devices
+```
+
+Install a development build first (`pnpm android:device`, or `expo run:ios` from apps/mobile).
+Use one connected native target. Maestro (or `MAESTRO_BIN`), Java, and the web driver's matching
+Chrome/chromedriver must be installed. Stop services on ports 2567 and 8081 before running.
+Alternatively, set `SMOKE_GAME_PORT` and `SMOKE_METRO_PORT` to free ports; the runner wires both
+players to those ports and leaves existing development servers running.
+The native runner starts Colyseus and one Metro serving both platforms, uses Android port reversal
+or the iOS Simulator's shared localhost, and attaches the dev client to that Metro. This Metro sets
+real sign-in for both players, so the seeded E2E auth user and Expo API configuration are required.
+
+The web flow (`.maestro/cross-platform-hand.yaml`) creates Cross Platform Table through the lobby
+form with the default 500 buy-in and Classic mode. The existing lobby watcher takes no seat and
+reports the room ID; only then does the native flow (`apps/mobile/.maestro/native/cross-platform-hand.yaml`)
+join it. Both ready up, check/call through all four streets, draft their words before closing river
+betting, and confirm them. Seed 505 gives web JET (15 points) and native ETA (8 points); web wins
+the $20 pot (stacks 510 / 490). Both UIs assert two words played, the pot and winning score;
+the native UI also checks that its own card loses. The engine probe pins the exact
+tile IDs, turn order and payout; changes to the deal or scoring must update the flows with it.
+
+The runner succeeds only after both Maestro processes pass. A failure, Ctrl-C, or `SMOKE_TIMEOUT_MS`
+(default 15 minutes, including setup) stops the owned service and player process trees. Per-player
+logs, Maestro artifacts and result screenshots stay in the temporary directory printed at startup.
+This is a local smoke; it does not provision native builds or remote devices in CI.
 

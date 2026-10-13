@@ -5,21 +5,21 @@
 #
 # Same seed as offline-hand.yaml: the Power Draw rolls from streams of its own, so the initial
 # tiles are the Classic hand's; CPU swaps change their later line. The hero is offered, in order,
-# Vowel Magnet, Mulligan and Random Wild (`drawOffers(20260919, 0)` in game-rules) — so a
+# Vowel Magnet, Mulligan and Random Wild (`drawOffers(178, 0)` in game-rules) — so a
 # changed seed or catalog fails at the pick, loudly.
 #
 # Selectors: the reveal is `power-draw`, each card `power-offer-<id>`, and `power-draw-ready` the
 # "CHOOSE ONE POWER" hint that shows once the cards take a tap (each a DOM id on the web, via
 # `webTestID`). The action row is reached by id, as in offline-hand.yaml. Sign-in composes the
 # same way that flow does.
-url: http://localhost:8081/offline?seed=20260919&powers=wild
+url: http://localhost:8081/offline?seed=178&powers=wild
 name: Offline Wild hand — pick a power, play the hand
 tags:
   - web
   - offline
   - powers
 ---
-- openLink: http://localhost:8081/offline?seed=20260919&powers=wild
+- openLink: http://localhost:8081/offline?seed=178&powers=wild
 
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
@@ -29,7 +29,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline?seed=20260919&powers=wild
+- openLink: http://localhost:8081/offline?seed=178&powers=wild
 
 # The draw opens once the dictionary has loaded and the hand is dealt. The draw's clock is 10 s
 # (POWER_DRAW_MS) and a web step here takes about half a second, so the flow taps the first card as
@@ -98,6 +98,6 @@ tags:
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 10000
-# Mira's played swap is revealed only here, with §44's marker on the A in DRAGS.
+# Mira's played swap is revealed only here, with §44's marker on the tile the swap put in her word.
 - assertVisible:
     id: "result-card-mira-tile-2-powered"

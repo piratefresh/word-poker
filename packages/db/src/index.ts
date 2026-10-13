@@ -30,6 +30,10 @@ export {
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
 export {
+  GameSession, GameHand, HandSeat, HandAction,
+  type GameSessionRow, type GameHandRow, type HandSeatRow, type HandActionRow,
+} from "./entities/index";
+export {
   playerProgress,
   questProgress,
   recordQuestHand,

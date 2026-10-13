@@ -223,7 +223,7 @@ describe("buildResultsSnapshot", () => {
     expect(snapshot.table).toEqual({ players: 4, folded: 3 });
     expect(snapshot.headline.lead).toBe("Ellis takes");
     expect(snapshot.headline.emphasis).toBe("the pot");
-    expect(snapshot.headline.subline).toBe("ELLIS · EVERYONE FOLDED");
+    expect(snapshot.headline.subline).toBe("ELLIS · WON, EVERYONE ELSE FOLDED");
     expect(snapshot.summary).toBe("4 PLAYERS · 3 FOLDS · 0 WORDS PLAYED");
     const bare = buildResultsSnapshot({ state, players: [] });
     expect(bare?.seats.map((seat) => seat.playerId)).toEqual(["ellis", HERO, "jay", "mira"]);

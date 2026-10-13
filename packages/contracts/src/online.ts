@@ -88,6 +88,8 @@ export interface GameMessageMap {
   readonly draftWord: OnlineWordAction;
   readonly confirmWord: OnlineWordAction;
   readonly ready: OnlineReadyAction;
+  /** A seat has put away the paid-out hand's results; carries no payload. */
+  readonly resultsSeen: undefined;
   readonly pickPower: OnlinePickPowerAction;
   readonly usePowerUp: OnlineUsePowerUpAction;
 }
@@ -98,6 +100,7 @@ export const GAME_MESSAGES = {
   draftWord: "draftWord",
   confirmWord: "confirmWord",
   ready: "ready",
+  resultsSeen: "resultsSeen",
   pickPower: "pickPower",
   usePowerUp: "usePowerUp",
 } as const satisfies { [Name in keyof GameMessageMap]: Name };
@@ -191,6 +194,10 @@ export interface OnlineSeatState extends SeatChips {
   readonly actedThisRound: boolean;
   /** Said ready in the waiting room; cleared whenever the table goes back to waiting. */
   readonly ready: boolean;
+  /** This seat chose Play another and left the settled results. */
+  readonly seenResults: boolean;
+  /** A dropped connection still holds its seat; a departed player does not. */
+  readonly present: boolean;
 }
 
 /** One live pot layer, with player ids rather than the engine's private seat indexes. */
@@ -388,6 +395,8 @@ export function isGameMessagePayload<Name extends GameMessageName>(
       return isOnlineWordAction(value);
     case "ready":
       return isOnlineReadyAction(value);
+    case "resultsSeen":
+      return value === undefined;
     case "pickPower":
       return isOnlinePickPowerAction(value);
     case "usePowerUp":

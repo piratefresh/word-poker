@@ -1,0 +1,18 @@
+# Online smokes need a real Better Auth session, even on E2E builds.
+appId: com.wordpoker.wordpoker
+env:
+  TEST_USER_EMAIL: e2e@wordpoker.dev
+  TEST_USER_PASSWORD: wordpoker-e2e
+---
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 180000
+- tapOn: "Email"
+- inputText: ${TEST_USER_EMAIL}
+- tapOn: "Password"
+- inputText: ${TEST_USER_PASSWORD}
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "Online Mode"
+    timeout: 60000
