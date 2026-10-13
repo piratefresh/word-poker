@@ -208,6 +208,21 @@ describe("usePowerTargeting", () => {
     expect(hook.result.current.discarded).toBe(TILE_A);
   });
 
+  test("Spotlight aims at the table, every other power at the rack", async () => {
+    const own = await setup(held());
+    await act(() => own.hook.result.current.toggle());
+    expect(own.hook.result.current.ownPick).toBeDefined();
+    expect(own.hook.result.current.tablePick).toBeUndefined();
+
+    const table = await setup(held({ id: "spotlight" }));
+    expect(table.hook.result.current.tablePick).toBeUndefined();
+    await act(() => table.hook.result.current.toggle());
+    expect(table.hook.result.current.ownPick).toBeUndefined();
+    await act(() => table.hook.result.current.tablePick?.(TILE_A));
+    await act(() => table.hook.result.current.confirm());
+    expect(table.onUse).toHaveBeenCalledWith("spotlight", "A-1");
+  });
+
   test("the chip's second tap cancels", async () => {
     const { hook } = await setup(held());
 

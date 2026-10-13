@@ -9,7 +9,7 @@ import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "@wordpoker/game-rules";
 import type { JSX, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { AccessibilityInfo, Platform, Text, View } from "react-native";
+import { AccessibilityInfo, Platform, Pressable, Text, View } from "react-native";
 
 import { GameButton } from "@/components/ui/game-button";
 import { ShadowBox } from "@/components/ui/shadow-box";
@@ -309,6 +309,7 @@ export function WordHand({
       <View style={styles.previewSlot}>
         <DraftPreview />
       </View>
+      <BlankPicker />
       <View style={styles.trayLip} testID="word-builder-tray">
         <ShadowBox radius={radius.lg} shadows={[{ dy: 10, blur: 20, color: "rgba(30,14,0,0.7)" }]} />
         {bonus === 0 ? null : (
@@ -339,6 +340,38 @@ export function WordHand({
     </View>
   );
 }
+
+/**
+ * A blank in the word (§44) names the letter it plays: an A–Z row above the tray while the word
+ * holds one, changeable until the word is confirmed. The pick lives in the draft's `chosenFace`,
+ * the same place a choice tile's face does.
+ */
+function BlankPicker(): JSX.Element | null {
+  const { strip, held, live, toggle } = useWordBuilderScope();
+  const entry = strip.find(({ tile }) => "blank" in tile && held.has(tile.id));
+  if (entry === undefined || !live) return null;
+
+  const chosen = held.get(entry.tile.id);
+  return (
+    <View style={styles.blankPicker} testID="word-builder-blank-picker">
+      {LETTERS.map((letter) => (
+        <Pressable
+          accessibilityLabel={`Play the blank as ${letter}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected: chosen === letter }}
+          key={letter}
+          onPress={() => toggle(entry, letter)}
+          style={[styles.chip, chosen === letter && styles.chipChosen]}
+          testID={`word-builder-blank-${letter}`}
+        >
+          <Text style={styles.chipFace}>{letter}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const LETTERS = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index));
 
 /** The tiles a seat can play: its private tiles and the whole board (§7). */
 const WORD_PLACES = PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;

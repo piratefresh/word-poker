@@ -38,7 +38,7 @@ import type {
   TilePlay,
   WordRejectionReason,
 } from "@wordpoker/contracts";
-import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
+import { POWER_UPS, WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import {
   BettingRejectionError,
   DEFAULT_STAKES,
@@ -890,11 +890,18 @@ interface SeatAction {
 function powerUsedBy(state: OfflineState, action: OfflineAction): PowerUsedEvent | null {
   if (action.type !== "usePowerUp" || state.phase === "payout") return null;
 
+  const lit = POWER_UPS[action.powerUpId].family === "spotlight"
+    ? state.community.find((tile) => tile.id === action.tileId)
+    : undefined;
+
   return {
     handId: state.hand,
     seat: state.seats.findIndex((seat) => seat.id === action.playerId),
     powerUpId: action.powerUpId,
     street: state.phase,
+    ...(lit === undefined
+      ? {}
+      : { tileId: lit.id, letter: "alternativeLetter" in lit ? `${lit.letter}/${lit.alternativeLetter}` : lit.letter }),
   };
 }
 

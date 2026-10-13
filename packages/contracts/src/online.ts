@@ -163,6 +163,9 @@ export interface PowerUsedEvent {
   readonly seat: number;
   readonly powerUpId: PowerUpId;
   readonly street: Exclude<RoundPhase, "payout">;
+  /** Spotlight only: the community tile it lit, and what it prints ("A", or a choice tile's "A/E"). */
+  readonly tileId?: string;
+  readonly letter?: string;
 }
 
 /** A rejection associated with the message family that produced it. */

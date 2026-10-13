@@ -1,5 +1,14 @@
-import { useMemo } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 
 import type { LetterTileData } from "../game-types";
 import { isCompactWindow, useScreenScale } from "../screen-scale";
@@ -48,15 +57,55 @@ function rackStyles(tile: number) {
 /** What an undealt slot's face-down tile is drawn from; its letter is never shown. */
 const BACK_TILE: LetterTileData = { id: "undealt", letter: "A", points: 1 };
 
+/**
+ * Spotlight's beam (§44): a tile that gains its 2x while it sits on the felt drops in from above
+ * with a gold glow, once. A tile that is dealt already doubled just appears — nothing was lit.
+ */
+function SpotlightBeam({ tile, children }: { tile: LetterTileData; children: ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const previous = useRef({ id: tile.id, lit: tile.multiplier !== undefined });
+  const drop = useSharedValue(0);
+  const glow = useSharedValue(0);
+
+  useEffect(() => {
+    const lit = tile.multiplier !== undefined;
+    const justLit = previous.current.id === tile.id && !previous.current.lit && lit;
+    previous.current = { id: tile.id, lit };
+    if (!justLit || reduceMotion) return;
+    drop.value = 1;
+    drop.value = withTiming(0, { duration: 520, easing: Easing.out(Easing.back(1.6)) });
+    glow.value = withSequence(withTiming(1, { duration: 220 }), withTiming(0, { duration: 900 }));
+    return () => {
+      cancelAnimation(drop);
+      cancelAnimation(glow);
+    };
+  }, [tile.id, tile.multiplier, reduceMotion, drop, glow]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: -60 * drop.value }, { scale: 1 + 0.25 * drop.value }],
+  }));
+  const halo = useAnimatedStyle(() => ({ opacity: glow.value }));
+
+  return (
+    <Animated.View style={style}>
+      <Animated.View pointerEvents="none" style={[styles.halo, halo]} />
+      {children}
+    </Animated.View>
+  );
+}
+
 export function CommunityStrip({
   tiles,
   inTable = false,
   scale: requestedScale,
+  onPick,
 }: {
   tiles: readonly (LetterTileData | null)[];
   /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
   inTable?: boolean;
   scale?: number;
+  /** Spotlight's aim: a tap on a dealt tile with no bonus picks it; other tiles stay inert. */
+  onPick?: (tile: LetterTileData) => void;
 }) {
   const screenScale = useScreenScale();
   const scale = requestedScale ?? screenScale;
@@ -89,13 +138,31 @@ export function CommunityStrip({
         >
           {five.map((tile, index) => (
             tile ? (
-              <LetterTile
-                dealDelayMs={communityDealDelayMs(index)}
-                key={`community-${index}`}
-                scale={scale}
-                size={tileWidth}
-                tile={tile}
-              />
+              <SpotlightBeam key={`community-${index}`} tile={tile}>
+                {onPick !== undefined && tile.multiplier === undefined ? (
+                  <Pressable
+                    accessibilityLabel={`Spotlight ${tile.letter}`}
+                    accessibilityRole="button"
+                    onPress={() => onPick(tile)}
+                    style={styles.target}
+                    testID={`community-tile-${tile.id}`}
+                  >
+                    <LetterTile
+                      dealDelayMs={communityDealDelayMs(index)}
+                      scale={scale}
+                      size={tileWidth}
+                      tile={tile}
+                    />
+                  </Pressable>
+                ) : (
+                  <LetterTile
+                    dealDelayMs={communityDealDelayMs(index)}
+                    scale={scale}
+                    size={tileWidth}
+                    tile={tile}
+                  />
+                )}
+              </SpotlightBeam>
             ) : inTable ? (
               <Tile
                 key={`community-${index}`}
@@ -121,4 +188,15 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   tileRow: { flexDirection: "row", gap: 6 },
+  // A tile the seat may aim Spotlight at wears a gold ring.
+  target: { borderColor: "#e7c75a", borderRadius: 8, borderWidth: 2 },
+  halo: {
+    backgroundColor: "rgba(231,199,90,0.55)",
+    borderRadius: 12,
+    bottom: -8,
+    left: -8,
+    position: "absolute",
+    right: -8,
+    top: -8,
+  },
 });

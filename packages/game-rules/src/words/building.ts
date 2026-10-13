@@ -45,12 +45,21 @@ const MAX_WORD_LETTERS = 7;
 /**
  * What a play's named face gives, checked against the faces the tile prints.
  *
- * A single letter has nothing to name and plays itself; a choice tile must name the face it
+ * A blank names any letter A–Z and scores 0. A single letter has nothing to name and plays itself; a choice tile must name the face it
  * plays (`E` for A/E) and may name only that — the letter it does not play is not used, not
  * scored, and counts toward nothing (§10).
  */
 function resolvePlay(tile: Tile, play: TilePlay): Resolution {
   const face = play.chosenFace;
+
+  // A blank plays whatever letter the seat names, and is worth nothing — so a multiplier on it
+  // would be worth nothing too, and none is carried (§44, Blank Tile).
+  if ("blank" in tile) {
+    if (face === undefined || !/^[A-Z]$/.test(face)) {
+      return { ok: false, reason: "uses-unavailable-letters" };
+    }
+    return { ok: true, play: { tileId: tile.id, letters: [{ letter: face, points: 0 }] } };
+  }
 
   if ("alternativeLetter" in tile) {
     if (face !== tile.letter && face !== tile.alternativeLetter) {

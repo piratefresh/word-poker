@@ -28,7 +28,8 @@ describe("weightedSampleWithoutReplacement", () => {
   it("keeps the pinned Power Draw for seed 409's first seat", () => {
     const rng = createRng(mixSeed(409, 0, "offer"));
     assert.deepEqual(weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, 3, rng), [
-      "vowel_magnet",
+      "spotlight",
+      "blank_tile",
       "random_wild",
     ]);
   });
@@ -44,7 +45,7 @@ describe("weightedSampleWithoutReplacement", () => {
   it("returns the whole pool, in a seeded order, when the count covers it", () => {
     const orders = new Set<string>();
     for (let seed = 0; seed < 200; seed += 1) {
-      const drawn = weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, 3, createRng(seed));
+      const drawn = weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, POWER_UP_IDS.length, createRng(seed));
       assert.deepEqual([...drawn].sort(), [...POWER_UP_IDS].sort());
       orders.add(drawn.join(","));
     }

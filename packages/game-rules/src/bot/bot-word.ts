@@ -37,7 +37,8 @@ export function evaluateBestWord({ available, dictionary }: ChooseWordOptions): 
     }
     if (played.length === 7) return best;
     for (const tile of available) {
-      if (used.has(tile.id)) continue;
+      // ponytail: CPUs never play a blank (0 points, 26x branching); try A-Z if the bots look dumb.
+      if (used.has(tile.id) || "blank" in tile) continue;
       const faces = "alternativeLetter" in tile ? [tile.letter, tile.alternativeLetter] : [tile.letter];
       for (const face of faces) {
         const next = word + face;

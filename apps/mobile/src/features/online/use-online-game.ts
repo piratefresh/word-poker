@@ -869,6 +869,9 @@ function decodePowerUsed(payload: unknown): PowerUsedEvent | null {
     seat: numberOf(payload.seat),
     powerUpId: payload.powerUpId,
     street,
+    ...(typeof payload.tileId === "string" && typeof payload.letter === "string"
+      ? { tileId: payload.tileId, letter: payload.letter }
+      : {}),
   };
 }
 

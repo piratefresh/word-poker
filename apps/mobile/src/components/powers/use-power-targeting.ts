@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import type { PowerUpId, Tile as TileData } from "@wordpoker/contracts";
+import { POWER_UPS, type PowerUpId, type Tile as TileData } from "@wordpoker/contracts";
 
 import type { PowerView } from "@/features/table/power-view";
 
@@ -59,7 +59,22 @@ export function usePowerTargeting({
     onUse(held.id, targeting.tile.id);
   }, [held, onUse, targeting]);
 
-  return { targeting, discarded, toggle, pick, cancel, confirm };
+  // Spotlight aims at a dealt table tile; every other power at one of the seat's own.
+  const aimsAtTable = held != null && POWER_UPS[held.id].family === "spotlight";
+  const picking = targeting.stage === "picking";
+
+  return {
+    targeting,
+    discarded,
+    toggle,
+    pick,
+    cancel,
+    confirm,
+    /** The rack's tap while choosing; `undefined` when the power does not aim at the rack. */
+    ownPick: picking && !aimsAtTable ? pick : undefined,
+    /** The community row's tap while choosing; `undefined` when the power does not aim at the table. */
+    tablePick: picking && aimsAtTable ? pick : undefined,
+  };
 }
 
 /**
