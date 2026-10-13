@@ -80,6 +80,14 @@ export type {
   OfflineState,
   StartHandOptions,
 } from "./table/offline";
+export { RULES_VERSION, replayHand, summarizeHand, verifyHandRecord } from "./table/replay";
+export type {
+  ReplayOutcome,
+  ReplayRefusal,
+  ReplayRefusalKind,
+  ReplayRefused,
+  ReplayVerified,
+} from "./table/replay";
 export {
   BettingRejectionError,
   OfflineActionError,

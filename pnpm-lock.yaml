@@ -407,15 +407,6 @@ importers:
       '@colyseus/tools':
         specifier: ^0.18.1
         version: 0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1)
-      '@mikro-orm/core':
-        specifier: ^7.2.0
-        version: 7.2.0
-      '@mikro-orm/migrations':
-        specifier: ^7.2.0
-        version: 7.2.0(@mikro-orm/core@7.2.0)
-      '@mikro-orm/postgresql':
-        specifier: ^7.2.0
-        version: 7.2.0(@mikro-orm/core@7.2.0)
       '@wordpoker/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -431,9 +422,6 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@8.1.1)
-      pg:
-        specifier: ^8.23.0
-        version: 8.23.0
     devDependencies:
       '@colyseus/loadtest':
         specifier: ^0.18.1
@@ -450,12 +438,18 @@ importers:
       '@types/mocha':
         specifier: ^10.0.1
         version: 10.0.10
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
       mocha:
         specifier: ^11.7.5
         version: 11.8.0
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10

@@ -29,6 +29,7 @@ export {
   type WalletEventStatus,
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
+export { pgConnectionString } from "../mikro-orm.config";
 export {
   GameSession, GameHand, HandSeat, HandAction,
   type GameSessionRow, type GameHandRow, type HandSeatRow, type HandActionRow,
@@ -93,3 +94,5 @@ export async function saveResultsRating(
   return rating.id;
 }
 export { friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";
+export { saveHistoryHand, handRecordDigest, HandRecordConflictError } from "./history";
+export { readHistoryHands, readHistoryHand } from "./history-read";

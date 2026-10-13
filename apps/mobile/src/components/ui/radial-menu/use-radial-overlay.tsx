@@ -1,5 +1,5 @@
-import { useCallback, useRef, type RefObject } from 'react'
-import { StyleSheet, View, type ReactNode } from 'react-native'
+import { useCallback, useRef, type RefObject, type ReactNode } from 'react'
+import { StyleSheet, View } from 'react-native'
 import { useSharedValue } from 'react-native-reanimated'
 import { Gesture } from 'react-native-gesture-handler'
 import { runOnJS } from 'react-native-reanimated'
