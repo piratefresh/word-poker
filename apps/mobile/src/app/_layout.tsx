@@ -212,7 +212,12 @@ function DeepLinks({
   }, [session]);
 
   useEffect(() => {
-    if (!session && initialDestination !== null && initialDestination.pathname !== "/friends") playAsGuest();
+    if (
+      !session &&
+      !initialConsumed.current &&
+      initialDestination !== null &&
+      initialDestination.pathname !== "/friends"
+    ) playAsGuest();
   }, [initialDestination, session, playAsGuest]);
 
   // Signed in: land on whatever link was waiting for a session, once. The launch URL is kept in
