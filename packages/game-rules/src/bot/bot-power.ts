@@ -19,10 +19,8 @@ export function chooseBotPower(state: OfflineState, botId: PlayerId): PowerUpId 
   const vowels = view.privateTiles.filter((tile) =>
     "AEIOU".includes(tile.letter) || ("alternativeLetter" in tile && "AEIOU".includes(tile.alternativeLetter)),
   ).length;
-  const hasWord = evaluateBestWord({ available: view.privateTiles, dictionary: view.dictionary }) !== null;
   const weights: Record<PowerUpId, number> = {
     vowel_magnet: vowels === 0 ? 4 : vowels === 1 ? 2 : 1,
-    mulligan: hasWord ? 1 : 2,
     random_wild: 0.5 + botProfile(slot.seat).aggression,
   };
   let roll = createRng(botDecisionSeed(view, "power-pick"))() *

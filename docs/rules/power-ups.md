@@ -30,14 +30,14 @@ Blinds → Deal → **Power Draw** → Pre-Flop → Flop → Turn → River → 
 - It is a window at the start of the pre-flop, the same way the word window (§19) sits inside
   the river: it is not a street of its own, and nobody bets during it. The pre-flop's first
   betting turn (§15) — and its turn clock — starts when the draw closes.
-- Every seat in the hand draws at the same time. Each is offered **3 powers** from the room's
-  pool and **keeps 1**.
+- Every seat in the hand draws at the same time. Each is offered **every power** in the
+  room's pool and **keeps 1**.
 - The draw has its own clock: **10 seconds**, shared by every seat. It closes as soon as every
   seat has picked, without waiting the clock out.
-- A seat that has not picked when the clock runs out keeps the **first** power it was offered.
-- The offers are drawn by weight, without replacement, so a seat is never offered the same power
-  twice. A rarer power has a lower weight and turns up among the three less often. When the
-  pool holds 3 powers or fewer, every power in it is offered.
+- A seat that has not picked when the clock runs out keeps the **first** power it was offered,
+  and is told: "Time's up. You got Vowel Magnet."
+- Every power in the pool is offered, so the weights only set the order of the offers; the first
+  is the one a seat that never picks keeps. A seat is never offered the same power twice.
 - The offers and the pick are **private**: no other seat sees them. In Wild every seat holds a
   power, so holding one says nothing.
 
@@ -68,18 +68,10 @@ differs.
 
 | Power | Tag | New letter comes from | Draw weight |
 | ----- | --- | --------------------- | ----------: |
-| Random Wild | WILD | Any letter A–Z, each equally likely | 10 |
+| Wild Tile | WILD | Any letter A–Z, each equally likely | 10 |
 | Vowel Magnet | VOWEL | A, E, I, O or U, each equally likely | 8 |
-| Mulligan | MULLIGAN | The next tile of this hand's shuffled bag after the community tiles | 8 |
 
 The tag is what the seat's nameplate prints when the power is used (see Visibility).
-
-Mulligan changes nobody else's tiles. The deal lays out every seat's private tiles and all five
-community tiles before the first bet (§14), so the tile it takes is one no other seat can ever
-be dealt this hand. The bag holds single letters only (§6), so that tile is already a plain
-letter. When more than one seat uses Mulligan in the same hand, each takes a different tile: the
-first seat at the table takes the first tile after the community, the second seat the next, and
-so on. The seat decides which tile, not the order in which the powers are used.
 
 ## Swapping a Tile
 
@@ -91,10 +83,12 @@ These rules hold for every power in the Swap a Private Tile family:
   discarded tile, so swapping away a multiplier or a choice tile gives those up. That is part
   of the price.
 - The new letter can be the same as the discarded one. The draw does not avoid it.
-- Random Wild and Vowel Magnet do not take their letter from the bag.
+- Wild Tile and Vowel Magnet do not take their letter from the bag.
 - If the discarded tile was in the seat's draft word, it leaves the draft. The new tile takes
   the discarded tile's place in the seat's rack, unselected.
 - The discarded tile is never shown to anyone, not even at showdown.
+- Before a power replaces a tile that carries a 2x or 3x bonus, the seat is warned: "This tile's
+  bonus will be lost".
 
 ## Randomness
 

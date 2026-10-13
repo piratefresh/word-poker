@@ -14,7 +14,7 @@ jest.mock("react-native-reanimated", () => ({
   useReducedMotion: () => mockReduceMotion,
 }));
 
-const OFFERS: readonly PowerUpId[] = ["vowel_magnet", "random_wild", "mulligan"];
+const OFFERS: readonly PowerUpId[] = ["vowel_magnet", "random_wild"];
 const READY_MS = POWER_DRAW_MOTION.entrance.readyAt;
 
 function openDraw(picked: PowerUpId | null = null, endsAtMs = Date.now() + POWER_DRAW_MS): NonNullable<PowerView["draw"]> {
@@ -54,7 +54,7 @@ describe("<PowerDrawReveal />", () => {
 
     const offers = screen.getAllByRole("button");
     expect(offers.map((offer) => offer.props.testID)).toEqual(OFFERS.map((id) => `power-offer-${id}`));
-    expect(screen.getByLabelText("Random Wild: Swap one of your tiles for a random letter.")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Wild Tile: Swap one of your tiles for a random letter.")).toBeOnTheScreen();
     expect(screen.getByRole("header", { name: "Wild power" })).toBeOnTheScreen();
     expect(announce).toHaveBeenCalledWith("Pick a power, 10 seconds");
   });
@@ -64,9 +64,9 @@ describe("<PowerDrawReveal />", () => {
     const screen = await render(<PowerDrawReveal draw={openDraw()} held={null} onPick={onPick} />);
     await layOut(screen);
 
-    expect(screen.getByTestId("power-offer-mulligan")).toBeDisabled();
+    expect(screen.getByTestId("power-offer-vowel_magnet")).toBeDisabled();
     expect(screen.queryByTestId("power-draw-ready")).toBeNull();
-    await fireEvent.press(screen.getByTestId("power-offer-mulligan"));
+    await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
     expect(onPick).not.toHaveBeenCalled();
 
     await advance(READY_MS - 1);
@@ -97,12 +97,12 @@ describe("<PowerDrawReveal />", () => {
     await layOut(screen);
     await advance(READY_MS);
 
-    await fireEvent(screen.getByTestId("power-offer-mulligan"), "focus");
-    await fireEvent.press(screen.getByTestId("power-offer-mulligan"));
+    await fireEvent(screen.getByTestId("power-offer-vowel_magnet"), "focus");
+    await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
     await fireEvent.press(screen.getByTestId("power-offer-random_wild"));
 
     expect(onPick).toHaveBeenCalledTimes(1);
-    expect(onPick).toHaveBeenCalledWith("mulligan");
+    expect(onPick).toHaveBeenCalledWith("vowel_magnet");
     expect(screen.queryByTestId("power-draw-ready")).toBeNull();
     for (const id of OFFERS) expect(screen.getByTestId(`power-offer-${id}`)).toBeDisabled();
   });
@@ -112,12 +112,12 @@ describe("<PowerDrawReveal />", () => {
     const screen = await render(<PowerDrawReveal draw={draw} held={null} onPick={jest.fn()} />);
     await layOut(screen);
     await advance(READY_MS);
-    await fireEvent.press(screen.getByTestId("power-offer-mulligan"));
+    await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
 
     await screen.rerender(<PowerDrawReveal draw={{ ...draw, picked: "random_wild" }} held={null} onPick={jest.fn()} />);
 
     expect(screen.getByTestId("power-offer-random_wild")).toBeSelected();
-    expect(screen.getByTestId("power-offer-mulligan")).not.toBeSelected();
+    expect(screen.getByTestId("power-offer-vowel_magnet")).not.toBeSelected();
   });
 
   test("plays the kept card out after the draw closes, then leaves the felt", async () => {
@@ -156,17 +156,17 @@ describe("<PowerDrawReveal />", () => {
     const screen = await render(<PowerDrawReveal draw={draw} held={null} onPick={jest.fn()} />);
     await layOut(screen);
     await advance(READY_MS);
-    await fireEvent.press(screen.getByTestId("power-offer-mulligan"));
+    await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
 
-    await screen.rerender(<PowerDrawReveal draw={{ ...draw, picked: "mulligan" }} held={null} onPick={jest.fn()} />);
+    await screen.rerender(<PowerDrawReveal draw={{ ...draw, picked: "vowel_magnet" }} held={null} onPick={jest.fn()} />);
     expect(screen.queryByTestId("power-draw-waiting")).toBeNull();
     await advance(POWER_DRAW_KEPT_MS);
 
     expect(screen.getByText("WAITING FOR OTHER PLAYERS")).toBeOnTheScreen();
-    expect(screen.queryByTestId("power-offer-mulligan")).toBeNull();
+    expect(screen.queryByTestId("power-offer-vowel_magnet")).toBeNull();
 
     // The other seats are in: the draw closes, and the exit that already played is not replayed.
-    await screen.rerender(<PowerDrawReveal draw={null} held="mulligan" onPick={jest.fn()} />);
+    await screen.rerender(<PowerDrawReveal draw={null} held="vowel_magnet" onPick={jest.fn()} />);
     expect(screen.queryByTestId("power-draw")).toBeNull();
   });
 

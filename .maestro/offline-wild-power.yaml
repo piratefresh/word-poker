@@ -6,7 +6,7 @@
 #
 # Same seed as offline-wild-hand.yaml. For it the hero is dealt M-1 and H-2,
 # is offered Vowel Magnet first, and Vowel Magnet's letter for seat 0 is O (`swapTile` in
-# game-rules, a stream of its own). CPU swaps change their later line: Mira uses Mulligan then
+# game-rules, a stream of its own). CPU swaps change their later line: Mira uses Wild Tile then
 # raises to 60, Ellis folds, and Jay uses Vowel Magnet then calls. The
 # swap takes H-2's place in the strip as `power-0`, and M-1 + O spells MO: 5 points. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
 #

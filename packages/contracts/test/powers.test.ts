@@ -24,7 +24,7 @@ describe("POWER_UPS", () => {
     }
   });
 
-  it("keeps §44's v1 pool: three friendly tile swaps with 10 / 8 / 8 weights", () => {
+  it("keeps the pool so far: two friendly tile swaps with 10 / 8 weights", () => {
     assert.deepStrictEqual(
       POWER_UP_IDS.map((id) => {
         const { title, tag, weight, window, family, hostile } = POWER_UPS[id];
@@ -33,7 +33,7 @@ describe("POWER_UPS", () => {
       [
         {
           id: "random_wild",
-          title: "Random Wild",
+          title: "Wild Tile",
           tag: "WILD",
           weight: 10,
           window: "ownTurnOrWordWindow",
@@ -44,15 +44,6 @@ describe("POWER_UPS", () => {
           id: "vowel_magnet",
           title: "Vowel Magnet",
           tag: "VOWEL",
-          weight: 8,
-          window: "ownTurnOrWordWindow",
-          family: "swapTile",
-          hostile: false,
-        },
-        {
-          id: "mulligan",
-          title: "Mulligan",
-          tag: "MULLIGAN",
           weight: 8,
           window: "ownTurnOrWordWindow",
           family: "swapTile",
@@ -71,8 +62,8 @@ describe("POWER_UPS", () => {
     }
   });
 
-  it("holds enough powers to fill a Power Draw", () => {
-    assert.ok(POWER_UP_IDS.length >= POWER_DRAW_OFFER_COUNT);
+  it("offers every power in a Power Draw", () => {
+    assert.strictEqual(POWER_DRAW_OFFER_COUNT, POWER_UP_IDS.length);
   });
 });
 

@@ -38,7 +38,7 @@ export interface GamePlayer {
   bet?: number;
   isHero?: boolean;
   /**
-   * The tag of a power the seat used on this street (§44: WILD, VOWEL, MULLIGAN), printed beside
+   * The tag of a power the seat used on this street (§44: WILD, VOWEL), printed beside
    * its status. Never what the power gave it.
    */
   powerTag?: string;

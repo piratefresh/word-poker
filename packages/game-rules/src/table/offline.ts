@@ -483,13 +483,7 @@ function applyUsePower(
     throw new PowerRejectionError("not-your-tile");
   }
 
-  const tile = swapTile(action.powerUpId, {
-    dealSeed: state.seed,
-    seat: seatIndex,
-    // The same deal `startHand` made, replayed from its seed: the bag is not kept on the state,
-    // and only Mulligan ever asks for it.
-    restOfBag: () => dealHand({ seed: state.seed, playerCount: state.seats.length }).rest,
-  });
+  const tile = swapTile(action.powerUpId, { dealSeed: state.seed, seat: seatIndex });
   const seats = [...state.seats];
   seats[seatIndex] = {
     ...seat,

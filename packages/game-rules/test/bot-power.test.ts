@@ -12,7 +12,7 @@ import { cloneState, testDictionary } from "./fixtures";
 const NOW = 1_000_000;
 const PLAYERS = ["hero", "ellis", "jay", "mira"];
 const DICTIONARY = testDictionary(["AT", "QI", "RAT", "STAR"]);
-const OFFERS: readonly PowerUpId[] = ["vowel_magnet", "mulligan", "random_wild"];
+const OFFERS: readonly PowerUpId[] = ["vowel_magnet", "random_wild"];
 
 function draw(seed = 62): OfflineState {
   return startHand({ seed, players: PLAYERS, nowMs: NOW, dictionary: DICTIONARY, powerUps: { deal: "choose3" } });
@@ -22,7 +22,7 @@ function holding(seed = 62): OfflineState {
   let state = draw(seed);
   assert.ok(state.powers);
   for (const slot of state.powers.draw.slots) {
-    state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId: "mulligan" }, NOW);
+    state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId: "random_wild" }, NOW);
   }
   return state;
 }
@@ -71,8 +71,8 @@ describe("offline bot powers (§44)", () => {
   it("pins reviewed picks for rack fit and the three seat personalities", () => {
     // Vowel-less racks favor Vowel Magnet; aggressive Jay also gives Wild more weight.
     for (const [seed, expected] of [
-      [62, ["mulligan", "random_wild", "mulligan"]],
-      [16, ["vowel_magnet", "random_wild", "mulligan"]],
+      [62, ["vowel_magnet", "random_wild", "vowel_magnet"]],
+      [16, ["vowel_magnet", "vowel_magnet", "vowel_magnet"]],
       [127, ["vowel_magnet", "vowel_magnet", "random_wild"]],
     ] as const) {
       assert.deepEqual(PLAYERS.slice(1).map((id) => chooseBotPower(draw(seed), id)), expected);
@@ -98,7 +98,7 @@ describe("offline bot powers (§44)", () => {
   it("rejects absent, closed, picked and empty offers", () => {
     assert.throws(() => chooseBotPower(draw(), "ghost"), OfflineActionError);
     assert.throws(() => chooseBotPower(holding(), "mira"), OfflineActionError);
-    const picked = reduce(draw(), { type: "pickPower", playerId: "mira", powerUpId: "mulligan" }, NOW);
+    const picked = reduce(draw(), { type: "pickPower", playerId: "mira", powerUpId: "random_wild" }, NOW);
     assert.throws(() => chooseBotPower(picked, "mira"), OfflineActionError);
     const state = draw();
     assert.ok(state.powers);
@@ -108,23 +108,21 @@ describe("offline bot powers (§44)", () => {
     assert.throws(() => chooseBotPower(empty, "mira"), OfflineActionError);
   });
 
-  it("weights vowel-less racks by the reviewed formula for both Mulligan weights and every style", () => {
+  it("weights vowel-less racks by the reviewed formula for every style", () => {
     for (const seat of [1, 2, 3]) {
-      for (const hasWord of [false, true]) {
-        let vowels = 0;
-        for (let seed = 0; seed < 1024; seed += 1) {
-          let state = rack(draw(seed), seat, [tile("b", "B"), tile("c", "C")]);
-          assert.ok(state.powers);
-          state = { ...state, dictionary: testDictionary(hasWord ? ["BC"] : ["AT"]), powers: {
-            ...state.powers, draw: { ...state.powers.draw,
-              slots: state.powers.draw.slots.map((slot) => ({ ...slot, offers: OFFERS })),
-            },
-          } };
-          if (chooseBotPower(state, PLAYERS[seat] ?? "") === "vowel_magnet") vowels += 1;
-        }
-        const expected = 4 / (4 + (hasWord ? 1 : 2) + 0.5 + botProfile(seat).aggression);
-        assert.ok(Math.abs(vowels / 1024 - expected) < 0.05, `${seat}/${hasWord}: ${vowels / 1024}, expected ${expected}`);
+      let vowels = 0;
+      for (let seed = 0; seed < 1024; seed += 1) {
+        let state = rack(draw(seed), seat, [tile("b", "B"), tile("c", "C")]);
+        assert.ok(state.powers);
+        state = { ...state, powers: {
+          ...state.powers, draw: { ...state.powers.draw,
+            slots: state.powers.draw.slots.map((slot) => ({ ...slot, offers: OFFERS })),
+          },
+        } };
+        if (chooseBotPower(state, PLAYERS[seat] ?? "") === "vowel_magnet") vowels += 1;
       }
+      const expected = 4 / (4 + 0.5 + botProfile(seat).aggression);
+      assert.ok(Math.abs(vowels / 1024 - expected) < 0.05, `${seat}: ${vowels / 1024}, expected ${expected}`);
     }
   });
 
@@ -157,7 +155,7 @@ describe("offline bot powers (§44)", () => {
     assert.ok(state.powers);
     const classic = startHand({ seed: 62, players: PLAYERS, nowMs: NOW, dictionary: DICTIONARY });
     const variants = [classic, draw(), { ...state, powers: { ...state.powers, held: {} } },
-      { ...state, powers: { ...state.powers, held: { mira: { id: "mulligan" as const, used: true } } } },
+      { ...state, powers: { ...state.powers, held: { mira: { id: "random_wild" as const, used: true } } } },
       { ...state, toActIndex: 1 }, rack(state, 3, []),
       { ...state, seats: state.seats.map((seat) => seat.id === "mira" ? { ...seat, folded: true } : seat) },
     ];

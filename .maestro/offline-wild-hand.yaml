@@ -5,7 +5,7 @@
 #
 # Same seed as offline-hand.yaml: the Power Draw rolls from streams of its own, so the initial
 # tiles are the Classic hand's; CPU swaps change their later line. The hero is offered, in order,
-# Vowel Magnet, Mulligan and Random Wild (`drawOffers(178, 0)` in game-rules) — so a
+# Vowel Magnet and Wild Tile (`drawOffers(178, 0)` in game-rules) — so a
 # changed seed or catalog fails at the pick, loudly.
 #
 # Selectors: the reveal is `power-draw`, each card `power-offer-<id>`, and `power-draw-ready` the
@@ -56,7 +56,7 @@ tags:
       id: "power-draw"
     timeout: 5000
 
-# The shipped-dictionary probe pins Mira's Mulligan on its first turn, before its raise.
+# The shipped-dictionary probe pins Mira's Wild Tile on its first turn, before its raise.
 - extendedWaitUntil:
     visible:
       id: "power-used"
@@ -66,7 +66,7 @@ tags:
 - assertVisible:
     id: "seat-power-tag-mira"
     containsDescendants:
-      - text: "MULLIGAN"
+      - text: "WILD"
 
 # The seed's pre-flop line, now that the table runs: mira raises the blind to 60.
 - extendedWaitUntil:

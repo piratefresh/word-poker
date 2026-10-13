@@ -94,6 +94,8 @@ export function PowerUsePrompt({
       ? `Discard ${tileLetters(targeting.tile)} for ${POWER_UPS[power].receives}?`
       : null;
   const stage = power === null ? "idle" : targeting.stage;
+  // A swap hands back a plain tile, so a 2x/3x tile loses its bonus (§44).
+  const bonusLost = targeting.stage === "confirming" && targeting.tile.multiplier !== undefined;
 
   // Each stage says itself once: the rack is waiting, or the felt is asking.
   useEffect(() => {
@@ -126,6 +128,7 @@ export function PowerUsePrompt({
           <View style={[styles.panel, styles.confirmPanel]} testID="power-confirm-sheet">
             <PowerCard id={power} width={88} />
             <Text style={styles.question}>{question}</Text>
+            {bonusLost ? <Text style={styles.warning}>This tile&apos;s bonus will be lost</Text> : null}
             <View style={styles.actions}>
               <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" />
               <GameButton
@@ -211,6 +214,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: "center",
   },
+  warning: { color: colors.goldHi, fontFamily: fonts.sansMedium, fontSize: 13, textAlign: "center" },
   actions: { alignSelf: "stretch", flexDirection: "row", gap: spacing.sm },
   action: { flex: 1 },
 });

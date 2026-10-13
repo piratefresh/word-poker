@@ -2,8 +2,8 @@
  * Finds a seed for the Wild online smoke (STO-500) and prints what the browser taps.
  *
  * Replays the smoke's opening against the room's own engine adapter, no sockets: the opponent
- * (seat 0) creates the table and keeps its first offer, the browser (seat 1) keeps Random Wild,
- * the opponent calls its small blind, and the browser uses Random Wild on its pre-flop turn. For
+ * (seat 0) creates the table and keeps its first offer, the browser (seat 1) keeps Wild Tile,
+ * the opponent calls its small blind, and the browser uses Wild Tile on its pre-flop turn. For
  * each seed and each private tile the browser could discard, it looks for a word the strip spells
  * by taps alone — the rack, then the board, read left to right — that plays the new tile, with no
  * choice tile in it, so the flow taps plain tiles only. Usage, from the repo root:

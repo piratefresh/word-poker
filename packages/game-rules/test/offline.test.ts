@@ -784,7 +784,7 @@ describe("reduce — §44's Power Draw", () => {
 
   it("closes the moment the last seat picks and puts pre-flop's first seat on the clock", () => {
     const state = wildHand();
-    const pick = offersOf(state, "hero")[2];
+    const pick = offersOf(state, "hero").at(-1);
     assert.ok(pick);
 
     let picked = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: pick }, NOW + 500);
@@ -839,7 +839,7 @@ describe("reduce — §44's Power Draw", () => {
 
   it("refuses a pick at a Classic table", () => {
     assert.throws(
-      () => reduce(dealHand(), { type: "pickPower", playerId: "hero", powerUpId: "mulligan" }, NOW),
+      () => reduce(dealHand(), { type: "pickPower", playerId: "hero", powerUpId: "random_wild" }, NOW),
       (error: unknown) => error instanceof PowerRejectionError && error.reason === "not-in-draw",
     );
     assert.throws(() => reduce(dealHand(), { type: "timeoutPowerDraw" }, NOW), OfflineActionError);
@@ -848,7 +848,7 @@ describe("reduce — §44's Power Draw", () => {
   it("preserves partial picks on timeout and defaults only unpicked slots", () => {
     let state = wildHand();
     for (const playerId of ["hero", "ellis"]) {
-      const powerUpId = offersOf(state, playerId)[2];
+      const powerUpId = offersOf(state, playerId).at(-1);
       assert.ok(powerUpId);
       state = reduce(state, { type: "pickPower", playerId, powerUpId }, NOW + 1);
     }
@@ -953,14 +953,9 @@ describe("reduce — §44's held power", () => {
     return (error) => error instanceof PowerRejectionError && error.reason === reason;
   }
 
-  /** The bag this table's first hand leaves behind, which Mulligan draws from. */
-  function restOfBag(): readonly Tile[] {
-    return dealTiles({ seed: SEED, playerCount: SEATS.length }).rest;
-  }
-
   /** The tile `power` hands `seat` in this table's first hand. */
   function expectedTile(power: PowerUpId, seat = HERO): Tile {
-    return swapTile(power, { dealSeed: SEED, seat, restOfBag });
+    return swapTile(power, { dealSeed: SEED, seat });
   }
 
   it("swaps the tile in place on the seat's own turn, and the turn goes on", () => {
@@ -987,7 +982,7 @@ describe("reduce — §44's held power", () => {
   });
 
   it("gives the seat the same letter whichever street it is used on", () => {
-    for (const power of ["random_wild", "vowel_magnet", "mulligan"] as const) {
+    for (const power of ["random_wild", "vowel_magnet"] as const) {
       const early = heroOnTurn(power);
       const onPreflop = use(early, heroTile(early).id, power);
 
@@ -1156,35 +1151,6 @@ describe("reduce — §44's held power", () => {
     assert.equal(canUsePower(onTurn, "hero", onTurn.endsAtMs), false, "the turn's clock ran out");
     assert.equal(canUsePower(used, "hero", NOW + 4), false, "already used");
     assert.equal(canUsePower(window, "hero", window.endsAtMs - 1), true, "in §19's window");
-  });
-
-  it("hands a Mulligan the seat's own tile from the rest of the bag, touching no other tile", () => {
-    const state = heroOnTurn("mulligan");
-    const used = use(state, heroTile(state).id, "mulligan");
-    const bagTile = restOfBag()[HERO];
-    assert.ok(bagTile);
-
-    assert.deepEqual(heroTile(used), { id: "power-0", letter: bagTile.letter, points: bagTile.points });
-    assert.deepEqual(used.community, state.community);
-    assert.deepEqual(used.seats.slice(1), state.seats.slice(1));
-  });
-
-  it("gives two seats' Mulligans different bag tiles, whatever order they are used in", () => {
-    let state = dealHand({ powerUps: { deal: "choose3" } });
-    for (const playerId of SEATS) {
-      state = reduce(state, { type: "pickPower", playerId, powerUpId: "mulligan" }, NOW + 1);
-    }
-    const window = playToWindow(state, NOW + 2);
-    const at = window.endsAtMs - 10;
-    const tileOf = (from: OfflineState, seat: number): Tile | undefined => from.seats[seat]?.privateTiles[0];
-    const first = (seat: number): string => tileOf(window, seat)?.id ?? "";
-
-    const heroFirst = use(use(window, first(0), "mulligan", at), first(1), "mulligan", at + 1, "ellis");
-    const ellisFirst = use(use(window, first(1), "mulligan", at, "ellis"), first(0), "mulligan", at + 1);
-
-    assert.deepEqual(heroFirst.seats, ellisFirst.seats, "the order of use changes nothing");
-    assert.deepEqual(tileOf(heroFirst, 0), expectedTile("mulligan", 0));
-    assert.deepEqual(tileOf(heroFirst, 1), expectedTile("mulligan", 1));
   });
 
   it("scores the new tile at its §6 value in a word at showdown, and marks it as swapped", () => {

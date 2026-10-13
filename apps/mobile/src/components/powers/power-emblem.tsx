@@ -7,7 +7,6 @@ import { fonts, palette } from "@/constants/theme";
 const ART: Readonly<Record<string, number>> = {
   "random-wild": require("../../../assets/images/ui/card/power-random-wild.webp"),
   "vowel-magnet": require("../../../assets/images/ui/card/power-vowel-magnet.webp"),
-  mulligan: require("../../../assets/images/ui/card/power-mulligan.webp"),
 };
 
 /**

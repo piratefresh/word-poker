@@ -51,11 +51,11 @@ describe("<PowerUsedCard />", () => {
     const screen = await render(<PowerUsedCard notices={[ELLIS]} onDone={jest.fn()} />);
 
     expect(screen.getByText("ELLIS USED")).toBeTruthy();
-    expect(screen.getByText("RANDOM WILD")).toBeTruthy();
+    expect(screen.getByText("WILD TILE")).toBeTruthy();
     expect(screen.getByText("Swap one of your tiles for a random letter.")).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith("Ellis used Random Wild");
+    expect(announce).toHaveBeenCalledWith("Ellis used Wild Tile");
     expect(screen.getByTestId("power-used").props.accessibilityLabel).toBe(
-      "Ellis used Random Wild: Swap one of your tiles for a random letter.",
+      "Ellis used Wild Tile: Swap one of your tiles for a random letter.",
     );
   });
 

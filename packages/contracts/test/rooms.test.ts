@@ -110,7 +110,7 @@ describe("validateRoomCreateOptions", () => {
   it("stores only the power-up keys it knows", () => {
     const checked = validateRoomCreateOptions({
       ...TABLE,
-      powerUps: { deal: "choose3", frequency: 0.3, pool: ["mulligan"] },
+      powerUps: { deal: "choose3", frequency: 0.3, pool: ["vowel_magnet"] },
     });
 
     assert.deepStrictEqual(checked.ok && checked.options.powerUps, { deal: "choose3" });

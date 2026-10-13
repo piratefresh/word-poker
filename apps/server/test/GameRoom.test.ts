@@ -1412,7 +1412,7 @@ describe("GameRoom", () => {
       return { room, clients: [first, second] as const, inboxOf };
     }
 
-    /** Both seats keep Random Wild; the draw closes and the seat on the turn is returned first. */
+    /** Both seats keep Wild Tile; the draw closes and the seat on the turn is returned first. */
     async function bothPickWild(table: Awaited<ReturnType<typeof wildTable>>) {
       for (const client of table.clients) {
         client.send(GAME_MESSAGES.pickPower, {
@@ -1434,7 +1434,7 @@ describe("GameRoom", () => {
       return { actor, opponent };
     }
 
-    /** The seat on the turn swaps its first private tile with Random Wild. */
+    /** The seat on the turn swaps its first private tile with Wild Tile. */
     async function useWild(table: Awaited<ReturnType<typeof wildTable>>, actor: ClientRoom) {
       const rack = last<PrivateSeatState>(table.inboxOf(actor), GAME_EVENTS.privateState)!.rack;
       const target = rack[0]!;
@@ -1500,7 +1500,7 @@ describe("GameRoom", () => {
       assert.ok(room.state.toActSeat >= 0, "pre-flop starts on the deal");
     });
 
-    it("lets both seats pick and the seat on the turn use Random Wild, telling the other only that it did", async () => {
+    it("lets both seats pick and the seat on the turn use Wild Tile, telling the other only that it did", async () => {
       const table = await wildTable(4_991);
       const { actor, opponent } = await bothPickWild(table);
       const actorSeat = table.room.state.seats.get(actor.sessionId)!.seat;
@@ -1570,7 +1570,7 @@ describe("GameRoom", () => {
         powerUpId: "random_wild",
       });
       // A command for a hand that is not this one is refused rather than landing on it.
-      actor.send(GAME_MESSAGES.pickPower, { actionId: "stale", handId: 2, powerUpId: "mulligan" });
+      actor.send(GAME_MESSAGES.pickPower, { actionId: "stale", handId: 2, powerUpId: "vowel_magnet" });
       await until(
         () => actionIdOf(last<GameRejectionEvent>(table.inboxOf(actor), GAME_EVENTS.rejected)) === "stale",
         "the stale refusal",

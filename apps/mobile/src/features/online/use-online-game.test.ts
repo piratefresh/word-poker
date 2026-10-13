@@ -615,7 +615,7 @@ describe("useOnlineGame", () => {
 });
 
 describe("useOnlineGame at a Wild table (STO-500)", () => {
-  const OFFERS = ["vowel_magnet", "random_wild", "mulligan"] as const;
+  const OFFERS = ["vowel_magnet", "random_wild"] as const;
   /** The server's clock is not the device's: the room says `now`, and the deadline is its own. */
   const SERVER_NOW = 1_000_000;
   const DRAW_DEADLINE = SERVER_NOW + 10_000;
