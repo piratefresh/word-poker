@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
   Pressable,
@@ -44,6 +45,7 @@ import { ShadowBox } from "@/components/ui/shadow-box";
 import { webTestID } from "@/lib/web-id";
 
 import { TileChoiceBeam } from "./tile-choice-beam";
+import { MultiplierBeam } from "./tile-multiplier-beam";
 
 /**
  * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
@@ -177,7 +179,7 @@ const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
 /** §10's choice tiles wear an accent no single letter does: the pair is one tile, not two. */
 const CHOICE_ACCENT = palette.violet400;
 
-/** A 2x tile wears this border all the way round; a 3x tile wears the rainbow below. */
+/** A 2x tile wears this border all the way round, a light running along it; a 3x tile the rainbow below. */
 const DOUBLE_BORDER = palette.violet400;
 const TRIPLE_BORDER = ["#ff4d4d", "#ffb020", "#ffe94d", "#3ddc84", "#3da9ff", "#a455ff"] as const;
 
@@ -582,6 +584,12 @@ export function Tile({
             slabMotion,
           ]}
         />
+        <MultiplierBeam
+          active={side === "front" && !reduceMotion}
+          borderWidth={metrics.borderWidth}
+          multiplier={tile.multiplier}
+          radius={metrics.radius}
+        >
         <View
           style={[
             styles.frame,
@@ -787,6 +795,7 @@ export function Tile({
           />
         ) : null}
         </View>
+        </MultiplierBeam>
       </Animated.View>
     </Pressable>
   );

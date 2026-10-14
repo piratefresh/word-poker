@@ -51,6 +51,11 @@ jest.mock("@/components/game/tile-choice-beam", () => ({
   },
 }));
 
+// The multiplier tile's beam is the same Skia decoration; tests keep the static border.
+jest.mock("@/components/game/tile-multiplier-beam", () => ({
+  MultiplierBeam: ({ children }) => children,
+}));
+
 // Shadows under the tray, racks and tiles are Skia canvases, and decoration only.
 jest.mock("@/components/ui/shadow-box", () => ({ ShadowBox: () => null }));
 
