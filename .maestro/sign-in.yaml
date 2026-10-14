@@ -83,7 +83,7 @@ tags:
 # back into reach — so a headless runner has to give the browser room for it (the four-seat
 # smoke asks for 1280x1000, not the 1280x800 a bare headless run gets).
 - extendedWaitUntil:
-    visible: "Choose how to play"
+    visible: "Offline Mode"
     timeout: 60000
 - assertVisible:
     text: "Signed in as"

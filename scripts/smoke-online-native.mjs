@@ -20,7 +20,7 @@ import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, writeFileSy
 import { get } from "node:http";
 import { createConnection } from "node:net";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const [platform, ...args] = process.argv.slice(2);
@@ -44,14 +44,15 @@ const gamePort = Number(process.env.SMOKE_GAME_PORT ?? 2567);
 const metroPort = Number(process.env.SMOKE_METRO_PORT ?? 8081);
 // History must lose its API connection without breaking development-only asset loading.
 // A second device port forwards to the same Metro API; no extra host server is needed.
-const deviceApiPort = platform === "android" && flow === ".maestro/native/history.yaml"
+const androidHistory = platform === "android" && normalize(flow) === normalize(".maestro/native/history.yaml");
+const deviceApiPort = androidHistory
   ? Number(process.env.SMOKE_DEVICE_API_PORT ?? metroPort + 1) : metroPort;
 if ([gamePort, metroPort].some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || gamePort === metroPort) {
   console.error("SMOKE_GAME_PORT and SMOKE_METRO_PORT must be distinct ports between 1 and 65535.");
   process.exit(2);
 }
 if (!Number.isInteger(deviceApiPort) || deviceApiPort < 1 || deviceApiPort > 65535 || deviceApiPort === gamePort ||
-    (platform === "android" && flow === ".maestro/native/history.yaml" && deviceApiPort === metroPort)) {
+    (androidHistory && deviceApiPort === metroPort)) {
   console.error("SMOKE_DEVICE_API_PORT must be a valid port distinct from the game port and, for Android history, the Metro port.");
   process.exit(2);
 }

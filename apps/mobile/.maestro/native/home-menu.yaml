@@ -1,4 +1,4 @@
-# The home menu on a device (STO-517): "Choose how to play" lists Tutorial, Online, Offline and
+# The home menu on a device (STO-517): the mode list shows Tutorial, Online, Offline and
 # Leaderboard, and Offline Mode carries its two choices — Normal and Wild Power — inside the card.
 #
 # On iPhone the universal layout drew each card at its content's width, and the hosted choices
@@ -22,7 +22,7 @@ tags:
     clearState: false
 
 - extendedWaitUntil:
-    visible: "Choose how to play"
+    visible: "Offline Mode"
     timeout: 60000
 
 # Every mode card is on the screen.
