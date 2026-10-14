@@ -1,7 +1,8 @@
 import { randomInt } from "node:crypto";
 import type { MikroORM } from "@mikro-orm/postgresql";
-import type { Friend, FriendRequestResult, FriendsPage } from "@wordpoker/contracts";
+import type { Friend, FriendRequestResult, FriendsPage, FriendStatus } from "@wordpoker/contracts";
 import { getOrm } from "./orm";
+import { PRESENCE_GRACE_MS } from "./presence";
 
 type DbOptions = { orm?: MikroORM };
 const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -78,16 +79,20 @@ export async function removeFriend(me: string, other: string, options: DbOptions
 
 export async function friendList(me: string, options: DbOptions = {}): Promise<Omit<FriendsPage, "code" | "referrals">> {
   const db = await connection(options);
-  const rows = await db.execute<(Friend & { status: string; requested_by: string })[]>(
-    `select u.id as "userId", u.name, f.status, f.requested_by from friends f
+  const rows = await db.execute<(Omit<Friend, "status"> & { status: string; requested_by: string; presence: FriendStatus })[]>(
+    `select u.id as "userId", u.name, f.status, f.requested_by,
+       case when p.seen_at > now() - make_interval(secs => ?::double precision)
+         then case when p.at_table then 'at-table' else 'online' end else 'offline' end as presence
+     from friends f
      join "user" u on u.id = case when f.user_a = ? then f.user_b else f.user_a end
+     left join presence p on p.user_id = u.id
      where (f.user_a = ? or f.user_b = ?) and coalesce(u."isAnonymous", false) = false
-     order by u.name, u.id`, [me, me, me],
+     order by u.name, u.id`, [PRESENCE_GRACE_MS / 1000, me, me, me],
   );
   const result: Omit<FriendsPage, "code" | "referrals"> = { friends: [], incoming: [], outgoing: [] };
   for (const row of rows) {
-    const list = row.status === "accepted" ? result.friends : row.requested_by === me ? result.outgoing : result.incoming;
-    list.push({ userId: row.userId, name: row.name });
+    if (row.status === "accepted") result.friends.push({ userId: row.userId, name: row.name, status: row.presence });
+    else (row.requested_by === me ? result.outgoing : result.incoming).push({ userId: row.userId, name: row.name });
   }
   return result;
 }

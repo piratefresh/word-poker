@@ -39,6 +39,8 @@ import {
 import { leaveTable } from "@/features/online/room-session";
 import { QuestsProvider } from "@/lib/quests-provider";
 import { useRevenueCatIdentity } from "@/lib/use-revenuecat";
+import { usePresence } from "@/lib/use-presence";
+import { TableInviteBanner } from "@/components/ui/table-invite-banner";
 
 Sentry.init({
   dsn: "https://275e0d7eaac4989bad2cdca3b110a5c0@o4512200430125056.ingest.us.sentry.io/4512200442904576",
@@ -75,6 +77,8 @@ export function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
   // Purchases credit the signed-in player's Wallet, so RevenueCat follows the session (STO-346).
   useRevenueCatIdentity(session?.user.id);
+  const account = !!session && !session.user.isAnonymous;
+  const presence = usePresence(account);
 
   // E2E builds have no auth server and no account: the guard takes their word for it instead
   // of holding the table behind a session nothing can start (`src/lib/e2e.ts`).
@@ -106,7 +110,7 @@ export function RootLayout() {
   if ((isPending && !E2E_AUTH_BYPASS) || !fontsLoaded) return null;
 
   return (
-    <DeepLinks session={!!session} account={!!session && !session.user.isAnonymous}>
+    <DeepLinks session={!!session} account={account}>
       <GestureHandlerRootView style={styles.root}>
         <ThemeProvider value={DarkTheme}>
           <QuestsProvider>
@@ -130,6 +134,7 @@ export function RootLayout() {
                 <Stack.Screen name="reset-password" />
               </Stack>
               <AnimatedSplashOverlay />
+              <TableInviteBanner invite={presence.invite} onDismiss={presence.dismiss} />
             </HistoryProvider>
           </QuestsProvider>
         </ThemeProvider>

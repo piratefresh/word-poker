@@ -19,7 +19,7 @@ test.each(["web", "native"])("resolves %s history ownership from the session and
     method: "POST", headers: { cookie: "better-auth.session_token=session-a" },
     body: JSON.stringify({ ownerId: "account-b" }),
   });
-  await expect(sessionUser(request)).resolves.toEqual({ id: "account-a", anonymous: false });
+  await expect(sessionUser(request)).resolves.toEqual({ id: "account-a", name: "A", anonymous: false });
   expect(getSession).toHaveBeenCalledWith({ headers: request.headers, query: { disableCookieCache: true } });
 });
 
@@ -34,5 +34,5 @@ test("identifies guest sessions", async () => {
   const guest = session();
   guest.user.isAnonymous = true;
   getSession.mockResolvedValueOnce(guest);
-  await expect(sessionUser(new Request("https://api.test/api/friends"))).resolves.toEqual({ id: "account-a", anonymous: true });
+  await expect(sessionUser(new Request("https://api.test/api/friends"))).resolves.toEqual({ id: "account-a", name: "A", anonymous: true });
 });

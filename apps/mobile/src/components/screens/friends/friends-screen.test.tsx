@@ -68,3 +68,11 @@ test("says how many friends joined through the player's invite", async () => {
   const view = await render(<FriendsScreen />);
   await waitFor(() => expect(view.getByTestId("friends-referrals")).toBeTruthy());
 });
+
+test("shows each friend's presence", async () => {
+  jest.mocked(getFriends).mockResolvedValue({ code: "WXYZ2345", incoming: [], outgoing: [], referrals: 0,
+    friends: [{ userId: "friend", name: "Bea", status: "at-table" }] });
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friend-name-friend")).toBeTruthy());
+  expect(JSON.stringify(view.getByTestId("friend-name-friend").props)).toContain("Bea · At a table");
+});

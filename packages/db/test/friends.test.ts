@@ -35,8 +35,8 @@ describe("friends", { skip: !serverUrl && "no TEST_DATABASE_URL or DATABASE_URL"
     assert.equal(await acceptFriend("B", "A", { orm }), false);
     assert.equal(await areFriends("A", "B", { orm }), true);
     assert.equal(await areFriends("B", "A", { orm }), true);
-    assert.deepEqual((await friendList("A", { orm })).friends, [{ userId: "B", name: "Bea" }]);
-    assert.deepEqual((await friendList("B", { orm })).friends, [{ userId: "A", name: "Ada" }]);
+    assert.deepEqual((await friendList("A", { orm })).friends, [{ userId: "B", name: "Bea", status: "offline" }]);
+    assert.deepEqual((await friendList("B", { orm })).friends, [{ userId: "A", name: "Ada", status: "offline" }]);
     assert.equal(await requestFriend("A", "B", { orm }), "already-friends");
   });
 

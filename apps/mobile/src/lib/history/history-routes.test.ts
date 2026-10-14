@@ -30,7 +30,7 @@ function request(value: unknown) {
 }
 
 beforeEach(() => {
-  jest.mocked(sessionUser).mockResolvedValue({ id: "a", anonymous: false });
+  jest.mocked(sessionUser).mockResolvedValue({ id: "a", name: "Ada", anonymous: false });
   jest.mocked(saveHistoryHand).mockReset().mockResolvedValue({ status: "recorded", id: "server-id" });
   jest.mocked(loadDictionary).mockResolvedValue(dictionary);
 });
@@ -39,7 +39,7 @@ test("requires authentication, enforces offline ownership/ranking, and bounds th
   jest.mocked(sessionUser).mockResolvedValueOnce(null);
   expect((await POST(request(record()))).status).toBe(401);
   expect((await POST(request({ ...record(), ranked: true }))).status).toBe(400);
-  jest.mocked(sessionUser).mockResolvedValueOnce({ id: "b", anonymous: false });
+  jest.mocked(sessionUser).mockResolvedValueOnce({ id: "b", name: "Ada", anonymous: false });
   expect((await POST(request(record()))).status).toBe(400);
   expect((await POST(request("x".repeat(512 * 1024)))).status).toBe(413);
   expect(saveHistoryHand).not.toHaveBeenCalled();
