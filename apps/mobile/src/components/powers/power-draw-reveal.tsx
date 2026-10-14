@@ -32,7 +32,7 @@ export { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION } from "./power-draw-motion";
 
 const { entrance, exit: EXIT, reduced: REDUCED } = POWER_DRAW_MOTION;
 
-const MAX_CARD_WIDTH = 150;
+const MAX_CARD_WIDTH = 190;
 /** How long "Time's up. You got …" stays on the felt after the kept card has flown. */
 const TIME_UP_NOTE_MS = 2_000;
 /** The room the heading and the hint take above and below the row, and the region's margin. */
@@ -47,16 +47,24 @@ function drawKey(draw: NonNullable<PowerView["draw"]>): string {
   return `${draw.endsAtMs}:${draw.offers.join(",")}`;
 }
 
+/** More than three offers wrap to two rows, the larger one on top: five deal as 3 over 2. */
+function rowsFor(count: number) {
+  const rows = count > 3 ? 2 : 1;
+  return { rows, perRow: Math.ceil(Math.max(count, 1) / rows) };
+}
+
 /**
- * The row's size in the region it is given: one row whatever the room, the cards as wide as they
- * can be up to `MAX_CARD_WIDTH` with room left for the hit's overshoot, the heading and the hint,
- * and the gaps closing in on a narrow screen.
+ * The grid's size in the region it is given: the cards as wide as they can be up to
+ * `MAX_CARD_WIDTH` with room left for the hit's overshoot, the heading and the hint, and the gaps
+ * closing in on a narrow screen.
  */
 function rowFor(region: { height: number; width: number }, count: number) {
-  const n = Math.max(count, 1);
+  const { rows, perRow } = rowsFor(count);
   const gap = Math.min(16, Math.max(6, region.width * 0.03));
-  const byWidth = (region.width - PAD * 2 - gap * (n - 1)) / (n + OVERSHOOT);
-  const byHeight = (region.height - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2) / (POWER_CARD_ASPECT * (1 + OVERSHOOT));
+  const byWidth = (region.width - PAD * 2 - gap * (perRow - 1)) / (perRow + OVERSHOOT);
+  const byHeight =
+    (region.height - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2 - gap * (rows - 1)) /
+    (POWER_CARD_ASPECT * (rows + OVERSHOOT));
   return { cardWidth: Math.max(0, Math.min(MAX_CARD_WIDTH, byWidth, byHeight)), gap };
 }
 
@@ -165,8 +173,16 @@ export function PowerDrawReveal({
 
   const count = shown.offers.length;
   const cardHeight = cardWidth * POWER_CARD_ASPECT;
-  const rowWidth = count * cardWidth + (count - 1) * gap;
-  const slotX = (index: number) => index * (cardWidth + gap) + cardWidth / 2;
+  const { rows, perRow } = rowsFor(count);
+  const rowWidth = perRow * cardWidth + (perRow - 1) * gap;
+  const gridHeight = rows * cardHeight + (rows - 1) * gap;
+  // A card's centre in the grid; a short last row sits centred under the full one.
+  const slotX = (index: number) => {
+    const inRow = Math.min(perRow, count - Math.floor(index / perRow) * perRow);
+    const indent = ((perRow - inRow) * (cardWidth + gap)) / 2;
+    return indent + (index % perRow) * (cardWidth + gap) + cardWidth / 2;
+  };
+  const slotY = (index: number) => Math.floor(index / perRow) * (cardHeight + gap) + cardHeight / 2;
   const lit = tapped ?? hovered;
   const leaving = kept !== null;
   const animated = !reduceMotion;
@@ -187,18 +203,18 @@ export function PowerDrawReveal({
       {laidOut ? (
         <View key={`stage:${key}`} pointerEvents="box-none" style={styles.stage}>
           <Heading fontSize={Math.min(26, Math.max(16, cardWidth * 0.16))} leaving={leaving} reduceMotion={reduceMotion} />
-          <View pointerEvents="box-none" style={{ height: cardHeight, marginVertical: (cardHeight * OVERSHOOT) / 2, width: rowWidth }}>
+          <View pointerEvents="box-none" style={{ height: gridHeight, marginVertical: (cardHeight * OVERSHOOT) / 2, width: rowWidth }}>
             {/* The bursts sit under the whole row, so a card's light never covers its neighbour. */}
             {animated && !exited ? (
               <View pointerEvents="none" style={StyleSheet.absoluteFill}>
                 {leaving ? null : (
-                  <View style={[styles.anchor, { left: rowWidth / 2, top: cardHeight / 2 }]}>
+                  <View style={[styles.anchor, { left: rowWidth / 2, top: gridHeight / 2 }]}>
                     <PowerImpact delay={entrance.gatherAt} kind="gather" size={cardWidth * 1.6} />
                   </View>
                 )}
                 {shown.offers.map((id, index) =>
                   leaving && id !== kept ? null : (
-                    <View key={`${key}:${id}:${leaving ? "pick" : "reveal"}`} style={[styles.anchor, { left: slotX(index), top: cardHeight / 2 }]}>
+                    <View key={`${key}:${id}:${leaving ? "pick" : "reveal"}`} style={[styles.anchor, { left: slotX(index), top: slotY(index) }]}>
                       {leaving ? (
                         <PowerImpact delay={EXIT.impactAt} kind="pick" size={cardWidth * 2.9} />
                       ) : (
@@ -210,8 +226,11 @@ export function PowerDrawReveal({
               </View>
             ) : null}
             {/* Once the exit has played, the cards are gone: a seat still waiting has nothing to pick. */}
-            <View pointerEvents="box-none" style={[styles.row, { gap }]}>
-              {exited ? null : shown.offers.map((id, index) => {
+            <View pointerEvents="box-none" style={[styles.grid, { gap }]}>
+              {exited ? null : Array.from({ length: rows }, (_, row) => (
+                <View key={row} pointerEvents="box-none" style={[styles.row, { gap }]}>
+                  {shown.offers.slice(row * perRow, (row + 1) * perRow).map((id, col) => {
+                const index = row * perRow + col;
                 const fate: OfferFate = kept === null ? "offered" : kept === id ? "kept" : "dropped";
                 return (
                   <PowerOfferCard
@@ -219,7 +238,7 @@ export function PowerDrawReveal({
                     dimmed={kept === null && lit !== null && lit !== id}
                     disabled={!ready || tapped !== null || kept !== null}
                     fate={fate}
-                    flight={{ x: rowWidth / 2 - slotX(index), y: region.height / 2 + cardHeight * 0.1 }}
+                    flight={{ x: rowWidth / 2 - slotX(index), y: gridHeight / 2 - slotY(index) + region.height / 2 + cardHeight * 0.1 }}
                     id={id}
                     index={index}
                     key={`${key}:${id}`}
@@ -232,7 +251,9 @@ export function PowerDrawReveal({
                     reduceMotion={reduceMotion}
                   />
                 );
-              })}
+                  })}
+                </View>
+              ))}
             </View>
           </View>
           <View style={styles.hintSlot}>
@@ -387,7 +408,8 @@ const styles = StyleSheet.create({
   },
   note: { alignItems: "center", justifyContent: "center" },
   anchor: { height: 0, position: "absolute", width: 0 },
-  row: { alignItems: "center", flexDirection: "row", height: "100%", justifyContent: "center" },
+  grid: { alignItems: "center", height: "100%", justifyContent: "center" },
+  row: { alignItems: "center", flexDirection: "row", justifyContent: "center" },
   hintSlot: { alignItems: "center", height: HINT_HEIGHT, justifyContent: "center" },
   pill: {
     borderColor: palette.gold050,

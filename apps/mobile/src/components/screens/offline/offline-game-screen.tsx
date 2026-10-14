@@ -222,6 +222,7 @@ function OfflineTable({
           onFold={fold}
           onHelp={help.open}
           onRaise={wager}
+          hidePot={powers?.draw != null}
           overFelt={
             // §44's Power Draw, at a Wild table: the offers land over the felt, above the rack
             // the seat picks with in view. A Classic table has no powers and draws nothing here.

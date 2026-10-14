@@ -76,6 +76,8 @@ export interface GameScreenProps {
    * table's region and nothing past it, so the community above and the rack below stay in view.
    */
   overFelt?: ReactNode;
+  /** Clears the pot from the middle of the felt, so the Power Draw's cards have the room. */
+  hidePot?: boolean;
   /** Spotlight's aim: while set, a tap on a dealt community tile with no bonus picks it. */
   onPickCommunityTile?: (tile: LetterTileData) => void;
   /** A short, presentation-only celebration above the table after a showdown. */
@@ -137,6 +139,7 @@ function GameScreenBody({
   rackActions,
   heroSideAccessory,
   overFelt,
+  hidePot,
   winOverlay,
   onPickCommunityTile,
   onBack,
@@ -335,15 +338,17 @@ function GameScreenBody({
             chromeInset={0}
             layoutConfig={layoutConfig}
             renderCommunity={() => null}
-            renderPot={({ size, appearanceWidth }) => (
-              <Pot
-                amount={game.pot}
-                sidePots={game.sidePots}
-                blinds={game.blinds}
-                tableWidth={appearanceWidth ?? size.width}
-                tabletop
-              />
-            )}
+            renderPot={({ size, appearanceWidth }) =>
+              hidePot ? null : (
+                <Pot
+                  amount={game.pot}
+                  sidePots={game.sidePots}
+                  blinds={game.blinds}
+                  tableWidth={appearanceWidth ?? size.width}
+                  tabletop
+                />
+              )
+            }
             renderSeat={(slot) => (
               <PlayerSeat {...slot} dealt={!waiting} onPress={onSeatPress} tabletop />
             )}
