@@ -121,11 +121,10 @@ test("shows the level-up banner, and dismisses it on tap", async () => {
   expect(mockDismissLevelUp).toHaveBeenCalledTimes(1);
 });
 
-test("shows no level strip without quest state", async () => {
+test("shows no level ring without quest state", async () => {
   const { queryByTestId } = await render(<HomeScreen />);
 
-  // The strip is RN content under an `RNHostView`; its own test file renders it directly.
-  expect(queryByTestId("level-strip")).toBeNull();
+  expect(queryByTestId("level-ring")).toBeNull();
 });
 
 test("prompts an unverified player to verify, and resends the mail", async () => {

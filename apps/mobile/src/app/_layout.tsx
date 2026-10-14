@@ -121,10 +121,8 @@ export function RootLayout() {
                   <Stack.Screen name="tutorial" />
                   <Stack.Screen name="offline" />
                   <Stack.Screen name="online" />
-                  <Stack.Screen name="friends" />
                   <Stack.Screen name="friend/[code]" />
                   <Stack.Screen name="online/[roomId]" />
-                  <Stack.Screen name="history" />
                 </Stack.Protected>
                 {/* Outside the guards: the emailed reset link may land while a stale
                     session is still on the device, and the reset has to win. */}
