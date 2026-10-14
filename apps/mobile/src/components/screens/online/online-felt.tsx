@@ -195,6 +195,7 @@ export function OnlineFelt({
                 />
               ) : null
             }
+            hidePot={powers?.draw != null}
             overFelt={
               powers === null ? null : (
                 <>
