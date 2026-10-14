@@ -40,7 +40,7 @@ import { fullWidth } from "@/lib/full-width";
 import { useQuests } from "@/lib/quests-provider";
 
 type ModeKey =
-  "tutorial" | "online" | "friend" | "offline" | "leaderboard" | "store" | "quests" | "history";
+  "tutorial" | "online" | "friend" | "friends" | "offline" | "leaderboard" | "store" | "quests" | "history";
 
 /**
  * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
@@ -62,6 +62,10 @@ type Mode = Omit<ModeCardProps, "width"> & {
 
 const MODES: Mode[] = [
 
+  {
+    key: "friends", href: "/friends", glyph: "👥", label: "Friends",
+    description: "Keep the people you play with",
+  },
   {
     key: "tutorial",
     href: "/tutorial",

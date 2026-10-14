@@ -93,7 +93,7 @@ describe("game history migration", { skip: !serverUrl && "no test database confi
   });
 
   it("rolls back all history tables", async () => {
-    await orm.migrator.down();
+    await orm.migrator.down({ to: "Migration20261006120000_xp_levels" });
     const rows = await sql("select tablename from pg_tables where schemaname = current_schema() and tablename in ('game_session', 'game_hand', 'hand_seat', 'hand_action')");
     assert.deepEqual(rows, []);
   });

@@ -30,6 +30,10 @@ export function getOrm(url?: string): Promise<MikroORM> {
             clientUrl: url,
             driverOptions: { connectionString: pgConnectionString(url) },
           });
+    orm = orm.catch((error) => {
+      orms.delete(key);
+      throw error;
+    });
     orms.set(key, orm);
   }
 

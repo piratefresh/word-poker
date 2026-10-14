@@ -1,14 +1,14 @@
 import { HAND_RECORD_MAX_BYTES, parseHandRecord, historyHand, isHistoryCursor } from "@wordpoker/contracts";
 import { HandRecordConflictError, readHistoryHands, saveHistoryHand } from "@wordpoker/db";
 import { loadDictionary, verifyHandRecord } from "@wordpoker/game-rules";
-import { historyUser } from "@/auth/server/history-user";
+import { sessionUser } from "@/auth/server/session-user";
 
 function json(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { "cache-control": "no-store" } });
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const userId = await historyUser(request);
+  const userId = (await sessionUser(request))?.id;
   if (!userId) return json({ error: "Sign in to see your history." }, 401);
   const cursor = new URL(request.url).searchParams.get("cursor");
   if (cursor !== null && !isHistoryCursor(cursor)) return json({ error: "Invalid cursor." }, 400);
@@ -21,7 +21,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const userId = await historyUser(request);
+  const userId = (await sessionUser(request))?.id;
   if (!userId) return json({ error: "Sign in to save your history." }, 401);
   // Bound the streamed body before allocating/parsing an uploaded action log.
   const reader = request.body?.getReader();

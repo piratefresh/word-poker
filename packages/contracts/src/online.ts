@@ -18,6 +18,7 @@ import {
   type SeatChips,
 } from "./betting";
 import type { RoomPhase, RoundPhase } from "./phases";
+import { isBefriendAction, type BefriendAction, type BefriendResult } from "./friends";
 import type { PlayerId } from "./players";
 import {
   POWER_REJECTION_REASONS,
@@ -84,6 +85,7 @@ export const POWER_ACTION_ID_MAX_LENGTH = 64;
  * use to register handlers.
  */
 export interface GameMessageMap {
+  readonly befriend: BefriendAction;
   readonly betting: OnlineBettingAction;
   readonly checkWord: OnlineWordAction;
   readonly draftWord: OnlineWordAction;
@@ -96,6 +98,7 @@ export interface GameMessageMap {
 }
 
 export const GAME_MESSAGES = {
+  befriend: "befriend",
   betting: "betting",
   checkWord: "checkWord",
   draftWord: "draftWord",
@@ -111,6 +114,7 @@ export type GameMessagePayload<Name extends GameMessageName = GameMessageName> =
 
 /** The server-to-client messages that are not represented by synchronized room state. */
 export interface GameEventMap {
+  readonly befriendResult: BefriendResult;
   /** Targeted to one connection; never put a private rack in the broadcast schema. */
   readonly privateState: PrivateSeatState;
   /** Targeted to the sender that submitted an invalid or illegal action. */
@@ -124,6 +128,7 @@ export interface GameEventMap {
 }
 
 export const GAME_EVENTS = {
+  befriendResult: "befriendResult",
   privateState: "privateState",
   rejected: "rejected",
   powerDraw: "powerDraw",
@@ -403,6 +408,8 @@ export function isGameMessagePayload<Name extends GameMessageName>(
   value: unknown,
 ): value is GameMessageMap[Name] {
   switch (name) {
+    case "befriend":
+      return isBefriendAction(value);
     case "betting":
       return isOnlineBettingAction(value);
     case "checkWord":

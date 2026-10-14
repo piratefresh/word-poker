@@ -83,6 +83,33 @@ describe("SettlementJournal", () => {
   });
 });
 
+describe("HistoryService configuration", () => {
+  it("rejects the renamed variable instead of silently disabling history", async () => {
+    const original = process.env[HISTORY_DATABASE_URL];
+    const legacy = process.env.WORDPOKER_HISTORY_DATABASE_URL;
+    const directory = process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
+    try {
+      delete process.env[HISTORY_DATABASE_URL];
+      delete process.env.WORDPOKER_HISTORY_DATABASE_URL;
+      assert.strictEqual(await HistoryService.fromEnv(), null);
+
+      process.env.WORDPOKER_HISTORY_DATABASE_URL = "postgres://unused/legacy";
+      await assert.rejects(HistoryService.fromEnv(), /WORDPOKER_HISTORY_DATABASE_URL was renamed to WORDPOKER_DATABASE_URL/);
+
+      process.env[HISTORY_DATABASE_URL] = "postgres://unused/current";
+      delete process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
+      await assert.rejects(HistoryService.fromEnv(), /WORDPOKER_HISTORY_JOURNAL_DIR must name a persistent settlement directory/);
+    } finally {
+      if (original === undefined) delete process.env[HISTORY_DATABASE_URL];
+      else process.env[HISTORY_DATABASE_URL] = original;
+      if (legacy === undefined) delete process.env.WORDPOKER_HISTORY_DATABASE_URL;
+      else process.env.WORDPOKER_HISTORY_DATABASE_URL = legacy;
+      if (directory === undefined) delete process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
+      else process.env.WORDPOKER_HISTORY_JOURNAL_DIR = directory;
+    }
+  });
+});
+
 describe("HistoryService (STO-455)", function () {
 
   let admin: Client;
@@ -115,6 +142,7 @@ describe("HistoryService (STO-455)", function () {
     }
 
     const orm = await getOrm(historyUrl);
+    await orm.em.getConnection().execute(`create table "user" (id text primary key, name text not null)`);
     await orm.migrator.up();
     service = new HistoryService(orm);
   });

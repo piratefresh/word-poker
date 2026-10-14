@@ -21,3 +21,7 @@ function webOrigin(): string {
 export function inviteLinkFor(roomId: string): string {
   return `${webOrigin()}/online?room=${encodeURIComponent(roomId)}`;
 }
+
+export function friendLinkFor(code: string): string {
+  return `${webOrigin()}/friend/${encodeURIComponent(code)}`;
+}

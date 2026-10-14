@@ -1,10 +1,10 @@
 import { createDictionary, DICTIONARIES, loadDictionary, reduce, startHand } from "@wordpoker/game-rules";
 import { HandRecordConflictError, readHistoryHands, saveHistoryHand } from "@wordpoker/db";
-import { historyUser } from "@/auth/server/history-user";
+import { sessionUser } from "@/auth/server/session-user";
 import { OfflineHandRecorder } from "./hand-recorder";
 import { GET, POST } from "@/app/api/history/hands+api";
 
-jest.mock("@/auth/server/history-user", () => ({ historyUser: jest.fn() }));
+jest.mock("@/auth/server/session-user", () => ({ sessionUser: jest.fn() }));
 jest.mock("@wordpoker/db", () => ({
   readHistoryHands: jest.fn(), saveHistoryHand: jest.fn(),
   HandRecordConflictError: class HandRecordConflictError extends Error {},
@@ -30,16 +30,16 @@ function request(value: unknown) {
 }
 
 beforeEach(() => {
-  jest.mocked(historyUser).mockResolvedValue("a");
+  jest.mocked(sessionUser).mockResolvedValue({ id: "a", anonymous: false });
   jest.mocked(saveHistoryHand).mockReset().mockResolvedValue({ status: "recorded", id: "server-id" });
   jest.mocked(loadDictionary).mockResolvedValue(dictionary);
 });
 
 test("requires authentication, enforces offline ownership/ranking, and bounds the upload", async () => {
-  jest.mocked(historyUser).mockResolvedValueOnce(null);
+  jest.mocked(sessionUser).mockResolvedValueOnce(null);
   expect((await POST(request(record()))).status).toBe(401);
   expect((await POST(request({ ...record(), ranked: true }))).status).toBe(400);
-  jest.mocked(historyUser).mockResolvedValueOnce("b");
+  jest.mocked(sessionUser).mockResolvedValueOnce({ id: "b", anonymous: false });
   expect((await POST(request(record()))).status).toBe(400);
   expect((await POST(request("x".repeat(512 * 1024)))).status).toBe(413);
   expect(saveHistoryHand).not.toHaveBeenCalled();
