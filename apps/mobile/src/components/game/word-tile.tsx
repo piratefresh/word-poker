@@ -177,6 +177,10 @@ const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
 /** §10's choice tiles wear an accent no single letter does: the pair is one tile, not two. */
 const CHOICE_ACCENT = palette.violet400;
 
+/** A 2x tile wears this border all the way round; a 3x tile wears the rainbow below. */
+const DOUBLE_BORDER = palette.violet400;
+const TRIPLE_BORDER = ["#ff4d4d", "#ffb020", "#ffe94d", "#3ddc84", "#3da9ff", "#a455ff"] as const;
+
 /**
  * The second face a choice tile prints — `E` for A/E — or null on a single-letter tile, which
  * has only the one face to show (§10).
@@ -582,9 +586,15 @@ export function Tile({
           style={[
             styles.frame,
             {
-              borderColor: selected ? colors.goldHi : OWNERSHIP_BORDER[ownership],
+              borderColor: selected
+                ? colors.goldHi
+                : tile.multiplier === "double-letter"
+                  ? DOUBLE_BORDER
+                  : tile.multiplier === "triple-letter"
+                    ? "transparent"
+                    : OWNERSHIP_BORDER[ownership],
               borderRadius: metrics.radius,
-              borderWidth: selected
+              borderWidth: selected || tile.multiplier !== undefined
                 ? metrics.borderWidth + 1
                 : metrics.borderWidth,
               height: metrics.height - metrics.slab,
@@ -592,6 +602,25 @@ export function Tile({
             selected && styles.selectedShell,
           ]}
         >
+        {tile.multiplier === "triple-letter" && !selected ? (
+          // A border cannot take a gradient, so the rainbow sits under the face and shows
+          // round it, in the border's own width.
+          <LinearGradient
+            colors={TRIPLE_BORDER}
+            end={{ x: 1, y: 1 }}
+            pointerEvents="none"
+            start={{ x: 0, y: 0 }}
+            style={{
+              borderRadius: metrics.radius,
+              bottom: -(metrics.borderWidth + 1),
+              left: -(metrics.borderWidth + 1),
+              position: "absolute",
+              right: -(metrics.borderWidth + 1),
+              top: -(metrics.borderWidth + 1),
+            }}
+            testID="tile-triple-border"
+          />
+        ) : null}
         <Animated.View
           importantForAccessibility="no-hide-descendants"
           style={[
