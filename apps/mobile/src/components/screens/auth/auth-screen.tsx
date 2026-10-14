@@ -131,13 +131,17 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
   };
 
   const playAsGuest = async () => {
-    if (pending) return;
+    // Already a guest: Better Auth refuses a second anonymous sign-in over an anonymous session.
+    if (pending || guestId) return;
     setPending(true);
     setError(null);
     try {
       await setAutoRestore(false);
       const { error: authError } = await changeSession(() => authClient.signIn.anonymous());
       if (authError) setError(authError.message ?? "Something went wrong. Please try again.");
+      // A guest keeps access to sign-in (to save progress), so the route guard does not move this
+      // screen away on its own the way it does for a registered account.
+      else router.replace("/");
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -215,7 +219,7 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
 
       {/* A friend opening an invite link has no account: an anonymous session seats them
           (STO-581), and the guard then lands the table the link named. */}
-      {mode === "sign-in" && (
+      {mode === "sign-in" && !guestId && (
         <FooterLine cta="Play as guest" onPress={playAsGuest} text="No account?" />
       )}
     </AuthShell>
