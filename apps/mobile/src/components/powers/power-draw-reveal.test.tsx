@@ -96,7 +96,7 @@ describe("<PowerDrawReveal />", () => {
     expect(screen.getByTestId("power-draw-ready")).toBeOnTheScreen();
   });
 
-  test("picks the tapped card, and only once", async () => {
+  test("opens the tapped card to read, and keeps it only on CONFIRM, once", async () => {
     const onPick = jest.fn();
     const screen = await render(<PowerDrawReveal draw={openDraw()} held={null} onPick={onPick} />);
     await layOut(screen);
@@ -104,7 +104,13 @@ describe("<PowerDrawReveal />", () => {
 
     await fireEvent(screen.getByTestId("power-offer-vowel_magnet"), "focus");
     await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
-    await fireEvent.press(screen.getByTestId("power-offer-random_wild"));
+    expect(onPick).not.toHaveBeenCalled();
+    expect(screen.getByTestId("power-draw-zoom")).toBeOnTheScreen();
+    // BACK returns to the row, and a card can be opened again.
+    await fireEvent.press(screen.getByTestId("power-draw-back"));
+    expect(screen.queryByTestId("power-draw-zoom")).toBeNull();
+    await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
+    await fireEvent.press(screen.getByTestId("power-draw-confirm"));
 
     expect(onPick).toHaveBeenCalledTimes(1);
     expect(onPick).toHaveBeenCalledWith("vowel_magnet");
@@ -118,6 +124,7 @@ describe("<PowerDrawReveal />", () => {
     await layOut(screen);
     await advance(READY_MS);
     await fireEvent.press(screen.getByTestId("power-offer-vowel_magnet"));
+    await fireEvent.press(screen.getByTestId("power-draw-confirm"));
 
     await screen.rerender(<PowerDrawReveal draw={{ ...draw, picked: "random_wild" }} held={null} onPick={jest.fn()} />);
 
@@ -180,6 +187,7 @@ describe("<PowerDrawReveal />", () => {
     await layOut(screen);
     await advance(READY_MS);
     await fireEvent.press(screen.getByTestId("power-offer-random_wild"));
+    await fireEvent.press(screen.getByTestId("power-draw-confirm"));
     await screen.rerender(<PowerDrawReveal draw={null} held="random_wild" onPick={jest.fn()} />);
     await advance(POWER_DRAW_KEPT_MS);
 
@@ -192,6 +200,7 @@ describe("<PowerDrawReveal />", () => {
     expect(screen.getByTestId("power-offer-random_wild")).not.toBeSelected();
     await advance(READY_MS);
     await fireEvent.press(screen.getByTestId("power-offer-random_wild"));
+    await fireEvent.press(screen.getByTestId("power-draw-confirm"));
     expect(onPick).toHaveBeenCalledWith("random_wild");
   });
 
@@ -224,6 +233,7 @@ describe("<PowerDrawReveal />", () => {
 
       expect(screen.getByTestId("power-draw-ready")).toBeOnTheScreen();
       await fireEvent.press(screen.getByTestId("power-offer-random_wild"));
+      await fireEvent.press(screen.getByTestId("power-draw-confirm"));
       expect(onPick).toHaveBeenCalledWith("random_wild");
     });
 

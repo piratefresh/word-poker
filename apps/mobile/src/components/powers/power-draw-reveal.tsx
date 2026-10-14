@@ -2,6 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -10,11 +11,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   cancelAnimation,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
   withTiming,
+  ZoomIn,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
@@ -24,7 +27,7 @@ import { colors, fonts, palette } from "@/constants/theme";
 import type { PowerView } from "@/features/table/power-view";
 import { webTestID } from "@/lib/web-id";
 
-import { POWER_CARD_ASPECT } from "./power-card";
+import { POWER_CARD_ASPECT, PowerCard } from "./power-card";
 import { POWER_DRAW_MOTION, revealAtFor } from "./power-draw-motion";
 import { PowerImpact } from "./power-impact";
 import { PowerOfferCard, type OfferFate } from "./power-offer-card";
@@ -34,6 +37,9 @@ export { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION } from "./power-draw-motion";
 const { entrance, exit: EXIT, reduced: REDUCED } = POWER_DRAW_MOTION;
 
 const MAX_CARD_WIDTH = 190;
+/** The zoomed card, and the room its confirm button and back link take below it. */
+const MAX_ZOOM_WIDTH = 320;
+const ZOOM_ACTIONS_HEIGHT = 96;
 /** How long "Time's up. You got …" stays on the felt after the kept card has flown. */
 const TIME_UP_NOTE_MS = 2_000;
 /** The room the heading and the hint take above and below the row, and the region's margin. */
@@ -107,6 +113,8 @@ export function PowerDrawReveal({
   const [tapped, setTapped] = useState<PowerUpId | null>(null);
   // The card under the pointer, the keyboard's focus or a finger.
   const [hovered, setHovered] = useState<PowerUpId | null>(null);
+  // The card tapped open to read, ahead of the pick: confirming it is what keeps it.
+  const [zoomed, setZoomed] = useState<PowerUpId | null>(null);
   // Which draw has finished its entrance, and which has finished its exit: a new draw is neither.
   const [readyKey, setReadyKey] = useState<string | null>(null);
   const [exitedKey, setExitedKey] = useState<string | null>(null);
@@ -117,6 +125,7 @@ export function PowerDrawReveal({
     setShown({ key: drawKey(draw), offers: draw.offers, endsAtMs: draw.endsAtMs });
     setTapped(null);
     setHovered(null);
+    setZoomed(null);
   }
 
   const key = shown?.key ?? null;
@@ -250,10 +259,7 @@ export function PowerDrawReveal({
                     key={`${key}:${id}`}
                     lit={kept === null ? lit === id : kept === id}
                     onLight={(on) => setHovered((current) => (on ? id : current === id ? null : current))}
-                    onPress={() => {
-                      setTapped(id);
-                      onPick(id);
-                    }}
+                    onPress={() => setZoomed(id)}
                     reduceMotion={reduceMotion}
                   />
                 );
@@ -271,7 +277,64 @@ export function PowerDrawReveal({
           </View>
         </View>
       ) : null}
+      {zoomed !== null && laidOut && tapped === null && kept === null ? (
+        <ZoomedOffer
+          id={zoomed}
+          onBack={() => setZoomed(null)}
+          onConfirm={() => {
+            setTapped(zoomed);
+            setZoomed(null);
+            onPick(zoomed);
+          }}
+          reduceMotion={reduceMotion}
+          width={Math.max(
+            0,
+            Math.min(
+              MAX_ZOOM_WIDTH,
+              region.width - PAD * 2 - 32,
+              (region.height - insets.top - insets.bottom - ZOOM_ACTIONS_HEIGHT - PAD * 2) / POWER_CARD_ASPECT,
+            ),
+          )}
+        />
+      ) : null}
     </View>
+  );
+}
+
+/**
+ * One offer opened to read: the card large over the dimmed row, a gold CONFIRM under it, and a way
+ * back to the row. Tapping the dimmed room around it goes back too.
+ */
+function ZoomedOffer({
+  id,
+  width,
+  reduceMotion,
+  onBack,
+  onConfirm,
+}: {
+  id: PowerUpId;
+  width: number;
+  reduceMotion: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(140)} style={styles.zoomLayer}>
+      <Pressable accessibilityLabel="Back to the powers" onPress={onBack} style={styles.zoomBackdrop} testID="power-draw-zoom-backdrop" />
+      <View pointerEvents="box-none" style={styles.zoomColumn}>
+        <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(180)} testID="power-draw-zoom">
+          <PowerCard id={id} width={width} />
+        </Animated.View>
+        <Pressable accessibilityRole="button" onPress={onConfirm} testID="power-draw-confirm">
+          <LinearGradient colors={[palette.gold100, palette.gold300, palette.gold500]} style={styles.pill}>
+            <Text style={styles.pillText}>CONFIRM {POWER_UPS[id].title.toUpperCase()}</Text>
+          </LinearGradient>
+        </Pressable>
+        <Pressable accessibilityRole="button" hitSlop={8} onPress={onBack} testID="power-draw-back">
+          <Text style={styles.backText}>BACK</Text>
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -397,6 +460,10 @@ const styles = StyleSheet.create({
     textShadowRadius: 10,
   },
   scrim: { backgroundColor: "rgba(0,0,0,0.78)" },
+  zoomLayer: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
+  zoomBackdrop: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0, backgroundColor: "rgba(0,0,0,0.6)" },
+  zoomColumn: { alignItems: "center", flex: 1, gap: 14, justifyContent: "center" },
+  backText: { color: palette.gold100, fontFamily: fonts.arcade, fontSize: 14, letterSpacing: 1 },
   note: { alignItems: "center", justifyContent: "center" },
   anchor: { height: 0, position: "absolute", width: 0 },
   grid: { alignItems: "center", height: "100%", justifyContent: "center" },

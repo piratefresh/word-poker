@@ -111,7 +111,7 @@ describe("<PowerUsePrompt />", () => {
     expect(screen.queryByTestId("power-scrim")).toBeNull();
   });
 
-  test("while choosing, says what to do, and the felt or CANCEL backs out", async () => {
+  test("while choosing, says what to do, and the CANCEL backs out", async () => {
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
     const onCancel = jest.fn();
     const screen = await render(
@@ -125,9 +125,10 @@ describe("<PowerUsePrompt />", () => {
 
     expect(screen.getByText("Tap one of your tiles to swap it")).toBeTruthy();
     expect(announce).toHaveBeenCalledWith("Choose one of your tiles to swap");
-    await fireEvent.press(screen.getByTestId("power-scrim"));
+    // The felt takes the tap that names a tile, so the scrim lets it through; CANCEL backs out.
+    expect(screen.getByTestId("power-scrim")).toHaveProp("pointerEvents", "none");
     await fireEvent.press(screen.getByTestId("power-cancel"));
-    expect(onCancel).toHaveBeenCalledTimes(2);
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   test("asks to confirm in the catalog's words, naming the tile", async () => {

@@ -116,6 +116,8 @@ export function PowerUsePrompt({
         accessibilityLabel="Cancel using your power"
         accessibilityRole="button"
         onPress={onCancel}
+        // Picking, the felt must still take the tap that names the tile; CANCEL backs out.
+        pointerEvents={stage === "picking" ? "none" : "auto"}
         style={styles.scrim}
         testID="power-scrim"
       />
