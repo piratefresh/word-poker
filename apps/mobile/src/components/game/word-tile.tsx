@@ -170,8 +170,8 @@ const OWNERSHIP_BORDER: Record<TileOwnership, string> = {
   neutral: "#7a4b27",
 };
 const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
-  "double-letter": "2L",
-  "triple-letter": "3L",
+  "double-letter": "2×",
+  "triple-letter": "3×",
 };
 
 /** §10's choice tiles wear an accent no single letter does: the pair is one tile, not two. */
