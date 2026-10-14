@@ -93,6 +93,7 @@ describe("<PowerHeldChip />", () => {
   });
 
   test("explains unavailable Spotlight without starting targeting, and clears the hint when usable", async () => {
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
     const onPress = jest.fn();
     const screen = await render(
       <PowerHeldChip active={false} held={held({ id: "spotlight", usable: false })} onPress={onPress} />,
@@ -101,6 +102,14 @@ describe("<PowerHeldChip />", () => {
     await fireEvent.press(screen.getByTestId("power-held"));
     expect(onPress).not.toHaveBeenCalled();
     expect(screen.getByText("Use Spotlight on your betting turn during the flop or turn.")).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith("Use Spotlight on your betting turn during the flop or turn.");
+    expect(announce).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByTestId("power-held"));
+    expect(screen.queryByTestId("power-unavailable-hint")).toBeNull();
+    expect(announce).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByTestId("power-held"));
+    expect(screen.getByTestId("power-unavailable-hint")).toBeTruthy();
+    expect(announce).toHaveBeenCalledTimes(2);
     await fireEvent.press(screen.getByTestId("power-unavailable-hint"));
     expect(screen.queryByTestId("power-unavailable-hint")).toBeNull();
 

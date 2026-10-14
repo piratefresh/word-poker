@@ -69,8 +69,9 @@ export function PowerHeldChip({
         disabled={state !== "ready" && !explainsSpotlight}
         id={webTestID("power-held")}
         onPress={explainsSpotlight ? () => {
-          setShowHint((shown) => !shown);
-          AccessibilityInfo.announceForAccessibility(hint);
+          const nextShowHint = !showHint;
+          setShowHint(nextShowHint);
+          if (nextShowHint) AccessibilityInfo.announceForAccessibility(hint);
         } : onPress}
         style={[
           styles.chip,
