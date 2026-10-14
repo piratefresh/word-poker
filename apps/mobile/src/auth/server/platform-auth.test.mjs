@@ -4,7 +4,8 @@
  * without TEST_DATABASE_URL; run through `pnpm --filter @wordpoker/mobile test:auth`.
  */
 import assert from "node:assert/strict";
-import { createHash, randomUUID } from "node:crypto";
+import { Buffer } from "node:buffer";
+import { createHash, createPrivateKey, randomUUID, sign } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 
 import { betterAuth } from "better-auth";
@@ -219,5 +220,47 @@ describe("platform-auth plugin", { skip: !serverUrl && "no TEST_DATABASE_URL" },
     const statuses = [];
     for (let i = 0; i < 11; i++) statuses.push((await call(limited, "/platform-auth/begin", { provider: "game-center", intent: "sign-in" })).status);
     assert.deepEqual(statuses, [...Array(10).fill(200), 429]);
+  });
+
+  it("with the real Game Center verifier, a proof works once across workers and a fresh one finds the same account", async () => {
+    const { gameCenterVerifier } = await import("./game-center.ts");
+    const fx = await import("./game-center.fixtures.mjs");
+    const bundleId = "com.wordpoker.wordpoker";
+    // Two API replicas: separate Better Auth instances and verifiers, one database.
+    const worker = () => makeAuth({
+      gameCenter: gameCenterVerifier({ bundleId, trust: { intermediates: [fx.INTERMEDIATE], roots: [fx.ROOT] }, now: () => Date.parse("2027-01-01T00:00:00Z"), fetchKey: async () => ({ body: Buffer.from(fx.LEAF) }) }),
+    });
+    const [first, second] = [await worker(), await worker()];
+    const signedProof = (salt) => {
+      const timestamp = String(Date.parse("2027-01-01T00:00:00Z"));
+      const stamp = Buffer.alloc(8);
+      stamp.writeBigUInt64BE(BigInt(timestamp));
+      const payload = Buffer.concat([Buffer.from("T:real"), Buffer.from(bundleId), stamp, Buffer.from(salt)]);
+      return {
+        teamPlayerID: "T:real", bundleId, publicKeyURL: "https://static.gc.apple.com/public-key/gc-prod-12.cer", timestamp,
+        saltBase64: Buffer.from(salt).toString("base64"), signatureBase64: sign("sha256", payload, createPrivateKey(fx.LEAF_KEY)).toString("base64"),
+      };
+    };
+    const exchange = async (instance, proofBody) => {
+      const attemptToken = (await (await call(instance, "/platform-auth/begin", { provider: "game-center", intent: "sign-in" })).json()).attemptToken;
+      return call(instance, "/platform-auth/game-center", { attemptToken, proof: proofBody });
+    };
+
+    const proofOnce = signedProof("salt-1");
+    const signedIn = await exchange(first, proofOnce);
+    assert.equal(signedIn.status, 200);
+    const userId = (await sessionOf({ cookie: cookieOf(signedIn) })).user.id;
+
+    // The response was lost and the same proof is retried on the other replica: refused, no session.
+    const replayed = await exchange(second, proofOnce);
+    assert.equal(await codeOf(replayed), "PROOF_REPLAYED");
+    assert.equal(replayed.headers.getSetCookie().length, 0);
+
+    const retried = await exchange(second, signedProof("salt-2"));
+    assert.equal((await sessionOf({ cookie: cookieOf(retried) })).user.id, userId);
+
+    const tampered = { ...signedProof("salt-3"), teamPlayerID: "T:someone-else" };
+    assert.equal(await codeOf(await exchange(first, tampered)), "INVALID_PROOF");
+    assert.equal(await db.providerOwner(pool, "game-center", "T:someone-else"), null);
   });
 });

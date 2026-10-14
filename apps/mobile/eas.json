@@ -12,7 +12,12 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_AUTH_URL": "https://web-production-8dd72.up.railway.app",
+        "EXPO_PUBLIC_GAME_URL": "https://us-ewr-251846dc.wordpoker.app",
+        "EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY": "appl_TWXWFUQLqVvUoYfzgNJdzaRvGJk"
+      }
     },
     "e2e-test": {
       "withoutCredentials": true,
@@ -28,6 +33,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6819115531"
+      }
+    }
   }
 }

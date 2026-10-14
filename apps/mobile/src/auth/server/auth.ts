@@ -9,6 +9,7 @@ import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
 import { afterEmailVerification, attributeReferral, grantEligibleRewards, sendVerificationEmail } from "./auth-verification";
 import { passwordResetEmail, sendEmail } from "./email";
+import { gameCenterVerifier } from "./game-center";
 import { platformAuth } from "./platform-auth";
 
 // `dotenv` leaves pre-existing variables untouched by default, so a shell that
@@ -105,11 +106,13 @@ export const auth = betterAuth({
         if (!adopted) console.warn("[guest-adoption] guest already adopted by another account");
       },
     }),
-    // Game Center sign-in and Play Games restore (STO-590). No verifier is configured yet, so both
-    // answer DISABLED; STO-591 and STO-592 supply them behind their own switches.
+    // Game Center sign-in and Play Games restore (STO-590). Each provider is on only when its
+    // configuration is set; otherwise its endpoints answer DISABLED. Play Games arrives with STO-592.
     platformAuth({
       pool: authPool,
-      verifiers: {},
+      verifiers: {
+        gameCenter: process.env.GAME_CENTER_BUNDLE_ID ? gameCenterVerifier({ bundleId: process.env.GAME_CENTER_BUNDLE_ID }) : undefined,
+      },
       onAccountReady: async (user, { created, headers }) => {
         if (created) await attributeReferral(user, headers);
         await grantEligibleRewards(user);
