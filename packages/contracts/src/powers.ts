@@ -92,7 +92,7 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
   spotlight: {
     id: "spotlight",
     title: "Spotlight",
-    description: "Pick one table tile. It scores double for everyone this hand.",
+    description: "Pick one table tile. It scores double for everyone this hand. Flop or turn only, on your betting turn.",
     receives: "a double",
     tag: "SPOTLIGHT",
     icon: "spotlight",

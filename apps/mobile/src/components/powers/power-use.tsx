@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
@@ -19,7 +19,8 @@ import type { PowerTargeting } from "./use-power-targeting";
  *
  * Lit while the table would take the power — the hero's own betting turn, or §19's window before
  * it confirms — and dimmed otherwise; once spent it wears USED until the next deal. A tap starts
- * choosing a tile to swap, and a second tap while choosing is the cancel.
+ * choosing a tile, and a second tap while choosing is the cancel. Unavailable Spotlight explains
+ * its flop/turn window when tapped.
  */
 export function PowerHeldChip({
   held,
@@ -33,40 +34,62 @@ export function PowerHeldChip({
 }) {
   const scale = useScreenScale();
   const compact = useCompactControls();
+  const [showHint, setShowHint] = useState(false);
+  const explainsSpotlight = held?.id === "spotlight" && !held.used && !held.usable;
+  if (!explainsSpotlight && showHint) setShowHint(false);
   if (held === null) return null;
 
   // As tall as the buttons beside it, and a card's shape at that height.
   const height = compact ? 44 : 48 * scale;
   const width = Math.round(height / POWER_CARD_ASPECT);
   const state = held.used ? "used" : held.usable ? "ready" : "waiting";
+  const hint = "Use Spotlight on your betting turn during the flop or turn.";
 
   return (
-    <Pressable
-      accessibilityHint={
-        state === "ready" ? (active ? "Cancels using it" : "Choose one of your tiles to swap") : undefined
-      }
-      accessibilityLabel={`${powerCardLabel(held.id)}${held.used ? " Used." : ""}`}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: state !== "ready", expanded: active }}
-      disabled={state !== "ready"}
-      id={webTestID("power-held")}
-      onPress={onPress}
-      style={[
-        styles.chip,
-        { height, width },
-        state === "ready" && styles.chipReady,
-        state !== "ready" && styles.chipIdle,
-        active && styles.chipActive,
-      ]}
-      testID="power-held"
-    >
-      <PowerCardMini id={held.id} width={width} />
-      {held.used ? (
-        <View pointerEvents="none" style={styles.usedBand}>
-          <Text style={styles.usedText}>USED</Text>
-        </View>
+    <View>
+      {showHint ? (
+        <Pressable
+          accessibilityLabel={`${hint} Tap to dismiss.`}
+          accessibilityRole="button"
+          onPress={() => setShowHint(false)}
+          style={styles.unavailableHint}
+          testID="power-unavailable-hint"
+        >
+          <Text style={styles.hint}>{hint}</Text>
+        </Pressable>
       ) : null}
-    </Pressable>
+      <Pressable
+        accessibilityHint={
+          explainsSpotlight ? "Explains when Spotlight can be used" : state === "ready"
+            ? (active ? "Cancels using it" : held.id === "spotlight" ? "Choose a table tile" : "Choose one of your tiles to swap") : undefined
+        }
+        accessibilityLabel={`${powerCardLabel(held.id)}${held.used ? " Used." : explainsSpotlight ? " Unavailable." : ""}`}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: state !== "ready" && !explainsSpotlight, expanded: explainsSpotlight ? showHint : active }}
+        disabled={state !== "ready" && !explainsSpotlight}
+        id={webTestID("power-held")}
+        onPress={explainsSpotlight ? () => {
+          const nextShowHint = !showHint;
+          setShowHint(nextShowHint);
+          if (nextShowHint) AccessibilityInfo.announceForAccessibility(hint);
+        } : onPress}
+        style={[
+          styles.chip,
+          { height, width },
+          state === "ready" && styles.chipReady,
+          state !== "ready" && styles.chipIdle,
+          active && styles.chipActive,
+        ]}
+        testID="power-held"
+      >
+        <PowerCardMini id={held.id} width={width} />
+        {held.used ? (
+          <View pointerEvents="none" style={styles.usedBand}>
+            <Text style={styles.usedText}>USED</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    </View>
   );
 }
 
@@ -169,6 +192,18 @@ function tileLetters(tile: TileData): string {
 const FILL = { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 } as const;
 
 const styles = StyleSheet.create({
+  unavailableHint: {
+    backgroundColor: palette.felt800,
+    borderColor: colors.goldDeep,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    bottom: "100%",
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    position: "absolute",
+    width: 220,
+    zIndex: 30,
+  },
   chip: { alignItems: "center", borderRadius: 6, justifyContent: "center" },
   chipReady: glow(colors.gold, 8),
   chipIdle: { opacity: 0.45 },
