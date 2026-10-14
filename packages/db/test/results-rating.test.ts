@@ -148,6 +148,7 @@ describe(
           "Migration20261014120000_referral",
           "Migration20261015120000_presence",
           "Migration20261016120000_notifications",
+          "Migration20261017120000_platform_auth",
         ],
         "the migrations are pending again",
       );

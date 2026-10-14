@@ -6,6 +6,8 @@
  * into the client bundle; every other name stays in the server process.
  */
 
+import { isPlaceholderEmail } from "@wordpoker/contracts";
+
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 /**
@@ -27,6 +29,9 @@ export type Email = {
 
 /** POSTs one message; throws with Resend's own diagnostic when it is rejected. */
 export async function sendEmail({ to, subject, html, text }: Email): Promise<void> {
+  // Game Center accounts and guests carry internal `.invalid` addresses: refused here, not just hidden.
+  if (isPlaceholderEmail(to)) throw new Error("Refusing to mail a placeholder address");
+
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {

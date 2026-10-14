@@ -17,6 +17,7 @@ import {
   type UniversalStyle,
   type UniversalTextStyle,
 } from "@expo/ui";
+import { isAccountEligible } from "@wordpoker/contracts";
 import { router } from "expo-router";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
@@ -80,7 +81,7 @@ export function StoreScreen() {
                 ) : null}
               </Column>
 
-              {user && !user.emailVerified && store.balance.status === "ready" && !store.balance.welcomed ? (
+              {user && !isAccountEligible(user) && store.balance.status === "ready" && !store.balance.welcomed ? (
                 <VerifyEmailCard email={user.email} testID="store-verify" />
               ) : null}
 

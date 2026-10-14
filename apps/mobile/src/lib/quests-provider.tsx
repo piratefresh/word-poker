@@ -38,7 +38,7 @@ import {
 } from "react";
 import { AppState } from "react-native";
 
-import type { QuestHandFacts, QuestId, QuestStateResponse } from "@wordpoker/contracts";
+import { isAccountEligible, type QuestHandFacts, type QuestId, type QuestStateResponse } from "@wordpoker/contracts";
 import { levelReward, xpForHand } from "@wordpoker/game-rules";
 
 import { authClient } from "@/auth/client/auth-client";
@@ -156,7 +156,7 @@ function mintHandToken(): string {
 
 export function QuestsProvider({ children }: { children: ReactNode }): ReactElement {
   const { data: session } = authClient.useSession();
-  const authorized = Boolean(session) && session?.user.emailVerified === true;
+  const authorized = isAccountEligible(session?.user);
   const userId = authorized ? (session?.user.id ?? null) : null;
 
   const [coins, setCoins] = useState<number | null>(null);

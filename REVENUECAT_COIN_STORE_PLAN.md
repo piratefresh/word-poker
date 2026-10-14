@@ -26,7 +26,7 @@ Settled in review (2026-10-04); each is the reason for a step below.
 | Server-side RevenueCat calls | A new server-only package, `packages/economy` (thin `fetch` client for API v2 + wallet operations). RevenueCat ships no official Node SDK, and the in-app SDK cannot add or remove currency. |
 | Ledger shape | Built for the whole economy: event kinds include `buy_in`/`cash_out`/`refund`; spends go through RevenueCat, which refuses to overdraw (HTTP 422). The Colyseus side is a later story. |
 | Audit log | `wallet_event` table: every change our server makes, plus every purchase/refund RevenueCat reports through its webhook. |
-| Welcome grant | **5,000 coins**, paid when the player **verifies their email** (Better Auth `afterEmailVerification`), once per user. No public grant endpoint. |
+| Welcome grant | **5,000 coins**, paid once per user when the account becomes eligible (`isAccountEligible`): it **verifies its email** (Better Auth `afterEmailVerification`) or signs in with a server-verified Game Center/Google identity (STO-593). No public grant endpoint. |
 | Existing accounts | One-off, rerunnable backfill grants every existing account, verified or not (verification never existed before this). |
 | Packs | Three consumables, `coins_small` / `coins_medium` / `coins_large` at ~$0.99 / $4.99 / $9.99 granting **2,000 / 12,000 / 30,000** (rising coins-per-dollar). Amounts are dashboard data, not code. |
 | Pack display data | Coin amounts come from RevenueCat's `product_grants` through our catalog endpoint; labels and badges from Offering metadata; price from `priceString`; "Best Value" computed from coins per price. A pack without a grant is hidden. Store-side product names stay neutral ("Small Coin Pack"). |

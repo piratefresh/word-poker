@@ -98,3 +98,20 @@ export { notifyUsers, savePushToken, deletePushToken, type NotificationKind } fr
 export { beat, goOffline, isOnline, inviteToTable, takeInvites, PRESENCE_GRACE_MS } from "./presence";
 export { saveHistoryHand, handRecordDigest, HandRecordConflictError } from "./history";
 export { readHistoryHands, readHistoryHand } from "./history-read";
+export {
+  ProofReplayedError,
+  accountStanding,
+  consumeAttempt,
+  createProviderUser,
+  dropRestorePointer,
+  inTransaction,
+  linkProvider,
+  openAttempt,
+  peekAttempt,
+  pointRestore,
+  providerOwner,
+  restorePointer,
+  type PlatformAuthAttempt,
+  type RestorePointer,
+  type Sql,
+} from "./platform-auth";

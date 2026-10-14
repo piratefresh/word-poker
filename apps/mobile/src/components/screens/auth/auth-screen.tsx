@@ -11,6 +11,9 @@ import {
 import { EMAIL_VERIFIED_CALLBACK } from "@/constants/links";
 import { colors, theme } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
+import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
+import { localHistory } from "@/lib/history/history-store";
+import { syncHistory } from "@/lib/history/history-sync";
 import { pendingReferral } from "@/lib/pending-destination";
 
 /** `type` is the token group's own name: rename it so it reads as a style set. */
@@ -26,6 +29,17 @@ function referralHeaders() {
 
 const NETWORK_ERROR =
   "Could not reach the server — check your connection and try again.";
+
+const UNSAVED_HANDS = "Your guest hands are still saving — check your connection and try again.";
+
+/**
+ * Registering deletes the guest once its server-side hands move over (STO-593), so the hands this
+ * device has not uploaded yet go first; if any are still pending the player stays a guest.
+ */
+async function guestHandsSaved(guestId: string): Promise<boolean> {
+  await syncHistory(guestId, () => {}).catch(() => {});
+  return !(await localHistory(guestId)).some((row) => row.status === "pending");
+}
 
 const Copy: Record<
   AuthMode,
@@ -61,6 +75,8 @@ const Copy: Record<
 
 function AuthScreen({ mode }: { mode: AuthMode }) {
   const copy = Copy[mode];
+  const { data: session } = authClient.useSession();
+  const guestId = session?.user.isAnonymous ? session.user.id : null;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,15 +88,21 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     setError(null);
 
     try {
-      const { error: authError } =
+      if (guestId && !(await guestHandsSaved(guestId))) {
+        setError(UNSAVED_HANDS);
+        return;
+      }
+      const { error: authError } = await changeSession(() =>
         mode === "sign-up"
-          ? await authClient.signUp.email({ name, email, password, callbackURL: EMAIL_VERIFIED_CALLBACK, fetchOptions: referralHeaders() })
-          : await authClient.signIn.email({ email, password });
+          ? authClient.signUp.email({ name, email, password, callbackURL: EMAIL_VERIFIED_CALLBACK, fetchOptions: referralHeaders() })
+          : authClient.signIn.email({ email, password }),
+      );
 
       if (authError) {
         setError(authError.message ?? "Something went wrong. Please try again.");
         return;
       }
+      await setAutoRestore(true);
     } catch {
       // A dropped connection rejects instead of returning `{ error }`.
       setError(NETWORK_ERROR);
@@ -94,7 +116,8 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     setPending(true);
     setError(null);
     try {
-      const { error: authError } = await authClient.signIn.anonymous();
+      await setAutoRestore(false);
+      const { error: authError } = await changeSession(() => authClient.signIn.anonymous());
       if (authError) setError(authError.message ?? "Something went wrong. Please try again.");
     } catch {
       setError(NETWORK_ERROR);
@@ -143,11 +166,20 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
         </Text>
       )}
 
+      {/* Moving a guest's hands into an account is the player's call, made before the flow starts. */}
+      {guestId ? (
+        <Text style={styles.notice}>
+          {mode === "sign-in"
+            ? "Signing in moves this guest's hands into that account."
+            : "Your guest hands move into the new account."}
+        </Text>
+      ) : null}
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <GoldButton
         kicker={copy.kicker}
-        label={copy.submit}
+        label={guestId && mode === "sign-in" ? "Sign in & move hands" : copy.submit}
         onPress={submit}
         pending={pending}
       />
@@ -184,5 +216,9 @@ const styles = StyleSheet.create({
   error: {
     ...typography.body,
     color: colors.danger,
+  },
+  notice: {
+    ...typography.body,
+    color: colors.textDim,
   },
 });

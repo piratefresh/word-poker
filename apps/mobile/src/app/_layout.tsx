@@ -29,6 +29,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { authClient } from "@/auth/client/auth-client";
+import { changeSession } from "@/auth/client/session-coordinator";
 import { E2E_AUTH_BYPASS } from "@/lib/e2e";
 import {
   destinationFromURL,
@@ -182,7 +183,7 @@ function DeepLinks({
   const playAsGuest = useCallback(() => {
     if (guestTried.current) return;
     guestTried.current = true;
-    void authClient.signIn.anonymous().catch(() => {});
+    void changeSession(() => authClient.signIn.anonymous()).catch(() => {});
   }, []);
 
   useEffect(() => {

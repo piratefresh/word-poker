@@ -29,7 +29,7 @@ has no part-of-speech data).
 | Once-only | A new partial unique index on `wallet_event (user_id, kind, ref) where kind in ('quest','streak')`. A repeat opens no row → `already_recorded`, no RevenueCat call. |
 | Streak state | Derived from the player's `streak` wallet events (`ref` = `YYYY-MM-DD`). No `login_streak` table. |
 | Retries | Nothing new: a reward RevenueCat missed stays `pending` and `GET /api/wallet` re-sends it. |
-| Who earns | Signed-in **and email-verified** (same gate as the welcome grant), so throwaway accounts cannot farm streaks. |
+| Who earns | Signed-in **and eligible** — verified email or server-verified Game Center/Google identity (`isAccountEligible`, same gate as the welcome grant), so throwaway accounts cannot farm streaks. |
 | Release | Home's Quests entry sits behind the existing `EXPO_PUBLIC_COIN_STORE` flag — coins mean nothing until buy-ins spend them. |
 | Tracking | A story under the **STO-444** economy epic, beside STO-346. |
 

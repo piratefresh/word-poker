@@ -81,7 +81,16 @@ export async function openRunOrm(target: RunTarget): Promise<MikroORM> {
       ...(target.schema ? { options: `-c search_path=${target.schema}` } : {}),
     },
   });
-  // Better Auth creates this table before the package's isAnonymous migration in production.
-  await orm.em.getConnection().execute(`create table "user" (id text primary key, name text not null)`);
+  // Better Auth creates these tables before the package's migrations in production (email is
+  // NOT NULL there; nullable here so suites can insert bare users).
+  await orm.em.getConnection().execute(`create table "user" (
+    id text primary key, name text not null, email text unique, "emailVerified" boolean not null default false,
+    "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()
+  )`);
+  await orm.em.getConnection().execute(`create table "account" (
+    id text primary key, "accountId" text not null, "providerId" text not null,
+    "userId" text not null references "user" (id) on delete cascade,
+    "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null
+  )`);
   return orm;
 }

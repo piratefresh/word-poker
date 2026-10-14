@@ -18,7 +18,7 @@ import {
   Text,
   type UniversalTextStyle,
 } from "@expo/ui";
-import { STREAK_REWARDS } from "@wordpoker/contracts";
+import { STREAK_REWARDS, isAccountEligible } from "@wordpoker/contracts";
 import { QUEST_CATALOG } from "@wordpoker/game-rules";
 import { router } from "expo-router";
 import { useEffect, type ReactElement } from "react";
@@ -42,7 +42,7 @@ export function QuestsScreen(): ReactElement {
 
   const user = session?.user;
   const signedOut = !user;
-  const unverified = Boolean(user) && !user?.emailVerified;
+  const unverified = Boolean(user) && !isAccountEligible(user);
   const current = state?.streak.current ?? 0;
 
   return (
