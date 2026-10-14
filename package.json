@@ -7,6 +7,7 @@
     "pnpm": ">=12"
   },
   "scripts": {
+    "ios:device": "pnpm --filter @wordpoker/mobile exec expo run:ios --device",
     "android:device": "pnpm --filter @wordpoker/mobile exec expo run:android --device",
     "android:device:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm android:device\"",
     "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
