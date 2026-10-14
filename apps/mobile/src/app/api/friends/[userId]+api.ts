@@ -38,7 +38,8 @@ export async function POST(request: Request, { userId }: { userId: string }): Pr
       return Response.json({ error: "That friend couldn't be found." }, { status: 404 });
     }
     // A friend whose app is open gets the in-app banner; one who is not gets a push (STO-585).
-    if (!(await isOnline(userId))) {
+    // Best-effort: the invite is already saved, so a failed lookup must not turn this into a 503.
+    if (!(await isOnline(userId).catch(() => true))) {
       void notifyUsers([userId], "tableInvite", {
         title: "Table invite", body: `${user.name} invited you to a table`, url: `wordpoker://online/${roomId}`,
       });

@@ -12,8 +12,9 @@ export async function POST(request: Request): Promise<Response> {
     const { announce } = await beat(user.id, atTable);
     if (announce) {
       // Throttled by `beat` to a few hours per player; only friends with "friend online" switched on are pushed.
-      const { friends } = await friendList(user.id);
-      void notifyUsers(friends.map((friend) => friend.userId), "friendOnline", { title: "Friend online", body: `${user.name} is online` });
+      // Best-effort: the heartbeat already succeeded, so a failed lookup just skips the push.
+      const list = await friendList(user.id).catch(() => null);
+      if (list) void notifyUsers(list.friends.map((friend) => friend.userId), "friendOnline", { title: "Friend online", body: `${user.name} is online` });
     }
     return Response.json({ invites: await takeInvites(user.id) }, { headers: { "Cache-Control": "no-store" } });
   } catch {
