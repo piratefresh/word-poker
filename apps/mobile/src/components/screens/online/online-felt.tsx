@@ -196,10 +196,14 @@ export function OnlineFelt({
               ) : null
             }
             hidePot={powers?.draw != null}
+            modal={
+              powers === null ? null : (
+                <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
+              )
+            }
             overFelt={
               powers === null ? null : (
                 <>
-                  <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={pickPower} />
                   <PowerUsePrompt
                     onCancel={power.cancel}
                     onConfirm={power.confirm}

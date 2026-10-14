@@ -7,6 +7,7 @@ import {
   View,
   type LayoutChangeEvent,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
@@ -58,12 +59,12 @@ function rowsFor(count: number) {
  * `MAX_CARD_WIDTH` with room left for the hit's overshoot, the heading and the hint, and the gaps
  * closing in on a narrow screen.
  */
-function rowFor(region: { height: number; width: number }, count: number) {
+function rowFor(region: { height: number; width: number }, count: number, insets: { top: number; bottom: number }) {
   const { rows, perRow } = rowsFor(count);
   const gap = Math.min(16, Math.max(6, region.width * 0.03));
   const byWidth = (region.width - PAD * 2 - gap * (perRow - 1)) / (perRow + OVERSHOOT);
   const byHeight =
-    (region.height - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2 - gap * (rows - 1)) /
+    (region.height - insets.top - insets.bottom - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2 - gap * (rows - 1)) /
     (POWER_CARD_ASPECT * (rows + OVERSHOOT));
   return { cardWidth: Math.max(0, Math.min(MAX_CARD_WIDTH, byWidth, byHeight)), gap };
 }
@@ -96,6 +97,7 @@ export function PowerDrawReveal({
   onPick: (id: PowerUpId) => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const insets = useSafeAreaInsets();
   const [shown, setShown] = useState<{
     key: string;
     offers: readonly PowerUpId[];
@@ -122,7 +124,7 @@ export function PowerDrawReveal({
   // by a pick, or by the clock handing the seat the first offer.
   const kept = shown === null ? null : draw !== null ? draw.picked : (held ?? shown.offers[0] ?? null);
   const closed = shown !== null && draw === null;
-  const { cardWidth, gap } = rowFor(region, shown?.offers.length ?? 0);
+  const { cardWidth, gap } = rowFor(region, shown?.offers.length ?? 0, insets);
   const laidOut = cardWidth > 0;
 
   // Selection opens once the row has landed. Every beat counts from the layout, so a resize
@@ -201,7 +203,11 @@ export function PowerDrawReveal({
     >
       <Scrim key={`scrim:${key}`} leaving={leaving} reduceMotion={reduceMotion} />
       {laidOut ? (
-        <View key={`stage:${key}`} pointerEvents="box-none" style={styles.stage}>
+        <View
+          key={`stage:${key}`}
+          pointerEvents="box-none"
+          style={[styles.stage, { paddingBottom: PAD + insets.bottom, paddingTop: PAD + insets.top }]}
+        >
           <Heading fontSize={Math.min(26, Math.max(16, cardWidth * 0.16))} leaving={leaving} reduceMotion={reduceMotion} />
           <View pointerEvents="box-none" style={{ height: gridHeight, marginVertical: (cardHeight * OVERSHOOT) / 2, width: rowWidth }}>
             {/* The bursts sit under the whole row, so a card's light never covers its neighbour. */}

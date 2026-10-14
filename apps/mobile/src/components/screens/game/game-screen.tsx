@@ -76,6 +76,8 @@ export interface GameScreenProps {
    * table's region and nothing past it, so the community above and the rack below stay in view.
    */
   overFelt?: ReactNode;
+  /** Drawn over the whole screen, above the HUD, rack and betting row: the Power Draw. */
+  modal?: ReactNode;
   /** Clears the pot from the middle of the felt, so the Power Draw's cards have the room. */
   hidePot?: boolean;
   /** Spotlight's aim: while set, a tap on a dealt community tile with no bonus picks it. */
@@ -140,6 +142,7 @@ function GameScreenBody({
   heroSideAccessory,
   overFelt,
   hidePot,
+  modal,
   winOverlay,
   onPickCommunityTile,
   onBack,
@@ -408,6 +411,11 @@ function GameScreenBody({
         turn={waiting ? null : view}
         turnPhrase={heroTurnPhrase(game)}
       />
+      {modal ? (
+        <View pointerEvents="box-none" style={styles.modalLayer}>
+          {modal}
+        </View>
+      ) : null}
       </CoinBowlGameContext.Provider>
     </LinearGradient>
   );
@@ -495,6 +503,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   screen: { flex: 1 },
+  modalLayer: { ...StyleSheet.absoluteFill, elevation: 40, zIndex: 40 },
   content: { alignSelf: "center", flex: 1, width: "100%", zIndex: 1 },
   tableRegion: { flex: 1, minHeight: 272 },
   // Landscape: the room runs under the whole screen and the side columns sit over its corners.

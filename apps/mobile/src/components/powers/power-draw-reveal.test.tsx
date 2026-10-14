@@ -7,6 +7,11 @@ import type { PowerView } from "@/features/table/power-view";
 
 import { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION, PowerDrawReveal } from "./power-draw-reveal";
 
+// `useSafeAreaInsets` throws without a provider; the library ships a mock.
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
+);
+
 // The suite's reanimated mock has no `useReducedMotion`, and the reveal reads it.
 let mockReduceMotion = false;
 jest.mock("react-native-reanimated", () => ({
