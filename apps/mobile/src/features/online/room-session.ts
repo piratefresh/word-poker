@@ -23,6 +23,7 @@ import {
   isPowerUpSettings,
   PowerUpSettings,
   RoomPhase,
+  TABLE_STARTED_MESSAGE,
 } from "@wordpoker/contracts";
 import { useSyncExternalStore } from "react";
 
@@ -146,6 +147,7 @@ function joinFailure(error: unknown): string {
   if (code === 401) return "Sign in to join an online table.";
   if (code === 503) return "Sign-in could not be verified. Try again.";
   if (code === 409) return "Your account already has a seat at that table.";
+  if (error instanceof Error && error.message === TABLE_STARTED_MESSAGE) return TABLE_STARTED_MESSAGE;
   if (code === MATCHMAKE_INVALID_ROOM_ID) return "That table is full or has just closed.";
   if (code === MATCHMAKE_NO_HANDLER || code === MATCHMAKE_INVALID_CRITERIA) {
     return "That table isn't available. Try the list again.";

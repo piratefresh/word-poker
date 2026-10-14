@@ -3,7 +3,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import type { MikroORM } from "@mikro-orm/postgresql";
 import { Client } from "pg";
 import { isFriendCode } from "@wordpoker/contracts";
-import { acceptFriend, areFriends, friendCode, friendList, removeFriend, requestFriend, userForFriendCode } from "../src/index";
+import { acceptFriend, areFriends, friendCode, friendList, paidReferralCount, recordReferral, referralCount, referrerOf, removeFriend, requestFriend, userForFriendCode } from "../src/index";
 import { createRunTarget, openRunOrm, serverUrl, type RunTarget } from "./run-target";
 
 describe("friends", { skip: !serverUrl && "no TEST_DATABASE_URL or DATABASE_URL" }, () => {
@@ -35,8 +35,8 @@ describe("friends", { skip: !serverUrl && "no TEST_DATABASE_URL or DATABASE_URL"
     assert.equal(await acceptFriend("B", "A", { orm }), false);
     assert.equal(await areFriends("A", "B", { orm }), true);
     assert.equal(await areFriends("B", "A", { orm }), true);
-    assert.deepEqual((await friendList("A", { orm })).friends, [{ userId: "B", name: "Bea" }]);
-    assert.deepEqual((await friendList("B", { orm })).friends, [{ userId: "A", name: "Ada" }]);
+    assert.deepEqual((await friendList("A", { orm })).friends, [{ userId: "B", name: "Bea", status: "offline" }]);
+    assert.deepEqual((await friendList("B", { orm })).friends, [{ userId: "A", name: "Ada", status: "offline" }]);
     assert.equal(await requestFriend("A", "B", { orm }), "already-friends");
   });
 
@@ -98,5 +98,26 @@ describe("friends", { skip: !serverUrl && "no TEST_DATABASE_URL or DATABASE_URL"
     assert.equal(await areFriends("A", "C", { orm }), false);
     await orm.em.getConnection().execute(`delete from "user" where id = 'C'`);
     assert.deepEqual((await friendList("A", { orm })).friends, []);
+  });
+
+  it("a referral is recorded once; guests, unknown codes and self are refused", async () => {
+    const db = orm.em.getConnection();
+    await db.execute(`delete from referral`);
+    const code = await friendCode("A", { orm });
+    assert.equal(await recordReferral("B", code, { orm }), true);
+    assert.equal(await recordReferral("B", await friendCode("C", { orm }), { orm }), false, "only once");
+    assert.equal(await referrerOf("B", { orm }), "A");
+    assert.equal(await recordReferral("A", code, { orm }), false, "self");
+    assert.equal(await recordReferral("C", "ZZZZZZZZ", { orm }), false, "unknown code");
+    assert.equal(await recordReferral("C", await friendCode("G", { orm }), { orm }), false, "guest referrer");
+    assert.equal(await referrerOf("C", { orm }), null);
+    assert.equal(await referralCount("A", { orm }), 1);
+  });
+
+  it("counts only the referrer-side referral grants", async () => {
+    const db = orm.em.getConnection();
+    await db.execute(`insert into wallet_event (user_id, kind, amount, status, ref) values ('A','referral',500,'applied','referee'), ('A','referral',1000,'applied','B'), ('A','welcome',5000,'applied',null)`);
+    assert.equal(await paidReferralCount("A", { orm }), 1);
+    await assert.rejects(db.execute(`insert into wallet_event (user_id, kind, amount, status, ref) values ('A','referral',1000,'applied','B')`));
   });
 });

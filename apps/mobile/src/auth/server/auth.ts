@@ -7,7 +7,7 @@ import { Pool } from "pg";
 
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
-import { afterEmailVerification, sendVerificationEmail } from "./auth-verification";
+import { afterEmailVerification, attributeReferral, sendVerificationEmail } from "./auth-verification";
 import { passwordResetEmail, sendEmail } from "./email";
 
 // `dotenv` leaves pre-existing variables untouched by default, so a shell that
@@ -101,6 +101,19 @@ export const auth = betterAuth({
         adoptGuestHistory(anonymousUser.user.id, newUser.user.id),
     }),
   ],
+  // The per-kind notification switches (STO-585) live on the account, so they follow the player
+  // across devices; the client reads them from the session and writes them with `updateUser`.
+  user: {
+    additionalFields: {
+      notifyTableInvite: { type: "boolean", defaultValue: true, required: false },
+      notifyFriendRequest: { type: "boolean", defaultValue: true, required: false },
+      notifyFriendOnline: { type: "boolean", defaultValue: false, required: false },
+    },
+  },
+  databaseHooks: {
+    // The sign-up call carries the inviter's friend code in a header (STO-582).
+    user: { create: { after: async (user, context) => attributeReferral(user, context?.headers ?? context?.request?.headers) } },
+  },
   // Verifying pays the Wallet's welcome grant (STO-346); signing in does not wait on it.
   emailVerification: {
     sendOnSignUp: true,

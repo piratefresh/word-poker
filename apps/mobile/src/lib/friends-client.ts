@@ -1,4 +1,4 @@
-import { isFriendsPage, isFriendRequestResult, type FriendsPage } from "@wordpoker/contracts";
+import { isFriendsPage, isFriendRequestResult, isPresenceResponse, type FriendsPage, type TableInvite } from "@wordpoker/contracts";
 import { Platform } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
 import { apiBaseURL } from "./api-base-url";
@@ -38,4 +38,27 @@ export async function acceptFriend(userId: string): Promise<void> {
 
 export async function removeFriend(userId: string): Promise<void> {
   await call(`/${encodeURIComponent(userId)}`, "DELETE");
+}
+
+/** One heartbeat (STO-584): marks this account online and returns the table invites waiting for it. */
+export async function beat(atTable: boolean): Promise<TableInvite[]> {
+  const result = await call("/presence", "POST", { atTable });
+  if (!isPresenceResponse(result)) throw new Error("The presence reply couldn't be read.");
+  return result.invites;
+}
+
+export async function goOffline(): Promise<void> {
+  await call("/presence", "DELETE");
+}
+
+export async function inviteFriend(userId: string, roomId: string): Promise<void> {
+  await call(`/${encodeURIComponent(userId)}`, "POST", { roomId });
+}
+
+export async function registerPushToken(token: string): Promise<void> {
+  await call("/push-token", "POST", { token });
+}
+
+export async function unregisterPushToken(token: string): Promise<void> {
+  await call("/push-token", "DELETE", { token });
 }

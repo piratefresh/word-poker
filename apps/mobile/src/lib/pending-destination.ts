@@ -149,3 +149,23 @@ export function takeDestination(): Destination | null {
   pending = null;
   return destination;
 }
+
+/** The friend code a link's `ref` parameter carries (STO-582), or `null` when it has none or it is not one. */
+export function referralFromURL(url: string | null | undefined): string | null {
+  if (typeof url !== "string") return null;
+  const query = url.split("#")[0]?.split("?")[1] ?? "";
+  const ref = new URLSearchParams(query).get("ref");
+  return isFriendCode(ref) ? ref : null;
+}
+
+let referral: string | null = null;
+
+/** Hold the referrer a link names until sign-up needs it; a later link without one leaves it be. */
+export function rememberReferral(url: string | null | undefined): void {
+  referral = referralFromURL(url) ?? referral;
+}
+
+/** The held referrer, kept (not taken): a failed sign-up must be able to retry with it. */
+export function pendingReferral(): string | null {
+  return referral;
+}

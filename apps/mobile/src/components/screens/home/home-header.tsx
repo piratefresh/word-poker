@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 import { formatCoins } from "@/lib/format";
+import { unregisterPush } from "@/lib/use-push-registration";
 import { useQuests } from "@/lib/quests-provider";
 import { levelForXp } from "@wordpoker/game-rules";
 
@@ -24,6 +25,8 @@ export function HomeHeader({ width }: { width: number }) {
   const signOut = async () => {
     setSignOutError(false);
     try {
+      // Before the session goes: the API needs it to take this device's push token back (STO-585).
+      await unregisterPush().catch(() => {});
       const result = await authClient.signOut();
       if (result.error) setSignOutError(true);
     } catch {

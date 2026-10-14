@@ -33,7 +33,16 @@ export function PowerCard({ id, width }: { id: PowerUpId; width: number }) {
   const power = POWER_UPS[id];
   const whole = WHOLE_CARD_ART[power.icon];
   if (whole !== undefined) {
-    return <Image contentFit="contain" source={whole} style={{ height: width * POWER_CARD_ASPECT, width }} />;
+    return (
+      <View style={{ height: width * POWER_CARD_ASPECT, width }}>
+        <Image contentFit="contain" source={whole} style={StyleSheet.absoluteFill} />
+        {id === "spotlight" ? (
+          <Text style={[styles.windowNote, { fontSize: width * 0.06, lineHeight: width * 0.075 }]}>
+            Flop or turn only{"\n"}On your betting turn
+          </Text>
+        ) : null}
+      </View>
+    );
   }
   const height = width * POWER_CARD_ASPECT;
   const frame = Math.max(2, width * 0.035);
@@ -111,6 +120,15 @@ export function powerCardLabel(id: PowerUpId): string {
 }
 
 const styles = StyleSheet.create({
+  windowNote: {
+    backgroundColor: palette.felt800,
+    bottom: "7%",
+    color: colors.goldHi,
+    fontFamily: fonts.sansBold,
+    left: "12%",
+    right: "12%",
+    textAlign: "center",
+  },
   frame: {
     shadowColor: "#000",
     shadowOffset: { height: 6, width: 0 },

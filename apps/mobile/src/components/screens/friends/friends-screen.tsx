@@ -13,6 +13,9 @@ import { webTestID } from "@/lib/web-id";
 const titleText = { color: colors.goldHi, fontFamily: fonts.serifBold, fontSize: fontSize.h2 } satisfies UniversalTextStyle;
 const bodyText = { color: colors.textBright, fontFamily: fonts.sans, fontSize: fontSize.body } satisfies UniversalTextStyle;
 const sectionText = { color: colors.goldHi, fontFamily: fonts.monoBold, fontSize: fontSize.small, letterSpacing: 1.4 } satisfies UniversalTextStyle;
+const STATUS_LABEL = { online: "Online", "at-table": "At a table", offline: "Offline" } as const;
+/** How often an open friends list re-reads, so a friend's status follows the heartbeat. */
+const REFRESH_MS = 15_000;
 type Section = { title: string; kind: "incoming" | "friends" | "outgoing"; data: Friend[] };
 
 export function FriendsScreen() {
@@ -29,16 +32,26 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
   const acting = useRef(false);
   const generation = useRef(0);
   useFocusEffect(useCallback(() => {
-    const current = ++generation.current;
-    if (!anonymous) void getFriends().then((data) => {
-      if (generation.current === current) {
-        setPage(data);
-        setMessage("");
-      }
-    }).catch((error: unknown) => {
-      if (generation.current === current) setMessage(error instanceof Error ? error.message : "Friends couldn't be reached.");
-    });
-    return () => { generation.current++; };
+    const load = () => {
+      const current = ++generation.current;
+      void getFriends().then((data) => {
+        if (generation.current === current) {
+          setPage(data);
+          setMessage("");
+        }
+      }).catch((error: unknown) => {
+        if (generation.current === current) setMessage(error instanceof Error ? error.message : "Friends couldn't be reached.");
+      });
+    };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    if (!anonymous) {
+      load();
+      timer = setInterval(load, REFRESH_MS);
+    }
+    return () => {
+      clearInterval(timer);
+      generation.current++;
+    };
   }, [anonymous]));
 
   const act = async (action: () => Promise<string | void>) => {
@@ -79,6 +92,7 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
             <Button label="Create account" onPress={() => router.push("/sign-up")} />
           </> : <>
             <Text textStyle={bodyText}>{page ? `YOUR CODE: ${page.code}` : "Loading friends…"}</Text>
+            {page && page.referrals > 0 ? <Text textStyle={bodyText} testID="friends-referrals">{`${page.referrals} ${page.referrals === 1 ? "friend" : "friends"} joined through you`}</Text> : null}
             {page ? <Button label="SHARE" testID="friends-share" onPress={() => {
               void Share.share({ message: friendLinkFor(page.code) }).catch(() => setMessage("Couldn't share. Try again."));
             }} /> : null}
@@ -96,7 +110,7 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
       renderItem={({ item, section }) => <View style={styles.row}>
         <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark" seedColor={colors.gold}>
           <Column alignment="start" spacing={spacing.sm}>
-            <Text textStyle={bodyText}>{item.name}</Text>
+            <Text textStyle={bodyText} testID={`friend-name-${item.userId}`}>{item.status ? `${item.name} · ${STATUS_LABEL[item.status]}` : item.name}</Text>
             <Row spacing={spacing.sm}>
               {section.kind === "incoming" ? <Button label="Accept" disabled={busy} testID={`friend-accept-${item.userId}`} onPress={() => { void act(() => acceptFriend(item.userId)); }} /> : null}
               <Button label={section.kind === "incoming" ? "Decline" : section.kind === "outgoing" ? "Cancel" : "Remove"} disabled={busy}

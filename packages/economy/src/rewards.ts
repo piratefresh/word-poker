@@ -11,14 +11,19 @@
  */
 
 import {
+  REFERRAL_CAP,
+  REFERRAL_REFEREE_GRANT,
+  REFERRAL_REFERRER_GRANT,
   STREAK_REWARDS,
   type QuestClaimResponse,
   type QuestHandClaim,
   type QuestId,
 } from "@wordpoker/contracts";
 import {
+  paidReferralCount as paidReferralCountDb,
   playerProgress as playerProgressDb,
   questProgress as questProgressDb,
+  referrerOf as referrerOfDb,
   recordQuestHand as recordQuestHandDb,
   setLevelPaid as setLevelPaidDb,
   streakDates as streakDatesDb,
@@ -47,6 +52,7 @@ export interface QuestStore {
 
 export interface RewardsDeps extends WalletDeps {
   readonly quests?: QuestStore;
+  readonly referrals?: ReferralStore;
 }
 
 const databaseQuestStore: QuestStore = {
@@ -179,4 +185,31 @@ export async function payCompletedQuests(userId: string, deps: RewardsDeps = {})
 
   const progress = await quests.playerProgress(userId);
   await payLevelUps(quests, userId, progress.levelPaid, levelForXp(progress.xp).level, deps);
+}
+
+/** The referral reads this module needs; the database's by default, a fake in tests. */
+export interface ReferralStore {
+  referrerOf(refereeId: string): Promise<string | null>;
+  paidReferralCount(referrerId: string): Promise<number>;
+}
+
+const databaseReferralStore: ReferralStore = {
+  referrerOf: (refereeId) => referrerOfDb(refereeId),
+  paidReferralCount: (referrerId) => paidReferralCountDb(referrerId),
+};
+
+/**
+ * Pays an invited friend and their inviter once the friend has verified their email (STO-582).
+ * A retry pays nothing twice: the referee's row is keyed `referee`, the referrer's by the referee's id.
+ */
+export async function payReferral(refereeId: string, deps: RewardsDeps = {}): Promise<void> {
+  const referrals = deps.referrals ?? databaseReferralStore;
+  const referrerId = await referrals.referrerOf(refereeId);
+  if (referrerId === null) return;
+
+  await applyWalletChange(refereeId, "referral", REFERRAL_REFEREE_GRANT, { ref: "referee" }, deps);
+  // ponytail: cap check races; serialize per referrer if farming shows up
+  if ((await referrals.paidReferralCount(referrerId)) < REFERRAL_CAP) {
+    await applyWalletChange(referrerId, "referral", REFERRAL_REFERRER_GRANT, { ref: refereeId }, deps);
+  }
 }

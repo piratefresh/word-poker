@@ -1,7 +1,8 @@
 import { randomInt } from "node:crypto";
 import type { MikroORM } from "@mikro-orm/postgresql";
-import type { Friend, FriendRequestResult, FriendsPage } from "@wordpoker/contracts";
+import type { Friend, FriendRequestResult, FriendsPage, FriendStatus } from "@wordpoker/contracts";
 import { getOrm } from "./orm";
+import { PRESENCE_GRACE_MS } from "./presence";
 
 type DbOptions = { orm?: MikroORM };
 const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -76,18 +77,22 @@ export async function removeFriend(me: string, other: string, options: DbOptions
   return rows.length > 0;
 }
 
-export async function friendList(me: string, options: DbOptions = {}): Promise<Omit<FriendsPage, "code">> {
+export async function friendList(me: string, options: DbOptions = {}): Promise<Omit<FriendsPage, "code" | "referrals">> {
   const db = await connection(options);
-  const rows = await db.execute<(Friend & { status: string; requested_by: string })[]>(
-    `select u.id as "userId", u.name, f.status, f.requested_by from friends f
+  const rows = await db.execute<(Omit<Friend, "status"> & { status: string; requested_by: string; presence: FriendStatus })[]>(
+    `select u.id as "userId", u.name, f.status, f.requested_by,
+       case when p.seen_at > now() - make_interval(secs => ?::double precision)
+         then case when p.at_table then 'at-table' else 'online' end else 'offline' end as presence
+     from friends f
      join "user" u on u.id = case when f.user_a = ? then f.user_b else f.user_a end
+     left join presence p on p.user_id = u.id
      where (f.user_a = ? or f.user_b = ?) and coalesce(u."isAnonymous", false) = false
-     order by u.name, u.id`, [me, me, me],
+     order by u.name, u.id`, [PRESENCE_GRACE_MS / 1000, me, me, me],
   );
-  const result: Omit<FriendsPage, "code"> = { friends: [], incoming: [], outgoing: [] };
+  const result: Omit<FriendsPage, "code" | "referrals"> = { friends: [], incoming: [], outgoing: [] };
   for (const row of rows) {
-    const list = row.status === "accepted" ? result.friends : row.requested_by === me ? result.outgoing : result.incoming;
-    list.push({ userId: row.userId, name: row.name });
+    if (row.status === "accepted") result.friends.push({ userId: row.userId, name: row.name, status: row.presence });
+    else (row.requested_by === me ? result.outgoing : result.incoming).push({ userId: row.userId, name: row.name });
   }
   return result;
 }
@@ -100,4 +105,44 @@ export async function areFriends(a: string, b: string, options: DbOptions = {}):
      and coalesce(a."isAnonymous", false) = false and coalesce(b."isAnonymous", false) = false`, [a, b, a, b],
   );
   return rows.length > 0;
+}
+
+/** Attributes a new account to the owner of `code`, once; a guest, unknown code or self changes nothing. */
+export async function recordReferral(refereeId: string, code: string, options: DbOptions = {}): Promise<boolean> {
+  const db = await connection(options);
+  const rows = await db.execute<{ referee_id: string }[]>(
+    `insert into referral (referee_id, referrer_id)
+     select ?, c.user_id from friend_code c join "user" u on u.id = c.user_id
+     where c.code = ? and coalesce(u."isAnonymous", false) = false and c.user_id <> ?
+     on conflict do nothing returning referee_id`, [refereeId, code, refereeId],
+  );
+  return rows.length > 0;
+}
+
+export async function referrerOf(refereeId: string, options: DbOptions = {}): Promise<string | null> {
+  const db = await connection(options);
+  const [row] = await db.execute<{ referrer_id: string }[]>(`select referrer_id from referral where referee_id = ?`, [refereeId]);
+  return row?.referrer_id ?? null;
+}
+
+/** Referrals this player has been paid for (the referee's own grant, ref `referee`, is not one). */
+export async function paidReferralCount(userId: string, options: DbOptions = {}): Promise<number> {
+  const db = await connection(options);
+  const [row] = await db.execute<{ n: string }[]>(
+    `select count(*) as n from wallet_event where user_id = ? and kind = 'referral' and ref <> 'referee'`, [userId],
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Accounts that signed up through this player's link. */
+export async function referralCount(userId: string, options: DbOptions = {}): Promise<number> {
+  const db = await connection(options);
+  const [row] = await db.execute<{ n: string }[]>(`select count(*) as n from referral where referrer_id = ?`, [userId]);
+  return Number(row?.n ?? 0);
+}
+
+export async function displayName(userId: string, options: DbOptions = {}): Promise<string> {
+  const db = await connection(options);
+  const [row] = await db.execute<{ name: string }[]>(`select name from "user" where id = ?`, [userId]);
+  return row?.name ?? "A player";
 }

@@ -15,6 +15,7 @@ import {
   createRevenueCatClient,
   creditDailyStreak,
   payCompletedQuests,
+  payReferral,
   streakLength,
   type QuestStore,
   type WalletStore,
@@ -32,7 +33,7 @@ function memoryWalletStore(): MemoryWalletStore {
   return {
     rows,
     async openWalletEvent(input: OpenWalletEventInput) {
-      const onceOnly = input.kind === "welcome" || input.kind === "quest" || input.kind === "streak" || input.kind === "level";
+      const onceOnly = input.kind === "welcome" || input.kind === "quest" || input.kind === "streak" || input.kind === "level" || input.kind === "referral";
       if (onceOnly && rows.some((row) => row.userId === input.userId && row.kind === input.kind && row.ref === (input.ref ?? null))) {
         return null;
       }
@@ -356,5 +357,35 @@ describe("payCompletedQuests", () => {
 
     assert.equal(d.store.rows.length, 0);
     assert.equal(d.requests.length, 0, "no RevenueCat call for an already-paid level");
+  });
+});
+
+describe("payReferral", () => {
+  const referrals = (referrer: string | null, paid = 0) => ({
+    referrerOf: async () => referrer,
+    paidReferralCount: async () => paid,
+  });
+
+  it("pays the friend and the inviter once, and a retry pays nothing", async () => {
+    const d = deps([balances(500), balances(1000)]);
+    await payReferral("friend", { ...d, referrals: referrals("host") });
+    await payReferral("friend", { ...d, referrals: referrals("host") });
+
+    assert.deepEqual(d.store.rows.map((row) => [row.userId, row.amount, row.ref]), [
+      ["friend", 500, "referee"],
+      ["host", 1000, "friend"],
+    ]);
+  });
+
+  it("pays nobody for an account nobody invited", async () => {
+    const d = deps([]);
+    await payReferral("friend", { ...d, referrals: referrals(null) });
+    assert.equal(d.store.rows.length, 0);
+  });
+
+  it("stops paying the inviter at the cap, but still pays the friend", async () => {
+    const d = deps([balances(500)]);
+    await payReferral("friend", { ...d, referrals: referrals("host", 20) });
+    assert.deepEqual(d.store.rows.map((row) => row.userId), ["friend"]);
   });
 });

@@ -20,6 +20,8 @@ Wallet Coins are used to:
 
 Wallet Coins cannot be used directly for bets during a game.
 
+Wallet Coins are also earned by inviting: when a friend signs up through your invite link and verifies their email, they receive 500 Coins and you receive 1,000 (up to 20 friends). Amounts live in `packages/contracts/src/coins.ts`.
+
 ## Table Stack
 
 The chips currently available to the player at a specific table.

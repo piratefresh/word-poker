@@ -8,6 +8,7 @@ import {
   GAME_MESSAGES,
   WAITING_PHASE,
   isGameMessagePayload,
+  TABLE_STARTED_MESSAGE,
   blindsFor,
   validateRoomCreateOptions,
   type GameRejectionEvent,
@@ -45,7 +46,7 @@ import { GameRoomState } from "./schema/GameRoomState.js";
 import { HistoryService } from "../history/history-service.js";
 import { SettlementRecorder } from "../history/settlement-recorder.js";
 import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
-import { requestFriend } from "@wordpoker/db";
+import { displayName, notifyUsers, requestFriend } from "@wordpoker/db";
 import { serverOrm } from "../database.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
@@ -163,7 +164,14 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         if (this.game !== null || !this.isAtTable(client)) {
           // keep the default "unavailable" message
         } else if (!target.present) message = SEAT_GONE_MESSAGE;
-        else if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
+        else if (orm) {
+          const result = await requestFriend(sender.userId, target.userId, { orm });
+          message = FRIEND_REQUEST_MESSAGES[result];
+          if (result === "requested") {
+            void displayName(sender.userId, { orm }).then((name) =>
+              notifyUsers([target.userId], "friendRequest", { title: "Friend request", body: `${name} sent you a friend request` }, { orm })).catch(() => {});
+          }
+        }
       } catch {
         // A service outage must not interrupt the hand or expose account details.
       } finally {
@@ -330,7 +338,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
   onJoin(client: Client, _options: unknown, auth: OnlineAccount) {
     if (this.game !== null) {
-      throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table is mid-hand; join the next hand");
+      throw new ServerError(ErrorCode.APPLICATION_ERROR, TABLE_STARTED_MESSAGE);
     }
 
     const seat = firstFreeSeat(this.bindings, this.maxClients);

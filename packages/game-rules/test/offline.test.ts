@@ -1258,4 +1258,14 @@ describe("reduce — §44's Blank Tile and Spotlight", () => {
     const river = holdingAll("spotlight", (s) => s.phase === "river");
     assert.throws(() => use(river, river.community[0]?.id ?? ""), refusedWith("outside-window"));
   });
+
+  it("only marks Spotlight usable on its own betting turn on the flop or turn", () => {
+    for (const phase of ["preflop", "flop", "turn", "river"] as const) {
+      const state = holdingAll("spotlight", (s) => s.phase === phase);
+      assert.equal(canUsePower(state, "hero", state.endsAtMs - 1), phase === "flop" || phase === "turn", phase);
+      assert.equal(canUsePower({ ...state, toActIndex: 1 }, "hero", state.endsAtMs - 1), false);
+    }
+    const window = playToWindow(holdingAll("spotlight", (s) => s.phase === "preflop"), NOW + 2);
+    assert.equal(canUsePower(window, "hero", window.endsAtMs - 1), false);
+  });
 });
