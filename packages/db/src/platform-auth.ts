@@ -17,16 +17,20 @@ export type Sql = Pick<PoolClient, "query">;
 /** Runs `run` in one transaction on one connection; any throw rolls the whole thing back. */
 export async function inTransaction<T>(pool: Pool, run: (sql: Sql) => Promise<T>): Promise<T> {
   const client = await pool.connect();
+  // A connection whose rollback failed may still hold the transaction: the pool discards it.
+  let broken: Error | undefined;
   try {
     await client.query("begin");
     const result = await run(client);
     await client.query("commit");
     return result;
   } catch (error) {
-    await client.query("rollback").catch(() => {});
+    await client.query("rollback").catch((rollbackError: unknown) => {
+      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    });
     throw error;
   } finally {
-    client.release();
+    client.release(broken);
   }
 }
 

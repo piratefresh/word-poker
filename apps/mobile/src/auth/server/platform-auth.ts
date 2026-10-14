@@ -117,6 +117,24 @@ function fail(code: PlatformAuthErrorCode, extra: Record<string, unknown> = {}):
   return new APIError(STATUS_NAMES[PLATFORM_AUTH_ERRORS[code]], { code, message: MESSAGES[code], ...extra });
 }
 
+/** Trusts a declared length; otherwise counts a clone's chunks and stops reading past the cap. */
+async function bodyTooLarge(request: Request): Promise<boolean> {
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared) return declared > MAX_BODY_BYTES;
+  const reader = request.clone().body?.getReader();
+  if (!reader) return false;
+  let size = 0;
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    size += chunk.value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      // Not awaited: a tee branch's cancel settles only once the other branch is cancelled too.
+      void reader.cancel().catch(() => {});
+      return true;
+    }
+  }
+  return false;
+}
+
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 
 /** Runs a verifier; never echoes its error, which may carry upstream detail. */
@@ -151,9 +169,7 @@ export function platformAuth({ pool, verifiers, onAccountReady }: PlatformAuthOp
     rateLimit: [{ pathMatcher: (path: string) => path.startsWith("/platform-auth/"), window: 60, max: 10 }],
     onRequest: async (request: Request) => {
       if (!new URL(request.url).pathname.includes("/platform-auth/") || request.method !== "POST") return;
-      const declared = Number(request.headers.get("content-length") ?? 0);
-      const size = declared || new TextEncoder().encode(await request.clone().text()).length;
-      if (size <= MAX_BODY_BYTES) return;
+      if (!(await bodyTooLarge(request))) return;
       return {
         response: new Response(JSON.stringify({ code: "INVALID_INPUT", message: MESSAGES.INVALID_INPUT }), {
           status: 413,

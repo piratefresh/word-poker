@@ -14,12 +14,18 @@ const LOGIN_METHODS: Record<string, string> = { credential: "Email", "game-cente
 export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
   const { data: session } = authClient.useSession();
   const userId = session?.user.isAnonymous ? null : session?.user.id;
-  const [methods, setMethods] = useState<string | null>(null);
+  // Kept with the account it was read for, so a different (or no) account never shows these.
+  const [loaded, setLoaded] = useState<{ userId: string; methods: string } | null>(null);
+  const methods = userId && loaded?.userId === userId ? loaded.methods : null;
   useEffect(() => {
     if (!userId) return;
+    let current = true;
     void authClient.listAccounts().then(({ data }) => {
-      if (data?.length) setMethods(data.map((account) => LOGIN_METHODS[account.providerId] ?? account.providerId).join(", "));
+      if (current && data?.length) {
+        setLoaded({ userId, methods: data.map((account) => LOGIN_METHODS[account.providerId] ?? account.providerId).join(", ") });
+      }
     }, () => {});
+    return () => { current = false; };
   }, [userId]);
   const name = useNativeState(session?.user.name ?? "");
   const [saving, setSaving] = useState(false);
