@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   StyleSheet,
@@ -15,7 +15,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 
 import { POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
 
@@ -270,11 +270,10 @@ export function PowerDrawReveal({
 }
 
 /**
- * The felt darkens behind the choices — soft at the edges, so the community above and the rack
- * below stay in view — and comes back as the kept card flies.
+ * The felt darkens behind the choices — a flat black wash over the seats and the table, so the
+ * cards read clearly — and comes back as the kept card flies.
  */
 function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: boolean }) {
-  const gradientId = useId();
   const shade = useSharedValue(0);
 
   useEffect(() => {
@@ -290,22 +289,7 @@ function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: bool
 
   const style = useAnimatedStyle(() => ({ opacity: shade.value }));
 
-  return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-      {/* Fade to transparent on every edge of the bounded felt, including desktop's sides. */}
-      <Svg height="100%" preserveAspectRatio="none" viewBox="0 0 100 100" width="100%">
-        <Defs>
-          <RadialGradient cx="50%" cy="50%" id={gradientId} r="50%">
-            <Stop offset="0" stopColor="#020a07" stopOpacity={0.65} />
-            <Stop offset="0.5" stopColor="#020a07" stopOpacity={0.65} />
-            <Stop offset="0.75" stopColor="#020a07" stopOpacity={0.35} />
-            <Stop offset="1" stopColor="#020a07" stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect fill={`url(#${gradientId})`} height="100" width="100" />
-      </Svg>
-    </Animated.View>
-  );
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, style]} />;
 }
 
 /** "✦ WILD POWER ✦" over the row: in with the first card, out with the cards not kept. */
@@ -406,6 +390,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { height: 0, width: 0 },
     textShadowRadius: 10,
   },
+  scrim: { backgroundColor: "rgba(0,0,0,0.78)" },
   note: { alignItems: "center", justifyContent: "center" },
   anchor: { height: 0, position: "absolute", width: 0 },
   grid: { alignItems: "center", height: "100%", justifyContent: "center" },
