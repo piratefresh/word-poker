@@ -322,7 +322,6 @@ function GameScreenBody({
                   tiles={game.community}
                 />
                 <ChipLayer flights={game.flights} onFlightEnd={onChipFlightEnd} />
-                {overFelt}
                 {heroSideAccessory == null ? null : (
                   <HeroSeatAccessory
                     avatarSize={seatMetrics(chromeWidth, true).avatar}
@@ -334,6 +333,7 @@ function GameScreenBody({
                 )}
               </>
             }
+            overlay={overFelt}
             // The table runs to the room's edges.
             chromeInset={0}
             layoutConfig={layoutConfig}

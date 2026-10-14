@@ -113,6 +113,8 @@ export interface PokerTableProps<TSeat, TCard> {
 
   /** Overlay drawn above the felt; laid out box-none so seats stay tappable. */
   hud?: ReactNode;
+  /** Drawn above the seats too, for a modal moment like the Power Draw; box-none like the hud. */
+  overlay?: ReactNode;
   style?: StyleProp<ViewStyle>;
   /**
    * The fullest reach of a seat's chrome around its anchor, for a felt `tableWidth` wide. With
@@ -160,6 +162,7 @@ export function PokerTable<TSeat, TCard>({
   renderPot,
   renderDealerButton,
   hud,
+  overlay,
   style,
   seatBounds,
   chromeInset,
@@ -331,6 +334,11 @@ export function PokerTable<TSeat, TCard>({
               {hud}
             </View>
           ) : null}
+          {overlay ? (
+            <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.overlay]}>
+              {overlay}
+            </View>
+          ) : null}
         </TableLayoutContext.Provider>
       ) : null}
     </View>
@@ -408,6 +416,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     zIndex: 1,
   },
+  // Above the seats' layer (and their status pills, which carry an elevation of their own).
+  overlay: { elevation: 30, zIndex: 30 },
   anchor: {
     position: "absolute",
     alignItems: "center",
