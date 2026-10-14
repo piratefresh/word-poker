@@ -34,6 +34,14 @@ export function changeSession<T>(change: () => Promise<T>): Promise<T> {
   return next;
 }
 
+/**
+ * For changes nobody tapped (an invite link's guest, a platform restore): skipped, resolving null,
+ * if a session exists by the time its turn comes — so neither can replace the other, or a sign-in.
+ */
+export function changeSessionIfSignedOut<T>(change: () => Promise<T>): Promise<T | null> {
+  return changeSession(async () => ((await authClient.getSession()).data ? null : change()));
+}
+
 const RESTORE_KEY = "wordpoker.platformRestore";
 
 /**

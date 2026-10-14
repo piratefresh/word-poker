@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
+import { GAME_CENTER_AVAILABLE, linkGameCenter } from "@/auth/client/game-center";
 import { colors, fonts, fontSize, spacing } from "@/constants/theme";
 
 import { NotificationSettings } from "./notification-settings";
@@ -15,18 +16,21 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
   const { data: session } = authClient.useSession();
   const userId = session?.user.isAnonymous ? null : session?.user.id;
   // Kept with the account it was read for, so a different (or no) account never shows these.
-  const [loaded, setLoaded] = useState<{ userId: string; methods: string } | null>(null);
-  const methods = userId && loaded?.userId === userId ? loaded.methods : null;
+  const [loaded, setLoaded] = useState<{ userId: string; providers: string[] } | null>(null);
+  const providers = userId && loaded?.userId === userId ? loaded.providers : null;
+  const methods = providers?.map((provider) => LOGIN_METHODS[provider] ?? provider).join(", ");
+  const [listed, setListed] = useState(0);
   useEffect(() => {
     if (!userId) return;
     let current = true;
     void authClient.listAccounts().then(({ data }) => {
-      if (current && data?.length) {
-        setLoaded({ userId, methods: data.map((account) => LOGIN_METHODS[account.providerId] ?? account.providerId).join(", ") });
-      }
+      if (current && data?.length) setLoaded({ userId, providers: data.map((account) => account.providerId) });
     }, () => {});
     return () => { current = false; };
-  }, [userId]);
+  }, [userId, listed]);
+  // Offered once the methods are known, so an account that already has Game Center never sees it.
+  const canLinkGameCenter = GAME_CENTER_AVAILABLE && !!providers && !providers.includes("game-center");
+  const [linking, setLinking] = useState(false);
   const name = useNativeState(session?.user.name ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +58,21 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
     }
   };
 
+  const link = async () => {
+    setLinking(true);
+    setError(null);
+    try {
+      const result = await linkGameCenter();
+      // A Game Center player already linked to another account stays there: nothing merges.
+      if (result.ok) setListed((n) => n + 1);
+      else setError(result.message);
+    } catch {
+      setError("Couldn’t link Game Center. Try again.");
+    } finally {
+      setLinking(false);
+    }
+  };
+
   return (
     <BottomSheet containerColor={colors.bgElevated} isPresented onDismiss={onDismiss} testID="account-settings">
       <View style={{ paddingBottom: spacing.lg }}>
@@ -70,6 +89,9 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
             ) : null}
             <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Display name</Text>
             <TextInput placeholder="Display name" editable={!saving} testID="account-display-name" value={name} />
+            {canLinkGameCenter ? (
+              <Button disabled={linking} label={linking ? "Linking…" : "Link Game Center"} onPress={link} variant="text" testID="account-link-game-center" />
+            ) : null}
             {session?.user.isAnonymous ? null : <NotificationSettings />}
             {error ? <Text textStyle={{ color: colors.danger }}>{error}</Text> : null}
             <Button disabled={saving} label={saving ? "Saving…" : "Save changes"} onPress={save} testID="account-save" />

@@ -23,13 +23,15 @@ import * as Linking from "expo-linking";
 import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, StyleSheet } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { authClient } from "@/auth/client/auth-client";
-import { changeSession } from "@/auth/client/session-coordinator";
+import { GAME_CENTER_AVAILABLE, restoreWithGameCenter } from "@/auth/client/game-center";
+import { changeSessionIfSignedOut } from "@/auth/client/session-coordinator";
+import { colors } from "@/constants/theme";
 import { E2E_AUTH_BYPASS } from "@/lib/e2e";
 import {
   destinationFromURL,
@@ -74,7 +76,13 @@ SplashScreen.preventAutoHideAsync();
  * dragged with `react-native-reanimated-dnd`, which rides on this view the same way every
  * Gesture Handler app does. Above the theme provider, so nothing inside has to know.
  */
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  restoring: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
+});
+
+/** How long a signed-out iOS launch hides sign-in while Game Center answers. */
+const RESTORE_COVER_MS = 15_000;
 
 export function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
@@ -108,6 +116,24 @@ export function RootLayout() {
     NotoSerif_700Bold_Italic,
   });
 
+  // Signed out on iOS: Game Center may sign straight back in (STO-591) once the UI is up to present
+  // its sheet. It checks the guest/sign-out choice and yields to any session that appears first.
+  // Until it settles a plain cover hides the sign-in screen, so a returning player never sees it
+  // flash; the cover is a view, not the native splash, so Apple's sheet can still present over it.
+  // Capped, in case GameKit never answers.
+  const signedOut = !E2E_AUTH_BYPASS && !isPending && !session && fontsLoaded;
+  const [restoring, setRestoring] = useState(GAME_CENTER_AVAILABLE && !E2E_AUTH_BYPASS);
+  useEffect(() => {
+    if (!signedOut) return;
+    const cap = setTimeout(() => setRestoring(false), RESTORE_COVER_MS);
+    // Signed in: lifted only once the new session has been read, so sign-in does not flash first.
+    void restoreWithGameCenter()
+      .then((signedIn) => (signedIn ? authClient.getSession() : null))
+      .catch(() => null)
+      .finally(() => setRestoring(false));
+    return () => clearTimeout(cap);
+  }, [signedOut]);
+
   // Keep the splash screen up until the first session check and the fonts resolve, so
   // a signed-in user never sees the sign-in screen flash on a cold load. An E2E build's
   // session check can only fail — nothing is listening — so it does not wait on one.
@@ -137,6 +163,11 @@ export function RootLayout() {
                     session is still on the device, and the reset has to win. */}
                 <Stack.Screen name="reset-password" />
               </Stack>
+              {restoring && !session ? (
+                <View accessibilityLabel="Signing in with Game Center" style={styles.restoring}>
+                  <ActivityIndicator color={colors.gold} />
+                </View>
+              ) : null}
               <AnimatedSplashOverlay />
               <TableInviteBanner invite={presence.invite} onDismiss={presence.dismiss} />
             </HistoryProvider>
@@ -183,7 +214,7 @@ function DeepLinks({
   const playAsGuest = useCallback(() => {
     if (guestTried.current) return;
     guestTried.current = true;
-    void changeSession(() => authClient.signIn.anonymous()).catch(() => {});
+    void changeSessionIfSignedOut(() => authClient.signIn.anonymous()).catch(() => {});
   }, []);
 
   useEffect(() => {

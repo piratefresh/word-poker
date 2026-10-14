@@ -43,6 +43,8 @@ example
 # generated native folders
 ios/
 android/
+!apps/mobile/modules/*/ios/
+!apps/mobile/modules/*/android/
 
 # stray lockfiles — this workspace pins one pnpm lock, at the repository root
 package-lock.json
@@ -88,3 +90,7 @@ sentry-wizard-installation-error-*.log
 # Server settlement journal and local runtime state
 /apps/server/data/
 .history-settlements/
+
+# EAS local credentials (certificates, profiles)
+apps/mobile/credentials.json
+apps/mobile/credentials/

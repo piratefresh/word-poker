@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["PlatformAuthModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.platformauth.PlatformAuthModule"]
+  }
+}

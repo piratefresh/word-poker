@@ -11,6 +11,7 @@ import {
 import { EMAIL_VERIFIED_CALLBACK } from "@/constants/links";
 import { colors, theme } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
+import { GAME_CENTER_AVAILABLE, signInWithGameCenter } from "@/auth/client/game-center";
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
 import { localHistory } from "@/lib/history/history-store";
 import { syncHistory } from "@/lib/history/history-sync";
@@ -111,6 +112,24 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   };
 
+  const continueWithGameCenter = async () => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      if (guestId && !(await guestHandsSaved(guestId))) {
+        setError(UNSAVED_HANDS);
+        return;
+      }
+      const result = await signInWithGameCenter({ adoptGuestProgress: !!guestId });
+      if (!result.ok) setError(result.message);
+    } catch {
+      setError(NETWORK_ERROR);
+    } finally {
+      setPending(false);
+    }
+  };
+
   const playAsGuest = async () => {
     if (pending) return;
     setPending(true);
@@ -183,6 +202,10 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
         onPress={submit}
         pending={pending}
       />
+
+      {GAME_CENTER_AVAILABLE && (
+        <FooterLine cta="Continue with Game Center" onPress={continueWithGameCenter} text="On iPhone?" />
+      )}
 
       <FooterLine
         cta={copy.footerCta}
