@@ -70,8 +70,44 @@ differs.
 | ----- | --- | --------------------- | ----------: |
 | Wild Tile | WILD | Any letter A–Z, each equally likely | 10 |
 | Vowel Magnet | VOWEL | A, E, I, O or U, each equally likely | 8 |
+| Blank Tile | BLANK | No letter yet: the seat names one A–Z for the blank when it plays it | 8 |
+
+Spotlight and River Review are not in this family; they have their own sections below.
 
 The tag is what the seat's nameplate prints when the power is used (see Visibility).
+
+## Blank Tile
+
+Blank Tile is a swap whose new tile is a **blank**: it prints "?" and is worth **0**. The seat
+names the letter it plays as — any one of A–Z — when it puts the blank in its word, and may change
+that letter until the word is confirmed. The blank carries no multiplier, so it scores 0 even in a
+word whose other tiles are doubled. CPU seats never play a blank's letter.
+
+## Spotlight
+
+Spotlight does not swap a tile. The seat picks **one dealt community tile** and it scores
+**double** (a Double Letter, §9) for every seat this hand.
+
+- Only on the **flop or the turn**, in the seat's own betting turn window; not before the flop,
+  not on the river, and not in §19's window.
+- The tile must already be face up, must not already carry a 2x or 3x, and must be a community
+  tile — never a private one.
+- Every seat sees the tile's 2× badge, and the table is told who lit which letter: "Jay
+  spotlighted the A". Nothing about the seat's own rack is revealed.
+- CPU seats never use Spotlight.
+
+## River Review
+
+River Review is never used. A seat that holds it is shown, once the hand pays out, the **three
+highest-scoring distinct words** it could have played from its two private tiles and the five
+community tiles, best first, each with its score (§7). It is shown whether or not the seat folded,
+and Spotlight's double counts. Its own tiles are drawn gold and the table's cream; the best word is
+highlighted.
+
+- Private: only the holder sees it, with the hand's results. Nothing carries into the next hand.
+- The power reads **Used** once the hand has paid out. It has no activation window, and a use is
+  refused.
+- CPU seats may keep it, and never see anything. Blank tiles are not searched (a blank scores 0).
 
 ## Swapping a Tile
 

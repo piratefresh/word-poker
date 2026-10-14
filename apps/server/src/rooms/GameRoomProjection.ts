@@ -8,7 +8,7 @@ import {
   type PrivateWordState,
 } from "@wordpoker/contracts";
 import type { Tile } from "@wordpoker/contracts";
-import { buildPots, canUsePower, playedWord, type OfflineState } from "@wordpoker/game-rules";
+import { buildPots, canUsePower, playedWord, riverReview, type OfflineState } from "@wordpoker/game-rules";
 
 import {
   BettingState,
@@ -307,6 +307,7 @@ function privatePowerState(
   if (game == null || powers === undefined || slot === undefined) return undefined;
 
   const held = powers.held[playerId];
+  const review = riverReview(game, playerId);
   return {
     handId: game.hand,
     draw:
@@ -316,8 +317,11 @@ function privatePowerState(
     held:
       held === undefined
         ? null
-        : { powerUpId: held.id, used: held.used, usable: canUsePower(game, playerId, now) },
+        : { powerUpId: held.id, used: held.used || review !== null, usable: canUsePower(game, playerId, now) },
     swap: privatePowerSwap(game, playerId),
+    ...(review === null
+      ? {}
+      : { review: review.map(({ word, score, submission }) => ({ word, score, plays: submission.plays })) }),
   };
 }
 

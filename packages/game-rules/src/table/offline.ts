@@ -49,6 +49,7 @@ import {
   type PowerRejectionReason,
   type PowerUpDealMode,
   type PowerUpId,
+  POWER_UPS,
   type RoundPhase,
   type ShowdownComparison,
   type ShowdownStanding,
@@ -479,6 +480,10 @@ function applyUsePower(
     throw new PowerRejectionError("not-held");
   }
 
+  if (POWER_UPS[action.powerUpId].family === "spotlight") {
+    return applySpotlight(state, powers, held, action);
+  }
+
   if (!seat.privateTiles.some((tile) => tile.id === action.tileId)) {
     throw new PowerRejectionError("not-your-tile");
   }
@@ -500,6 +505,35 @@ function applyUsePower(
         ...powers.held,
         [action.playerId]: { ...held, used: true, swap: { discardedTileId: action.tileId, tile } },
       },
+    },
+  };
+}
+
+/**
+ * Spotlight (§44): a dealt community tile with no bonus of its own scores double for every seat
+ * this hand. Only the flop and the turn take it, and the use is not a betting action.
+ */
+function applySpotlight(
+  state: OfflineState,
+  powers: HandPowers,
+  held: HeldPower,
+  action: Extract<OfflineAction, { type: "usePowerUp" }>,
+): OfflineState {
+  const index = state.community.findIndex((tile) => tile.id === action.tileId);
+  const tile = state.community[index];
+  if (tile === undefined || index >= state.revealed) throw new PowerRejectionError("not-a-table-tile");
+  if (tile.multiplier !== undefined) throw new PowerRejectionError("already-bonus");
+  if (state.phase !== "flop" && state.phase !== "turn") throw new PowerRejectionError("outside-window");
+
+  const letter = "alternativeLetter" in tile ? `${tile.letter}/${tile.alternativeLetter}` : tile.letter;
+  return {
+    ...state,
+    community: state.community.map((candidate, at) =>
+      at === index ? { ...candidate, multiplier: "double-letter" } : candidate,
+    ),
+    powers: {
+      ...powers,
+      held: { ...powers.held, [action.playerId]: { ...held, used: true, spotlight: { tileId: tile.id, letter } } },
     },
   };
 }
@@ -534,6 +568,8 @@ function powerUseRefusal(
   const held = powers.held[playerId];
   if (seat === undefined || held === undefined || held.id !== powerUpId) return "not-held";
   if (held.used) return "already-used";
+  // River Review is never used: it reads out at the payout, so no window is ever open for it.
+  if (POWER_UPS[powerUpId].family === "review") return "outside-window";
 
   return powerWindowRefusal(state, seatIndex, playerId, nowMs);
 }

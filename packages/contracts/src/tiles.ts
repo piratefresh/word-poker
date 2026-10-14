@@ -36,5 +36,15 @@ export interface ChoiceTile extends LetterTile {
   alternativePoints: number;
 }
 
-/** Every tile a hand can hold: the bag's single letters, and the deal's choice tiles (§6, §10). */
-export type Tile = LetterTile | ChoiceTile;
+/**
+ * A blank (§44, Blank Tile): any letter, worth nothing. It prints "?" and the seat names the
+ * letter it plays through the play's `chosenFace`; it never carries a multiplier.
+ */
+export interface BlankTile extends LetterTile {
+  letter: "?";
+  points: 0;
+  blank: true;
+}
+
+/** Every tile a hand can hold: the bag's single letters, the deal's choice tiles, and a power's blank (§6, §10). */
+export type Tile = LetterTile | ChoiceTile | BlankTile;

@@ -21,23 +21,28 @@ function better(candidate: BotWord, best: BotWord): boolean {
   return candidate.word < best.word;
 }
 
-/** Exact search, pruned only when the dictionary rules out every continuation. */
-export function evaluateBestWord({ available, dictionary }: ChooseWordOptions): BotWord | null {
+/**
+ * Exact search for the best `count` distinct words, pruned only when the dictionary rules out every
+ * continuation. A word reachable by two tile orders keeps its better-scoring play.
+ */
+export function topWords({ available, dictionary }: ChooseWordOptions, count: number): BotWord[] {
   const played: TilePlay[] = [];
   const used = new Set<string>();
-  let best: BotWord | null = null;
-  const visit = (word: string): BotWord | null => {
+  const found = new Map<string, BotWord>();
+  const visit = (word: string): void => {
     if (word.length >= 2 && dictionary.isWord(word)) {
       const submission = { plays: [...played] };
       const resolution = resolveSubmission({ available, submission });
       if (resolution.ok) {
         const candidate = { submission, word, score: scoreWord(resolution.tiles).total };
-        if (best === null || better(candidate, best)) best = candidate;
+        const prior = found.get(word);
+        if (prior === undefined || candidate.score > prior.score) found.set(word, candidate);
       }
     }
-    if (played.length === 7) return best;
+    if (played.length === 7) return;
     for (const tile of available) {
-      if (used.has(tile.id)) continue;
+      // ponytail: CPUs never play a blank (0 points, 26x branching); try A-Z if the bots look dumb.
+      if (used.has(tile.id) || "blank" in tile) continue;
       const faces = "alternativeLetter" in tile ? [tile.letter, tile.alternativeLetter] : [tile.letter];
       for (const face of faces) {
         const next = word + face;
@@ -49,9 +54,14 @@ export function evaluateBestWord({ available, dictionary }: ChooseWordOptions): 
         used.delete(tile.id);
       }
     }
-    return best;
   };
-  return visit("");
+  visit("");
+  return [...found.values()].sort((a, b) => (better(a, b) ? -1 : 1)).slice(0, count);
+}
+
+/** The single best word, or null when nothing is buildable. */
+export function evaluateBestWord(options: ChooseWordOptions): BotWord | null {
+  return topWords(options, 1)[0] ?? null;
 }
 
 /** Same scoring, length and alphabetical tie-break as the original word picker. */

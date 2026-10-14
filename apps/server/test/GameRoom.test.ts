@@ -1463,6 +1463,32 @@ describe("GameRoom", () => {
       return { use, target, swap };
     }
 
+    it("shows River Review to its holder alone once the hand pays out", async () => {
+      const table = await wildTable(4_990);
+      const [holder, other] = table.clients;
+      holder!.send(GAME_MESSAGES.pickPower, { actionId: "pick-rr", handId: 1, powerUpId: "river_review" });
+      other!.send(GAME_MESSAGES.pickPower, { actionId: "pick-wild", handId: 1, powerUpId: "random_wild" });
+      await until(() => table.room.state.toActSeat >= 0, "pre-flop to start");
+      const actor = table.clients.find(
+        (client) => table.room.state.seats.get(client.sessionId)?.seat === table.room.state.toActSeat,
+      )!;
+      actor.send(GAME_MESSAGES.betting, { type: "fold" });
+
+      const review = await until(
+        () => last<PrivateSeatState>(table.inboxOf(holder!), GAME_EVENTS.privateState)?.power?.review,
+        "the holder's review",
+      );
+      assert.ok(review.length > 0 && review.length <= 3, "at most three words");
+      assert.ok(review.every((entry, index) => index === 0 || review[index - 1]!.score >= entry.score));
+      const state = last<PrivateSeatState>(table.inboxOf(holder!), GAME_EVENTS.privateState)!;
+      assert.strictEqual(state.power?.held?.used, true, "the chip reads Used");
+      assert.strictEqual(
+        last<PrivateSeatState>(table.inboxOf(other!), GAME_EVENTS.privateState)?.power?.review,
+        undefined,
+        "the other seat is told nothing",
+      );
+    });
+
     it("deals each seat its own three offers, privately, and holds the turn until the draw closes", async () => {
       const table = await wildTable(4_990);
 
@@ -1559,6 +1585,44 @@ describe("GameRoom", () => {
       assert.ok(!heard.includes(swap.tile.id), "the opponent never sees the new tile");
       assert.ok(!heard.includes(target.id), "the opponent never sees the discarded tile");
       assert.strictEqual(ofType(table.inboxOf(opponent), GAME_EVENTS.powerSwap).length, 0);
+    });
+
+    it("lights a flop tile for every seat when Spotlight is used, and says which and who", async () => {
+      const table = await wildTable(4_991);
+      for (const client of table.clients) {
+        client.send(GAME_MESSAGES.pickPower, { actionId: `pick-${client.sessionId}`, handId: 1, powerUpId: "spotlight" });
+      }
+      await until(() => table.room.state.toActSeat >= 0, "the draw to close");
+      const seatOf = (client: ClientRoom) => table.room.state.seats.get(client.sessionId)!;
+
+      // Call and check around until the flop is out and a seat is on the turn.
+      for (let step = 0; step < 20 && table.room.state.community.length === 0; step += 1) {
+        const mover = table.clients.find((client) => seatOf(client).seat === table.room.state.toActSeat)!;
+        const owes = seatOf(mover).committedThisRound < table.room.state.betting.currentBet;
+        mover.send(GAME_MESSAGES.betting, { type: owes ? "call" : "check" });
+        await table.room.waitForNextPatch();
+      }
+      assert.ok(table.room.state.community.length >= 3, "the flop is out");
+      const actor = table.clients.find((client) => seatOf(client).seat === table.room.state.toActSeat)!;
+      await until(
+        () => last<PrivateSeatState>(table.inboxOf(actor), GAME_EVENTS.privateState)?.power?.held?.usable,
+        "the actor's Spotlight to light",
+      );
+
+      const tile = table.room.state.community[0]!;
+      actor.send(GAME_MESSAGES.usePowerUp, { actionId: "spot-1", handId: 1, powerUpId: "spotlight", tileId: tile.id });
+      for (const client of table.clients) {
+        const used = await until(() => last<PowerUsedEvent>(table.inboxOf(client), GAME_EVENTS.powerUsed), "powerUsed");
+        assert.deepStrictEqual(used, {
+          handId: 1,
+          seat: seatOf(actor).seat,
+          powerUpId: "spotlight",
+          street: "flop",
+          tileId: tile.id,
+          letter: tile.alternativeLetter === "" ? tile.letter : `${tile.letter}/${tile.alternativeLetter}`,
+        });
+      }
+      await until(() => table.room.state.community[0]?.multiplier === "double-letter", "the lit tile in the table state");
     });
 
     it("answers a repeated actionId with the first result, never a second charge or roll", async () => {

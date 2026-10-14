@@ -89,7 +89,8 @@ function UsedNotice({
   const [leaving, setLeaving] = useState(false);
   const power = POWER_UPS[notice.powerUpId];
   const who = notice.mine ? "You" : notice.name;
-  const said = `${who} used ${power.title}`;
+  const lit = notice.letter;
+  const said = lit === undefined ? `${who} used ${power.title}` : `${who} spotlighted the ${lit}`;
 
   // The beat runs once per card, whatever the felt re-renders with in the meantime: the latest
   // notice and handler are read when the clear lands, not when it was armed.
@@ -125,7 +126,7 @@ function UsedNotice({
           style={styles.card}
           testID="power-used"
         >
-          <Text style={[styles.caption, { fontSize: 15 * scale }]}>{`${who.toUpperCase()} USED`}</Text>
+          <Text style={[styles.caption, { fontSize: 15 * scale }]}>{lit === undefined ? `${who.toUpperCase()} USED` : `${who.toUpperCase()} SPOTLIGHTED THE ${lit}`}</Text>
           <PowerCard id={notice.powerUpId} width={Math.round(104 * scale)} />
         </Animated.View>
       )}

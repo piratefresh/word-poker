@@ -25,7 +25,7 @@ import {
 } from "./backdrop";
 import { CoinBowlGameContext } from "./backdrop/coin-bowl-motion";
 import { BettingControls, bettingRowStyle, useRaiseAmount } from "./betting";
-import type { GamePlayer, GameScreenState } from "./game-types";
+import type { GamePlayer, GameScreenState, LetterTileData } from "./game-types";
 import {
   BestWord,
   CommunityStrip,
@@ -76,6 +76,8 @@ export interface GameScreenProps {
    * table's region and nothing past it, so the community above and the rack below stay in view.
    */
   overFelt?: ReactNode;
+  /** Spotlight's aim: while set, a tap on a dealt community tile with no bonus picks it. */
+  onPickCommunityTile?: (tile: LetterTileData) => void;
   /** A short, presentation-only celebration above the table after a showdown. */
   winOverlay?: ReactNode;
   onBack?: () => void;
@@ -136,6 +138,7 @@ function GameScreenBody({
   heroSideAccessory,
   overFelt,
   winOverlay,
+  onPickCommunityTile,
   onBack,
   onHelp,
   onBalancePress,
@@ -311,6 +314,7 @@ function GameScreenBody({
               // layer is in the container's pixel space, exactly as `resolveContainer` reads it.
               <>
                 <CommunityInTable
+                  onPick={onPickCommunityTile}
                   scale={scale}
                   tiles={game.community}
                 />
@@ -412,9 +416,11 @@ function GameScreenBody({
 function CommunityInTable({
   tiles,
   scale,
+  onPick,
 }: {
   tiles: GameScreenState["community"];
   scale: number;
+  onPick?: (tile: LetterTileData) => void;
 }) {
   const { layout, resolveContainer } = useTableLayout();
   const center = resolveContainer({ x: 0.5, y: layout.config.communityY });
@@ -425,7 +431,7 @@ function CommunityInTable({
       style={[styles.communityInTable, { height, top: center.y - height / 2 }]}
     >
       <CoachTarget id="community">
-        <CommunityStrip inTable scale={scale} tiles={tiles} />
+        <CommunityStrip inTable onPick={onPick} scale={scale} tiles={tiles} />
       </CoachTarget>
     </View>
   );

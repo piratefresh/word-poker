@@ -13,12 +13,15 @@ import {
 } from "@wordpoker/contracts";
 
 import { bettingBounds } from "../src/money/betting";
+import { resolveSubmission } from "../src/words/building";
+import { scoreWord } from "../src/words/scoring";
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand as dealTiles } from "../src/tiles/deal";
 import { BettingRejectionError, OfflineActionError, PowerRejectionError } from "../src/core/errors";
 import { drawOffers, type PowerDraw } from "../src/powers/power-draw";
 import { swapTile } from "../src/powers/power-swap";
 import {
   OFFLINE_TURN_MS,
+  availableTiles,
   canUsePower,
   reduce,
   revealedCount,
@@ -914,9 +917,8 @@ describe("reduce — §44's held power", () => {
     assert.ok(state.powers);
     for (const slot of state.powers.draw.slots) {
       if (slot.picked !== null) continue;
-      const powerUpId = slot.offers[0];
-      assert.ok(powerUpId);
-      state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId }, NOW + 1);
+      // Every power is offered, so the CPUs take the one a swap test can act on.
+      state = reduce(state, { type: "pickPower", playerId: slot.playerId, powerUpId: "random_wild" }, NOW + 1);
     }
     return state;
   }
@@ -1175,5 +1177,85 @@ describe("reduce — §44's held power", () => {
     assert.equal(standing?.score, tile.points + board.points);
     assert.equal(standing?.place, 1, "the only word at the table");
     assert.equal(paid.powers?.held.hero?.swap?.tile.id, tile.id, "the ⚡ reads the swapped tile's id");
+  });
+});
+
+describe("reduce — §44's Blank Tile and Spotlight", () => {
+  /** A Wild hand where every seat holds `power`, walked politely until `stopAt` holds on the hero's turn. */
+  function holdingAll(power: PowerUpId, stopAt: (state: OfflineState) => boolean): OfflineState {
+    let state = dealHand({ powerUps: { deal: "choose3" } });
+    for (const playerId of SEATS) state = reduce(state, { type: "pickPower", playerId, powerUpId: power }, NOW + 1);
+    for (let step = 0; !(stopAt(state) && state.toActIndex === 0); step += 1) {
+      assert.ok(step < 40, "the walk reaches the hero's turn");
+      state = reduce(state, politeAction(state), NOW + 2 + step);
+    }
+    return state;
+  }
+
+  const use = (state: OfflineState, tileId: string, power: PowerUpId = "spotlight", playerId = "hero") =>
+    reduce(state, { type: "usePowerUp", playerId, powerUpId: power, tileId }, NOW + 100);
+  const refusedWith = (reason: PowerRejectionReason) => (error: unknown) =>
+    error instanceof PowerRejectionError && error.reason === reason;
+
+  it("makes a blank that plays any letter at 0, even on a word that would take a multiplier", () => {
+    const state = holdingAll("blank_tile", (s) => s.phase === "preflop");
+    const own = state.seats[0]?.privateTiles[0];
+    assert.ok(own);
+    const blank = use(state, own.id, "blank_tile").seats[0]?.privateTiles[0];
+    assert.deepEqual(blank, { id: "power-0", letter: "?", points: 0, blank: true });
+
+    const available = [blank as Tile, { id: "m", letter: "M", points: 3, multiplier: "double-letter" as const }];
+    const word = resolveSubmission({
+      available,
+      submission: { plays: [{ tileId: "power-0", chosenFace: "Q" }, { tileId: "m" }] },
+    });
+    assert.ok(word.ok);
+    assert.equal(word.word, "QM");
+    assert.deepEqual(word.tiles[0], { tileId: "power-0", letters: [{ letter: "Q", points: 0 }] });
+    assert.equal(scoreWord(word.tiles).letterScore, 6, "the blank adds nothing; M doubles");
+
+    for (const chosenFace of [undefined, "a", "AB", "1"]) {
+      const first: TilePlay = chosenFace === undefined ? { tileId: "power-0" } : { tileId: "power-0", chosenFace };
+      const bad = resolveSubmission({ available, submission: { plays: [first, { tileId: "m" }] } });
+      assert.deepEqual(bad, { ok: false, reason: "uses-unavailable-letters" }, String(chosenFace));
+    }
+  });
+
+  it("doubles a flop tile for every seat, and refuses the river, undealt, bonus and private tiles", () => {
+    const flop = holdingAll("spotlight", (s) => s.phase === "flop");
+    const tile = flop.community.find((candidate, index) => index < flop.revealed && candidate.multiplier === undefined);
+    assert.ok(tile);
+
+    const lit = use(flop, tile.id);
+    assert.equal(lit.community.find((candidate) => candidate.id === tile.id)?.multiplier, "double-letter");
+    assert.equal(lit.powers?.held.hero?.spotlight?.tileId, tile.id);
+    assert.equal(lit.powers?.held.hero?.used, true);
+    assert.equal(lit.toActIndex, flop.toActIndex, "not a betting action");
+    for (const seat of [0, 1]) {
+      const own = lit.seats[seat]?.privateTiles[0];
+      assert.ok(own);
+      const play = (t: Tile): TilePlay => ("alternativeLetter" in t ? { tileId: t.id, chosenFace: t.letter } : { tileId: t.id });
+      const resolved = resolveSubmission({
+        available: availableTiles(lit, seat),
+        submission: { plays: [play(tile), play(own)] },
+      });
+      assert.ok(resolved.ok, `seat ${seat}`);
+      assert.equal(resolved.tiles[0]?.multiplier, "double-letter", `seat ${seat} sees the double`);
+    }
+
+    const undealt = flop.community[flop.revealed];
+    assert.ok(undealt);
+    assert.throws(() => use(flop, undealt.id), refusedWith("not-a-table-tile"));
+    assert.throws(() => use(flop, flop.seats[0]?.privateTiles[0]?.id ?? ""), refusedWith("not-a-table-tile"));
+    assert.throws(() => use(lit, tile.id), refusedWith("already-used"));
+
+    const bonus = {
+      ...flop,
+      community: flop.community.map((c) => (c.id === tile.id ? { ...c, multiplier: "triple-letter" as const } : c)),
+    };
+    assert.throws(() => use(bonus, tile.id), refusedWith("already-bonus"));
+
+    const river = holdingAll("spotlight", (s) => s.phase === "river");
+    assert.throws(() => use(river, river.community[0]?.id ?? ""), refusedWith("outside-window"));
   });
 });

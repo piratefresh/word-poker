@@ -17,6 +17,7 @@ import { FREE_PLAY } from "@/components/hud";
 import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import type { GameScreenState } from "@/components/screens/game/game-types";
+import { reviewOf } from "@/components/screens/results/river-review";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
@@ -146,8 +147,7 @@ function OfflineTable({
     useSimpleWinCelebration(results);
   // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
   const power = usePowerTargeting({ held: powers?.held, onUse: usePower });
-  const choosing = power.targeting.stage === "picking";
-  const flip = swapFlipOf(powers?.swap, power.discarded);
+    const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
   // The HUD's "How to play": a tour of the felt's own controls, over the hand in progress.
   const help = useCoachTour("helper", HELPER_TOUR);
@@ -188,7 +188,7 @@ function OfflineTable({
       reason={words?.reason ?? null}
       score={words?.score ?? null}
       word={words?.word ?? ""}
-      onPickTile={choosing ? power.pick : undefined}
+      onPickTile={power.ownPick}
       // The new letter turns over once the felt's "power used" card for the hero's own use has
       // cleared (§44, Visibility): the table sees the use first, and only the hero the result.
       swapFlip={flip === null ? null : { ...flip, revealed: !ownCardShowing }}
@@ -198,6 +198,7 @@ function OfflineTable({
           // Free play (ADR 0002): the offline table's chips are local, so no Wallet is read.
           balance={FREE_PLAY}
           game={game}
+          onPickCommunityTile={power.tablePick}
           heroSideAccessory={
             powers === null ? null : (
               <PowerHeldChip
@@ -266,7 +267,12 @@ function OfflineTable({
         useful thing left to say once the hero has busted (ADR 0002).
       */}
       {payout && !sessionOver && results !== null && !celebratingWin && xp.hero === null ? (
-        <ResultsScreen onDeal={deal} onExit={leaveTable} snapshot={results} />
+        <ResultsScreen
+          onDeal={deal}
+          onExit={leaveTable}
+          review={reviewOf(powers?.review, game)}
+          snapshot={results}
+        />
       ) : null}
       {sessionOver && xp.hero === null ? <SessionOver game={game} onNewGame={restart} /> : null}
       {historyError ? (

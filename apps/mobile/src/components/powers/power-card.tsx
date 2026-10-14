@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -11,6 +12,16 @@ import { PowerEmblem } from "./power-emblem";
 export const POWER_CARD_ASPECT = 7 / 5;
 
 /**
+ * Powers whose art is a whole finished card (frame, title and line painted in) rather than an
+ * emblem for the card to frame. Relative, as the felt's other art is: Jest maps `@/` to `src/` only.
+ */
+const WHOLE_CARD_ART: Readonly<Record<string, number>> = {
+  "blank-tile": require("../../../assets/images/ui/card/power-blank-tile.webp"),
+  spotlight: require("../../../assets/images/ui/card/power-spotlight.webp"),
+  "river-review": require("../../../assets/images/ui/card/power-river-review.webp"),
+};
+
+/**
  * One power as a card: the gold frame, the power's art, its title on a banner and its one line
  * underneath. Every word on it is the catalog's (`POWER_UPS`), never the card's own, so the draw,
  * the held-power chip and the felt's "power used" card read the same copy.
@@ -20,6 +31,10 @@ export const POWER_CARD_ASPECT = 7 / 5;
  */
 export function PowerCard({ id, width }: { id: PowerUpId; width: number }) {
   const power = POWER_UPS[id];
+  const whole = WHOLE_CARD_ART[power.icon];
+  if (whole !== undefined) {
+    return <Image contentFit="contain" source={whole} style={{ height: width * POWER_CARD_ASPECT, width }} />;
+  }
   const height = width * POWER_CARD_ASPECT;
   const frame = Math.max(2, width * 0.035);
 
@@ -66,6 +81,10 @@ export function PowerCard({ id, width }: { id: PowerUpId; width: number }) {
  * them to a screen reader (`powerCardLabel`).
  */
 export function PowerCardMini({ id, width }: { id: PowerUpId; width: number }) {
+  const whole = WHOLE_CARD_ART[POWER_UPS[id].icon];
+  if (whole !== undefined) {
+    return <Image contentFit="contain" source={whole} style={{ height: width * POWER_CARD_ASPECT, width }} />;
+  }
   const frame = Math.max(1.5, width * 0.06);
 
   return (

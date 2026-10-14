@@ -41,6 +41,7 @@ import type {
   PowerUpId,
   PowerUsedEvent,
   PrivatePowerSwap,
+  RiverReviewWord,
   PrivateWordCheckState,
   RoomPhase,
   RoundPhase,
@@ -160,6 +161,7 @@ interface PowerPrivate {
   draw: { offers: readonly PowerUpId[]; picked: PowerUpId | null; endsAtMs: number } | null;
   held: { id: PowerUpId; used: boolean; usable: boolean } | null;
   swap: PrivatePowerSwap | null;
+  review: readonly RiverReviewWord[] | null;
 }
 
 /** A power gesture the room has not answered yet: what to resend, under the same id, on reconnect. */
@@ -568,6 +570,7 @@ export function useOnlineGame({
           ? null
           : { ...power.held, usable: power.held.usable && !using },
       swap: power?.swap ?? null,
+      review: power?.review ?? null,
       used: handPowerEvents
         .filter((event) => !shownPowerEvents.includes(powerEventKey(event)))
         .map((event) => ({
@@ -869,6 +872,9 @@ function decodePowerUsed(payload: unknown): PowerUsedEvent | null {
     seat: numberOf(payload.seat),
     powerUpId: payload.powerUpId,
     street,
+    ...(typeof payload.tileId === "string" && typeof payload.letter === "string"
+      ? { tileId: payload.tileId, letter: payload.letter }
+      : {}),
   };
 }
 
@@ -918,6 +924,16 @@ function decodePower(
             tile: decodeTile(swap.tile) as LetterTile,
           }
         : null,
+    review: Array.isArray(value.review)
+      ? value.review.filter(isRecord).map((entry) => ({
+          word: stringOf(entry.word),
+          score: numberOf(entry.score),
+          plays: iterate(entry.plays).filter(isRecord).map((play) => ({
+            tileId: stringOf(play.tileId),
+            ...(typeof play.chosenFace === "string" ? { chosenFace: play.chosenFace } : {}),
+          })),
+        }))
+      : null,
   };
 }
 

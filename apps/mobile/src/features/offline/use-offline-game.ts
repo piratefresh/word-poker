@@ -38,7 +38,7 @@ import type {
   TilePlay,
   WordRejectionReason,
 } from "@wordpoker/contracts";
-import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
+import { POWER_UPS, WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import {
   BettingRejectionError,
   DEFAULT_STAKES,
@@ -52,6 +52,7 @@ import {
   decideOfflineMove,
   reduce,
   resolveSubmission,
+  riverReview,
   startHand,
   type Dictionary,
   type OfflineState,
@@ -733,6 +734,7 @@ function powerViewOf(
 
   const slot = powers.draw.slots.find((candidate) => candidate.playerId === HERO_ID);
   const held = powers.held[HERO_ID];
+  const review = riverReview(state, HERO_ID);
   // The table's own timers settle every deadline — a turn that runs out is folded, a window that
   // runs out is closed — but a beat after it, so the clock in play is either still running or
   // has just run out and is waiting to be settled. Reading "now" as its last millisecond, or as
@@ -748,7 +750,9 @@ function powerViewOf(
     held:
       held === undefined
         ? null
-        : { id: held.id, used: held.used, usable: canUsePower(state, HERO_ID, nowMs) },
+        : { id: held.id, used: held.used || review !== null, usable: canUsePower(state, HERO_ID, nowMs) },
+    review:
+      review?.map(({ word, score, submission }) => ({ word, score, plays: submission.plays })) ?? null,
     swap:
       held?.swap === undefined
         ? null
@@ -890,11 +894,18 @@ interface SeatAction {
 function powerUsedBy(state: OfflineState, action: OfflineAction): PowerUsedEvent | null {
   if (action.type !== "usePowerUp" || state.phase === "payout") return null;
 
+  const lit = POWER_UPS[action.powerUpId].family === "spotlight"
+    ? state.community.find((tile) => tile.id === action.tileId)
+    : undefined;
+
   return {
     handId: state.hand,
     seat: state.seats.findIndex((seat) => seat.id === action.playerId),
     powerUpId: action.powerUpId,
     street: state.phase,
+    ...(lit === undefined
+      ? {}
+      : { tileId: lit.id, letter: "alternativeLetter" in lit ? `${lit.letter}/${lit.alternativeLetter}` : lit.letter }),
   };
 }
 

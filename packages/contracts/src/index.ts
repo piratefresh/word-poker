@@ -81,6 +81,7 @@ export {
   type QuestStateResponse,
 } from "./quests";
 export type {
+  BlankTile,
   ChoiceTile,
   LetterMultiplier,
   LetterTile,
@@ -173,6 +174,7 @@ export {
   type PrivatePowerDraw,
   type PrivatePowerState,
   type PrivatePowerSwap,
+  type RiverReviewWord,
   type PrivateSeatState,
   type PrivateWordState,
 } from "./online";

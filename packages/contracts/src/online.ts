@@ -28,6 +28,7 @@ import {
 import type { GameRoomMetadata } from "./rooms";
 import type { ShowdownComparison, ShowdownStanding } from "./showdown";
 import type { LetterTile, Tile } from "./tiles";
+import type { TilePlay } from "./words";
 import {
   WORD_REJECTION_REASONS,
   isWordSubmission,
@@ -163,6 +164,9 @@ export interface PowerUsedEvent {
   readonly seat: number;
   readonly powerUpId: PowerUpId;
   readonly street: Exclude<RoundPhase, "payout">;
+  /** Spotlight only: the community tile it lit, and what it prints ("A", or a choice tile's "A/E"). */
+  readonly tileId?: string;
+  readonly letter?: string;
 }
 
 /** A rejection associated with the message family that produced it. */
@@ -318,6 +322,18 @@ export interface PrivatePowerState {
     readonly usable: boolean;
   } | null;
   readonly swap: PrivatePowerSwap | null;
+  /**
+   * River Review (§44): the seat's best words once the hand has paid out, best first. Absent until
+   * then and for any other power; riding on the private state means a reconnect restores it.
+   */
+  readonly review?: readonly RiverReviewWord[];
+}
+
+/** One word River Review shows: the word, what it scores, and the tiles that play it, in order. */
+export interface RiverReviewWord {
+  readonly word: string;
+  readonly score: number;
+  readonly plays: readonly TilePlay[];
 }
 
 /** The private draft/confirmation record a seat restores after a reconnect. */

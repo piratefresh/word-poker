@@ -40,6 +40,9 @@ export {
 export type { RankShowdownOptions, ShowdownEntry } from "./money/showdown";
 export { decideOfflineMove, chooseOfflineWord } from "./bot/bot";
 export type { ChooseWordOptions } from "./bot/bot";
+export { topWords } from "./bot/bot-word";
+export { RIVER_REVIEW_WORDS, riverReview } from "./words/river-review";
+export type { BotWord } from "./bot/bot-word";
 export {
   OFFLINE_TURN_MS,
   availableTiles,
