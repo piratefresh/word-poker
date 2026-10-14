@@ -9,7 +9,7 @@ tags:
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: "Choose how to play"
+    visible: "Offline Mode"
     timeout: 30000
 - openLink: wordpoker://tutorial
 - extendedWaitUntil:

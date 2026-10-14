@@ -41,7 +41,7 @@ export function HistoryScreen() {
   const rows = sessionId ? history.hands.filter((row) => row.hand.sessionId === sessionId) : [];
   return (
     <View style={[styles.screen, { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom }]} testID="history-screen">
-      <Host matchContents colorScheme="dark" seedColor={colors.gold}>
+      <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark" seedColor={colors.gold}>
         <Column spacing={spacing.sm} style={styles.header}>
           <Row spacing={spacing.md}>
             <Button label="Back" onPress={back} testID="history-back" />
@@ -52,9 +52,10 @@ export function HistoryScreen() {
           {history.error ? <Text textStyle={styles.dim}>{history.error}</Text> : null}
         </Column>
       </Host>
+      {/* Host rows acquire their height from native layout; clipping them at zero height prevents measurement. */}
       {selected ? <HandDetail row={selected} /> : sessionId ? (
-        <FlatList data={rows} keyExtractor={(row) => row.hand.id} renderItem={({ item }) => (
-          <Host matchContents colorScheme="dark">
+        <FlatList removeClippedSubviews={false} data={rows} keyExtractor={(row) => row.hand.id} renderItem={({ item }) => (
+          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark">
             <Column spacing={spacing.xs} style={styles.card}>
               <Text textStyle={styles.title}>{`Hand #${item.hand.handNo}`}</Text>
               <Text textStyle={styles.dim}>{new Date(item.hand.endedAtMs).toLocaleString()}</Text>
@@ -65,8 +66,8 @@ export function HistoryScreen() {
           </Host>
         )} />
       ) : (
-        <FlatList data={sessions} keyExtractor={([id]) => id} renderItem={({ item: [id, hands] }) => (
-          <Host matchContents colorScheme="dark">
+        <FlatList removeClippedSubviews={false} data={sessions} keyExtractor={([id]) => id} renderItem={({ item: [id, hands] }) => (
+          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark">
             <Column spacing={spacing.xs} style={styles.card}>
               <Text textStyle={styles.title}>{hands[0].hand.tableName ?? `${hands[0].hand.mode === "offline" ? "Offline" : "Online"} session`}</Text>
               <Text textStyle={styles.dim}>{`${new Date(hands[0].hand.endedAtMs).toLocaleString()} · ${hands.length} hand${hands.length === 1 ? "" : "s"}`}</Text>
@@ -75,7 +76,7 @@ export function HistoryScreen() {
             </Column>
           </Host>
         )} ListEmptyComponent={
-          <Host matchContents colorScheme="dark"><Column style={styles.card} spacing={spacing.sm}>
+          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.card} spacing={spacing.sm}>
             <Text textStyle={styles.title}>{history.loading ? "Opening saved hands…" : "Your next hand starts here"}</Text>
             <Text textStyle={styles.dim}>Finish an online or offline hand, then return here to see the result. Saved hands stay available without a connection.</Text>
             <Button label="Play offline" onPress={() => router.push("/offline")} testID="history-play" />
@@ -95,8 +96,8 @@ function handLabel(hand: HistoryHand): string {
 
 function HandDetail({ row }: { row: LocalHistoryHand }) {
   const hand = row.hand;
-  return <FlatList data={hand.actions} keyExtractor={(entry) => String(entry.sequence)} ListHeaderComponent={
-    <Host matchContents colorScheme="dark"><Column spacing={spacing.sm} style={styles.card}>
+  return <FlatList removeClippedSubviews={false} data={hand.actions} keyExtractor={(entry) => String(entry.sequence)} ListHeaderComponent={
+    <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column spacing={spacing.sm} style={styles.card}>
       <Text textStyle={styles.title}>{handLabel(hand)}</Text>
       <Text textStyle={styles.dim}>{status(row)}</Text>
       {row.error ? <Text textStyle={styles.dim}>{row.error}</Text> : null}
@@ -119,7 +120,7 @@ function HandDetail({ row }: { row: LocalHistoryHand }) {
       <Text textStyle={styles.dim}>Only your tiles and the tiles revealed at showdown are shown. Private drafts belong to their player.</Text>
       <Text textStyle={styles.title}>ACTION LOG</Text>
     </Column></Host>
-  } renderItem={({ item }) => <Host matchContents colorScheme="dark"><Column style={styles.action}>
+  } renderItem={({ item }) => <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.action}>
     <Text textStyle={styles.body}>{actionLabel(hand, item)}</Text>
     <Text textStyle={styles.dim}>{`${new Date(item.atMs).toLocaleTimeString()} · ${item.source}`}</Text>
   </Column></Host>} />;
@@ -133,6 +134,7 @@ function actionLabel(hand: HistoryHand, entry: HistoryHand["actions"][number]): 
 }
 
 const styles = StyleSheet.create({
+  host: { width: "100%" },
   screen: { flex: 1, backgroundColor: colors.bg },
   header: { padding: spacing.md },
   card: { padding: spacing.md, margin: spacing.sm, backgroundColor: colors.surface, borderRadius: 16 },

@@ -101,7 +101,7 @@ env:
 # Registered: Better Auth creates the account and the session together, so the
 # guard lets the fresh user through to the home screen.
 - extendedWaitUntil:
-    visible: "Choose how to play"
+    visible: "Offline Mode"
     timeout: 60000
 - assertVisible:
     text: "Signed in as"

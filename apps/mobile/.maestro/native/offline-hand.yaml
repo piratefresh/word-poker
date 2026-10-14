@@ -1,6 +1,6 @@
 # The offline hand, played end to end on a build of the app rather than in a browser: deal →
-# real betting rounds to the river → a hero BET → §19's window opens → build a word from the
-# rack → confirm → §11 judges it against the real dictionary → §21 names a winner → next hand.
+# real betting rounds to the river → a hero BET → draft a word from the rack → call the raise →
+# §19's window opens → confirm → §11 judges it → §21 names a winner → next hand.
 #
 # The same hand as .maestro/offline-hand.yaml (repository root) on the same pinned seed, and a
 # second flow on purpose: a flow is a web flow (`url:`) or a device flow (`appId:`), never
@@ -49,83 +49,99 @@ tags:
   - native
   - offline
 ---
-- launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH === 'undefined'}
+    commands:
+      - launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH !== 'undefined'}
+    commands:
+      # The runner opened the dev client on its Metro; relaunching would drop that URL.
+      - tapOn:
+          text: "Continue"
+          optional: true
+      - runFlow:
+          when:
+            visible: "Open React Native dev menu"
+          commands:
+            - back
 
 # On a cold start the root layout renders nothing until the fonts load, and a link that
 # lands then is dropped (STO-516): wait for home before sending it.
 - extendedWaitUntil:
-    visible: "Choose how to play"
+    visible: "Offline Mode"
     timeout: 30000
 
 # The web flow pins the seed in its URL; a device gets the same route as a deep link. The
 # scheme is app.json's `scheme`, so expo-router reads this as /offline?seed=…
-- openLink: wordpoker://offline?seed=7578
+# turn= lengthens the 60 s offline clock: a Maestro step can take 10-50 s on the emulator.
+- openLink: wordpoker://offline?seed=7578&turn=300000
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
     visible: "PREFLOP"
     timeout: 90000
-- assertVisible:
-    text: "COMMUNITY · 0/5"
 
-# The blinds are posted before the deal, and the seat clockwise from the big blind opens the
-# round a beat later: mira raises the blind to 40, so the row states the call the engine says is
-# owed. This is the seed's line, so a changed seed or table configuration fails here, loudly.
+# Mira raises the blind to 40: a changed seed or table configuration fails here.
 - extendedWaitUntil:
-    visible: "CALL \\$40"
+    visible:
+      id: "action-check-call"
+      text: "Call \\$40"
     timeout: 20000
 
-# Play the hero's turns to the river. Each pass waits for the hero to hold the clock — the
-# seat's own nameplate says so, and the wait also ends when the street turns past the hero — so
-# the loop paces itself against the bots instead of spinning. The control it taps is the row's
-# check-or-call, whose label depends on the bot line and is left to the engine; the loop's own
-# condition ends the walk at the river, where the row is asked for a bet rather than a call.
-- repeat:
-    while:
-      notVisible:
-        text: "RIVER"
-    commands:
-      - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER"
-          timeout: 40000
-          optional: true
-      - runFlow:
-          when:
-            visible: "YOUR TURN"
-          commands:
-            - tapOn:
-                id: "action-check-call"
+# Follow the seeded betting line directly. Repeated condition checks on the animated table
+# can consume the turn clock, and a fold-out must fail at the next street instead of looping.
+# Bound tap settling and wait for game state: the clock and Rive art keep moving.
+- tapOn:
+    id: "action-check-call"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "FLOP"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 20000
+- tapOn:
+    id: "action-check-call"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "TURN"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 20000
+- tapOn:
+    id: "action-check-call"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "RIVER"
+    timeout: 20000
 
-# The hero can open the river. Mira answers with a raise: call it before building the word.
+# The hero can open the river. Mira answers with a raise; draft before calling it.
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 20000
 - tapOn:
     id: "wager-slider"
     point: "2%,50%"
+    waitToSettleTimeoutMs: 500
 - assertVisible:
     id: "action-wager"
+    text: "Bet \\$20"
 - assertVisible:
     text: "\\$460"
 - tapOn:
     id: "action-wager"
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "CALL \\$460"
+    visible:
+      id: "action-check-call"
+      text: "Call \\$460"
     timeout: 20000
-- tapOn:
-    id: "action-check-call"
-- extendedWaitUntil:
-    visible: "\\$1,900"
-    timeout: 20000
-- assertNotVisible:
-    text: "BET \\$20"
-- assertVisible:
-    text: "RIVER"
-
-# The river's close opened §19's window: the band under the felt — the draft line and the strip
-# of tiles the seat sorts — is what the flow builds its word through. The phase stays the river
-# while the window is open.
-#
+# Draft before calling the river raise, as in cross-platform-hand.yaml. Slow native taps
+# otherwise consume §19's shared 60-second window before the word can be confirmed.
 # Build the word out of three tiles the strip holds for the seed the deep link pins. A tap toggles
 # a tile where it lies, so the word is the played tiles read left to right, not the order they
 # were tapped: Z-1, I-9 and G-1 sit in that order in this deal's strip, and the draft spells ZIG. Those three
@@ -133,41 +149,70 @@ tags:
 # fails here, loudly, instead of silently playing some other word.
 - tapOn:
     id: "word-builder-tile-Z-1"
+    waitToSettleTimeoutMs: 500
 - tapOn:
     id: "word-builder-tile-I-9"
+    waitToSettleTimeoutMs: 500
 - tapOn:
     id: "word-builder-tile-G-1"
+    waitToSettleTimeoutMs: 500
 - assertVisible:
     text: "ZIG"
 - assertVisible:
     text: "14 pts"
 
-# Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
-# exactly as it was — which is the whole point of shuffling while a word is being built.
+# Shuffling rearranges the tiles the word does not hold, so the draft stands as built.
 - tapOn:
     id: "word-builder-shuffle"
+    waitToSettleTimeoutMs: 500
 - assertVisible:
     text: "ZIG"
 - assertVisible:
     text: "14 pts"
 
-# §19's window turns the check into the confirm: the word as it stands is locked in, and no
-# second control row carries a confirm of its own.
+# Calling the raise closes betting; §19 turns the same control into the word confirm.
 - tapOn:
     id: "action-check-call"
-
-# Every seat has answered, so the window closes and the hand pays out on the real judging:
-# immediately when the bots found words, or on the window's clock when they did not.
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "PAYOUT"
-    timeout: 70000
-- assertVisible:
-    text: "WINNER"
-
-# And the table deals again.
+    visible: "\\$1,900"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "action-check-call"
+      enabled: true
+    timeout: 20000
 - tapOn:
-    text: "Deal"
+    id: "action-check-call"
+    waitToSettleTimeoutMs: 500
+
+# Signed-in builds show XP before the results; bypass builds may show the win celebration.
+- extendedWaitUntil:
+    visible:
+      id: "xp-result-continue|simple-win-continue|results-back"
+    timeout: 70000
+- runFlow:
+    when:
+      visible:
+        id: "xp-result-continue|simple-win-continue"
+    commands:
+      - tapOn:
+          id: "xp-result-continue|simple-win-continue"
+          waitToSettleTimeoutMs: 500
+
+# The results sheet follows the payout, and its primary deals the next hand.
+- extendedWaitUntil:
+    visible: "HAND #1 · RESULTS"
+    timeout: 15000
+- assertVisible: "4 PLAYERS · 1 FOLD · 3 WORDS PLAYED"
+- assertNotVisible: "The window closed"
 - assertVisible:
-    text: "PREFLOP"
-- assertVisible:
-    text: "COMMUNITY · 0/5"
+    text: "DEAL ANOTHER"
+- tapOn:
+    text: "DEAL ANOTHER"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 15000
+- assertNotVisible:
+    text: "HAND #1 · RESULTS"

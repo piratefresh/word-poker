@@ -16,11 +16,11 @@
  * (STO-578). The browser creates Cross Platform Table first, then the device joins its room.
  */
 import { execFile, spawn, spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdtempSync, openSync, readFileSync } from "node:fs";
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { get } from "node:http";
 import { createConnection } from "node:net";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const [platform, ...args] = process.argv.slice(2);
@@ -38,15 +38,27 @@ if (platform === "ios" && process.platform !== "darwin") {
 }
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+const APP_ID = "com.wordpoker.wordpoker";
 const isWindows = process.platform === "win32";
 const gamePort = Number(process.env.SMOKE_GAME_PORT ?? 2567);
 const metroPort = Number(process.env.SMOKE_METRO_PORT ?? 8081);
+// History must lose its API connection without breaking development-only asset loading.
+// A second device port forwards to the same Metro API; no extra host server is needed.
+const androidHistory = platform === "android" && normalize(flow) === normalize(".maestro/native/history.yaml");
+const deviceApiPort = androidHistory
+  ? Number(process.env.SMOKE_DEVICE_API_PORT ?? metroPort + 1) : metroPort;
 if ([gamePort, metroPort].some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || gamePort === metroPort) {
   console.error("SMOKE_GAME_PORT and SMOKE_METRO_PORT must be distinct ports between 1 and 65535.");
   process.exit(2);
 }
+if (!Number.isInteger(deviceApiPort) || deviceApiPort < 1 || deviceApiPort > 65535 || deviceApiPort === gamePort ||
+    (androidHistory && deviceApiPort === metroPort)) {
+  console.error("SMOKE_DEVICE_API_PORT must be a valid port distinct from the game port and, for Android history, the Metro port.");
+  process.exit(2);
+}
 const logs = mkdtempSync(join(tmpdir(), "wordpoker-native-smoke-"));
 const children = [];
+let adb;
 console.log(`Logs: ${logs}`);
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS ?? 15 * 60_000);
 if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
@@ -67,7 +79,8 @@ const env = {
   EXPO_PUBLIC_GAME_URL: `ws://localhost:${gamePort}`,
   EXPO_PUBLIC_E2E_AUTH_BYPASS: "0",
   AUTH_API_URL: `http://localhost:${metroPort}`,
-  EXPO_PUBLIC_AUTH_URL: `http://localhost:${metroPort}`,
+  AUTH_ALLOWED_HOSTS: [process.env.AUTH_ALLOWED_HOSTS, `localhost:${metroPort}`, `localhost:${deviceApiPort}`].filter(Boolean).join(","),
+  EXPO_PUBLIC_AUTH_URL: `http://localhost:${deviceApiPort}`,
   // Observed Maestro taps have exceeded the normal 42 s clock. The cause of those delays is
   // still under investigation. Long turns keep the diagnostic hand alive;
   // the payout hold keeps the results up for the flow to read.
@@ -105,6 +118,17 @@ function killTree(child) {
 function stopAll() {
   stopping = true;
   clearTimeout(timer);
+  // Stop the dev client while Metro still answers its reversed connections. On Windows,
+  // leaving it alive after Metro exits floods ADB with failed connects and stalls even devices.
+  if (adb) {
+    // Airplane mode and the mirror loop's removed mappings would otherwise outlive the run.
+    spawnSync(adb, ["shell", "cmd", "connectivity", "airplane-mode", "disable"], { timeout: 5_000, stdio: "ignore" });
+    for (const port of new Set([gamePort, metroPort, deviceApiPort]))
+      spawnSync(adb, ["reverse", `tcp:${port}`, `tcp:${port === deviceApiPort ? metroPort : port}`], { timeout: 5_000, stdio: "ignore" });
+    for (const appId of [APP_ID, "dev.mobile.maestro", "dev.mobile.maestro.test"]) {
+      spawnSync(adb, ["shell", "am", "force-stop", appId], { timeout: 5_000, stdio: "ignore" });
+    }
+  }
   for (const child of children) killTree(child);
 }
 
@@ -172,7 +196,8 @@ function adbCommand(args) {
     children.push(child);
   });
 }
-let adb;
+let mirrorAndroidNetwork;
+let reverseAndroidPorts;
 if (platform === "android") {
   const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ??
     (isWindows ? join(process.env.LOCALAPPDATA ?? "", "Android", "Sdk") : join(homedir(), "Library", "Android", "sdk"));
@@ -181,8 +206,41 @@ if (platform === "android") {
   const deviceList = await adbCommand(["devices"]);
   if (!/\tdevice\b/.test(deviceList))
     fail(`No Android device is connected and authorized:\n${deviceList}`);
+  await adbCommand(["shell", "am", "force-stop", APP_ID]);
+  // A failed offline flow can leave the device disconnected. Metro must load before the
+  // flow deliberately cuts connectivity, including after an emulator cold boot.
+  await adbCommand(["shell", "cmd", "connectivity", "airplane-mode", "disable"]);
   // The device's localhost is not this machine's; reverse both ports the app dials.
-  for (const port of [gamePort, metroPort]) await adbCommand(["reverse", `tcp:${port}`, `tcp:${port}`]);
+  reverseAndroidPorts = async () => {
+    for (const port of new Set([gamePort, metroPort, deviceApiPort]))
+      await adbCommand(["reverse", `tcp:${port}`, `tcp:${port === deviceApiPort ? metroPort : port}`]);
+  };
+  await reverseAndroidPorts();
+  // Airplane mode does not cut adb, so a reversed localhost would keep the "offline" device online:
+  // mirror the device's airplane setting onto the mappings and repair dropped mappings. Do not
+  // rebind a working port while Metro is serving the bundle through it.
+  mirrorAndroidNetwork = async () => {
+    while (!stopping) {
+      const airplane = (await adbCommand(["shell", "settings", "get", "global", "airplane_mode_on"])).trim() === "1";
+      const mappings = (await adbCommand(["reverse", "--list"]))
+        .trim().split(/\r?\n/).map((line) => line.split(/\s+/));
+      // Airplane mode cuts the game and API ports; Metro's own port is only ever repaired.
+      const cut = new Set([gamePort, deviceApiPort]);
+      for (const port of new Set([...cut, metroPort])) {
+        const address = `tcp:${port}`;
+        const target = `tcp:${port === deviceApiPort ? metroPort : port}`;
+        const mapping = mappings.find(([, source]) => source === address);
+        if (airplane) {
+          // Leave other tools' mappings alone; Maestro can also use adb reverse.
+          if (mapping && cut.has(port)) await adbCommand(["reverse", "--remove", address]);
+          else if (!mapping && !cut.has(port)) await adbCommand(["reverse", address, target]);
+        } else if (mapping?.[2] !== target) {
+          await adbCommand(["reverse", address, target]);
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+  };
 }
 
 start("server", "pnpm --filter @wordpoker/server exec tsx src/index.ts");
@@ -255,11 +313,33 @@ function runMaestro(target, targetFlow, cwd, extraArgs) {
 
 // Cold-start the dev client straight onto this Metro. Launched any other way it reopens the last
 // Metro it used, which may be another machine's, with another game server baked in.
-const APP_ID = "com.wordpoker.wordpoker";
 const devLink = "exp+word-poker://expo-development-client/?url=" + encodeURIComponent(`http://localhost:${metroPort}`);
+let nativeFlow = flow;
 if (platform === "android") {
-  await adbCommand(["shell", "am", "force-stop", APP_ID]);
-  await adbCommand(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", `"${devLink}"`, APP_ID]);
+  // Mappings set at startup have been found missing by now (the dev client then shows
+  // "Failed to connect to localhost:8081" and never retries): set them again, before Maestro runs.
+  await reverseAndroidPorts();
+  // Initialize Maestro on the idle device before bootstrapping React Native. Starting both
+  // together has stalled the driver's instrumentation handshake before the first flow step.
+  nativeFlow = join(logs, "android-bootstrap.yaml");
+  writeFileSync(nativeFlow, `appId: ${APP_ID}
+---
+- openLink: \${DEV_LINK}
+- extendedWaitUntil:
+    visible: "Continue|TAKE YOUR SEAT|Offline Mode"
+    timeout: 300000
+- tapOn:
+    text: "Continue"
+    optional: true
+- runFlow:
+    when:
+      visible: "Open React Native dev menu"
+    commands:
+      - back
+- runFlow:
+    label: "Android app ready"
+    file: ${JSON.stringify(join(root, "apps", "mobile", flow))}
+`);
 } else {
   spawnSync("xcrun", ["simctl", "terminate", "booted", APP_ID], { timeout: 15_000 });
   const opened = spawnSync("xcrun", ["simctl", "openurl", "booted", devLink], { stdio: "inherit", timeout: 15_000 });
@@ -268,10 +348,14 @@ if (platform === "android") {
 
 console.log(`Running ${platform} smoke in room ${roomId}...`);
 // Track Maestro too, so cancellation, failures and the deadline stop its driver process tree.
-const run = runMaestro(platform, flow, join(root, "apps", "mobile"),
-  ["-e", `ROOM_ID=${roomId}`, "-e", "ATTACH=1"]);
+const run = runMaestro(platform, nativeFlow, join(root, "apps", "mobile"),
+  ["-e", `ROOM_ID=${roomId}`, "-e", "ATTACH=1", "-e", `DEV_LINK=${devLink}`]);
+if (platform === "android") {
+  await waitFor("Android app bootstrap", () => readLog("android").includes("Android app ready"), 360);
+  void mirrorAndroidNetwork();
+}
 const statuses = await Promise.all([run, ...(webRun ? [webRun] : [])]);
 const status = statuses.every((code) => code === 0) ? 0 : 1;
 stopAll();
-console.log(status === 0 ? `${webOpponent ? "Cross-platform" : "Native"} online smoke passed.` : `Online smoke failed. Logs: ${logs}`);
+console.log(status === 0 ? `${webOpponent ? "Cross-platform" : "Native"} smoke passed (${flow}).` : `Smoke failed. Logs: ${logs}`);
 process.exit(status ?? 1);
