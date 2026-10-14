@@ -111,7 +111,13 @@ export function PowerUsePrompt({
   if (power === null || stage === "idle") return null;
 
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={styles.layer}>
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      exiting={FadeOut.duration(140)}
+      // Choosing, the layer only dims: the tap that names a tile reaches the table under it.
+      pointerEvents={stage === "picking" ? "box-none" : "auto"}
+      style={styles.layer}
+    >
       <Pressable
         accessibilityLabel="Cancel using your power"
         accessibilityRole="button"
