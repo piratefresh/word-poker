@@ -49,6 +49,11 @@ tags:
     id: "power-offer-vowel_magnet"
     waitToSettleTimeoutMs: 0
     retryTapIfNoChange: false
+# A tap opens the card to read; CONFIRM keeps it.
+- tapOn:
+    id: "power-draw-confirm"
+    waitToSettleTimeoutMs: 0
+    retryTapIfNoChange: false
 
 # The three CPUs pick on separate 900 ms beats, then pre-flop starts on its clock.
 - extendedWaitUntil:

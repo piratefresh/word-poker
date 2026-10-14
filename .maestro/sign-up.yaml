@@ -10,16 +10,6 @@
 # The flow ends signed out: it leaves Maestro's Chrome profile the way it found it,
 # so a headed rerun (or a later flow in the same profile) starts from a clean slate.
 #
-# Headless runs need a window tall enough for the home screen's account row:
-# Maestro's default is 1008x617, where that row lands under the tab bar's hit area
-# (app-tabs.web.tsx pins the bar to the bottom, the content is top-anchored) and the
-# click at its centre is swallowed — the tap is dispatched, nothing happens, and the
-# sign-out step reads as a dead button. Maestro's web scroll is a drag, and a
-# react-native-web ScrollView scrolls on the wheel, not on a drag, so no amount of
-# scrolling moves the row out. A taller window simply clears it:
-#
-#   maestro test --platform web --headless --screen-size 1280x1024 .maestro/sign-up.yaml
-#
 # Selector notes are sign-in.yaml's: commands take the mapping form, elements match
 # by `text:` / `id:` — and web text matching folds case, so a caption and its
 # placeholder fold to the same string (NAME/Name, PASSWORD/Password) and neither field
@@ -56,18 +46,16 @@ env:
 # dropped first. `optional` — a signed-out profile shows the form straight away.
 - extendedWaitUntil:
     visible:
-      text: "Sign out"
+      id: "home-account-menu"
     timeout: 20000
     optional: true
 - runFlow:
     when:
-      visible: "Sign out"
+      visible:
+        id: "home-account-menu"
     commands:
-      - scrollUntilVisible:
-          element:
-            text: "Sign out"
-          direction: DOWN
-          timeout: 20000
+      - tapOn:
+          id: "home-account-menu"
       - tapOn:
           text: "Sign out"
       - extendedWaitUntil:
@@ -103,17 +91,18 @@ env:
 - extendedWaitUntil:
     visible: "Offline Mode"
     timeout: 60000
-- assertVisible:
-    text: "Signed in as"
+- tapOn:
+    id: "home-account-menu"
+- tapOn:
+    text: "Settings"
 - assertVisible:
     text: ${output.email}
+- tapOn:
+    text: "Cancel"
 
 # Leave the profile the way the flow found it: signed out.
-- scrollUntilVisible:
-    element:
-      text: "Sign out"
-    direction: DOWN
-    timeout: 20000
+- tapOn:
+    id: "home-account-menu"
 - tapOn:
     text: "Sign out"
 - extendedWaitUntil:

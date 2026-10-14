@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
   Pressable,
@@ -44,6 +45,7 @@ import { ShadowBox } from "@/components/ui/shadow-box";
 import { webTestID } from "@/lib/web-id";
 
 import { TileChoiceBeam } from "./tile-choice-beam";
+import { MultiplierBeam } from "./tile-multiplier-beam";
 
 /**
  * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
@@ -170,12 +172,16 @@ const OWNERSHIP_BORDER: Record<TileOwnership, string> = {
   neutral: "#7a4b27",
 };
 const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
-  "double-letter": "2L",
-  "triple-letter": "3L",
+  "double-letter": "2×",
+  "triple-letter": "3×",
 };
 
 /** §10's choice tiles wear an accent no single letter does: the pair is one tile, not two. */
 const CHOICE_ACCENT = palette.violet400;
+
+/** A 2x tile wears this border all the way round, a light running along it; a 3x tile the rainbow below. */
+const DOUBLE_BORDER = palette.violet400;
+const TRIPLE_BORDER = ["#ff4d4d", "#ffb020", "#ffe94d", "#3ddc84", "#3da9ff", "#a455ff"] as const;
 
 /**
  * The second face a choice tile prints — `E` for A/E — or null on a single-letter tile, which
@@ -578,13 +584,25 @@ export function Tile({
             slabMotion,
           ]}
         />
+        <MultiplierBeam
+          active={side === "front" && !reduceMotion}
+          borderWidth={metrics.borderWidth}
+          multiplier={tile.multiplier}
+          radius={metrics.radius}
+        >
         <View
           style={[
             styles.frame,
             {
-              borderColor: selected ? colors.goldHi : OWNERSHIP_BORDER[ownership],
+              borderColor: selected
+                ? colors.goldHi
+                : tile.multiplier === "double-letter"
+                  ? DOUBLE_BORDER
+                  : tile.multiplier === "triple-letter"
+                    ? "transparent"
+                    : OWNERSHIP_BORDER[ownership],
               borderRadius: metrics.radius,
-              borderWidth: selected
+              borderWidth: selected || tile.multiplier !== undefined
                 ? metrics.borderWidth + 1
                 : metrics.borderWidth,
               height: metrics.height - metrics.slab,
@@ -592,6 +610,25 @@ export function Tile({
             selected && styles.selectedShell,
           ]}
         >
+        {tile.multiplier === "triple-letter" && !selected ? (
+          // A border cannot take a gradient, so the rainbow sits under the face and shows
+          // round it, in the border's own width.
+          <LinearGradient
+            colors={TRIPLE_BORDER}
+            end={{ x: 1, y: 1 }}
+            pointerEvents="none"
+            start={{ x: 0, y: 0 }}
+            style={{
+              borderRadius: metrics.radius,
+              bottom: -(metrics.borderWidth + 1),
+              left: -(metrics.borderWidth + 1),
+              position: "absolute",
+              right: -(metrics.borderWidth + 1),
+              top: -(metrics.borderWidth + 1),
+            }}
+            testID="tile-triple-border"
+          />
+        ) : null}
         <Animated.View
           importantForAccessibility="no-hide-descendants"
           style={[
@@ -758,6 +795,7 @@ export function Tile({
           />
         ) : null}
         </View>
+        </MultiplierBeam>
       </Animated.View>
     </Pressable>
   );

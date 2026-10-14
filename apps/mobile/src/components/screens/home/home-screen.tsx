@@ -1,19 +1,14 @@
 import {
-  Button,
   Column,
   Host,
   RNHostView,
-  Row,
   ScrollView,
-  Spacer,
   Text,
   type UniversalTextStyle,
 } from "@expo/ui";
 import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { useWindowDimensions } from "react-native";
-
-import { levelForXp } from "@wordpoker/game-rules";
 
 import { authClient } from "@/auth/client/auth-client";
 import {
@@ -24,23 +19,22 @@ import {
   ModeVariants,
   type ModeVariant,
 } from "@/components/screens/home/components/mode-variants";
-import { LevelStrip } from "@/components/screens/home/level-strip";
+import { HomeHeader } from "@/components/screens/home/home-header";
 import { TileLogo, Wordmark } from "@/components/screens/home/tile-logo";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
-import {
-  colors,
-  fonts,
-  fontSize,
-  layout,
-  radius,
-  spacing,
-} from "@/constants/theme";
+import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 import { formatCoins } from "@/lib/format";
 import { fullWidth } from "@/lib/full-width";
 import { useQuests } from "@/lib/quests-provider";
 
 type ModeKey =
-  "tutorial" | "online" | "friend" | "friends" | "offline" | "leaderboard" | "store" | "quests" | "history";
+  | "tutorial"
+  | "online"
+  | "friend"
+  | "offline"
+  | "leaderboard"
+  | "store"
+  | "quests";
 
 /**
  * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
@@ -61,11 +55,6 @@ type Mode = Omit<ModeCardProps, "width"> & {
 };
 
 const MODES: Mode[] = [
-
-  {
-    key: "friends", href: "/friends", glyph: "👥", label: "Friends",
-    description: "Keep the people you play with",
-  },
   {
     key: "tutorial",
     href: "/tutorial",
@@ -120,10 +109,6 @@ const MODES: Mode[] = [
     ],
   },
   {
-    key: "history", href: "/history", glyph: "📖", label: "Game History",
-    description: "Your sessions, words & results", tone: "warm",
-  },
-  {
     key: "leaderboard",
     glyph: "🏆",
     label: "Leaderboard",
@@ -151,12 +136,6 @@ const QUESTS_MODE: Mode = {
 
 const CARD_PADDING = spacing.lg;
 
-const signedInText = {
-  color: colors.textDim,
-  fontFamily: fonts.sans,
-  fontSize: fontSize.small,
-} satisfies UniversalTextStyle;
-
 const bannerText = {
   color: colors.goldHi,
   fontFamily: fonts.monoBold,
@@ -166,9 +145,8 @@ const bannerText = {
 
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
-  const { streakBanner, dismissStreakBanner, state, levelUp, dismissLevelUp } =
+  const { streakBanner, dismissStreakBanner, levelUp, dismissLevelUp } =
     useQuests();
-  const standing = state ? levelForXp(state.xp) : null;
   const [pending, setPending] = useState<ModeKey | null>(null);
   const [logoIdle, setLogoIdle] = useState(false);
   // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
@@ -195,6 +173,9 @@ export function HomeScreen() {
           style={{ ...styles.screen, width: windowWidth }}
         >
           <RNHostView matchContents>
+            <HomeHeader width={contentWidth} />
+          </RNHostView>
+          <RNHostView matchContents>
             <Wordmark visible={logoIdle} />
           </RNHostView>
 
@@ -203,7 +184,9 @@ export function HomeScreen() {
           </RNHostView>
 
           {/* A guest's placeholder address can't be verified; they make an account to claim one. */}
-          {session?.user && !session.user.emailVerified && !session.user.isAnonymous ? (
+          {session?.user &&
+          !session.user.emailVerified &&
+          !session.user.isAnonymous ? (
             <VerifyEmailCard email={session.user.email} testID="home-verify" />
           ) : null}
 
@@ -231,17 +214,6 @@ export function HomeScreen() {
                 {`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
               </Text>
             </Column>
-          ) : null}
-
-          {standing ? (
-            <RNHostView matchContents>
-              <LevelStrip
-                intoLevel={standing.intoLevel}
-                level={standing.level}
-                toNext={standing.toNext}
-                width={contentWidth}
-              />
-            </RNHostView>
           ) : null}
 
           {(coinStoreEnabled()
@@ -275,31 +247,6 @@ export function HomeScreen() {
               </ModeCard>
             );
           })}
-
-          <Spacer size={spacing.lg} />
-
-          <Column
-            spacing={spacing.md}
-            style={{ ...styles.footer, width: contentWidth }}
-          >
-            <Row
-              alignment="center"
-              style={{ width: contentWidth - spacing.lg * 2 }}
-            >
-              <Text textStyle={signedInText}>Signed in as</Text>
-              <Spacer flexible />
-              <Text textStyle={signedInText}>
-                {session?.user.isAnonymous ? "Guest" : (session?.user.email ?? "Unknown player")}
-              </Text>
-            </Row>
-            <Button
-              label="Sign out"
-              onPress={() => authClient.signOut()}
-              variant="text"
-            />
-          </Column>
-
-          <Spacer size={layout.tabBarHeight + spacing.lg} />
         </Column>
       </ScrollView>
     </Host>
@@ -315,12 +262,6 @@ const styles = {
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.gutter,
     paddingTop: spacing.md,
-  },
-  footer: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
   },
   banner: {
     backgroundColor: colors.goldDeep,

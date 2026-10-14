@@ -1,21 +1,25 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
+  Pressable,
   StyleSheet,
   Text,
   View,
   type LayoutChangeEvent,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   cancelAnimation,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
   withTiming,
+  ZoomIn,
 } from "react-native-reanimated";
-import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 
 import { POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
 
@@ -23,7 +27,7 @@ import { colors, fonts, palette } from "@/constants/theme";
 import type { PowerView } from "@/features/table/power-view";
 import { webTestID } from "@/lib/web-id";
 
-import { POWER_CARD_ASPECT } from "./power-card";
+import { POWER_CARD_ASPECT, PowerCard } from "./power-card";
 import { POWER_DRAW_MOTION, revealAtFor } from "./power-draw-motion";
 import { PowerImpact } from "./power-impact";
 import { PowerOfferCard, type OfferFate } from "./power-offer-card";
@@ -32,7 +36,10 @@ export { POWER_DRAW_KEPT_MS, POWER_DRAW_MOTION } from "./power-draw-motion";
 
 const { entrance, exit: EXIT, reduced: REDUCED } = POWER_DRAW_MOTION;
 
-const MAX_CARD_WIDTH = 150;
+const MAX_CARD_WIDTH = 190;
+/** The zoomed card, and the room its confirm button and back link take below it. */
+const MAX_ZOOM_WIDTH = 320;
+const ZOOM_ACTIONS_HEIGHT = 96;
 /** How long "Time's up. You got …" stays on the felt after the kept card has flown. */
 const TIME_UP_NOTE_MS = 2_000;
 /** The room the heading and the hint take above and below the row, and the region's margin. */
@@ -47,16 +54,24 @@ function drawKey(draw: NonNullable<PowerView["draw"]>): string {
   return `${draw.endsAtMs}:${draw.offers.join(",")}`;
 }
 
+/** More than three offers wrap to two rows, the larger one on top: five deal as 3 over 2. */
+function rowsFor(count: number) {
+  const rows = count > 3 ? 2 : 1;
+  return { rows, perRow: Math.ceil(Math.max(count, 1) / rows) };
+}
+
 /**
- * The row's size in the region it is given: one row whatever the room, the cards as wide as they
- * can be up to `MAX_CARD_WIDTH` with room left for the hit's overshoot, the heading and the hint,
- * and the gaps closing in on a narrow screen.
+ * The grid's size in the region it is given: the cards as wide as they can be up to
+ * `MAX_CARD_WIDTH` with room left for the hit's overshoot, the heading and the hint, and the gaps
+ * closing in on a narrow screen.
  */
-function rowFor(region: { height: number; width: number }, count: number) {
-  const n = Math.max(count, 1);
+function rowFor(region: { height: number; width: number }, count: number, insets: { top: number; bottom: number }) {
+  const { rows, perRow } = rowsFor(count);
   const gap = Math.min(16, Math.max(6, region.width * 0.03));
-  const byWidth = (region.width - PAD * 2 - gap * (n - 1)) / (n + OVERSHOOT);
-  const byHeight = (region.height - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2) / (POWER_CARD_ASPECT * (1 + OVERSHOOT));
+  const byWidth = (region.width - PAD * 2 - gap * (perRow - 1)) / (perRow + OVERSHOOT);
+  const byHeight =
+    (region.height - insets.top - insets.bottom - HEADING_HEIGHT - HINT_HEIGHT - PAD * 2 - gap * (rows - 1)) /
+    (POWER_CARD_ASPECT * (rows + OVERSHOOT));
   return { cardWidth: Math.max(0, Math.min(MAX_CARD_WIDTH, byWidth, byHeight)), gap };
 }
 
@@ -88,6 +103,7 @@ export function PowerDrawReveal({
   onPick: (id: PowerUpId) => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const insets = useSafeAreaInsets();
   const [shown, setShown] = useState<{
     key: string;
     offers: readonly PowerUpId[];
@@ -97,6 +113,8 @@ export function PowerDrawReveal({
   const [tapped, setTapped] = useState<PowerUpId | null>(null);
   // The card under the pointer, the keyboard's focus or a finger.
   const [hovered, setHovered] = useState<PowerUpId | null>(null);
+  // The card tapped open to read, ahead of the pick: confirming it is what keeps it.
+  const [zoomed, setZoomed] = useState<PowerUpId | null>(null);
   // Which draw has finished its entrance, and which has finished its exit: a new draw is neither.
   const [readyKey, setReadyKey] = useState<string | null>(null);
   const [exitedKey, setExitedKey] = useState<string | null>(null);
@@ -107,6 +125,7 @@ export function PowerDrawReveal({
     setShown({ key: drawKey(draw), offers: draw.offers, endsAtMs: draw.endsAtMs });
     setTapped(null);
     setHovered(null);
+    setZoomed(null);
   }
 
   const key = shown?.key ?? null;
@@ -114,7 +133,7 @@ export function PowerDrawReveal({
   // by a pick, or by the clock handing the seat the first offer.
   const kept = shown === null ? null : draw !== null ? draw.picked : (held ?? shown.offers[0] ?? null);
   const closed = shown !== null && draw === null;
-  const { cardWidth, gap } = rowFor(region, shown?.offers.length ?? 0);
+  const { cardWidth, gap } = rowFor(region, shown?.offers.length ?? 0, insets);
   const laidOut = cardWidth > 0;
 
   // Selection opens once the row has landed. Every beat counts from the layout, so a resize
@@ -165,8 +184,16 @@ export function PowerDrawReveal({
 
   const count = shown.offers.length;
   const cardHeight = cardWidth * POWER_CARD_ASPECT;
-  const rowWidth = count * cardWidth + (count - 1) * gap;
-  const slotX = (index: number) => index * (cardWidth + gap) + cardWidth / 2;
+  const { rows, perRow } = rowsFor(count);
+  const rowWidth = perRow * cardWidth + (perRow - 1) * gap;
+  const gridHeight = rows * cardHeight + (rows - 1) * gap;
+  // A card's centre in the grid; a short last row sits centred under the full one.
+  const slotX = (index: number) => {
+    const inRow = Math.min(perRow, count - Math.floor(index / perRow) * perRow);
+    const indent = ((perRow - inRow) * (cardWidth + gap)) / 2;
+    return indent + (index % perRow) * (cardWidth + gap) + cardWidth / 2;
+  };
+  const slotY = (index: number) => Math.floor(index / perRow) * (cardHeight + gap) + cardHeight / 2;
   const lit = tapped ?? hovered;
   const leaving = kept !== null;
   const animated = !reduceMotion;
@@ -185,20 +212,24 @@ export function PowerDrawReveal({
     >
       <Scrim key={`scrim:${key}`} leaving={leaving} reduceMotion={reduceMotion} />
       {laidOut ? (
-        <View key={`stage:${key}`} pointerEvents="box-none" style={styles.stage}>
+        <View
+          key={`stage:${key}`}
+          pointerEvents="box-none"
+          style={[styles.stage, { paddingBottom: PAD + insets.bottom, paddingTop: PAD + insets.top }]}
+        >
           <Heading fontSize={Math.min(26, Math.max(16, cardWidth * 0.16))} leaving={leaving} reduceMotion={reduceMotion} />
-          <View pointerEvents="box-none" style={{ height: cardHeight, marginVertical: (cardHeight * OVERSHOOT) / 2, width: rowWidth }}>
+          <View pointerEvents="box-none" style={{ height: gridHeight, marginVertical: (cardHeight * OVERSHOOT) / 2, width: rowWidth }}>
             {/* The bursts sit under the whole row, so a card's light never covers its neighbour. */}
             {animated && !exited ? (
               <View pointerEvents="none" style={StyleSheet.absoluteFill}>
                 {leaving ? null : (
-                  <View style={[styles.anchor, { left: rowWidth / 2, top: cardHeight / 2 }]}>
+                  <View style={[styles.anchor, { left: rowWidth / 2, top: gridHeight / 2 }]}>
                     <PowerImpact delay={entrance.gatherAt} kind="gather" size={cardWidth * 1.6} />
                   </View>
                 )}
                 {shown.offers.map((id, index) =>
                   leaving && id !== kept ? null : (
-                    <View key={`${key}:${id}:${leaving ? "pick" : "reveal"}`} style={[styles.anchor, { left: slotX(index), top: cardHeight / 2 }]}>
+                    <View key={`${key}:${id}:${leaving ? "pick" : "reveal"}`} style={[styles.anchor, { left: slotX(index), top: slotY(index) }]}>
                       {leaving ? (
                         <PowerImpact delay={EXIT.impactAt} kind="pick" size={cardWidth * 2.9} />
                       ) : (
@@ -210,8 +241,11 @@ export function PowerDrawReveal({
               </View>
             ) : null}
             {/* Once the exit has played, the cards are gone: a seat still waiting has nothing to pick. */}
-            <View pointerEvents="box-none" style={[styles.row, { gap }]}>
-              {exited ? null : shown.offers.map((id, index) => {
+            <View pointerEvents="box-none" style={[styles.grid, { gap }]}>
+              {exited ? null : Array.from({ length: rows }, (_, row) => (
+                <View key={row} pointerEvents="box-none" style={[styles.row, { gap }]}>
+                  {shown.offers.slice(row * perRow, (row + 1) * perRow).map((id, col) => {
+                const index = row * perRow + col;
                 const fate: OfferFate = kept === null ? "offered" : kept === id ? "kept" : "dropped";
                 return (
                   <PowerOfferCard
@@ -219,20 +253,19 @@ export function PowerDrawReveal({
                     dimmed={kept === null && lit !== null && lit !== id}
                     disabled={!ready || tapped !== null || kept !== null}
                     fate={fate}
-                    flight={{ x: rowWidth / 2 - slotX(index), y: region.height / 2 + cardHeight * 0.1 }}
+                    flight={{ x: rowWidth / 2 - slotX(index), y: gridHeight / 2 - slotY(index) + region.height / 2 + cardHeight * 0.1 }}
                     id={id}
                     index={index}
                     key={`${key}:${id}`}
                     lit={kept === null ? lit === id : kept === id}
                     onLight={(on) => setHovered((current) => (on ? id : current === id ? null : current))}
-                    onPress={() => {
-                      setTapped(id);
-                      onPick(id);
-                    }}
+                    onPress={() => setZoomed(id)}
                     reduceMotion={reduceMotion}
                   />
                 );
-              })}
+                  })}
+                </View>
+              ))}
             </View>
           </View>
           <View style={styles.hintSlot}>
@@ -244,16 +277,72 @@ export function PowerDrawReveal({
           </View>
         </View>
       ) : null}
+      {zoomed !== null && laidOut && tapped === null && kept === null ? (
+        <ZoomedOffer
+          id={zoomed}
+          onBack={() => setZoomed(null)}
+          onConfirm={() => {
+            setTapped(zoomed);
+            setZoomed(null);
+            onPick(zoomed);
+          }}
+          reduceMotion={reduceMotion}
+          width={Math.max(
+            0,
+            Math.min(
+              MAX_ZOOM_WIDTH,
+              region.width - PAD * 2 - 32,
+              (region.height - insets.top - insets.bottom - ZOOM_ACTIONS_HEIGHT - PAD * 2) / POWER_CARD_ASPECT,
+            ),
+          )}
+        />
+      ) : null}
     </View>
   );
 }
 
 /**
- * The felt darkens behind the choices — soft at the edges, so the community above and the rack
- * below stay in view — and comes back as the kept card flies.
+ * One offer opened to read: the card large over the dimmed row, a gold CONFIRM under it, and a way
+ * back to the row. Tapping the dimmed room around it goes back too.
+ */
+function ZoomedOffer({
+  id,
+  width,
+  reduceMotion,
+  onBack,
+  onConfirm,
+}: {
+  id: PowerUpId;
+  width: number;
+  reduceMotion: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(140)} style={styles.zoomLayer}>
+      <Pressable accessibilityLabel="Back to the powers" onPress={onBack} style={styles.zoomBackdrop} testID="power-draw-zoom-backdrop" />
+      <View pointerEvents="box-none" style={styles.zoomColumn}>
+        <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(180)} testID="power-draw-zoom">
+          <PowerCard id={id} width={width} />
+        </Animated.View>
+        <Pressable accessibilityRole="button" onPress={onConfirm} testID="power-draw-confirm">
+          <LinearGradient colors={[palette.gold100, palette.gold300, palette.gold500]} style={styles.pill}>
+            <Text style={styles.pillText}>CONFIRM {POWER_UPS[id].title.toUpperCase()}</Text>
+          </LinearGradient>
+        </Pressable>
+        <Pressable accessibilityRole="button" hitSlop={8} onPress={onBack} testID="power-draw-back">
+          <Text style={styles.backText}>BACK</Text>
+        </Pressable>
+      </View>
+    </Animated.View>
+  );
+}
+
+/**
+ * The felt darkens behind the choices — a flat black wash over the seats and the table, so the
+ * cards read clearly — and comes back as the kept card flies.
  */
 function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: boolean }) {
-  const gradientId = useId();
   const shade = useSharedValue(0);
 
   useEffect(() => {
@@ -269,22 +358,7 @@ function Scrim({ leaving, reduceMotion }: { leaving: boolean; reduceMotion: bool
 
   const style = useAnimatedStyle(() => ({ opacity: shade.value }));
 
-  return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-      {/* Fade to transparent on every edge of the bounded felt, including desktop's sides. */}
-      <Svg height="100%" preserveAspectRatio="none" viewBox="0 0 100 100" width="100%">
-        <Defs>
-          <RadialGradient cx="50%" cy="50%" id={gradientId} r="50%">
-            <Stop offset="0" stopColor="#020a07" stopOpacity={0.65} />
-            <Stop offset="0.5" stopColor="#020a07" stopOpacity={0.65} />
-            <Stop offset="0.75" stopColor="#020a07" stopOpacity={0.35} />
-            <Stop offset="1" stopColor="#020a07" stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect fill={`url(#${gradientId})`} height="100" width="100" />
-      </Svg>
-    </Animated.View>
-  );
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, style]} />;
 }
 
 /** "✦ WILD POWER ✦" over the row: in with the first card, out with the cards not kept. */
@@ -385,9 +459,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { height: 0, width: 0 },
     textShadowRadius: 10,
   },
+  scrim: { backgroundColor: "rgba(0,0,0,0.78)" },
+  zoomLayer: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
+  zoomBackdrop: { bottom: 0, left: 0, position: "absolute", right: 0, top: 0, backgroundColor: "rgba(0,0,0,0.6)" },
+  zoomColumn: { alignItems: "center", flex: 1, gap: 14, justifyContent: "center" },
+  backText: { color: palette.gold100, fontFamily: fonts.arcade, fontSize: 14, letterSpacing: 1 },
   note: { alignItems: "center", justifyContent: "center" },
   anchor: { height: 0, position: "absolute", width: 0 },
-  row: { alignItems: "center", flexDirection: "row", height: "100%", justifyContent: "center" },
+  grid: { alignItems: "center", height: "100%", justifyContent: "center" },
+  row: { alignItems: "center", flexDirection: "row", justifyContent: "center" },
   hintSlot: { alignItems: "center", height: HINT_HEIGHT, justifyContent: "center" },
   pill: {
     borderColor: palette.gold050,

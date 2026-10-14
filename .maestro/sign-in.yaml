@@ -35,22 +35,19 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 
-# A session left by a previous run is dropped first, so the flow signs in from
-# a known state. `optional` — a signed-out profile simply never shows Sign out.
+# A session left by a previous run is dropped through the avatar menu first.
 - extendedWaitUntil:
     visible:
-      text: "Sign out"
+      id: "home-account-menu"
     timeout: 20000
     optional: true
 - runFlow:
     when:
-      visible: "Sign out"
+      visible:
+        id: "home-account-menu"
     commands:
-      - scrollUntilVisible:
-          element:
-            text: "Sign out"
-          direction: DOWN
-          timeout: 20000
+      - tapOn:
+          id: "home-account-menu"
       - tapOn:
           text: "Sign out"
       - extendedWaitUntil:
@@ -78,14 +75,15 @@ tags:
 - tapOn:
     text: "Sign in"
 
-# Past the guard: home shows the mode picker and the signed-in identity. The identity is the
-# home's last row — below the fold of a short viewport, which Maestro's web driver cannot scroll
-# back into reach — so a headless runner has to give the browser room for it (the four-seat
-# smoke asks for 1280x1000, not the 1280x800 a bare headless run gets).
+# Past the guard: verify the account email in Settings, then return to Home.
 - extendedWaitUntil:
     visible: "Offline Mode"
     timeout: 60000
-- assertVisible:
-    text: "Signed in as"
+- tapOn:
+    id: "home-account-menu"
+- tapOn:
+    text: "Settings"
 - assertVisible:
     text: ${output.email}
+- tapOn:
+    text: "Cancel"

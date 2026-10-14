@@ -35,16 +35,14 @@ export function HistoryScreen() {
   const back = () => {
     if (handId) setHandId(null);
     else if (sessionId) setSessionId(null);
-    else if (router.canGoBack()) router.back();
-    else router.replace("/");
   };
   const rows = sessionId ? history.hands.filter((row) => row.hand.sessionId === sessionId) : [];
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom }]} testID="history-screen">
+    <View style={[styles.screen, { paddingTop: insets.top + spacing.md }]} testID="history-screen">
       <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark" seedColor={colors.gold}>
         <Column spacing={spacing.sm} style={styles.header}>
           <Row spacing={spacing.md}>
-            <Button label="Back" onPress={back} testID="history-back" />
+            {handId || sessionId ? <Button label="Back" onPress={back} testID="history-back" /> : null}
             <Spacer flexible />
             <Button label={history.syncing ? "Syncing…" : "Sync"} onPress={history.refresh} disabled={history.syncing} testID="history-sync" />
           </Row>

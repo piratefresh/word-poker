@@ -66,7 +66,7 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
     { title: "SENT", kind: "outgoing", data: page.outgoing },
   ] : [];
 
-  return <SafeAreaView edges={["top", "bottom"]} style={styles.screen} testID="friends-screen">
+  return <SafeAreaView edges={["top"]} style={styles.screen} testID="friends-screen">
     <SectionList<Friend, Section>
       contentContainerStyle={styles.content}
       sections={anonymous ? [] : sections}
@@ -74,7 +74,6 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
       ListHeaderComponent={<Host colorScheme="dark" matchContents={{ vertical: true }} style={{ width: "100%" }} seedColor={colors.gold}>
         <Column alignment="start" spacing={spacing.md}>
           <Text textStyle={titleText}>Friends</Text>
-          <Button label="Back to Home" onPress={() => router.dismissTo("/")} variant="outlined" />
           {anonymous ? <>
             <Text textStyle={bodyText}>Sign up to add friends.</Text>
             <Button label="Create account" onPress={() => router.push("/sign-up")} />

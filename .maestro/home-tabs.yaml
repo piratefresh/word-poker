@@ -1,0 +1,44 @@
+# Run against Expo web with the seeded E2E account.
+url: http://localhost:8081
+name: Home, Friends, and Game History bottom navigation
+tags:
+  - web
+  - navigation
+---
+- runFlow: sign-in.yaml
+- assertVisible:
+    id: "tab-home"
+- tapOn:
+    id: "tab-friends"
+- extendedWaitUntil:
+    visible:
+      id: "friends-screen"
+    timeout: 30000
+- assertVisible:
+    id: "tab-home"
+- tapOn:
+    id: "tab-history"
+- extendedWaitUntil:
+    visible:
+      id: "history-screen"
+    timeout: 30000
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline Mode"
+# Direct links must land inside the same tab bar.
+- openLink: http://localhost:8081/friends
+- extendedWaitUntil:
+    visible:
+      id: "friends-screen"
+    timeout: 30000
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline Mode"
+- openLink: http://localhost:8081/history
+- extendedWaitUntil:
+    visible:
+      id: "history-screen"
+    timeout: 30000
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline Mode"

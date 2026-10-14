@@ -55,6 +55,11 @@ tags:
 - tapOn:
     id: "power-offer-random_wild"
     retryTapIfNoChange: false
+# A tap opens the card to read; CONFIRM keeps it.
+- tapOn:
+    id: "power-draw-confirm"
+    waitToSettleTimeoutMs: 0
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible:
       id: "power-draw"
