@@ -11,11 +11,18 @@ import {
 import { EMAIL_VERIFIED_CALLBACK } from "@/constants/links";
 import { colors, theme } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
+import { clearReferral, pendingReferral } from "@/lib/pending-destination";
 
 /** `type` is the token group's own name: rename it so it reads as a style set. */
 const { type: typography } = theme;
 
 type AuthMode = "sign-in" | "sign-up";
+
+/** The inviter whose link brought this device here (STO-582); the server attributes it once. */
+function referralHeaders() {
+  const ref = pendingReferral();
+  return ref ? { headers: { "x-wordpoker-ref": ref } } : undefined;
+}
 
 const NETWORK_ERROR =
   "Could not reach the server — check your connection and try again.";
@@ -67,13 +74,14 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     try {
       const { error: authError } =
         mode === "sign-up"
-          ? await authClient.signUp.email({ name, email, password, callbackURL: EMAIL_VERIFIED_CALLBACK })
+          ? await authClient.signUp.email({ name, email, password, callbackURL: EMAIL_VERIFIED_CALLBACK, fetchOptions: referralHeaders() })
           : await authClient.signIn.email({ email, password });
 
       if (authError) {
         setError(authError.message ?? "Something went wrong. Please try again.");
         return;
       }
+      if (mode === "sign-up") clearReferral();
     } catch {
       // A dropped connection rejects instead of returning `{ error }`.
       setError(NETWORK_ERROR);

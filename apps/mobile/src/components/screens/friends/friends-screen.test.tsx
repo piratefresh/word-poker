@@ -19,7 +19,7 @@ beforeEach(() => {
   mockGuest = false;
   mockCode = "ABCD2345";
   jest.mocked(getFriends).mockResolvedValue({ code: "WXYZ2345", friends: [{ userId: "friend", name: "Bea" }],
-    incoming: [{ userId: "incoming", name: "Ada" }], outgoing: [{ userId: "sent", name: "Cal" }] });
+    incoming: [{ userId: "incoming", name: "Ada" }], outgoing: [{ userId: "sent", name: "Cal" }], referrals: 2 });
   jest.mocked(addFriend).mockResolvedValue("Friend request sent");
 });
 
@@ -62,4 +62,9 @@ test("invalid add codes cannot send a request", async () => {
   const view = await render(<FriendsScreen />);
   await waitFor(() => expect(view.getByTestId("friend-remove-friend")).toBeTruthy());
   expect(view.queryByTestId("friend-add")).toBeNull();
+});
+
+test("says how many friends joined through the player's invite", async () => {
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friends-referrals")).toBeTruthy());
 });

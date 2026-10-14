@@ -1,5 +1,5 @@
 import { isFriendCode, FRIEND_REQUEST_MESSAGES } from "@wordpoker/contracts";
-import { friendCode, friendList, requestFriend, userForFriendCode } from "@wordpoker/db";
+import { friendCode, friendList, referralCount, requestFriend, userForFriendCode } from "@wordpoker/db";
 import { sessionUser } from "@/auth/server/session-user";
 
 export async function GET(request: Request): Promise<Response> {
@@ -7,8 +7,8 @@ export async function GET(request: Request): Promise<Response> {
     const user = await sessionUser(request);
     if (!user) return Response.json({ error: "Sign in to add friends." }, { status: 401 });
     if (user.anonymous) return Response.json({ error: "Sign up to add friends." }, { status: 403 });
-    const [code, lists] = await Promise.all([friendCode(user.id), friendList(user.id)]);
-    return Response.json({ code, ...lists }, { headers: { "Cache-Control": "no-store" } });
+    const [code, lists, referrals] = await Promise.all([friendCode(user.id), friendList(user.id), referralCount(user.id)]);
+    return Response.json({ code, ...lists, referrals }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Friends aren't available right now. Try again." }, { status: 503 });
   }

@@ -10,6 +10,8 @@ export interface FriendsPage {
   readonly friends: Friend[];
   readonly incoming: Friend[];
   readonly outgoing: Friend[];
+  /** Players who signed up through this player's invite link. */
+  readonly referrals: number;
 }
 
 export type FriendRequestResult = "requested" | "accepted" | "already-friends" | "already-requested" | "self" | "not-found" | "guest";
@@ -42,7 +44,7 @@ function isFriend(value: unknown): value is Friend {
 export function isFriendsPage(value: unknown): value is FriendsPage {
   if (typeof value !== "object" || value === null) return false;
   const page = value as Record<string, unknown>;
-  return isFriendCode(page.code) && [page.friends, page.incoming, page.outgoing].every(
+  return isFriendCode(page.code) && Number.isInteger(page.referrals) && (page.referrals as number) >= 0 && [page.friends, page.incoming, page.outgoing].every(
     (rows) => Array.isArray(rows) && rows.length <= 10000 && rows.every(isFriend),
   );
 }

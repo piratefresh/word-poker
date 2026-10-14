@@ -3,14 +3,14 @@
  * the welcome grant without ever failing the verification itself.
  */
 
-import { countPlayedHands } from "@wordpoker/db";
-import { grantWelcome } from "@wordpoker/economy";
+import { countPlayedHands, recordReferral } from "@wordpoker/db";
+import { grantWelcome, payReferral } from "@wordpoker/economy";
 
-import { afterEmailVerification, sendVerificationEmail } from "./auth-verification";
+import { afterEmailVerification, attributeReferral, sendVerificationEmail } from "./auth-verification";
 import { sendEmail } from "./email";
 
-jest.mock("@wordpoker/db", () => ({ countPlayedHands: jest.fn(async () => 0) }));
-jest.mock("@wordpoker/economy", () => ({ grantWelcome: jest.fn() }));
+jest.mock("@wordpoker/db", () => ({ countPlayedHands: jest.fn(async () => 0), recordReferral: jest.fn(async () => true) }));
+jest.mock("@wordpoker/economy", () => ({ grantWelcome: jest.fn(), payReferral: jest.fn(async () => {}) }));
 jest.mock("./email", () => ({
   ...jest.requireActual("./email"),
   sendEmail: jest.fn(async () => {}),
@@ -94,5 +94,34 @@ describe("sendVerificationEmail", () => {
 
     await expect(sendVerificationEmail({ user: USER, url: "http://x" })).resolves.toBeUndefined();
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+describe("referrals", () => {
+  const withRef = (code: string) => new Headers({ "x-wordpoker-ref": code });
+
+  test("verifying pays the referral after the welcome grant, and survives its failure", async () => {
+    grant.mockResolvedValue({ applied: true, balance: 5000 });
+    jest.mocked(payReferral).mockRejectedValueOnce(new Error("down"));
+    await expect(afterEmailVerification(USER)).resolves.toBeUndefined();
+    expect(payReferral).toHaveBeenCalledWith("user_1");
+  });
+
+  test("a sign-up carrying a friend code is attributed; a guest, a bad code or no header is not", async () => {
+    jest.mocked(recordReferral).mockClear();
+    await attributeReferral({ id: "new" }, withRef("ABCD2345"));
+    expect(recordReferral).toHaveBeenCalledWith("new", "ABCD2345");
+
+    jest.mocked(recordReferral).mockClear();
+    await attributeReferral({ id: "g", isAnonymous: true }, withRef("ABCD2345"));
+    await attributeReferral({ id: "new" }, withRef("ABCI2345"));
+    await attributeReferral({ id: "new" }, new Headers());
+    await attributeReferral({ id: "new" }, undefined);
+    expect(recordReferral).not.toHaveBeenCalled();
+  });
+
+  test("never throws when recording fails", async () => {
+    jest.mocked(recordReferral).mockRejectedValueOnce(new Error("down"));
+    await expect(attributeReferral({ id: "new" }, withRef("ABCD2345"))).resolves.toBeUndefined();
   });
 });

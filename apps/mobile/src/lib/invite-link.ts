@@ -18,8 +18,8 @@ function webOrigin(): string {
   return apiBaseURL;
 }
 
-export function inviteLinkFor(roomId: string): string {
-  return `${webOrigin()}/online?room=${encodeURIComponent(roomId)}`;
+export function inviteLinkFor(roomId: string, ref?: string): string {
+  return `${webOrigin()}/online?room=${encodeURIComponent(roomId)}${ref ? `&ref=${encodeURIComponent(ref)}` : ""}`;
 }
 
 export function friendLinkFor(code: string): string {

@@ -145,6 +145,7 @@ describe(
           "Migration20261013120000_anonymous_user",
           "Migration20261013130000_hand_seat_adopted_from",
           "Migration20261013140000_friends",
+          "Migration20261014120000_referral",
         ],
         "the migrations are pending again",
       );

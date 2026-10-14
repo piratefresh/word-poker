@@ -93,6 +93,6 @@ export async function saveResultsRating(
 
   return rating.id;
 }
-export { friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";
+export { recordReferral, referrerOf, paidReferralCount, referralCount, friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";
 export { saveHistoryHand, handRecordDigest, HandRecordConflictError } from "./history";
 export { readHistoryHands, readHistoryHand } from "./history-read";

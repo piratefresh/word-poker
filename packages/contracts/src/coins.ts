@@ -25,12 +25,18 @@ export const WALLET_EVENT_KINDS = [
   "quest",
   "streak",
   "level",
+  "referral",
 ] as const;
 
 export type WalletEventKind = (typeof WALLET_EVENT_KINDS)[number];
 
 /** The coins a player is granted, once, when they verify their email. */
 export const WELCOME_GRANT = 5000;
+
+/** A friend who signs up through your link and verifies their email (STO-582): both are paid, you up to the cap. */
+export const REFERRAL_REFERRER_GRANT = 1000;
+export const REFERRAL_REFEREE_GRANT = 500;
+export const REFERRAL_CAP = 20;
 
 /** A guest who registers is paid this much per hand they played, up to the cap, on top of the welcome grant. */
 export const GUEST_HAND_BONUS = 100;

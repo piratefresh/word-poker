@@ -1,9 +1,9 @@
-import { friendCode, friendList, requestFriend, userForFriendCode, acceptFriend, removeFriend } from "@wordpoker/db";
+import { friendCode, friendList, referralCount, requestFriend, userForFriendCode, acceptFriend, removeFriend } from "@wordpoker/db";
 import { GET, POST } from "@/app/api/friends+api";
 import { PUT, DELETE } from "@/app/api/friends/[userId]+api";
 import { sessionUser } from "@/auth/server/session-user";
 
-jest.mock("@wordpoker/db", () => ({ friendCode: jest.fn(), friendList: jest.fn(), requestFriend: jest.fn(), userForFriendCode: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
+jest.mock("@wordpoker/db", () => ({ friendCode: jest.fn(), friendList: jest.fn(), referralCount: jest.fn(), requestFriend: jest.fn(), userForFriendCode: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
 jest.mock("@/auth/server/session-user", () => ({ sessionUser: jest.fn() }));
 
 function request(method: string, body?: unknown) {
@@ -16,6 +16,7 @@ beforeEach(() => {
   jest.mocked(friendCode).mockResolvedValue("ABCD2345");
   jest.mocked(friendList).mockResolvedValue({ friends: [], incoming: [], outgoing: [] });
   jest.mocked(userForFriendCode).mockResolvedValue("target");
+  jest.mocked(referralCount).mockResolvedValue(3);
 });
 
 test.each([null, { id: "caller", anonymous: true }])("rejects every route for missing or guest sessions: %j", async (user) => {
@@ -33,7 +34,7 @@ test.each([null, { id: "caller", anonymous: true }])("rejects every route for mi
 
 test("reads only the caller's list and disables caching", async () => {
   const response = await GET(request("GET"));
-  expect(await response.json()).toEqual({ code: "ABCD2345", friends: [], incoming: [], outgoing: [] });
+  expect(await response.json()).toEqual({ code: "ABCD2345", friends: [], incoming: [], outgoing: [], referrals: 3 });
   expect(friendList).toHaveBeenCalledWith("caller");
   expect(response.headers.get("cache-control")).toBe("no-store");
 });

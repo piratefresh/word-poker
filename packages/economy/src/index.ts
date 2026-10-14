@@ -35,8 +35,10 @@ export {
   claimQuestHand,
   creditDailyStreak,
   payCompletedQuests,
+  payReferral,
   streakLength,
   type QuestStore,
+  type ReferralStore,
   type RewardsDeps,
 } from "./rewards";
 export { CURRENCY_EVENT_TYPE, parseCurrencyEvent, type ParsedWebhook } from "./webhook";

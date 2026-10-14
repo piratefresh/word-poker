@@ -79,6 +79,7 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
             <Button label="Create account" onPress={() => router.push("/sign-up")} />
           </> : <>
             <Text textStyle={bodyText}>{page ? `YOUR CODE: ${page.code}` : "Loading friends…"}</Text>
+            {page && page.referrals > 0 ? <Text textStyle={bodyText} testID="friends-referrals">{`${page.referrals} ${page.referrals === 1 ? "friend" : "friends"} joined through you`}</Text> : null}
             {page ? <Button label="SHARE" testID="friends-share" onPress={() => {
               void Share.share({ message: friendLinkFor(page.code) }).catch(() => setMessage("Couldn't share. Try again."));
             }} /> : null}
