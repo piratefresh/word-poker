@@ -6,11 +6,12 @@
  * re-judges a hand — `claimQuestHand` dedupes by `handToken` and `@wordpoker/game-rules`' pure
  * evaluator judges the *claimed* facts. The client authors those facts (shape-validated in
  * contracts, not corroborated), so XP and quest farming by a verified account is an accepted
- * risk (STO-543: "we'd rather people play"); there is no rate limit. Earning coins needs a verified email, the same gate the welcome
- * grant uses: a throwaway account should not be able to farm a streak.
+ * risk (STO-543: "we'd rather people play"); there is no rate limit. Earning coins needs an eligible
+ * account (`isAccountEligible`: verified email or verified Game Center/Google), the same gate the
+ * welcome grant uses: a throwaway account should not be able to farm a streak.
  */
 
-import { isQuestHandClaim, type QuestClaimResponse, type QuestStateResponse } from "@wordpoker/contracts";
+import { isAccountEligible, isQuestHandClaim, type QuestClaimResponse, type QuestStateResponse } from "@wordpoker/contracts";
 import { playerProgress, questProgress } from "@wordpoker/db";
 import { claimQuestHand, creditDailyStreak, payCompletedQuests } from "@wordpoker/economy";
 import { QUEST_CATALOG, levelForXp } from "@wordpoker/game-rules";
@@ -30,7 +31,7 @@ const UNVERIFIED = { error: "Verify your email to earn coins." };
 export async function GET(request: Request): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in to see your quests." }, 401);
-  if (!session.user.emailVerified) return json(UNVERIFIED, 403);
+  if (!isAccountEligible(session.user)) return json(UNVERIFIED, 403);
 
   const userId = session.user.id;
 
@@ -76,7 +77,7 @@ export async function GET(request: Request): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in to earn coins." }, 401);
-  if (!session.user.emailVerified) return json(UNVERIFIED, 403);
+  if (!isAccountEligible(session.user)) return json(UNVERIFIED, 403);
 
   let body: unknown;
   try {

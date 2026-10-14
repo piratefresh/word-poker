@@ -18,6 +18,8 @@ import { Migration20261013140000_friends } from "./Migration20261013140000_frien
 import { Migration20261014120000_referral } from "./Migration20261014120000_referral";
 import { Migration20261015120000_presence } from "./Migration20261015120000_presence";
 import { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
+import { Migration20261017120000_platform_auth } from "./Migration20261017120000_platform_auth";
+export { Migration20261017120000_platform_auth } from "./Migration20261017120000_platform_auth";
 export { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
 export { Migration20261015120000_presence } from "./Migration20261015120000_presence";
 export { Migration20261014120000_referral } from "./Migration20261014120000_referral";
@@ -52,4 +54,5 @@ export const migrations: Constructor<Migration>[] = [
   Migration20261014120000_referral,
   Migration20261015120000_presence,
   Migration20261016120000_notifications,
+  Migration20261017120000_platform_auth,
 ];

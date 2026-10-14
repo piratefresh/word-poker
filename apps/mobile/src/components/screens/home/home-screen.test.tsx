@@ -9,6 +9,12 @@ import { authClient } from "@/auth/client/auth-client";
 
 import { HomeScreen } from "./home-screen";
 
+// The coordinator leaves the online table first, which loads Colyseus; these tests only need the call.
+jest.mock("@/auth/client/session-coordinator", () => ({
+  changeSession: (change: () => Promise<unknown>) => change(),
+  setAutoRestore: jest.fn(async () => {}),
+}));
+
 jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useFocusEffect: jest.fn() }));
 let mockSessionUser: { email: string; emailVerified: boolean } | null = null;
 jest.mock("@/auth/client/auth-client", () => ({

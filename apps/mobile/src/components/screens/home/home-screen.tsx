@@ -6,6 +6,7 @@ import {
   Text,
   type UniversalTextStyle,
 } from "@expo/ui";
+import { isAccountEligible } from "@wordpoker/contracts";
 import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { useWindowDimensions } from "react-native";
@@ -183,9 +184,10 @@ export function HomeScreen() {
             <TileLogo onIdleChange={setLogoIdle} width={contentWidth} />
           </RNHostView>
 
-          {/* A guest's placeholder address can't be verified; they make an account to claim one. */}
+          {/* A guest's placeholder address can't be verified; they make an account to claim one. A
+              Game Center account is already eligible and its placeholder is never shown. */}
           {session?.user &&
-          !session.user.emailVerified &&
+          !isAccountEligible(session.user) &&
           !session.user.isAnonymous ? (
             <VerifyEmailCard email={session.user.email} testID="home-verify" />
           ) : null}

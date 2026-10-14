@@ -8,7 +8,14 @@
  * Signing in never waits on verification; only the grant does.
  */
 
-import { GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP, WELCOME_GRANT, isFriendCode } from "@wordpoker/contracts";
+import {
+  GUEST_HAND_BONUS,
+  GUEST_HAND_BONUS_CAP,
+  WELCOME_GRANT,
+  isAccountEligible,
+  isFriendCode,
+  type EligibilityUser,
+} from "@wordpoker/contracts";
 import { countPlayedHands, recordReferral } from "@wordpoker/db";
 import { grantWelcome, payReferral } from "@wordpoker/economy";
 
@@ -39,17 +46,25 @@ export async function sendVerificationEmail({ user, url }: { user: VerifiedUser;
 }
 
 /**
- * Pays the welcome grant once the email is verified. Never throws: a RevenueCat outage leaves the
- * wallet_event row `pending`, and the player's next `GET /api/wallet` sends it again.
+ * The once-only rewards an eligible account earns (STO-346, STO-593): the welcome grant with its
+ * guest-hand bonus, then the referral pay. Email verification, a Game Center sign-in or link, and
+ * `GET /api/wallet` (the retry) all call it; each lands on the same once-only wallet_event rows,
+ * so it can run any number of times. Never throws: a RevenueCat outage leaves the row `pending`.
+ *
+ * A guest-hand count that fails records nothing, so the bonus is never finalized smaller than the
+ * hands that moved; the next wallet read tries again.
  */
-export async function afterEmailVerification(user: VerifiedUser): Promise<void> {
+export async function grantEligibleRewards(user: { readonly id: string } & EligibilityUser): Promise<void> {
+  if (!isAccountEligible(user)) return;
+  let hands: number;
   try {
-    // Hands a guest played before registering (moved over by `adoptGuestHistory`) earn a bonus. A
-    // failed count costs the bonus, never the base grant.
-    const hands = await countPlayedHands(user.id).catch((error: unknown) => {
-      console.error(`[welcome-grant] ${user.id}: could not count guest hands:`, error);
-      return 0;
-    });
+    // Hands a guest played before registering (moved over by `adoptGuestHistory`) earn a bonus.
+    hands = await countPlayedHands(user.id);
+  } catch (error) {
+    console.error(`[welcome-grant] ${user.id}: could not count guest hands; left for the next wallet read:`, error);
+    return;
+  }
+  try {
     const bonus = Math.min(hands * GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP);
     const result = await grantWelcome(user.id, {}, bonus);
     if (!result.applied && result.reason === "pending") {
@@ -58,9 +73,14 @@ export async function afterEmailVerification(user: VerifiedUser): Promise<void> 
   } catch (error) {
     console.error(`[welcome-grant] ${user.id}: could not record the grant:`, error);
   }
-  // An invited friend and their inviter are paid on the same verification (STO-582); never blocks it.
-  // ponytail: a failed payment is not retried; re-run payReferral from GET /api/wallet if it shows up.
+  // An invited friend and their inviter are paid with the welcome grant (STO-582); never blocks it.
+  // ponytail: a failed payment is retried only while the welcome row is missing; retry payReferral on every wallet read if it shows up.
   await payReferral(user.id).catch((error: unknown) => console.error(`[referral] ${user.id}: could not pay:`, error));
+}
+
+/** Better Auth calls this once the email is verified, which is what makes the account eligible. */
+export async function afterEmailVerification(user: VerifiedUser): Promise<void> {
+  await grantEligibleRewards({ ...user, emailVerified: true });
 }
 
 /** The header the sign-up screen sends with the friend code its invite link carried (STO-582). */

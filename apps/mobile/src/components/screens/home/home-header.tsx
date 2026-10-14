@@ -2,6 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
+import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 import { formatCoins } from "@/lib/format";
 import { unregisterPush } from "@/lib/use-push-registration";
@@ -27,7 +28,9 @@ export function HomeHeader({ width }: { width: number }) {
     try {
       // Before the session goes: the API needs it to take this device's push token back (STO-585).
       await unregisterPush().catch(() => {});
-      const result = await authClient.signOut();
+      // Signing out means staying out: no Game Center / Play Games restore on the next launch.
+      await setAutoRestore(false);
+      const result = await changeSession(() => authClient.signOut());
       if (result.error) setSignOutError(true);
     } catch {
       setSignOutError(true);

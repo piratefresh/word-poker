@@ -1,14 +1,15 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { anonymous, bearer } from "better-auth/plugins";
-import { adoptGuestHistory } from "@wordpoker/db";
+import { adoptGuestHistory, inTransaction } from "@wordpoker/db";
 import { config } from "dotenv";
 import { Pool } from "pg";
 
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
-import { afterEmailVerification, attributeReferral, sendVerificationEmail } from "./auth-verification";
+import { afterEmailVerification, attributeReferral, grantEligibleRewards, sendVerificationEmail } from "./auth-verification";
 import { passwordResetEmail, sendEmail } from "./email";
+import { platformAuth } from "./platform-auth";
 
 // `dotenv` leaves pre-existing variables untouched by default, so a shell that
 // carries stale copies of these names would silently win over this app's `.env`.
@@ -95,12 +96,28 @@ export const auth = betterAuth({
   plugins: [
     expo(),
     bearer(),
-    // Registering from a guest session: Better Auth deletes the guest, so its hands move first.
+    // Registering from a guest session: Better Auth deletes the guest, so its hands move first —
+    // through the same once-only claim the Game Center flow uses (STO-593). A second account
+    // racing for the same guest gets nothing moved; it still exists, just without the history.
     anonymous({
-      onLinkAccount: ({ anonymousUser, newUser }) =>
-        adoptGuestHistory(anonymousUser.user.id, newUser.user.id),
+      onLinkAccount: async ({ anonymousUser, newUser }) => {
+        const adopted = await inTransaction(authPool, (sql) => adoptGuestHistory(sql, anonymousUser.user.id, newUser.user.id));
+        if (!adopted) console.warn("[guest-adoption] guest already adopted by another account");
+      },
+    }),
+    // Game Center sign-in and Play Games restore (STO-590). No verifier is configured yet, so both
+    // answer DISABLED; STO-591 and STO-592 supply them behind their own switches.
+    platformAuth({
+      pool: authPool,
+      verifiers: {},
+      onAccountReady: async (user, { created, headers }) => {
+        if (created) await attributeReferral(user, headers);
+        await grantEligibleRewards(user);
+      },
     }),
   ],
+  // Rate limits live in Postgres (`rateLimit`), so every API replica counts the same attempts.
+  rateLimit: { storage: "database" },
   // The per-kind notification switches (STO-585) live on the account, so they follow the player
   // across devices; the client reads them from the session and writes them with `updateUser`.
   user: {
@@ -108,6 +125,9 @@ export const auth = betterAuth({
       notifyTableInvite: { type: "boolean", defaultValue: true, required: false },
       notifyFriendRequest: { type: "boolean", defaultValue: true, required: false },
       notifyFriendOnline: { type: "boolean", defaultValue: false, required: false },
+      // Set only by the server after it verified a Game Center or Google identity (STO-593); never
+      // accepted from sign-up, updateUser or any custom body.
+      primaryIdentityVerified: { type: "boolean", defaultValue: false, required: false, input: false },
     },
   },
   databaseHooks: {

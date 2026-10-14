@@ -183,3 +183,4 @@ export {
 } from "./online";
 export * from "./friends";
 export { historyHand, isHistoryCursor, isHistoryHand, isHistoryPage, type HistoryHand, type HistoryPage } from "./history-view";
+export * from "./platform-auth";

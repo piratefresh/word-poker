@@ -6,11 +6,12 @@
  * the player's `pending` wallet changes — a welcome grant RevenueCat missed lands here.
  */
 
-import type { WalletResponse } from "@wordpoker/contracts";
+import { isAccountEligible, type WalletResponse } from "@wordpoker/contracts";
 import { hasWelcomeEvent } from "@wordpoker/db";
 import { getCoinBalance, retryPending } from "@wordpoker/economy";
 
 import { auth } from "@/auth/server/auth";
+import { grantEligibleRewards } from "@/auth/server/auth-verification";
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -25,6 +26,12 @@ export async function GET(request: Request): Promise<Response> {
   if (!session || session.user.isAnonymous) return json({ error: "Sign in to see your coins." }, 401);
 
   const userId = session.user.id;
+
+  // A welcome grant that was never recorded (a failed guest-hand count, a crash before the row) is
+  // retried here; recorded-but-pending ones go out in `retryPending` below.
+  if (isAccountEligible(session.user) && !(await hasWelcomeEvent(userId).catch(() => true))) {
+    await grantEligibleRewards(session.user);
+  }
 
   try {
     await retryPending(userId);

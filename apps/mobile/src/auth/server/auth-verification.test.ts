@@ -6,7 +6,7 @@
 import { countPlayedHands, recordReferral } from "@wordpoker/db";
 import { grantWelcome, payReferral } from "@wordpoker/economy";
 
-import { afterEmailVerification, attributeReferral, sendVerificationEmail } from "./auth-verification";
+import { afterEmailVerification, attributeReferral, grantEligibleRewards, sendVerificationEmail } from "./auth-verification";
 import { sendEmail } from "./email";
 
 jest.mock("@wordpoker/db", () => ({ countPlayedHands: jest.fn(async () => 0), recordReferral: jest.fn(async () => true) }));
@@ -50,13 +50,23 @@ describe("afterEmailVerification", () => {
     expect(grant).toHaveBeenLastCalledWith("user_1", {}, 1000);
   });
 
-  test("still pays the base grant when the hand count fails", async () => {
+  test("records nothing when the hand count fails, so the wallet read retries the full grant", async () => {
     grant.mockResolvedValue({ applied: true, balance: 5000 });
     jest.mocked(countPlayedHands).mockRejectedValueOnce(new Error("database down"));
 
     await afterEmailVerification(USER);
 
-    expect(grant).toHaveBeenLastCalledWith("user_1", {}, 0);
+    expect(grant).not.toHaveBeenCalled();
+  });
+
+  test("pays eligible Game Center accounts and nobody ineligible", async () => {
+    grant.mockResolvedValue({ applied: true, balance: 5000 });
+
+    await grantEligibleRewards({ id: "gc", emailVerified: false, primaryIdentityVerified: true });
+    await grantEligibleRewards({ id: "unverified", emailVerified: false, primaryIdentityVerified: false });
+    await grantEligibleRewards({ id: "guest", isAnonymous: true, primaryIdentityVerified: true });
+
+    expect(grant.mock.calls.map(([id]) => id)).toEqual(["gc"]);
   });
 
   test("never throws when the grant fails", async () => {
