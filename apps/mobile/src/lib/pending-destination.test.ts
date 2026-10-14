@@ -100,3 +100,7 @@ describe("a link's referral", () => {
     expect(pendingReferral()).toBe("ABCD2345");
   });
 });
+
+test("a table-invite notification's link lands at the table", () => {
+  expect(destinationFromURL("wordpoker://online/room_1")).toEqual({ pathname: "/online/[roomId]", params: { roomId: "room_1" } });
+});

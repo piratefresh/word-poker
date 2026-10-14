@@ -17,6 +17,8 @@ import type { Migration } from "@mikro-orm/migrations";
 import { Migration20261013140000_friends } from "./Migration20261013140000_friends";
 import { Migration20261014120000_referral } from "./Migration20261014120000_referral";
 import { Migration20261015120000_presence } from "./Migration20261015120000_presence";
+import { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
+export { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
 export { Migration20261015120000_presence } from "./Migration20261015120000_presence";
 export { Migration20261014120000_referral } from "./Migration20261014120000_referral";
 export { Migration20261013140000_friends } from "./Migration20261013140000_friends";
@@ -49,4 +51,5 @@ export const migrations: Constructor<Migration>[] = [
   Migration20261013140000_friends,
   Migration20261014120000_referral,
   Migration20261015120000_presence,
+  Migration20261016120000_notifications,
 ];

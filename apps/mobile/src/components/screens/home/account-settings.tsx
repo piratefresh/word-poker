@@ -5,6 +5,8 @@ import { useWindowDimensions, View } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
 import { colors, fonts, fontSize, spacing } from "@/constants/theme";
 
+import { NotificationSettings } from "./notification-settings";
+
 export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
   const { data: session } = authClient.useSession();
   const name = useNativeState(session?.user.name ?? "");
@@ -45,6 +47,7 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
             </Text>
             <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Display name</Text>
             <TextInput placeholder="Display name" editable={!saving} testID="account-display-name" value={name} />
+            {session?.user.isAnonymous ? null : <NotificationSettings />}
             {error ? <Text textStyle={{ color: colors.danger }}>{error}</Text> : null}
             <Button disabled={saving} label={saving ? "Saving…" : "Save changes"} onPress={save} testID="account-save" />
             <Button disabled={saving} label="Cancel" onPress={onDismiss} variant="text" />

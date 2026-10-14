@@ -8,7 +8,7 @@ const getSession = jest.mocked(auth.api.getSession);
 function session(expiresAt = new Date(Date.now() + 60000)): typeof auth.$Infer.Session {
   const now = new Date();
   return {
-    user: { id: "account-a", name: "A", email: "a@example.test", emailVerified: true, isAnonymous: false, createdAt: now, updatedAt: now },
+    user: { id: "account-a", name: "A", email: "a@example.test", emailVerified: true, isAnonymous: false, notifyTableInvite: true, notifyFriendRequest: true, notifyFriendOnline: false, createdAt: now, updatedAt: now },
     session: { id: "session-a", userId: "account-a", token: "session-token", expiresAt, createdAt: now, updatedAt: now },
   };
 }

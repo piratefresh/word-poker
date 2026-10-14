@@ -23,7 +23,8 @@ import * as Linking from "expo-linking";
 import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
+import * as Notifications from "expo-notifications";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
@@ -40,6 +41,7 @@ import { leaveTable } from "@/features/online/room-session";
 import { QuestsProvider } from "@/lib/quests-provider";
 import { useRevenueCatIdentity } from "@/lib/use-revenuecat";
 import { usePresence } from "@/lib/use-presence";
+import { usePushRegistration } from "@/lib/use-push-registration";
 import { TableInviteBanner } from "@/components/ui/table-invite-banner";
 
 Sentry.init({
@@ -79,6 +81,7 @@ export function RootLayout() {
   useRevenueCatIdentity(session?.user.id);
   const account = !!session && !session.user.isAnonymous;
   const presence = usePresence(account);
+  usePushRegistration(account);
 
   // E2E builds have no auth server and no account: the guard takes their word for it instead
   // of holding the table behind a session nothing can start (`src/lib/e2e.ts`).
@@ -196,20 +199,39 @@ function DeepLinks({
     }
   }, []);
 
-  useEffect(() => {
-    const arriving = Linking.addEventListener("url", ({ url }) => {
-      rememberReferral(url);
-      const destination = destinationFromURL(url);
-      if (!destination) return;
-      if (session && (destination.pathname !== "/friends" || account)) {
-        router.replace(destination);
-        return;
-      }
-      rememberDestination(destination);
-      if (!session && destination.pathname !== "/friends") playAsGuest();
-    });
-    return () => arriving.remove();
+  // A link that arrives while the app is open: a URL, or a tapped notification carrying one (STO-585).
+  const follow = useCallback((url: string) => {
+    rememberReferral(url);
+    const destination = destinationFromURL(url);
+    if (!destination) return;
+    if (session && (destination.pathname !== "/friends" || account)) {
+      router.replace(destination);
+      return;
+    }
+    rememberDestination(destination);
+    if (!session && destination.pathname !== "/friends") playAsGuest();
   }, [account, session, playAsGuest]);
+
+  useEffect(() => {
+    const arriving = Linking.addEventListener("url", ({ url }) => follow(url));
+    return () => arriving.remove();
+  }, [follow]);
+
+  // A notification tapped while the app was closed is the launch's own link, read once.
+  const notificationRead = useRef(false);
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const open = (response: Notifications.NotificationResponse | null) => {
+      const url = response?.notification.request.content.data?.url;
+      if (typeof url === "string") follow(url);
+    };
+    if (!notificationRead.current) {
+      notificationRead.current = true;
+      open(Notifications.getLastNotificationResponse());
+    }
+    const tapped = Notifications.addNotificationResponseReceivedListener(open);
+    return () => tapped.remove();
+  }, [follow]);
 
   // Signed out, the seat is not a seat: the guarded routes are unreachable until someone signs in
   // again, so the device gives the table up rather than leaving the server counting a player who

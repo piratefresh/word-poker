@@ -3,6 +3,7 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 import { authClient } from "@/auth/client/auth-client";
 
 import { AccountSettings } from "./account-settings";
+import { NotificationSettings } from "./notification-settings";
 import { HomeHeader } from "./home-header";
 
 jest.mock("@/auth/client/auth-client", () => ({
@@ -11,6 +12,14 @@ jest.mock("@/auth/client/auth-client", () => ({
     signOut: jest.fn(),
     updateUser: jest.fn(),
   },
+}));
+
+const mockOrder: string[] = [];
+jest.mock("@/lib/use-push-registration", () => ({
+  unregisterPush: jest.fn(async () => { mockOrder.push("unregister"); }),
+}));
+jest.mock("expo-notifications", () => ({
+  getPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
 }));
 
 jest.mock("@/lib/quests-provider", () => ({
@@ -53,6 +62,26 @@ test("shows credits and XP, opens Settings, and signs out through the avatar men
 
   await fireEvent(view.getByTestId("home-account-menu"), "pressAction", { nativeEvent: { event: "sign-out" } });
   expect(authClient.signOut).toHaveBeenCalledTimes(1);
+});
+
+test("takes the push token back before the session goes", async () => {
+  mockOrder.length = 0;
+  jest.mocked(authClient.signOut).mockImplementation((async () => {
+    mockOrder.push("signOut");
+    return { data: { success: true }, error: null };
+  }) as never);
+  const view = await render(<HomeHeader width={342} />);
+  await fireEvent(view.getByTestId("home-account-menu"), "pressAction", { nativeEvent: { event: "sign-out" } });
+  await act(async () => {});
+  expect(mockOrder).toEqual(["unregister", "signOut"]);
+});
+
+test("a notification switch saves to the account", async () => {
+  jest.mocked(authClient.updateUser).mockResolvedValue({ data: { status: true }, error: null } as never);
+  const view = await render(<NotificationSettings />);
+  const online = view.getByTestId("notify-notifyFriendOnline");
+  await act(async () => { await online.props.onIsOnChange({ nativeEvent: { isOn: true } }); });
+  expect(authClient.updateUser).toHaveBeenCalledWith({ notifyFriendOnline: true });
 });
 
 test("rejects an empty display name, saves a trimmed name, and keeps failed saves open", async () => {

@@ -1,5 +1,5 @@
 import { isFriendCode, FRIEND_REQUEST_MESSAGES } from "@wordpoker/contracts";
-import { friendCode, friendList, referralCount, requestFriend, userForFriendCode } from "@wordpoker/db";
+import { friendCode, friendList, notifyUsers, referralCount, requestFriend, userForFriendCode } from "@wordpoker/db";
 import { sessionUser } from "@/auth/server/session-user";
 
 export async function GET(request: Request): Promise<Response> {
@@ -24,6 +24,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!isFriendCode(code)) return Response.json({ error: "That friend code couldn't be read." }, { status: 400 });
     const other = await userForFriendCode(code);
     const result = other === null ? "not-found" : await requestFriend(user.id, other);
+    if (other !== null && result === "requested") {
+      void notifyUsers([other], "friendRequest", { title: "Friend request", body: `${user.name} sent you a friend request` });
+    }
     const status = result === "requested" ? 201 : result === "accepted" ? 200 :
       result === "self" ? 400 : result === "guest" || result === "not-found" ? 404 : 409;
     const message = FRIEND_REQUEST_MESSAGES[result === "guest" ? "not-found" : result];

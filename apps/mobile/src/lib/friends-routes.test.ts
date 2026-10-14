@@ -1,10 +1,11 @@
-import { beat, inviteToTable, takeInvites, friendCode, friendList, referralCount, requestFriend, userForFriendCode, acceptFriend, removeFriend } from "@wordpoker/db";
+import { beat, deletePushToken, inviteToTable, isOnline, notifyUsers, savePushToken, takeInvites, friendCode, friendList, referralCount, requestFriend, userForFriendCode, acceptFriend, removeFriend } from "@wordpoker/db";
 import { GET, POST } from "@/app/api/friends+api";
 import { PUT, DELETE, POST as invitePOST } from "@/app/api/friends/[userId]+api";
+import { POST as pushPOST, DELETE as pushDELETE } from "@/app/api/friends/push-token+api";
 import { POST as presencePOST } from "@/app/api/friends/presence+api";
 import { sessionUser } from "@/auth/server/session-user";
 
-jest.mock("@wordpoker/db", () => ({ friendCode: jest.fn(), friendList: jest.fn(), referralCount: jest.fn(), beat: jest.fn(), goOffline: jest.fn(), takeInvites: jest.fn(), inviteToTable: jest.fn(), requestFriend: jest.fn(), userForFriendCode: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
+jest.mock("@wordpoker/db", () => ({ friendCode: jest.fn(), friendList: jest.fn(), referralCount: jest.fn(), beat: jest.fn(), isOnline: jest.fn(), notifyUsers: jest.fn(), savePushToken: jest.fn(), deletePushToken: jest.fn(), goOffline: jest.fn(), takeInvites: jest.fn(), inviteToTable: jest.fn(), requestFriend: jest.fn(), userForFriendCode: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
 jest.mock("@/auth/server/session-user", () => ({ sessionUser: jest.fn() }));
 
 function request(method: string, body?: unknown) {
@@ -100,5 +101,51 @@ describe("presence and table invites", () => {
     expect((await invitePOST(request("POST", { roomId: "a/../b" }), { userId: "target" })).status).toBe(400);
     jest.mocked(inviteToTable).mockResolvedValue(false);
     expect((await invitePOST(request("POST", { roomId: "room_1" }), { userId: "stranger" })).status).toBe(404);
+  });
+});
+
+describe("push notifications", () => {
+  test("coming online pushes accepted friends only when the throttle says to announce", async () => {
+    jest.mocked(takeInvites).mockResolvedValue([]);
+    jest.mocked(friendList).mockResolvedValue({ friends: [{ userId: "f1", name: "Bea" }], incoming: [], outgoing: [] });
+    jest.mocked(beat).mockResolvedValue({ cameOnline: true, announce: false });
+    await presencePOST(request("POST", {}));
+    expect(notifyUsers).not.toHaveBeenCalled();
+    jest.mocked(beat).mockResolvedValue({ cameOnline: true, announce: true });
+    await presencePOST(request("POST", {}));
+    expect(notifyUsers).toHaveBeenCalledWith(["f1"], "friendOnline", expect.anything());
+  });
+
+  test("an invite pushes an offline friend, with a link to the table, and an online one not at all", async () => {
+    jest.mocked(inviteToTable).mockResolvedValue(true);
+    jest.mocked(isOnline).mockResolvedValue(false);
+    await invitePOST(request("POST", { roomId: "room_1" }), { userId: "target" });
+    expect(notifyUsers).toHaveBeenCalledWith(["target"], "tableInvite", expect.objectContaining({ url: "wordpoker://online/room_1" }));
+    jest.mocked(notifyUsers).mockClear();
+    jest.mocked(isOnline).mockResolvedValue(true);
+    await invitePOST(request("POST", { roomId: "room_1" }), { userId: "target" });
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  test("a new friend request pushes its recipient, a repeat does not", async () => {
+    jest.mocked(requestFriend).mockResolvedValue("requested");
+    await POST(request("POST", { code: "ABCD2345" }));
+    expect(notifyUsers).toHaveBeenCalledWith(["target"], "friendRequest", expect.anything());
+    jest.mocked(notifyUsers).mockClear();
+    jest.mocked(requestFriend).mockResolvedValue("already-requested");
+    await POST(request("POST", { code: "ABCD2345" }));
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  test("a token is registered for the caller only when it looks like an Expo token; guests are refused", async () => {
+    expect((await pushPOST(request("POST", { token: "ExponentPushToken[abc]" }))).status).toBe(201);
+    expect(savePushToken).toHaveBeenCalledWith("caller", "ExponentPushToken[abc]");
+    for (const token of ["abc", "ExponentPushToken[" + "x".repeat(300) + "]", 5]) {
+      expect((await pushPOST(request("POST", { token }))).status).toBe(400);
+    }
+    expect((await pushDELETE(request("DELETE", { token: "ExponentPushToken[abc]" }))).status).toBe(200);
+    expect(deletePushToken).toHaveBeenCalledWith("caller", "ExponentPushToken[abc]");
+    jest.mocked(sessionUser).mockResolvedValue({ id: "caller", name: "Ada", anonymous: true });
+    expect((await pushPOST(request("POST", { token: "ExponentPushToken[abc]" }))).status).toBe(403);
   });
 });

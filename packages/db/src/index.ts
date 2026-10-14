@@ -93,7 +93,8 @@ export async function saveResultsRating(
 
   return rating.id;
 }
-export { recordReferral, referrerOf, paidReferralCount, referralCount, friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";
+export { displayName, recordReferral, referrerOf, paidReferralCount, referralCount, friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";
+export { notifyUsers, savePushToken, deletePushToken, type NotificationKind } from "./notify";
 export { beat, goOffline, isOnline, inviteToTable, takeInvites, PRESENCE_GRACE_MS } from "./presence";
 export { saveHistoryHand, handRecordDigest, HandRecordConflictError } from "./history";
 export { readHistoryHands, readHistoryHand } from "./history-read";

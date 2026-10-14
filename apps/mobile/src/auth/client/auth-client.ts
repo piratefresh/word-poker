@@ -1,5 +1,5 @@
 import { expoClient } from "@better-auth/expo/client";
-import { anonymousClient } from "better-auth/client/plugins";
+import { anonymousClient, inferAdditionalFields } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
 
@@ -9,6 +9,14 @@ export const authClient = createAuthClient({
   baseURL: apiBaseURL,
   plugins: [
     anonymousClient(),
+    // Mirrors `user.additionalFields` in auth.ts (server-only, so its types cannot be imported here).
+    inferAdditionalFields({
+      user: {
+        notifyTableInvite: { type: "boolean", required: false },
+        notifyFriendRequest: { type: "boolean", required: false },
+        notifyFriendOnline: { type: "boolean", required: false },
+      },
+    }),
     expoClient({
       scheme: "wordpoker",
       storagePrefix: "wordpoker",

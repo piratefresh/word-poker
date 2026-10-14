@@ -54,3 +54,11 @@ export async function goOffline(): Promise<void> {
 export async function inviteFriend(userId: string, roomId: string): Promise<void> {
   await call(`/${encodeURIComponent(userId)}`, "POST", { roomId });
 }
+
+export async function registerPushToken(token: string): Promise<void> {
+  await call("/push-token", "POST", { token });
+}
+
+export async function unregisterPushToken(token: string): Promise<void> {
+  await call("/push-token", "DELETE", { token });
+}

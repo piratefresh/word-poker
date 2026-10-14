@@ -140,3 +140,9 @@ export async function referralCount(userId: string, options: DbOptions = {}): Pr
   const [row] = await db.execute<{ n: string }[]>(`select count(*) as n from referral where referrer_id = ?`, [userId]);
   return Number(row?.n ?? 0);
 }
+
+export async function displayName(userId: string, options: DbOptions = {}): Promise<string> {
+  const db = await connection(options);
+  const [row] = await db.execute<{ name: string }[]>(`select name from "user" where id = ?`, [userId]);
+  return row?.name ?? "A player";
+}

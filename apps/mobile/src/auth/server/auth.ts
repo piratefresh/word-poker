@@ -101,6 +101,15 @@ export const auth = betterAuth({
         adoptGuestHistory(anonymousUser.user.id, newUser.user.id),
     }),
   ],
+  // The per-kind notification switches (STO-585) live on the account, so they follow the player
+  // across devices; the client reads them from the session and writes them with `updateUser`.
+  user: {
+    additionalFields: {
+      notifyTableInvite: { type: "boolean", defaultValue: true, required: false },
+      notifyFriendRequest: { type: "boolean", defaultValue: true, required: false },
+      notifyFriendOnline: { type: "boolean", defaultValue: false, required: false },
+    },
+  },
   databaseHooks: {
     // The sign-up call carries the inviter's friend code in a header (STO-582).
     user: { create: { after: async (user, context) => attributeReferral(user, context?.headers ?? context?.request?.headers) } },
