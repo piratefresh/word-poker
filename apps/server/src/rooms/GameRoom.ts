@@ -4,6 +4,7 @@ import { Client, CloseCode, ErrorCode, Room, ServerError, definePlugins } from "
 import { UniqueSessionPlugin } from "colyseus/plugins/unique-session";
 import {
   GAME_EVENTS,
+  FRIEND_REQUEST_MESSAGES,
   GAME_MESSAGES,
   WAITING_PHASE,
   isGameMessagePayload,
@@ -44,10 +45,13 @@ import { GameRoomState } from "./schema/GameRoomState.js";
 import { HistoryService } from "../history/history-service.js";
 import { SettlementRecorder } from "../history/settlement-recorder.js";
 import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
+import { requestFriend } from "@wordpoker/db";
+import { serverOrm } from "../database.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
 /** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
 const MIN_PLAYERS = 2;
+const SEAT_GONE_MESSAGE = "That player has left the table.";
 
 type TableConfig = GameTableConfig;
 
@@ -97,15 +101,17 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   plugins = definePlugins({ unique: new UniqueSessionPlugin({ max: 1 }) });
 
   // `id` is the key Colyseus's session tracker indexes (the plugin reads it back from the same index).
-  static override async onAuth(token: string): Promise<OnlineAccount & { readonly id: string }> {
+  static override async onAuth(token: string): Promise<OnlineAccount & { readonly id: string; readonly token: string }> {
     const account = await onlineAccount(token);
-    return { ...account, id: account.userId };
+    return { ...account, id: account.userId, token };
   }
 
   private dictionary!: Dictionary;
   private table!: TableConfig;
   private engine?: AuthoritativeGame;
   private readonly bindings = new Map<string, SeatBinding>();
+  /** Sessions with a befriend request in flight; overlapping ones are dropped. */
+  private readonly befriending = new Set<string>();
   private readonly projection = new GameRoomProjection(this.state);
   private seed = 1;
   private turnDuration = OFFLINE_TURN_MS;
@@ -136,6 +142,34 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   }
 
   messages = {
+    [GAME_MESSAGES.befriend]: async (client: Client, payload: unknown) => {
+      if (!isGameMessagePayload("befriend", payload) || !this.isAtTable(client)) return;
+      if (this.game !== null) return;
+      const sender = this.bindings.get(client.sessionId);
+      const target = this.bindings.get(payload.playerId);
+      if (!sender || sender === target || this.befriending.has(client.sessionId)) return;
+      const reply = (message: string) =>
+        client.send(GAME_EVENTS.befriendResult, { playerId: payload.playerId, message });
+      if (!target?.present) return reply(SEAT_GONE_MESSAGE);
+      this.befriending.add(client.sessionId);
+      let message = "Friends aren't available right now. Try again.";
+      try {
+        // Persistent account changes require a current session, even on a surviving socket.
+        const account = await onlineAccount(client.auth?.token);
+        if (account.userId !== sender.userId) throw new Error("The seat's account no longer matches its session");
+        const orm = await serverOrm();
+        // A hand dealt or a seat gone during the awaits still answers, so the sheet clears its pending state.
+        if (this.game !== null || !this.isAtTable(client)) {
+          // keep the default "unavailable" message
+        } else if (!target.present) message = SEAT_GONE_MESSAGE;
+        else if (orm) message = FRIEND_REQUEST_MESSAGES[await requestFriend(sender.userId, target.userId, { orm })];
+      } catch {
+        // A service outage must not interrupt the hand or expose account details.
+      } finally {
+        this.befriending.delete(client.sessionId);
+      }
+      reply(message);
+    },
     [GAME_MESSAGES.betting]: (client: Client, payload: unknown) => {
       if (!this.isAtTable(client) || !this.isPayload(GAME_MESSAGES.betting, payload)) return;
 
@@ -265,7 +299,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
     const history = await HistoryService.fromEnv();
     if (history === null) {
-      console.log("history: WORDPOKER_HISTORY_DATABASE_URL is not set; hands at this table are not recorded");
+      console.log("history: WORDPOKER_DATABASE_URL is not set; hands at this table are not recorded");
     }
     this.settlements = new SettlementRecorder({
       build: (settled) =>

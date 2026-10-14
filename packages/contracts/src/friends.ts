@@ -1,0 +1,61 @@
+export const FRIEND_CODE_PATTERN = /^[2-9A-HJKMNP-Z]{8}$/;
+
+export interface Friend {
+  readonly userId: string;
+  readonly name: string;
+}
+
+export interface FriendsPage {
+  readonly code: string;
+  readonly friends: Friend[];
+  readonly incoming: Friend[];
+  readonly outgoing: Friend[];
+}
+
+export type FriendRequestResult = "requested" | "accepted" | "already-friends" | "already-requested" | "self" | "not-found" | "guest";
+
+export const FRIEND_REQUEST_MESSAGES = {
+  requested: "Friend request sent",
+  accepted: "You're now friends",
+  "already-friends": "You're already friends",
+  "already-requested": "Request already sent",
+  self: "That's your own code.",
+  "not-found": "That player couldn't be found.",
+  guest: "Guests can't be added as friends",
+} as const satisfies Record<FriendRequestResult, string>;
+
+export function isFriendCode(value: unknown): value is string {
+  return typeof value === "string" && value.length === 8 && FRIEND_CODE_PATTERN.test(value);
+}
+
+export function isFriendRequestResult(value: unknown): value is FriendRequestResult {
+  return typeof value === "string" && Object.hasOwn(FRIEND_REQUEST_MESSAGES, value);
+}
+
+function isFriend(value: unknown): value is Friend {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.userId === "string" && row.userId.length > 0 && row.userId.length <= 256 &&
+    typeof row.name === "string" && row.name.length <= 512;
+}
+
+export function isFriendsPage(value: unknown): value is FriendsPage {
+  if (typeof value !== "object" || value === null) return false;
+  const page = value as Record<string, unknown>;
+  return isFriendCode(page.code) && [page.friends, page.incoming, page.outgoing].every(
+    (rows) => Array.isArray(rows) && rows.length <= 10000 && rows.every(isFriend),
+  );
+}
+
+export interface BefriendAction { readonly playerId: string }
+export interface BefriendResult extends BefriendAction { readonly message: string }
+
+export function isBefriendAction(value: unknown): value is BefriendAction {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.playerId === "string" && row.playerId.length > 0 && row.playerId.length <= 256;
+}
+
+export function isBefriendResult(value: unknown): value is BefriendResult {
+  return isBefriendAction(value) && "message" in value && typeof value.message === "string" && value.message.length <= 512;
+}

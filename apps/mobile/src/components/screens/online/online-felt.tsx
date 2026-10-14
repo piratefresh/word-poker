@@ -69,6 +69,8 @@ import { useBalanceView } from "@/lib/use-balance-view";
 
 import { InviteSheet } from "./invite-sheet";
 import { SaveProgressSheet } from "./save-progress-sheet";
+import { SeatFriendSheet } from "./seat-friend-sheet";
+import type { GamePlayer } from "@/components/screens/game/game-types";
 
 export function OnlineFelt({
   room,
@@ -122,6 +124,7 @@ export function OnlineFelt({
   // A guest is asked once, at the first results screen, whether to keep what they played.
   const { data: session } = authClient.useSession();
   const [saveDismissed, setSaveDismissed] = useState(false);
+  const [friendSeat, setFriendSeat] = useState<GamePlayer | null>(null);
 
   // One quest claim per hand (STO-525), and the XP overlay a lost showdown opens on it (STO-573):
   // `powers` is non-null only at a Wild table (`use-online-game.ts`), so it doubles as the
@@ -144,6 +147,9 @@ export function OnlineFelt({
           game={game}
           onBack={onLeave}
           onBalancePress={goToSignIn}
+          onSeatPress={session?.user.isAnonymous ? undefined : (player) => {
+            if (!player.isHero) setFriendSeat(player);
+          }}
           waiting={{
             stamp: "WAITING FOR PLAYERS",
             controls: (
@@ -257,6 +263,9 @@ export function OnlineFelt({
         visible={!saveDismissed && showingResults && !!session?.user.isAnonymous}
       />
       {reconnecting ? <ReconnectingBanner /> : null}
+      {friendSeat && waiting !== null ? (
+        <SeatFriendSheet key={friendSeat.id} player={friendSeat} room={room} onClose={() => setFriendSeat(null)} />
+      ) : null}
       {roomId === undefined ? null : (
         <InviteSheet onClose={() => setInviting(false)} roomId={roomId} visible={inviting} />
       )}

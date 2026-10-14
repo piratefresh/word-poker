@@ -1,5 +1,5 @@
 import { auth } from "./auth";
-import { historyUser } from "./history-user";
+import { sessionUser } from "./session-user";
 
 jest.mock("./auth", () => ({ auth: { api: { getSession: jest.fn() } } }));
 
@@ -19,13 +19,20 @@ test.each(["web", "native"])("resolves %s history ownership from the session and
     method: "POST", headers: { cookie: "better-auth.session_token=session-a" },
     body: JSON.stringify({ ownerId: "account-b" }),
   });
-  await expect(historyUser(request)).resolves.toBe("account-a");
+  await expect(sessionUser(request)).resolves.toEqual({ id: "account-a", anonymous: false });
   expect(getSession).toHaveBeenCalledWith({ headers: request.headers, query: { disableCookieCache: true } });
 });
 
 test("rejects missing and expired sessions", async () => {
   getSession.mockResolvedValueOnce(null);
-  await expect(historyUser(new Request("https://api.test/api/history/hands"))).resolves.toBeNull();
+  await expect(sessionUser(new Request("https://api.test/api/history/hands"))).resolves.toBeNull();
   getSession.mockResolvedValueOnce(session(new Date(0)));
-  await expect(historyUser(new Request("https://api.test/api/history/hands"))).resolves.toBeNull();
+  await expect(sessionUser(new Request("https://api.test/api/history/hands"))).resolves.toBeNull();
+});
+
+test("identifies guest sessions", async () => {
+  const guest = session();
+  guest.user.isAnonymous = true;
+  getSession.mockResolvedValueOnce(guest);
+  await expect(sessionUser(new Request("https://api.test/api/friends"))).resolves.toEqual({ id: "account-a", anonymous: true });
 });

@@ -20,6 +20,7 @@ import {
 describe("online message vocabulary", () => {
   it("keeps client messages separate from server-owned transitions", () => {
     assert.deepEqual(GAME_MESSAGES, {
+      befriend: "befriend",
       betting: "betting",
       checkWord: "checkWord",
       draftWord: "draftWord",
@@ -30,6 +31,7 @@ describe("online message vocabulary", () => {
       usePowerUp: "usePowerUp",
     });
     assert.deepEqual(GAME_EVENTS, {
+      befriendResult: "befriendResult",
       privateState: "privateState",
       rejected: "rejected",
       powerDraw: "powerDraw",

@@ -11,6 +11,8 @@
  * knows how a table is joined — that is `room-session`'s business, one screen further on.
  */
 
+import { isFriendCode } from "@wordpoker/contracts";
+
 /** The screen that means the lobby, on the custom scheme and on a web URL alike. */
 const ONLINE_SCREEN = "online";
 
@@ -23,6 +25,7 @@ const ROOM_PARAM = "room";
  * a nested route this app does not have, while `/online?room=<id>` stays the lobby with an arrival.
  */
 export type Destination =
+  | { readonly pathname: "/friends"; readonly params: { readonly add: string } }
   | { readonly pathname: "/online" }
   | { readonly pathname: "/online/[roomId]"; readonly params: { readonly roomId: string } };
 
@@ -111,6 +114,20 @@ function parseLink(url: string): Link {
  */
 export function destinationFromURL(url: string | null | undefined): Destination | null {
   if (typeof url !== "string" || url.length === 0) return null;
+
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const friendSegments = parsed.protocol === "wordpoker:" && parsed.hostname === "friend"
+      ? ["friend", ...segments] : segments;
+    if (friendSegments[0] === "friend") {
+      const code = friendSegments[1];
+      return friendSegments.length === 2 && isFriendCode(code)
+        ? { pathname: "/friends", params: { add: code } } : null;
+    }
+  } catch {
+    return null;
+  }
 
   const { screen, room } = parseLink(url);
   if (screen !== ONLINE_SCREEN) return null;

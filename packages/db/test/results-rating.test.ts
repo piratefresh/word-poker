@@ -142,6 +142,9 @@ describe(
           "Migration20261005120000_quests",
           "Migration20261006120000_xp_levels",
           "Migration20261012120000_game_history",
+          "Migration20261013120000_anonymous_user",
+          "Migration20261013130000_hand_seat_adopted_from",
+          "Migration20261013140000_friends",
         ],
         "the migrations are pending again",
       );

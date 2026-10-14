@@ -1,8 +1,8 @@
 import { readHistoryHand } from "@wordpoker/db";
-import { historyUser } from "@/auth/server/history-user";
+import { sessionUser } from "@/auth/server/session-user";
 
 export async function GET(request: Request, { id }: { id: string }): Promise<Response> {
-  const userId = await historyUser(request);
+  const userId = (await sessionUser(request))?.id;
   if (!userId) return Response.json({ error: "Sign in to see your history." }, { status: 401 });
   try {
     const hand = await readHistoryHand(userId, id);

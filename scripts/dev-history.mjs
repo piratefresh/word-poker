@@ -7,7 +7,7 @@ const child = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
   env: {
     ...process.env,
     AUTH_API_URL: "http://localhost:8081",
-    WORDPOKER_HISTORY_DATABASE_URL: process.env.DATABASE_URL,
+    WORDPOKER_DATABASE_URL: process.env.DATABASE_URL,
     WORDPOKER_HISTORY_JOURNAL_DIR: resolve(".history-settlements"),
   },
 });

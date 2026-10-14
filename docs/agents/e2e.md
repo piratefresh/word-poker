@@ -17,7 +17,7 @@ pnpm start:local
 `dev:history` uses `apps/mobile/.env`'s database, verifies online seats at `http://localhost:8081`,
 and retains uncommitted settlements in `.history-settlements/`. `start:local` disables `API_PROXY`
 and pins the game connection to the local server even when the API reloads its environment. In
-production, configure the room server's `WORDPOKER_HISTORY_DATABASE_URL` and mount a persistent
+production, configure the room server's `WORDPOKER_DATABASE_URL` and mount a persistent
 `WORDPOKER_HISTORY_JOURNAL_DIR`; see `apps/server/.env.example`.
 
 Play a completed online or offline hand and open **Game History** on home. The list groups hands

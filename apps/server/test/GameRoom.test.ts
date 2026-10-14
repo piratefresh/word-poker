@@ -33,9 +33,10 @@ import {
   bestStripWord,
   toEngineAction,
 } from "../scripts/four-seat-scenario.js";
-import { closeOrm, getOrm, pgConnectionString } from "@wordpoker/db";
+import { closeOrm, friendList, getOrm, pgConnectionString } from "@wordpoker/db";
 import { Client as PgClient } from "pg";
 import appConfig from "../src/app.config.js";
+import { createRunTarget, openRunOrm, serverUrl } from "../../../packages/db/test/run-target.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
 // this gate. The suite boots unseeded rooms too, so only tests that pin a seed need it on.
@@ -132,7 +133,10 @@ describe("GameRoom", () => {
   const originalAuthOrigin = process.env.AUTH_API_URL;
   // A protocol fixture, not an auth bypass in application code: joins still call the real verifier.
   let accountCount = 0;
+  let sessionChecks = 0;
+  const revokedTokens = new Set<string>();
   const authServer = createServer((request, response) => {
+    sessionChecks += 1;
     const token = request.headers.authorization;
     response.setHeader("content-type", "application/json");
     // `test-session` verifies as a fresh account each join (one seat per account); the others are fixed.
@@ -140,7 +144,7 @@ describe("GameRoom", () => {
       : token === "Bearer second-session" ? "second-account"
       : token === "Bearer same-session" ? "same-account"
       : undefined;
-    if (id === undefined) {
+    if (id === undefined || revokedTokens.has(token ?? "")) {
       response.end("null");
       return;
     }
@@ -166,10 +170,112 @@ describe("GameRoom", () => {
 
   beforeEach(async () => {
     await colyseus.cleanup();
+    revokedTokens.clear();
     colyseus.sdk.auth.token = "test-session";
   });
 
   describe("authenticated seats", () => {
+    it("revalidates the session before a waiting-room friendship write", async () => {
+      const room = await colyseus.createRoom("game", { name: "Revoked friends", buyIn: 500, maxSeats: 2 });
+      colyseus.sdk.auth.token = "same-session";
+      const first = await colyseus.connectTo(room);
+      colyseus.sdk.auth.token = "second-session";
+      const second = await colyseus.connectTo(room);
+      const binding = room["bindings"].get(first.sessionId);
+      assert.ok(binding);
+      const checksBefore = sessionChecks;
+      revokedTokens.add("Bearer same-session");
+      const reply = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
+      await room.messages.befriend(binding.client, { playerId: second.sessionId });
+      assert.equal(sessionChecks, checksBefore + 1);
+      assert.deepEqual(await reply, {
+        playerId: second.sessionId,
+        message: "Friends aren't available right now. Try again.",
+      });
+    });
+
+    it("ignores friend requests during play and payout", async () => {
+      const room = await colyseus.createRoom("game", { name: "Friends during play", buyIn: 500, maxSeats: 2 });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      await readyUp(room, [first, second]);
+      assert.equal(room.state.phase, "preflop");
+      const binding = room["bindings"].get(first.sessionId);
+      assert.ok(binding);
+      const send = binding.client.send;
+      let replies = 0;
+      try {
+        binding.client.send = (type) => { if (type === GAME_EVENTS.befriendResult) replies += 1; };
+        await room.messages.befriend(binding.client, { playerId: second.sessionId });
+        assert.equal(replies, 0);
+
+        const actorId = [...room.state.seats.values()].find((seat) => seat.seat === room.state.toActSeat)?.playerId;
+        const actor = room["bindings"].get(actorId ?? "");
+        assert.ok(actor);
+        room.messages.betting(actor.client, { type: "fold" });
+        assert.equal(room.state.phase, "payout");
+        await room.messages.befriend(binding.client, { playerId: second.sessionId });
+        assert.equal(replies, 0);
+      } finally {
+        binding.client.send = send;
+      }
+    });
+
+    it("requests friends using only server-owned seat account IDs", async function (this: Mocha.Context) {
+      if (!serverUrl) this.skip();
+      const originalDatabase = process.env.WORDPOKER_DATABASE_URL;
+      const admin = new PgClient({ connectionString: serverUrl });
+      await admin.connect();
+      const target = await createRunTarget(admin, "room-friends");
+      const orm = await openRunOrm(target);
+      try {
+        await orm.migrator.up();
+        const url = new URL(target.url);
+        if (target.schema) url.searchParams.set("options", `-c search_path=${target.schema}`);
+        const room = await colyseus.createRoom("game", { name: "Friends", buyIn: 500, maxSeats: 2 });
+        process.env.WORDPOKER_DATABASE_URL = url.toString();
+        colyseus.sdk.auth.token = "same-session";
+        const first = await colyseus.connectTo(room);
+        colyseus.sdk.auth.token = "second-session";
+        const second = await colyseus.connectTo(room);
+        const firstId = room["bindings"].get(first.sessionId)?.userId;
+        const secondId = room["bindings"].get(second.sessionId)?.userId;
+        assert.ok(firstId && secondId);
+        await orm.em.getConnection().execute(`insert into "user" (id, name) values (?, 'Ada'), (?, 'Bea')`, [firstId, secondId]);
+        const inbox: unknown[] = [];
+        const off = first.onMessage(GAME_EVENTS.befriendResult, (payload) => inbox.push(payload));
+        const binding = room["bindings"].get(first.sessionId);
+        assert.ok(binding);
+        await room.messages.befriend(binding.client, { playerId: "not-at-table", userId: secondId });
+        assert.equal(inbox.length, 0);
+        revokedTokens.add("Bearer same-session");
+        const refused = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
+        first.send(GAME_MESSAGES.befriend, { playerId: second.sessionId });
+        assert.deepEqual(await refused, {
+          playerId: second.sessionId,
+          message: "Friends aren't available right now. Try again.",
+        });
+        assert.deepEqual((await friendList(firstId, { orm })).outgoing, []);
+        assert.deepEqual((await friendList(secondId, { orm })).incoming, []);
+        revokedTokens.delete("Bearer same-session");
+        const reply = new Promise<unknown>((resolve) => first.onMessage(GAME_EVENTS.befriendResult, resolve));
+        first.send(GAME_MESSAGES.befriend, { playerId: second.sessionId, userId: "forged" });
+        assert.deepEqual(await reply, { playerId: second.sessionId, message: "Friend request sent" });
+        assert.deepEqual((await friendList(firstId, { orm })).outgoing, [{ userId: secondId, name: "Bea" }]);
+        assert.deepEqual((await friendList(secondId, { orm })).incoming, [{ userId: firstId, name: "Ada" }]);
+        off();
+        await first.leave();
+        await second.leave();
+      } finally {
+        await closeOrm();
+        await orm.close(true);
+        await target.drop(admin);
+        await admin.end();
+        if (originalDatabase === undefined) delete process.env.WORDPOKER_DATABASE_URL;
+        else process.env.WORDPOKER_DATABASE_URL = originalDatabase;
+      }
+    });
+
     it("rejects anonymous and forged joins before a seat is taken", async () => {
       const room = await colyseus.createRoom("game", { name: "Auth", buyIn: 500, maxSeats: 2 });
       colyseus.sdk.auth.token = "";
@@ -1672,7 +1778,7 @@ describe("GameRoom", () => {
     const serverUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
     const journalDirOriginal = process.env.WORDPOKER_HISTORY_JOURNAL_DIR;
     let journalDir: string;
-    const historyUrlOriginal = process.env.WORDPOKER_HISTORY_DATABASE_URL;
+    const historyUrlOriginal = process.env.WORDPOKER_DATABASE_URL;
     let admin: PgClient | undefined;
     let historyUrl: string | undefined;
     const databases: string[] = [];
@@ -1693,8 +1799,9 @@ describe("GameRoom", () => {
 
       journalDir = await mkdtemp(join(tmpdir(), "room-history-"));
       process.env.WORDPOKER_HISTORY_JOURNAL_DIR = journalDir;
-      process.env.WORDPOKER_HISTORY_DATABASE_URL = historyUrl;
+      process.env.WORDPOKER_DATABASE_URL = historyUrl;
       const orm = await getOrm(historyUrl);
+      await orm.em.getConnection().execute(`create table "user" (id text primary key, name text not null)`);
       await orm.migrator.up();
     });
 
@@ -1702,8 +1809,8 @@ describe("GameRoom", () => {
       if (admin === undefined) return;
       this.timeout(30_000);
 
-      if (historyUrlOriginal === undefined) delete process.env.WORDPOKER_HISTORY_DATABASE_URL;
-      else process.env.WORDPOKER_HISTORY_DATABASE_URL = historyUrlOriginal;
+      if (historyUrlOriginal === undefined) delete process.env.WORDPOKER_DATABASE_URL;
+      else process.env.WORDPOKER_DATABASE_URL = historyUrlOriginal;
       await closeOrm();
       for (const database of databases) {
         await admin.query(`drop database if exists "${database}" with (force)`);
@@ -1872,7 +1979,7 @@ describe("GameRoom", () => {
       const url = new URL(historyUrl);
       url.pathname = `/${database}`;
       await closeOrm();
-      process.env.WORDPOKER_HISTORY_DATABASE_URL = url.toString();
+      process.env.WORDPOKER_DATABASE_URL = url.toString();
 
       const room = await colyseus.createRoom("game", { name: "History Outage", buyIn: 500, maxSeats: 2, tickMs: 5 });
       const clients: ClientRoom[] = [];
