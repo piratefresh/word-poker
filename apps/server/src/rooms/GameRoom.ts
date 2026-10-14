@@ -8,6 +8,7 @@ import {
   GAME_MESSAGES,
   WAITING_PHASE,
   isGameMessagePayload,
+  TABLE_STARTED_MESSAGE,
   blindsFor,
   validateRoomCreateOptions,
   type GameRejectionEvent,
@@ -330,7 +331,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
   onJoin(client: Client, _options: unknown, auth: OnlineAccount) {
     if (this.game !== null) {
-      throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table is mid-hand; join the next hand");
+      throw new ServerError(ErrorCode.APPLICATION_ERROR, TABLE_STARTED_MESSAGE);
     }
 
     const seat = firstFreeSeat(this.bindings, this.maxClients);

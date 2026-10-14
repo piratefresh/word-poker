@@ -16,7 +16,7 @@ import QRCode from "react-native-qrcode-svg";
 import { authClient } from "@/auth/client/auth-client";
 import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
-import { getFriends } from "@/lib/friends-client";
+import { getFriends, inviteFriend } from "@/lib/friends-client";
 import { inviteLinkFor } from "@/lib/invite-link";
 import { webTestID } from "@/lib/web-id";
 
@@ -43,11 +43,21 @@ export function InviteSheet({
   const account = session !== null && session?.user.isAnonymous !== true;
   // A signed-in account's link carries its friend code, so a friend who signs up through it pays the sharer (STO-582).
   const [page, setPage] = useState<FriendsPage | null>(null);
+  const [invited, setInvited] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
     if (!visible || !account) return;
     void getFriends().then(setPage).catch(() => {});
   }, [visible, account]);
   const link = inviteLinkFor(roomId, account ? page?.code : undefined);
+  const online = account ? (page?.friends ?? []).filter((friend) => friend.status === "online") : [];
+  const invite = (userId: string) => {
+    setInvited((prev) => new Set(prev).add(userId));
+    void inviteFriend(userId, roomId).catch(() => setInvited((prev) => {
+      const next = new Set(prev);
+      next.delete(userId);
+      return next;
+    }));
+  };
   const [copy, setCopy] = useState<CopyState>("idle");
 
   const close = () => {
@@ -91,6 +101,25 @@ export function InviteSheet({
             {link}
           </Text>
 
+          {online.length > 0 ? (
+            <View style={styles.friends} testID="invite-online-friends">
+              <Text style={styles.kicker}>ONLINE FRIENDS</Text>
+              {online.map((friend) => (
+                <View key={friend.userId} style={styles.friendRow}>
+                  <Text style={styles.friendName}>{friend.name}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={invited.has(friend.userId)}
+                    onPress={() => invite(friend.userId)}
+                    testID={`invite-friend-${friend.userId}`}
+                  >
+                    <Text style={styles.friendAction}>{invited.has(friend.userId) ? "Invited" : "Invite"}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <GoldButton label={COPY_LABEL[copy]} onPress={copyLink} testID="invite-copy" />
           <Pressable
             accessibilityRole="button"
@@ -125,6 +154,10 @@ const styles = StyleSheet.create({
     letterSpacing: 2.2,
   },
   // A QR code needs a light quiet zone around it to scan off a dark felt.
+  friends: { alignSelf: "stretch", gap: spacing.sm },
+  friendRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  friendName: { color: colors.textBright, fontFamily: fonts.sans, fontSize: fontSize.body },
+  friendAction: { color: colors.goldHi, fontFamily: fonts.sansBold, fontSize: fontSize.small },
   reward: {
     color: colors.textBright,
     fontFamily: fonts.sansBold,

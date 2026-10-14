@@ -121,3 +121,8 @@ test("keeps an existing seat when the device creates another table", async () =>
   await leaveTable();
   expect(first.leave).toHaveBeenCalledTimes(1);
 });
+
+test("names a table that has already started as such", async () => {
+  joinById.mockRejectedValue(Object.assign(new Error("That table has already started."), { code: 4211 }));
+  await expect(joinTable("table-1")).rejects.toThrow("That table has already started.");
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isFriendCode, isFriendsPage, isBefriendResult, isGameMessagePayload } from "../src/index";
+import { isFriendCode, isFriendsPage, isBefriendResult, isGameMessagePayload, isPresenceResponse, isTableInvite } from "../src/index";
 
 test("validates friend codes, private lists and online seat messages", () => {
   const code = "ABCD2345";
@@ -16,4 +16,16 @@ test("validates friend codes, private lists and online seat messages", () => {
   assert.equal(isGameMessagePayload("befriend", { userId: "account" }), false);
   assert.equal(isBefriendResult({ playerId: "seat", message: "Friend request sent" }), true);
   assert.equal(isBefriendResult({ playerId: "seat", message: null }), false);
+});
+
+test("validates presence statuses and table invites", () => {
+  const page = { code: "ABCD2345", friends: [{ userId: "a", name: "Ada", status: "at-table" }], incoming: [], outgoing: [], referrals: 0 };
+  assert.equal(isFriendsPage(page), true);
+  assert.equal(isFriendsPage({ ...page, friends: [{ userId: "a", name: "Ada", status: "away" }] }), false);
+  assert.equal(isTableInvite({ fromName: "Ada", roomId: "abc_123-X" }), true);
+  assert.equal(isTableInvite({ fromName: "Ada", roomId: "a b" }), false);
+  assert.equal(isTableInvite({ fromName: "Ada", roomId: "x".repeat(65) }), false);
+  assert.equal(isPresenceResponse({ invites: [{ fromName: "Ada", roomId: "abc" }] }), true);
+  assert.equal(isPresenceResponse({ invites: [{ fromName: 1, roomId: "abc" }] }), false);
+  assert.equal(isPresenceResponse({}), false);
 });
