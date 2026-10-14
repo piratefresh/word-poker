@@ -523,7 +523,6 @@ function applySpotlight(
   const tile = state.community[index];
   if (tile === undefined || index >= state.revealed) throw new PowerRejectionError("not-a-table-tile");
   if (tile.multiplier !== undefined) throw new PowerRejectionError("already-bonus");
-  if (state.phase !== "flop" && state.phase !== "turn") throw new PowerRejectionError("outside-window");
 
   const letter = "alternativeLetter" in tile ? `${tile.letter}/${tile.alternativeLetter}` : tile.letter;
   return {
@@ -570,6 +569,9 @@ function powerUseRefusal(
   if (held.used) return "already-used";
   // River Review is never used: it reads out at the payout, so no window is ever open for it.
   if (POWER_UPS[powerUpId].family === "review") return "outside-window";
+  if (POWER_UPS[powerUpId].family === "spotlight" && state.phase !== "flop" && state.phase !== "turn") {
+    return "outside-window";
+  }
 
   return powerWindowRefusal(state, seatIndex, playerId, nowMs);
 }

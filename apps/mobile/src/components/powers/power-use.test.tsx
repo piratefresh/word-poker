@@ -13,6 +13,10 @@ import type { PowerView } from "@/features/table/power-view";
 import { PowerHeldChip, PowerUsePrompt } from "./power-use";
 import { swapFlipOf, usePowerTargeting } from "./use-power-targeting";
 
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
+);
+
 // The suite's reanimated mock has no `useReducedMotion`, and the card art reads through it.
 jest.mock("react-native-reanimated", () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -86,6 +90,27 @@ describe("<PowerHeldChip />", () => {
     expect(screen.getByTestId("power-held").props.accessibilityLabel).toMatch(
       /Used\.$/,
     );
+  });
+
+  test("explains unavailable Spotlight without starting targeting, and clears the hint when usable", async () => {
+    const onPress = jest.fn();
+    const screen = await render(
+      <PowerHeldChip active={false} held={held({ id: "spotlight", usable: false })} onPress={onPress} />,
+    );
+
+    await fireEvent.press(screen.getByTestId("power-held"));
+    expect(onPress).not.toHaveBeenCalled();
+    expect(screen.getByText("Use Spotlight on your betting turn during the flop or turn.")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("power-unavailable-hint"));
+    expect(screen.queryByTestId("power-unavailable-hint")).toBeNull();
+
+    await fireEvent.press(screen.getByTestId("power-held"));
+    await screen.rerender(
+      <PowerHeldChip active={false} held={held({ id: "spotlight" })} onPress={onPress} />,
+    );
+    expect(screen.queryByTestId("power-unavailable-hint")).toBeNull();
+    await fireEvent.press(screen.getByTestId("power-held"));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   test("draws nothing while the hero holds no power", async () => {
