@@ -208,8 +208,23 @@ export async function payReferral(refereeId: string, deps: RewardsDeps = {}): Pr
   if (referrerId === null) return;
 
   await applyWalletChange(refereeId, "referral", REFERRAL_REFEREE_GRANT, { ref: "referee" }, deps);
-  // ponytail: cap check races; serialize per referrer if farming shows up
-  if ((await referrals.paidReferralCount(referrerId)) < REFERRAL_CAP) {
-    await applyWalletChange(referrerId, "referral", REFERRAL_REFERRER_GRANT, { ref: refereeId }, deps);
+
+  // Count-then-grant runs one at a time per referrer, so two referees can't both see a stale count.
+  // ponytail: in-process only; a multi-instance deploy needs a DB lock (advisory lock per referrer).
+  const previous = referrerQueue.get(referrerId) ?? Promise.resolve();
+  const turn = previous.then(async () => {
+    if ((await referrals.paidReferralCount(referrerId)) < REFERRAL_CAP) {
+      await applyWalletChange(referrerId, "referral", REFERRAL_REFERRER_GRANT, { ref: refereeId }, deps);
+    }
+  });
+  const tail = turn.catch(() => {});
+  referrerQueue.set(referrerId, tail);
+  try {
+    await turn;
+  } finally {
+    if (referrerQueue.get(referrerId) === tail) referrerQueue.delete(referrerId);
   }
 }
+
+/** The tail of each referrer's in-flight grants. */
+const referrerQueue = new Map<string, Promise<void>>();

@@ -11,7 +11,7 @@ import {
 import { EMAIL_VERIFIED_CALLBACK } from "@/constants/links";
 import { colors, theme } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
-import { pendingReferral } from "@/lib/pending-destination";
+import { clearReferral, pendingReferral } from "@/lib/pending-destination";
 
 /** `type` is the token group's own name: rename it so it reads as a style set. */
 const { type: typography } = theme;
@@ -81,6 +81,7 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
         setError(authError.message ?? "Something went wrong. Please try again.");
         return;
       }
+      if (mode === "sign-up") clearReferral();
     } catch {
       // A dropped connection rejects instead of returning `{ error }`.
       setError(NETWORK_ERROR);

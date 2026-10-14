@@ -169,3 +169,8 @@ export function rememberReferral(url: string | null | undefined): void {
 export function pendingReferral(): string | null {
   return referral;
 }
+
+/** Drop the held referrer once a sign-up has used it, so a later account can't inherit it. */
+export function clearReferral(): void {
+  referral = null;
+}
