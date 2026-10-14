@@ -90,6 +90,7 @@ tags:
     visible: "Verified · Unranked offline"
     timeout: 60000
 - assertNotVisible: "Pending sync"
+- assertVisible: ".* · 1 hand"
 - tapOn:
     text: "View session"
     index: 0
@@ -102,9 +103,16 @@ tags:
 - assertVisible: "HAND #1"
 - assertVisible:
     text: "Verified · Unranked offline"
+- assertVisible: "ZIG · 14 points · .*"
 - scrollUntilVisible:
     element:
       text: "ACTION LOG"
     direction: DOWN
     timeout: 10000
 - assertVisible: "ACTION LOG"
+# The seeded river: the hero opens with a $20 bet.
+- scrollUntilVisible:
+    element:
+      text: "[0-9]+\\. .* · bet 20"
+    direction: DOWN
+    timeout: 20000

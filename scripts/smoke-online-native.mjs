@@ -121,6 +121,10 @@ function stopAll() {
   // Stop the dev client while Metro still answers its reversed connections. On Windows,
   // leaving it alive after Metro exits floods ADB with failed connects and stalls even devices.
   if (adb) {
+    // Airplane mode and the mirror loop's removed mappings would otherwise outlive the run.
+    spawnSync(adb, ["shell", "cmd", "connectivity", "airplane-mode", "disable"], { timeout: 5_000, stdio: "ignore" });
+    for (const port of new Set([gamePort, metroPort, deviceApiPort]))
+      spawnSync(adb, ["reverse", `tcp:${port}`, `tcp:${port === deviceApiPort ? metroPort : port}`], { timeout: 5_000, stdio: "ignore" });
     for (const appId of [APP_ID, "dev.mobile.maestro", "dev.mobile.maestro.test"]) {
       spawnSync(adb, ["shell", "am", "force-stop", appId], { timeout: 5_000, stdio: "ignore" });
     }
