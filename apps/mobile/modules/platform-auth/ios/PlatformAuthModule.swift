@@ -17,6 +17,9 @@ public class PlatformAuthModule: Module {
   private var unavailable = false
   private var lastReported: String?
   private var authObserver: NSObjectProtocol?
+  /// Ends an `authenticate()` that GameKit never answers (no network at all): it can stay silent.
+  private var silenceTimer: DispatchWorkItem?
+  private static let silenceLimit: TimeInterval = 15
 
   public func definition() -> ModuleDefinition {
     Name("PlatformAuth")
@@ -92,6 +95,13 @@ public class PlatformAuthModule: Module {
     waiters.append(promise)
     guard waiters.count == 1 else { return } // shares the attempt already in flight
 
+    // Cancelled as soon as sign-in UI is shown: a player typing a password is not silence.
+    let timer = DispatchWorkItem { [weak self] in
+      self?.settle(error: ("NETWORK_ERROR", "Game Center did not answer. Check your connection."))
+    }
+    silenceTimer = timer
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.silenceLimit, execute: timer)
+
     if let controller = heldController {
       // An earlier attempt had UI to show and nowhere to show it; this is the player's retry.
       heldController = nil
@@ -137,10 +147,14 @@ public class PlatformAuthModule: Module {
       settle(error: ("NO_ACTIVITY", "Game Center sign-in needs a visible screen. Try again."))
       return
     }
+    silenceTimer?.cancel()
+    silenceTimer = nil
     presenter.present(controller, animated: true)
   }
 
   private func settle(error: (String, String)?) {
+    silenceTimer?.cancel()
+    silenceTimer = nil
     let pending = waiters
     waiters = []
     for promise in pending {
