@@ -1,4 +1,4 @@
-import { destinationFromURL, rememberDestination, takeDestination } from "./pending-destination";
+import { destinationFromURL, pendingReferral, referralFromURL, rememberDestination, rememberReferral, takeDestination } from "./pending-destination";
 
 describe("a link's destination", () => {
   test("holds web and native friend links as an explicit add card", () => {
@@ -87,5 +87,16 @@ describe("a destination held for a later session", () => {
       pathname: "/online/[roomId]",
       params: { roomId: "later" },
     });
+  });
+});
+
+describe("a link's referral", () => {
+  test("is the friend code its ref names, and survives a later link without one", () => {
+    expect(referralFromURL("https://play.wordpoker.dev/online?room=abc&ref=ABCD2345")).toBe("ABCD2345");
+    expect(referralFromURL("wordpoker://online?ref=ABCI2345")).toBeNull();
+    expect(referralFromURL("wordpoker://online?room=abc")).toBeNull();
+    rememberReferral("wordpoker://online?room=abc&ref=ABCD2345");
+    rememberReferral("wordpoker://online?room=def");
+    expect(pendingReferral()).toBe("ABCD2345");
   });
 });

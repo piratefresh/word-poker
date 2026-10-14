@@ -40,6 +40,7 @@ describe("coin vocabulary", () => {
       "quest",
       "streak",
       "level",
+      "referral",
     ]);
     assert.ok(isWalletEventKind("buy_in"));
     assert.ok(isWalletEventKind("level"));

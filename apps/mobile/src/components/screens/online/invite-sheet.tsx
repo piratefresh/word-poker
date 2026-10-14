@@ -8,12 +8,15 @@
 
 import { BottomSheet, RNHostView } from "@expo/ui";
 import * as Clipboard from "expo-clipboard";
-import { useState } from "react";
+import { REFERRAL_REFERRER_GRANT, type FriendsPage } from "@wordpoker/contracts";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
+import { authClient } from "@/auth/client/auth-client";
 import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
+import { getFriends } from "@/lib/friends-client";
 import { inviteLinkFor } from "@/lib/invite-link";
 import { webTestID } from "@/lib/web-id";
 
@@ -36,7 +39,15 @@ export function InviteSheet({
   roomId: string;
   onClose: () => void;
 }) {
-  const link = inviteLinkFor(roomId);
+  const { data: session } = authClient.useSession();
+  const account = session !== null && session?.user.isAnonymous !== true;
+  // A signed-in account's link carries its friend code, so a friend who signs up through it pays the sharer (STO-582).
+  const [page, setPage] = useState<FriendsPage | null>(null);
+  useEffect(() => {
+    if (!visible || !account) return;
+    void getFriends().then(setPage).catch(() => {});
+  }, [visible, account]);
+  const link = inviteLinkFor(roomId, account ? page?.code : undefined);
   const [copy, setCopy] = useState<CopyState>("idle");
 
   const close = () => {
@@ -61,6 +72,11 @@ export function InviteSheet({
         <View style={styles.sheet}>
           <Text style={styles.title}>Invite a friend</Text>
           <Text style={styles.kicker}>NO APP NEEDED</Text>
+          {account ? (
+            <Text style={styles.reward} testID="invite-reward">
+              {`Invite friends, earn ${REFERRAL_REFERRER_GRANT.toLocaleString("en-US")} coins`}
+            </Text>
+          ) : null}
 
           <View id={webTestID("invite-qr")} style={styles.qr} testID="invite-qr">
             <QRCode size={QR_SIZE} value={link} />
@@ -109,6 +125,11 @@ const styles = StyleSheet.create({
     letterSpacing: 2.2,
   },
   // A QR code needs a light quiet zone around it to scan off a dark felt.
+  reward: {
+    color: colors.textBright,
+    fontFamily: fonts.sansBold,
+    fontSize: fontSize.small,
+  },
   qr: {
     backgroundColor: "#fff",
     borderRadius: radius.sm,

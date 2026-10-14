@@ -32,6 +32,7 @@ import { E2E_AUTH_BYPASS } from "@/lib/e2e";
 import {
   destinationFromURL,
   rememberDestination,
+  rememberReferral,
   takeDestination,
   type Destination,
 } from "@/lib/pending-destination";
@@ -182,13 +183,17 @@ function DeepLinks({
       // Do not cancel this promise when auth changes: a signed-out launch can resolve after the
       // user signs in, and the current session must decide whether it is routed or remembered.
       void (WEB_LAUNCH_URL !== null ? Promise.resolve(WEB_LAUNCH_URL) : Linking.getInitialURL())
-        .then((url) => setInitialDestination(destinationFromURL(url) ?? null))
+        .then((url) => {
+          rememberReferral(url);
+          setInitialDestination(destinationFromURL(url) ?? null);
+        })
         .catch(() => {});
     }
   }, []);
 
   useEffect(() => {
     const arriving = Linking.addEventListener("url", ({ url }) => {
+      rememberReferral(url);
       const destination = destinationFromURL(url);
       if (!destination) return;
       if (session && (destination.pathname !== "/friends" || account)) {

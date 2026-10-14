@@ -8,9 +8,9 @@
  * Signing in never waits on verification; only the grant does.
  */
 
-import { GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP, WELCOME_GRANT } from "@wordpoker/contracts";
-import { countPlayedHands } from "@wordpoker/db";
-import { grantWelcome } from "@wordpoker/economy";
+import { GUEST_HAND_BONUS, GUEST_HAND_BONUS_CAP, WELCOME_GRANT, isFriendCode } from "@wordpoker/contracts";
+import { countPlayedHands, recordReferral } from "@wordpoker/db";
+import { grantWelcome, payReferral } from "@wordpoker/economy";
 
 import { sendEmail, verifyEmailEmail } from "./email";
 
@@ -57,5 +57,25 @@ export async function afterEmailVerification(user: VerifiedUser): Promise<void> 
     }
   } catch (error) {
     console.error(`[welcome-grant] ${user.id}: could not record the grant:`, error);
+  }
+  // An invited friend and their inviter are paid on the same verification (STO-582); never blocks it.
+  // ponytail: a failed payment is not retried; re-run payReferral from GET /api/wallet if it shows up.
+  await payReferral(user.id).catch((error: unknown) => console.error(`[referral] ${user.id}: could not pay:`, error));
+}
+
+/** The header the sign-up screen sends with the friend code its invite link carried (STO-582). */
+export const REFERRAL_HEADER = "x-wordpoker-ref";
+
+/**
+ * Attributes a new account to the inviter whose code rode on the sign-up call. Never throws: a
+ * bad or missing code just means no referral. Guests (the anonymous plugin's users) are skipped.
+ */
+export async function attributeReferral(user: { id: string; isAnonymous?: unknown }, headers: Headers | undefined): Promise<void> {
+  const code = headers?.get(REFERRAL_HEADER);
+  if (user.isAnonymous === true || !isFriendCode(code)) return;
+  try {
+    await recordReferral(user.id, code);
+  } catch (error) {
+    console.error(`[referral] ${user.id}: could not record the referral:`, error);
   }
 }

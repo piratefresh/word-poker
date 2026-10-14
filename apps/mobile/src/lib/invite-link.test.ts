@@ -1,5 +1,5 @@
 import { inviteLinkFor } from "./invite-link";
-import { destinationFromURL } from "./pending-destination";
+import { destinationFromURL, referralFromURL } from "./pending-destination";
 
 afterEach(() => {
   delete process.env.EXPO_PUBLIC_WEB_URL;
@@ -19,5 +19,15 @@ describe("an invite link", () => {
         params: { roomId },
       });
     }
+  });
+});
+
+describe("an invite link's referral", () => {
+  test("carries the sharer's friend code, and reads back as the same table and referrer", () => {
+    const link = inviteLinkFor("abc123", "ABCD2345");
+    expect(link).toMatch(/\?room=abc123&ref=ABCD2345$/);
+    expect(referralFromURL(link)).toBe("ABCD2345");
+    expect(destinationFromURL(link)).toEqual({ pathname: "/online/[roomId]", params: { roomId: "abc123" } });
+    expect(inviteLinkFor("abc123")).not.toContain("ref=");
   });
 });
