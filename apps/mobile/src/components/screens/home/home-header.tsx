@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
+import { goOffline } from "@/lib/friends-client";
 import { formatCoins } from "@/lib/format";
 import { useQuests } from "@/lib/quests-provider";
 import { levelForXp } from "@wordpoker/game-rules";
@@ -24,6 +25,7 @@ export function HomeHeader({ width }: { width: number }) {
   const signOut = async () => {
     setSignOutError(false);
     try {
+      await goOffline().catch(() => {}); // needs the session cookie, so before signOut
       const result = await authClient.signOut();
       if (result.error) setSignOutError(true);
     } catch {

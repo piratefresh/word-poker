@@ -33,6 +33,8 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
   const generation = useRef(0);
   useFocusEffect(useCallback(() => {
     const load = () => {
+      // A refresh mid-action would bump the generation and drop the action's own result.
+      if (acting.current) return;
       const current = ++generation.current;
       void getFriends().then((data) => {
         if (generation.current === current) {

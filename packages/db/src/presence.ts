@@ -59,6 +59,7 @@ export async function isOnline(userId: string, options: DbOptions = {}): Promise
 export async function inviteToTable(from: string, to: string, roomId: string, options: DbOptions = {}): Promise<boolean> {
   if (!await areFriends(from, to, options)) return false;
   const db = await connection(options);
+  await db.execute(`delete from table_invite where created_at < now() - make_interval(mins => ?::int)`, [INVITE_TTL_MINUTES]);
   await db.execute(
     `insert into table_invite (to_user, from_user, room_id) values (?, ?, ?)
      on conflict (to_user, from_user) do update set room_id = excluded.room_id, created_at = now()`,
