@@ -1,9 +1,12 @@
 /**
+ * The street menu (STO-597): each mode slab walks through the door before opening its screen.
  * Home's Coin Store entry is behind `EXPO_PUBLIC_COIN_STORE` (STO-346): off until table buy-ins
  * spend the Wallet. The verify-email prompt (STO-566) rides on the session alone.
  */
 
 import { act, fireEvent, render, type RenderResult } from "@testing-library/react-native";
+
+import { router } from "expo-router";
 
 import { authClient } from "@/auth/client/auth-client";
 
@@ -16,6 +19,9 @@ jest.mock("@/auth/client/session-coordinator", () => ({
 }));
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useFocusEffect: jest.fn() }));
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
+);
 let mockSessionUser: { email: string; emailVerified: boolean } | null = null;
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: {
@@ -75,6 +81,7 @@ beforeEach(() => {
   mockLevelUp = null;
   mockDismissStreakBanner.mockReset();
   mockDismissLevelUp.mockReset();
+  jest.mocked(router.push).mockReset();
   jest.mocked(authClient.sendVerificationEmail).mockReset();
 });
 
@@ -83,54 +90,78 @@ afterEach(() => {
   else process.env.EXPO_PUBLIC_COIN_STORE = saved;
 });
 
-test("shows no Coin Store or Quests without the flag", async () => {
-  delete process.env.EXPO_PUBLIC_COIN_STORE;
+test("shows the four mode slabs", async () => {
+  const view = await render(<HomeScreen />);
 
-  const texts = libraryTexts((await render(<HomeScreen />)).toJSON());
-
-  expect(texts).toContain("Tutorial");
-  expect(texts).not.toContain("Coin Store");
-  expect(texts).not.toContain("Quests");
+  for (const label of ["Play Online", "Play a Friend", "Tutorial", "Offline"]) {
+    expect(view.getByLabelText(label)).toBeTruthy();
+  }
 });
 
-test("shows the Coin Store and Quests with the flag on", async () => {
-  process.env.EXPO_PUBLIC_COIN_STORE = "1";
+test("walks through the door, then opens the mode", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
 
-  const texts = libraryTexts((await render(<HomeScreen />)).toJSON());
-  expect(texts).toContain("Coin Store");
-  expect(texts).toContain("Quests");
+  await fireEvent.press(view.getByTestId("home-slab-online"));
+  expect(router.push).not.toHaveBeenCalled();
+
+  await act(async () => jest.runAllTimers());
+  expect(router.push).toHaveBeenCalledWith("/online");
+  jest.useRealTimers();
+});
+
+test("opens Offline's choices, and Wild Power starts a wild table", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+  expect(view.queryByTestId("offline-wild")).toBeNull();
+
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  await fireEvent.press(view.getByTestId("offline-wild"));
+  await act(async () => jest.runAllTimers());
+
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { powers: "wild" } });
+  jest.useRealTimers();
+});
+
+test("opens the Coin Store from the coin pill only with the flag on", async () => {
+  delete process.env.EXPO_PUBLIC_COIN_STORE;
+  expect((await render(<HomeScreen />)).getByTestId("home-credits").props.accessibilityState?.disabled).toBe(true);
+
+  process.env.EXPO_PUBLIC_COIN_STORE = "1";
+  await fireEvent.press((await render(<HomeScreen />)).getByTestId("home-credits"));
+  expect(router.push).toHaveBeenCalledWith("/store");
 });
 
 test("shows no streak banner when none is set", async () => {
-  const texts = libraryTexts((await render(<HomeScreen />)).toJSON());
+  const { queryByTestId } = await render(<HomeScreen />);
 
-  expect(texts.some((text) => text.includes("STREAK"))).toBe(false);
+  expect(queryByTestId("quest-streak-banner")).toBeNull();
 });
 
 test("shows the streak banner, and dismisses it on tap", async () => {
   mockStreakBanner = { day: 4, reward: 125 };
 
-  const { getByTestId, toJSON } = await render(<HomeScreen />);
-  expect(libraryTexts(toJSON())).toContain("DAY 4 STREAK · +125 COINS");
+  const { getByTestId, getByText } = await render(<HomeScreen />);
+  expect(getByText("DAY 4 STREAK · +125 COINS")).toBeTruthy();
 
-  fireEvent.press(getByTestId("quest-streak-banner"));
+  await fireEvent.press(getByTestId("quest-streak-banner"));
   expect(mockDismissStreakBanner).toHaveBeenCalledTimes(1);
 });
 
 test("shows the level-up banner, and dismisses it on tap", async () => {
   mockLevelUp = { level: 3, reward: 350 };
 
-  const { getByTestId, toJSON } = await render(<HomeScreen />);
-  expect(libraryTexts(toJSON())).toContain("LEVEL 3 REACHED · +350 COINS");
+  const { getByTestId, getByText } = await render(<HomeScreen />);
+  expect(getByText("LEVEL 3 REACHED · +350 COINS")).toBeTruthy();
 
-  fireEvent.press(getByTestId("level-up-banner"));
+  await fireEvent.press(getByTestId("level-up-banner"));
   expect(mockDismissLevelUp).toHaveBeenCalledTimes(1);
 });
 
-test("shows no level ring without quest state", async () => {
+test("shows no level pill without quest state", async () => {
   const { queryByTestId } = await render(<HomeScreen />);
 
-  expect(queryByTestId("level-ring")).toBeNull();
+  expect(queryByTestId("home-level")).toBeNull();
 });
 
 test("prompts an unverified player to verify, and resends the mail", async () => {

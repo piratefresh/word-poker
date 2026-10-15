@@ -9,14 +9,14 @@ tags: [native, online, cross-platform]
     text: "Continue"
     optional: true
 - extendedWaitUntil:
-    visible: "TAKE YOUR SEAT|Online Mode"
+    visible: "TAKE YOUR SEAT|Play Online"
     timeout: 180000
 - runFlow:
     when:
       visible: "TAKE YOUR SEAT"
     file: _sign-in.yaml
 - extendedWaitUntil:
-    visible: "Online Mode"
+    visible: "Play Online"
     timeout: 180000
 - openLink: wordpoker://online?room=${ROOM_ID}
 - extendedWaitUntil:

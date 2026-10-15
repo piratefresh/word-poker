@@ -326,7 +326,7 @@ if (platform === "android") {
 ---
 - openLink: \${DEV_LINK}
 - extendedWaitUntil:
-    visible: "Continue|TAKE YOUR SEAT|Offline Mode"
+    visible: "Continue|TAKE YOUR SEAT|Offline"
     timeout: 300000
 - tapOn:
     text: "Continue"

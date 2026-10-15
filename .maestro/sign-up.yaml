@@ -89,7 +89,7 @@ env:
 # Registered: Better Auth creates the account and the session together, so the
 # guard lets the fresh user through to the home screen.
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 60000
 - tapOn:
     id: "home-account-menu"

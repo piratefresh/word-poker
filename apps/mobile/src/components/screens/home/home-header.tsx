@@ -1,9 +1,11 @@
+import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
+import { coinStoreEnabled } from "@/lib/coin-store";
 import { formatCoins } from "@/lib/format";
 import { unregisterPush } from "@/lib/use-push-registration";
 import { useQuests } from "@/lib/quests-provider";
@@ -11,8 +13,8 @@ import { levelForXp } from "@wordpoker/game-rules";
 
 import { AccountMenu } from "./account-menu";
 import { AccountSettings } from "./account-settings";
-import { LevelRing } from "./level-ring";
 
+/** The street menu's top bar (STO-597): a gold avatar on the left, level and coin pills on the right. */
 export function HomeHeader({ width }: { width: number }) {
   const { data: session } = authClient.useSession();
   const { coins, state } = useQuests();
@@ -43,15 +45,33 @@ export function HomeHeader({ width }: { width: number }) {
         <AccountMenu name={name} onSettings={() => setSettingsOpen(true)} onSignOut={signOut}>
           <View accessibilityLabel={`Avatar for ${name}`} accessibilityRole="image" accessible style={styles.avatar}>
             <Text style={styles.initial}>{name.charAt(0).toUpperCase()}</Text>
-            <View style={styles.chevron}><Text style={styles.chevronText}>⌄</Text></View>
           </View>
         </AccountMenu>
         <View style={styles.stats}>
-          <View accessibilityLabel={coins == null ? "Credits unavailable" : `${coins} credits`} accessible style={styles.credits} testID="home-credits">
-            <Text style={styles.caption}>Credits</Text>
-            <Text style={styles.amount}>{coins == null ? "—" : formatCoins(coins)}</Text>
-          </View>
-          {standing ? <LevelRing {...standing} /> : null}
+          {standing ? (
+            // Quests and the Store ride behind the Coin Store's flag; until then the pills only read out.
+            <Pressable
+              accessibilityLabel={`Level ${standing.level}, ${standing.intoLevel} of ${standing.intoLevel + standing.toNext} XP`}
+              accessibilityRole={coinStoreEnabled() ? "button" : "text"}
+              disabled={!coinStoreEnabled()}
+              onPress={() => router.push("/quests")}
+              style={styles.pill}
+              testID="home-level"
+            >
+              <Text style={styles.pillText}>{`LV ${standing.level}`}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityLabel={coins == null ? "Credits unavailable" : `${coins} credits`}
+            accessibilityRole={coinStoreEnabled() ? "button" : "text"}
+            disabled={!coinStoreEnabled()}
+            onPress={() => router.push("/store")}
+            style={styles.pill}
+            testID="home-credits"
+          >
+            <View style={styles.coin} />
+            <Text style={styles.pillText}>{coins == null ? "—" : formatCoins(coins)}</Text>
+          </Pressable>
         </View>
       </View>
       {signOutError ? <Text accessibilityRole="alert" style={styles.error}>Couldn’t sign out. Try again from the account menu.</Text> : null}
@@ -61,14 +81,43 @@ export function HomeHeader({ width }: { width: number }) {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 56 },
-  avatar: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center" },
-  initial: { color: colors.onGold, fontFamily: fonts.ui, fontSize: fontSize.h3 },
-  chevron: { position: "absolute", bottom: -1, right: -3, width: 18, height: 18, borderRadius: radius.pill, backgroundColor: colors.bgElevated, borderColor: colors.borderStrong, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  chevronText: { color: colors.goldHi, fontSize: fontSize.small, lineHeight: 14 },
-  stats: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  credits: { alignItems: "flex-end" },
-  caption: { color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.caption },
-  amount: { color: colors.goldHi, fontFamily: fonts.ui, fontSize: fontSize.title },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 48 },
+  // The lip is the darker bottom border: the face sits on it, as the slabs below do.
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: "#d4a24c",
+    borderColor: "#e0974a",
+    borderWidth: 1.5,
+    borderBottomWidth: 4,
+    borderBottomColor: "#8f5f22",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  initial: { color: "#3a2410", fontFamily: fonts.arcade, fontSize: 22 },
+  stats: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexShrink: 1, marginLeft: spacing.sm },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minHeight: 44,
+    flexShrink: 1,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(8, 12, 28, 0.7)",
+    borderColor: "#e0974a",
+    borderWidth: 3,
+  },
+  pillText: { color: "#f7e7b5", fontFamily: fonts.arcade, fontSize: 17 },
+  coin: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#d4a24c",
+    borderColor: "#f7df7a",
+    borderWidth: 2,
+  },
   error: { color: colors.danger, fontFamily: fonts.sans, fontSize: fontSize.small, marginTop: spacing.sm },
 });

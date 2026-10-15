@@ -71,7 +71,7 @@ tags:
 # On a cold start the root layout renders nothing until the fonts load, and a link that
 # lands then is dropped (STO-516): wait for home before sending it.
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 30000
 
 # The web flow pins the seed in its URL; a device gets the same route as a deep link. The
