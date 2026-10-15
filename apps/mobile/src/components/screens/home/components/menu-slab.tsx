@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tileLetter: { color: MENU.cream, fontFamily: fonts.arcade, fontSize: 20 },
-  label: { flexShrink: 1, fontFamily: fonts.arcade, fontSize: 19 },
+  label: { flexShrink: 1, fontFamily: fonts.arcade, fontSize: 17 },
   tag: {
     position: "absolute",
     top: -9,

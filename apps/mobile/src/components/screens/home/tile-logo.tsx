@@ -9,12 +9,13 @@
  */
 
 import { useFocusEffect } from "expo-router";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
+  cancelAnimation,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -54,7 +55,7 @@ const PAD_Y = spacing.xs;
  * Where each tile waits before it lights, in reading order: x and y as fractions of the room the
  * box leaves a tile, and a tilt in degrees. Drawn fresh per mount, so every visit scatters differently.
  */
-function randomScatter(): (readonly [number, number, number])[] {
+export function createLogoScatter(): (readonly [number, number, number])[] {
   return Array.from({ length: 9 }, () => [
     Math.random(),
     Math.random(),
@@ -65,6 +66,16 @@ function randomScatter(): (readonly [number, number, number])[] {
 /** Once per app session: coming back from a game shows the finished logo. */
 let introPlayed = false;
 
+/** Share the original entrance without starting the optional word-building demo. */
+export function useLogoIntro(): boolean {
+  const reduceMotion = useReducedMotion();
+  const [play] = useState(() => !introPlayed && !reduceMotion);
+  useEffect(() => {
+    if (play) introPlayed = true;
+  }, [play]);
+  return play;
+}
+
 interface Slot {
   key: string;
   letter: Letter;
@@ -73,7 +84,7 @@ interface Slot {
   fromX: number;
   fromY: number;
   fromRotate: number;
-  delay: number;
+  index: number;
 }
 
 /** The tiles' scale and the box's height at a width. */
@@ -107,40 +118,50 @@ function slots(
         fromX: fx * (width - w) - left,
         fromY: fy * (height - h) - top,
         fromRotate: rotate,
-        delay: SHUFFLE_MS + index * STAGGER_MS,
+        index,
       });
     });
   });
   return out;
 }
 
-function LogoTile({
+export function LogoTileEntrance({
   slot,
-  scale,
   play,
+  tilt = 0,
+  children,
+  testID,
 }: {
-  slot: Slot;
-  scale: number;
+  slot: Pick<Slot, "left" | "top" | "fromX" | "fromY" | "fromRotate" | "index">;
   play: boolean;
+  tilt?: number;
+  children: ReactNode;
+  testID: string;
 }) {
   const progress = useSharedValue(play ? 0 : 1);
   const lit = useSharedValue(play ? opacity.muted : 1);
   const pop = useSharedValue(1);
+  const delay = SHUFFLE_MS + slot.index * STAGGER_MS;
 
   useEffect(() => {
     if (!play) return;
-    progress.set(withDelay(slot.delay, withSpring(1, MOVE_SPRING)));
-    lit.set(withDelay(slot.delay, withTiming(1, { duration: LIGHT_MS })));
+    progress.set(withDelay(delay, withSpring(1, MOVE_SPRING)));
+    lit.set(withDelay(delay, withTiming(1, { duration: LIGHT_MS })));
     pop.set(
       withDelay(
-        slot.delay,
+        delay,
         withSequence(
           withTiming(LAND_SCALE, { duration: LIGHT_MS }),
           withSpring(1, MOVE_SPRING),
         ),
       ),
     );
-  }, [lit, play, pop, progress, slot.delay]);
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(lit);
+      cancelAnimation(pop);
+    };
+  }, [delay, lit, play, pop, progress]);
 
   const motion = useAnimatedStyle(() => {
     const away = 1 - progress.get();
@@ -149,7 +170,7 @@ function LogoTile({
       transform: [
         { translateX: slot.fromX * away },
         { translateY: slot.fromY * away },
-        { rotate: `${slot.fromRotate * away}deg` },
+        { rotate: `${slot.fromRotate * away + tilt * progress.get()}deg` },
         { scale: pop.get() },
       ],
     };
@@ -158,8 +179,16 @@ function LogoTile({
   return (
     <Animated.View
       style={[styles.tile, { left: slot.left, top: slot.top }, motion]}
-      testID={`tile-logo-${slot.key}`}
+      testID={testID}
     >
+      {children}
+    </Animated.View>
+  );
+}
+
+function LogoTile({ slot, scale, play }: { slot: Slot; scale: number; play: boolean }) {
+  return (
+    <LogoTileEntrance slot={slot} play={play} testID={`tile-logo-${slot.key}`}>
       <Tile
         animation="none"
         interactive={false}
@@ -172,7 +201,7 @@ function LogoTile({
           points: LETTER_VALUES[slot.letter],
         }}
       />
-    </Animated.View>
+    </LogoTileEntrance>
   );
 }
 
@@ -337,8 +366,8 @@ export function TileLogo({
 }): ReactElement {
   const reduceMotion = useReducedMotion();
   // Read once per mount: a re-render mid-intro must not snap the tiles home.
-  const [play] = useState(() => !introPlayed && !reduceMotion);
-  const [scatter] = useState(randomScatter);
+  const play = useLogoIntro();
+  const [scatter] = useState(createLogoScatter);
   const [demo, setDemo] = useState<{ index: number; step: number } | null>(
     null,
   );
@@ -347,10 +376,6 @@ export function TileLogo({
   useEffect(() => {
     onIdleChange?.(idle);
   }, [idle, onIdleChange]);
-
-  useEffect(() => {
-    if (play) introPlayed = true;
-  }, [play]);
 
   // One timer chain: logo -> unsorted word -> swaps -> hold -> next word. Blur or unmount clears it.
   useFocusEffect(
