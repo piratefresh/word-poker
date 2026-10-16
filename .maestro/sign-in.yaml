@@ -77,7 +77,7 @@ tags:
 
 # Past the guard: verify the account email in Settings, then return to Home.
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 60000
 - tapOn:
     id: "home-account-menu"

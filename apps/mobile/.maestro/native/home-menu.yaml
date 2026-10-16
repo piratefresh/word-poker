@@ -1,19 +1,14 @@
-# The home menu on a device (STO-517): the mode list shows Tutorial, Online, Offline and
-# Leaderboard, and Offline Mode carries its two choices — Normal and Wild Power — inside the card.
-#
-# On iPhone the universal layout drew each card at its content's width, and the hosted choices
-# took the card's height instead of their own, so the Offline card clipped them to a sliver and
-# their labels never showed. This flow holds the fix: every choice and its label is on screen
-# and tappable, and the screenshots it leaves (the run's debug output) show the cards' edges.
+# The street menu on a device (STO-597): the four mode slabs — Play Online, Play a Friend,
+# Tutorial, Offline — sit on the wall left of the door, and the Offline slab opens its two
+# choices, Normal and Wild Power.
 #
 #   maestro test --platform ios .maestro/native/home-menu.yaml        # from apps/mobile
 #
 # It needs the app past the sign-in guard: the `e2e-test` build (EXPO_PUBLIC_E2E_AUTH_BYPASS=1,
 # src/lib/e2e.ts) boots straight to the home tab. Run it on the iPhone 17 simulator and on a
-# smaller phone (iPhone SE) — the width is the window's, so a narrow screen is the case that
-# would clip first.
+# smaller phone (iPhone SE): the slabs and the door must still fit the short screen.
 appId: com.wordpoker.wordpoker
-name: Home menu — cards fit and Offline choices are visible (native)
+name: Home menu — slabs fit and Offline choices open (native)
 tags:
   - native
   - home
@@ -22,30 +17,29 @@ tags:
     clearState: false
 
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 60000
 
-# Every mode card is on the screen.
+# Every mode slab is on the screen.
+- assertVisible: "Play Online"
+- assertVisible: "Play a Friend"
 - assertVisible: "Tutorial"
-- assertVisible: "Online Mode"
-- assertVisible: "Offline Mode"
-- assertVisible: "Leaderboard"
+- assertVisible: "Offline"
+- takeScreenshot: home-menu
 
-# The Offline card's choices are whole: the tile by testID, then by the label it reads out. Each
-# tile is one accessibility element ("<label>: <description>", mode-variants.tsx), so its texts are
-# not exposed on their own; the label is matched whole.
+# The Offline slab opens its choices, each one whole: the tile by testID, then by the label it
+# reads out ("<label>: <description>", mode-variants.tsx).
+- tapOn:
+    id: "home-slab-offline"
 - assertVisible:
     id: "offline-normal"
 - assertVisible:
     id: "offline-wild"
 - assertVisible: "Normal: Standard rules"
 - assertVisible: "Wild Power: Pick a power each hand"
+- takeScreenshot: home-menu-offline
 
-# The card below them is not pushed off or covered.
-- assertVisible: "Top players & best words"
-- takeScreenshot: home-menu
-
-# And tappable: Normal opens the offline table.
+# And tappable: Normal walks through the door to the offline table.
 - tapOn:
     id: "offline-normal"
 - extendedWaitUntil:

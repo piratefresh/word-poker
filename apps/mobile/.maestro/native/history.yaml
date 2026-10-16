@@ -26,7 +26,7 @@ tags:
             - back
 # A fresh Metro compiles the auth route on first use, so the session check can take minutes.
 - extendedWaitUntil:
-    visible: "TAKE YOUR SEAT|Offline Mode"
+    visible: "TAKE YOUR SEAT|Offline"
     timeout: 300000
 - runFlow:
     when:
@@ -43,7 +43,7 @@ tags:
     timeout: 90000
 - back
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 30000
 - openLink: wordpoker://history
 - extendedWaitUntil:
@@ -51,7 +51,7 @@ tags:
     timeout: 30000
 - back
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 30000
 
 # Offline: the runner removes the game and API reverse mappings while airplane mode is on.
@@ -83,7 +83,7 @@ tags:
     commands:
       - openLink: ${DEV_LINK}
 - extendedWaitUntil:
-    visible: "Offline Mode"
+    visible: "Offline"
     timeout: 300000
 - openLink: wordpoker://history
 - extendedWaitUntil:

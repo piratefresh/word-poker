@@ -24,7 +24,7 @@ tags:
     timeout: 30000
 - tapOn:
     id: "tab-home"
-- assertVisible: "Offline Mode"
+- assertVisible: "Offline"
 # Direct links must land inside the same tab bar.
 - openLink: http://localhost:8081/friends
 - extendedWaitUntil:
@@ -33,7 +33,7 @@ tags:
     timeout: 30000
 - tapOn:
     id: "tab-home"
-- assertVisible: "Offline Mode"
+- assertVisible: "Offline"
 - openLink: http://localhost:8081/history
 - extendedWaitUntil:
     visible:
@@ -41,4 +41,4 @@ tags:
     timeout: 30000
 - tapOn:
     id: "tab-home"
-- assertVisible: "Offline Mode"
+- assertVisible: "Offline"

@@ -6,6 +6,7 @@ import { AccountSettings } from "./account-settings";
 import { NotificationSettings } from "./notification-settings";
 import { HomeHeader } from "./home-header";
 
+jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: {
     useSession: () => ({ data: { user: { name: "Ada", email: "ada@example.com" } } }),
@@ -61,7 +62,7 @@ test("shows credits and XP, opens Settings, and signs out through the avatar men
   jest.mocked(authClient.signOut).mockResolvedValue({ data: { success: true }, error: null } as never);
   const view = await render(<HomeHeader width={342} />);
   expect(view.getByLabelText("1250 credits")).toBeTruthy();
-  expect(view.getByTestId("level-ring")).toBeTruthy();
+  expect(view.getByTestId("home-level")).toBeTruthy();
 
   await fireEvent(view.getByTestId("home-account-menu"), "pressAction", { nativeEvent: { event: "settings" } });
   expect(view.getByTestId("account-settings")).toBeTruthy();

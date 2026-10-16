@@ -1,274 +1,388 @@
-import {
-  Column,
-  Host,
-  RNHostView,
-  ScrollView,
-  Text,
-  type UniversalTextStyle,
-} from "@expo/ui";
+/**
+ * home-screen.tsx — the street menu (STO-595, STO-597): a dusk street with a lit club door, the
+ * tile logo, and the mode slabs stacked on the wall to the left of the door.
+ *
+ * Choosing a mode walks through the door: the UI fades, the street zooms toward the doorway and
+ * the warm interior colour fills the screen, then the mode's screen opens. Coming back resets it.
+ *
+ * ponytail: the zoom runs on the one flat background, so the door doesn't swing and the sky
+ * doesn't parallax. Swap in STO-596's layers (door rotated about its hinge, sky slower than the
+ * wall, light spill) and STO-598's 2.4s beat timing once the art lands.
+ */
+
+import { Host } from "@expo/ui";
 import { isAccountEligible } from "@wordpoker/contracts";
-import { router, type Href } from "expo-router";
-import { useState } from "react";
-import { useWindowDimensions } from "react-native";
+import { Image } from "expo-image";
+import { router, useFocusEffect, type Href } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { authClient } from "@/auth/client/auth-client";
 import {
-  ModeCard,
-  type ModeCardProps,
-} from "@/components/screens/home/components/mode-card";
+  MenuSlab,
+  type MenuSlabProps,
+} from "@/components/screens/home/components/menu-slab";
 import {
   ModeVariants,
   type ModeVariant,
 } from "@/components/screens/home/components/mode-variants";
 import { HomeHeader } from "@/components/screens/home/home-header";
-import { TileLogo, Wordmark } from "@/components/screens/home/tile-logo";
+import { StreetLogo } from "@/components/screens/home/street-logo";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 import { formatCoins } from "@/lib/format";
-import { fullWidth } from "@/lib/full-width";
 import { useQuests } from "@/lib/quests-provider";
 
-type ModeKey =
-  | "tutorial"
-  | "online"
-  | "friend"
-  | "offline"
-  | "leaderboard"
-  | "store"
-  | "quests";
-
 /**
- * The Coin Store stays hidden until table buy-ins spend the Wallet (STO-346). Expo inlines the
- * `EXPO_PUBLIC_*` name at build time; reading it here rather than at module load lets a test set it.
+ * The street art for each window shape, in its own pixels: `door` is the doorway's centre (the
+ * point the walk-in zooms toward), `wallTop` the first brick row under the wall's coping (the
+ * slabs always hang below it), `doorLeft` the doorframe's outer left edge (the slabs centre in
+ * the wall left of it).
  */
-function coinStoreEnabled(): boolean {
-  return process.env.EXPO_PUBLIC_COIN_STORE === "1";
-}
+const STREETS = {
+  portrait: {
+    source: require("@/assets/images/ui/v2/bgs/main-menu-bg.jpg"),
+    width: 1152,
+    height: 2048,
+    door: { x: 762, y: 1440 },
+    wallTop: 820,
+    doorLeft: 600,
+  },
+  landscape: {
+    source: require("@/assets/images/ui/v2/bgs/main-menu-bg-dusk-landscape.jpg"),
+    width: 2048,
+    height: 1152,
+    door: { x: 1205, y: 826 },
+    wallTop: 420,
+    doorLeft: 1092,
+  },
+} as const;
+type Street = (typeof STREETS)[keyof typeof STREETS];
+const WALL_PAD = 12;
+/**
+ * The interior's warm wood, which fills the screen at the threshold.
+ * ponytail: eyeballed from the door's light; STO-596 picks the real one from the table art.
+ */
+const INTERIOR = "#c98a4b";
+const ENTER_MS = 900;
+const ENTER_ZOOM = 3.4;
+const LOGO_MAX_WIDTH = 280;
 
 type Variant = ModeVariant & { href: Href };
 
-type Mode = Omit<ModeCardProps, "width"> & {
-  key: ModeKey;
-  /** The mode's screen. Modes without one still only mark intent. */
-  href?: Href;
-  /** The mode's own choices, each with its own screen, in place of `href`. */
-  variants?: readonly Variant[];
-};
-
-const MODES: Mode[] = [
+const OFFLINE_VARIANTS: readonly Variant[] = [
   {
-    key: "tutorial",
-    href: "/tutorial",
-    glyph: "🎓",
-    label: "Tutorial",
-    description: "Learn the hands in 2 minutes + 100 chips",
-    badge: "Recommended",
-    tone: "recommended",
+    key: "normal",
+    href: "/offline",
+    art: require("@/assets/images/ui/icons/normal-mode.png"),
+    label: "Normal",
+    description: "Standard rules",
+    testID: "offline-normal",
   },
   {
-    key: "online",
-    href: "/online",
-    glyph: "🌐",
-    label: "Online Mode",
-    description: "Play live opponents",
-  },
-  {
-    key: "friend",
-    // The lobby opens its create sheet; the dealt table carries the invite (STO-581).
-    href: { pathname: "/online", params: { create: "1" } },
-    glyph: "👥",
-    label: "Play a Friend",
-    description: "Deal a table, invite by QR or link",
-  },
-  {
-    key: "offline",
-    // Temporary: the picker routes straight to the game. STO-269's landing screen owns
-    // this entry (and the rows around it) when it lands.
-    glyph: "🤖",
-    label: "Offline Mode",
-    description: "Play a hand vs. bots, no stakes",
-    tone: "warm",
-    variants: [
-      {
-        key: "normal",
-        href: "/offline",
-        art: require("@/assets/images/ui/icons/normal-mode.png"),
-        label: "Normal",
-        description: "Standard rules",
-        testID: "offline-normal",
-      },
-      {
-        key: "wild",
-        // The table's power-ups switch (STO-484): the offline adapter reads it off the route.
-        href: { pathname: "/offline", params: { powers: "wild" } },
-        art: require("@/assets/images/ui/icons/wildpower-mode.png"),
-        label: "Wild Power",
-        description: "Pick a power each hand",
-        tone: "featured",
-        testID: "offline-wild",
-      },
-    ],
-  },
-  {
-    key: "leaderboard",
-    glyph: "🏆",
-    label: "Leaderboard",
-    description: "Top players & best words",
-    tone: "warm",
+    key: "wild",
+    // The table's power-ups switch (STO-484): the offline adapter reads it off the route.
+    href: { pathname: "/offline", params: { powers: "wild" } },
+    art: require("@/assets/images/ui/icons/wildpower-mode.png"),
+    label: "Wild Power",
+    description: "Pick a power each hand",
+    tone: "featured",
+    testID: "offline-wild",
   },
 ];
 
-const STORE_MODE: Mode = {
-  key: "store",
-  href: "/store",
-  glyph: "🪙",
-  label: "Coin Store",
-  description: "Top up your Wallet",
+type Slab = Pick<
+  MenuSlabProps,
+  "label" | "letter" | "tone" | "tag" | "width" | "tilt"
+> & {
+  key: string;
+  /** The mode's screen; Offline has none of its own and opens its choices instead. */
+  href?: Href;
 };
 
-const QUESTS_MODE: Mode = {
-  key: "quests",
-  href: "/quests",
-  glyph: "📜",
-  label: "Quests",
-  description: "Earn coins for wins & streaks",
-  tone: "warm",
-};
+/** Widest first, and each stays left of the doorway on a 375-point phone. */
+const SLABS: readonly Slab[] = [
+  {
+    key: "online",
+    label: "Play Online",
+    letter: "O",
+    tone: "gold",
+    width: 204,
+    tilt: -0.8,
+    href: "/online",
+  },
+  // The lobby opens its create sheet; the dealt table carries the invite (STO-581).
+  {
+    key: "friend",
+    label: "Play a Friend",
+    letter: "P",
+    width: 190,
+    tilt: 0.8,
+    href: { pathname: "/online", params: { create: "1" } },
+  },
+  {
+    key: "tutorial",
+    label: "Tutorial",
+    letter: "T",
+    tag: "+100",
+    width: 176,
+    tilt: -0.8,
+    href: "/tutorial",
+  },
+  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: 0.8 },
+];
+const SLAB_MAX_WIDTH = Math.max(...SLABS.map((slab) => slab.width));
 
-const CARD_PADDING = spacing.lg;
-
-const bannerText = {
-  color: colors.goldHi,
-  fontFamily: fonts.monoBold,
-  fontSize: fontSize.small,
-  letterSpacing: 1.2,
-} satisfies UniversalTextStyle;
+/** Where a point of the art lands in a box the art covers (centred, cropped to fill). */
+function artPoint(
+  art: Street,
+  box: { width: number; height: number },
+  point: { x: number; y: number },
+) {
+  const scale = Math.max(box.width / art.width, box.height / art.height);
+  return {
+    x: point.x * scale - (art.width * scale - box.width) / 2,
+    y: point.y * scale - (art.height * scale - box.height) / 2,
+  };
+}
 
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
   const { streakBanner, dismissStreakBanner, levelUp, dismissLevelUp } =
     useQuests();
-  const [pending, setPending] = useState<ModeKey | null>(null);
-  const [logoIdle, setLogoIdle] = useState(false);
-  // SwiftUI frames take points, not "100%": on iPhone a percentage width is dropped and each
-  // card shrinks to its own content, so the column's width is handed down as a number.
-  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
+  const [box, setBox] = useState({ width: windowWidth, height: windowHeight });
+  const [offlineOpen, setOfflineOpen] = useState(false);
+  /** Where the slab stack starts before it is pushed down onto the wall. */
+  const [slabsY, setSlabsY] = useState<number | null>(null);
   const contentWidth = windowWidth - spacing.gutter * 2;
 
-  // Modes with a route navigate; the rest don't exist yet, so selecting one
-  // just marks intent for now.
-  const handleSelect = (mode: Mode, href = mode.href) => {
-    if (href) {
+  /** 0 on the street, 1 through the door. */
+  const enter = useSharedValue(0);
+  const leaving = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      leaving.current = false;
+      enter.set(0);
+    }, [enter]),
+  );
+
+  const go = (href: Href) => {
+    if (leaving.current) return;
+    if (reduceMotion) {
       router.push(href);
       return;
     }
-    setPending(mode.key);
+    leaving.current = true;
+    enter.set(
+      withTiming(1, { duration: ENTER_MS, easing: Easing.in(Easing.cubic) }),
+    );
+    setTimeout(() => router.push(href), ENTER_MS);
   };
 
-  return (
-    <Host colorScheme="dark" seedColor={colors.gold} style={styles.host}>
-      <ScrollView>
-        <Column
-          alignment="start"
-          spacing={spacing.md}
-          style={{ ...styles.screen, width: windowWidth }}
-        >
-          <RNHostView matchContents>
-            <HomeHeader width={contentWidth} />
-          </RNHostView>
-          <RNHostView matchContents>
-            <Wordmark visible={logoIdle} />
-          </RNHostView>
+  const street = box.width > box.height ? STREETS.landscape : STREETS.portrait;
+  // Continue the art behind the rack so its doorway keeps the full-screen proportions.
+  const artBox = { width: box.width, height: Math.max(box.height, windowHeight - insets.top) };
+  const door = artPoint(street, artBox, street.door);
+  const wallY = artPoint(street, artBox, { x: 0, y: street.wallTop }).y;
+  const toWall = slabsY == null ? 0 : Math.max(0, wallY + WALL_PAD - slabsY);
+  // A wide wall centres the stack left of the door; a phone's is too narrow, so it stays on the edge.
+  const doorLeft = artPoint(street, artBox, { x: street.doorLeft, y: 0 }).x;
+  const slabsX = box.width > box.height ? Math.max(0, (doorLeft - SLAB_MAX_WIDTH) / 2) : 0;
+  const zoom = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(enter.get(), [0, 1], [1, ENTER_ZOOM]) }],
+  }));
+  const uiFade = useAnimatedStyle(() => ({
+    opacity: interpolate(enter.get(), [0, 0.3], [1, 0], "clamp"),
+  }));
+  const warm = useAnimatedStyle(() => ({
+    opacity: interpolate(enter.get(), [0.5, 1], [0, 1], "clamp"),
+  }));
 
-          <RNHostView matchContents>
-            <TileLogo onIdleChange={setLogoIdle} width={contentWidth} />
-          </RNHostView>
+  const onLayout = ({ nativeEvent }: LayoutChangeEvent) =>
+    setBox({
+      width: nativeEvent.layout.width,
+      height: nativeEvent.layout.height,
+    });
+
+  return (
+    <View onLayout={onLayout} style={styles.root}>
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { bottom: undefined, height: artBox.height },
+          { transformOrigin: [door.x, door.y, 0] },
+          zoom,
+        ]}
+      >
+        <Image
+          contentFit="cover"
+          source={street.source}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+
+      <Animated.View style={[styles.fill, uiFade]}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: Math.max(insets.top + spacing.sm, box.height >= 700 ? 54 : 20) },
+          ]}
+        >
+          <View style={styles.gutter}>
+            <HomeHeader width={contentWidth} />
+          </View>
+
+          <View style={[styles.gutter, styles.logo]}>
+            <StreetLogo width={Math.min(contentWidth, LOGO_MAX_WIDTH)} />
+          </View>
 
           {/* A guest's placeholder address can't be verified; they make an account to claim one. A
               Game Center account is already eligible and its placeholder is never shown. */}
           {session?.user &&
           !isAccountEligible(session.user) &&
           !session.user.isAnonymous ? (
-            <VerifyEmailCard email={session.user.email} testID="home-verify" />
+            <View style={styles.gutter}>
+              <Host
+                colorScheme="dark"
+                matchContents={{ vertical: true }}
+                seedColor={colors.gold}
+                style={{ width: contentWidth }}
+              >
+                <VerifyEmailCard
+                  email={session.user.email}
+                  testID="home-verify"
+                />
+              </Host>
+            </View>
           ) : null}
 
           {streakBanner ? (
-            <Column
+            <Banner
               onPress={dismissStreakBanner}
-              spacing={spacing.none}
               testID="quest-streak-banner"
-              {...fullWidth(styles.banner)}
-            >
-              <Text textStyle={bannerText}>
-                {`DAY ${streakBanner.day} STREAK · +${formatCoins(streakBanner.reward)} COINS`}
-              </Text>
-            </Column>
+              text={`DAY ${streakBanner.day} STREAK · +${formatCoins(streakBanner.reward)} COINS`}
+            />
           ) : null}
 
           {levelUp ? (
-            <Column
+            <Banner
               onPress={dismissLevelUp}
-              spacing={spacing.none}
               testID="level-up-banner"
-              {...fullWidth(styles.banner)}
-            >
-              <Text textStyle={bannerText}>
-                {`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
-              </Text>
-            </Column>
+              text={`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
+            />
           ) : null}
 
-          {(coinStoreEnabled()
-            ? [...MODES, QUESTS_MODE, STORE_MODE]
-            : MODES
-          ).map((mode) => {
-            const disabled = pending !== null && pending !== mode.key;
-            const { variants } = mode;
-            return (
-              <ModeCard
-                key={mode.key}
-                badge={mode.badge}
-                description={mode.description}
-                disabled={disabled}
-                glyph={mode.glyph}
-                label={mode.label}
-                onSelect={() => handleSelect(mode)}
-                tone={mode.tone}
-                width={contentWidth}
-              >
-                {variants ? (
-                  <RNHostView matchContents>
-                    <ModeVariants
-                      disabled={disabled}
-                      onSelect={(variant) => handleSelect(mode, variant.href)}
-                      variants={variants}
-                      width={contentWidth - CARD_PADDING * 2}
-                    />
-                  </RNHostView>
-                ) : null}
-              </ModeCard>
-            );
-          })}
-        </Column>
-      </ScrollView>
-    </Host>
+          <View
+            onLayout={(event) => setSlabsY(event.nativeEvent.layout.y)}
+            style={[styles.slabs, { paddingTop: toWall, marginLeft: slabsX }]}
+          >
+            {SLABS.map(({ key, href, ...slab }) => (
+              <MenuSlab
+                key={key}
+                {...slab}
+                attached={slabsX === 0}
+                onPress={() =>
+                  href ? go(href) : setOfflineOpen((open) => !open)
+                }
+                testID={`home-slab-${key}`}
+              />
+            ))}
+          </View>
+
+          {offlineOpen ? (
+            <View
+              style={[
+                styles.variants,
+                {
+                  marginLeft: Math.max(spacing.gutter, slabsX),
+                  width: Math.min(contentWidth, 320),
+                },
+              ]}
+            >
+              <ModeVariants
+                onSelect={(variant) => go(variant.href)}
+                variants={OFFLINE_VARIANTS}
+                width={Math.min(contentWidth, 320) - spacing.md * 2}
+              />
+            </View>
+          ) : null}
+        </ScrollView>
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.interior, warm]}
+      />
+    </View>
   );
 }
 
-const styles = {
-  host: {
-    backgroundColor: colors.bg,
-    flex: 1,
-  },
-  screen: {
-    backgroundColor: colors.bg,
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.md,
+function Banner({
+  text,
+  onPress,
+  testID,
+}: {
+  text: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.banner}
+      testID={testID}
+    >
+      <Text style={styles.bannerText}>{text}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, overflow: "hidden", backgroundColor: colors.bg },
+  fill: { flex: 1 },
+  content: { gap: spacing.md, paddingBottom: spacing.lg },
+  gutter: { paddingHorizontal: spacing.gutter },
+  logo: { alignItems: "center" },
+  slabs: { gap: 14, marginTop: spacing.sm, alignItems: "flex-start" },
+  variants: {
+    padding: spacing.md,
+    borderRadius: radius.card,
+    backgroundColor: "rgba(12, 10, 28, 0.72)",
   },
   banner: {
+    marginHorizontal: spacing.gutter,
     backgroundColor: colors.goldDeep,
     borderRadius: radius.card,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-};
+  bannerText: {
+    color: colors.goldHi,
+    fontFamily: fonts.monoBold,
+    fontSize: fontSize.small,
+    letterSpacing: 1.2,
+  },
+  interior: { backgroundColor: INTERIOR },
+});

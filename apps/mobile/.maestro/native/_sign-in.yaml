@@ -14,5 +14,5 @@ env:
 - hideKeyboard
 - tapOn: "Sign in"
 - extendedWaitUntil:
-    visible: "Online Mode"
+    visible: "Play Online"
     timeout: 60000
