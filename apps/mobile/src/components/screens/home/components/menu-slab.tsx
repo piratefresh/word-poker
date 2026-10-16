@@ -111,6 +111,8 @@ export function MenuSlab({
       accessibilityState={{ disabled: !!disabled }}
       disabled={!!disabled}
       hitSlop={4}
+      // Composite the tilted slab as one texture to smooth Android's diagonal edges.
+      renderToHardwareTextureAndroid
       onPress={onPress}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
