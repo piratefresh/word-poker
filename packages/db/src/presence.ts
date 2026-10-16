@@ -1,12 +1,11 @@
 import type { MikroORM } from "@mikro-orm/postgresql";
 import type { TableInvite } from "@wordpoker/contracts";
-import { areFriends } from "./friends";
+import { areFriends, PRESENCE_GRACE_MS } from "./friends";
 import { getOrm } from "./orm";
 
 type DbOptions = { orm?: MikroORM };
 
-/** A player is online for this long after their last heartbeat (the client beats every 20s). */
-export const PRESENCE_GRACE_MS = 45_000;
+export { PRESENCE_GRACE_MS };
 /** An invite that was not picked up by then is stale: the table has moved on. */
 const INVITE_TTL_MINUTES = 10;
 /** "Friend came online" is announced at most this often per player. */

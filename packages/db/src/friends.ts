@@ -2,7 +2,9 @@ import { randomInt } from "node:crypto";
 import type { MikroORM } from "@mikro-orm/postgresql";
 import type { Friend, FriendRequestResult, FriendsPage, FriendStatus } from "@wordpoker/contracts";
 import { getOrm } from "./orm";
-import { PRESENCE_GRACE_MS } from "./presence";
+
+/** A player is online for this long after their last heartbeat (the client beats every 20s). */
+export const PRESENCE_GRACE_MS = 45_000;
 
 type DbOptions = { orm?: MikroORM };
 const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
