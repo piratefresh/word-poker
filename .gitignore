@@ -45,6 +45,7 @@ ios/
 android/
 !apps/mobile/modules/*/ios/
 !apps/mobile/modules/*/android/
+apps/mobile/modules/*/android/build/
 
 # stray lockfiles — this workspace pins one pnpm lock, at the repository root
 package-lock.json
