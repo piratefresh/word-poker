@@ -60,6 +60,8 @@ const MENU = {
 const LIP = 5;
 const HEIGHT = 50;
 const RADIUS = 12;
+const TAG_RISE = 9;
+const TAG_OUT = 6;
 
 const tones = {
   gold: {
@@ -117,7 +119,13 @@ export function MenuSlab({
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
       style={({ pressed }) => [
-        { width, transform: [{ rotate: `${tilt}deg` }] },
+        {
+          width,
+          transform: [{ rotate: `${tilt}deg` }],
+          // The hardware texture clips to the view's bounds, so pad out to hold the overhanging tag
+          // and cancel the padding with negative margins to leave the stack's layout alone.
+          ...(note && { paddingTop: TAG_RISE, paddingRight: TAG_OUT, marginTop: -TAG_RISE, marginRight: -TAG_OUT }),
+        },
         !disabled && menuFeedback(hovered, pressed),
       ]}
       id={webTestID(testID)}
@@ -209,8 +217,8 @@ const styles = StyleSheet.create({
   label: { flexShrink: 1, fontFamily: fonts.arcade, fontSize: 17 },
   tag: {
     position: "absolute",
-    top: -9,
-    right: -6,
+    top: -TAG_RISE,
+    right: -TAG_OUT,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,

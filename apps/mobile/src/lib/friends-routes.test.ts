@@ -88,7 +88,7 @@ describe("presence and table invites", () => {
     jest.mocked(beat).mockResolvedValue({ cameOnline: true, announce: false });
     jest.mocked(takeInvites).mockResolvedValue([{ fromName: "Ada", roomId: "room1" }]);
     const response = await presencePOST(request("POST", { atTable: true }));
-    expect(await response.json()).toEqual({ invites: [{ fromName: "Ada", roomId: "room1" }] });
+    expect(await response.json()).toEqual({ invites: [{ fromName: "Ada", roomId: "room1" }], emailVerified: false });
     expect(beat).toHaveBeenCalledWith("caller", true);
     jest.mocked(sessionUser).mockResolvedValue({ id: "caller", name: "Ada", anonymous: true });
     expect((await presencePOST(request("POST", {}))).status).toBe(403);

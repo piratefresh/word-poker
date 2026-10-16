@@ -1,12 +1,12 @@
 import { auth } from "./auth";
 
 /** Scope every query and write to the session account, never to a body/query user id. */
-export async function sessionUser(request: Request): Promise<{ id: string; name: string; anonymous: boolean } | null> {
+export async function sessionUser(request: Request): Promise<{ id: string; name: string; anonymous: boolean; emailVerified?: boolean } | null> {
   const session = await auth.api.getSession({
     headers: request.headers,
     query: { disableCookieCache: true },
   });
   return session && session.session.expiresAt.getTime() > Date.now()
-    ? { id: session.user.id, name: session.user.name, anonymous: session.user.isAnonymous === true }
+    ? { id: session.user.id, name: session.user.name, anonymous: session.user.isAnonymous === true, emailVerified: session.user.emailVerified }
     : null;
 }
