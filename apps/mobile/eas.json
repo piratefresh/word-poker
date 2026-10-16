@@ -14,7 +14,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_AUTH_URL": "https://web-production-8dd72.up.railway.app",
+        "EXPO_PUBLIC_AUTH_URL": "https://api.wordpoker.app",
         "EXPO_PUBLIC_GAME_URL": "https://us-ewr-251846dc.wordpoker.app",
         "EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY": "appl_TWXWFUQLqVvUoYfzgNJdzaRvGJk"
       }
