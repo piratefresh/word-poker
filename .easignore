@@ -1,0 +1,120 @@
+# EAS uses this file instead of .gitignore; keep the shared rules below in sync.
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files — `.env.example` is the only env file that is versioned
+.env
+.env.*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+ios/
+android/
+!apps/mobile/modules/*/ios/
+!apps/mobile/modules/*/android/
+
+# stray lockfiles — this workspace pins one pnpm lock, at the repository root
+package-lock.json
+/apps/*/pnpm-lock.yaml
+/packages/*/pnpm-lock.yaml
+
+# the raw word list the dictionary script reads; the artifact it prepares under
+# packages/game-rules/data is what ships (see scripts/prepare-dictionary.ts)
+/en_US-large.txt
+
+# one-off probes, not assets
+/probe-table.png
+
+# working plan notes — AGENTS.md keeps work in the tracker, not in repo docs
+/plans/
+/TUTORIAL_CLIENT_SIDE_COUNTDOWN_PLAN.md
+
+# agent skills — `.agents/skills/` is the canonical project install and is
+# versioned (sources and hashes in skills-lock.json). `npx skills` points each
+# harness's own project directory at that copy, so those are generated links,
+# not source: after cloning, `npx skills update -p` (re)creates them for the
+# harnesses whose root directory exists in the checkout.
+/skills/
+/.claude/skills/
+/.pi/skills/
+# the omp harness's own state — per-machine config and the secret-obfuscator mapping
+# AGENTS.md refers to. Never shared, and never committed.
+/.omp/
+
+.env.local
+/packages/3d/
+# retired game-room backdrop art, kept locally in case a look returns;
+# git history is the durable copy — restore with `git checkout <sha> -- <path>`
+/archive/
+/.tmp/
+
+# local machine artifacts: JVM/Sentry crash dumps, agent worktrees, and the Colyseus Cloud
+# deploy token — never shared, never committed.
+hs_err_pid*.log
+sentry-wizard-installation-error-*.log
+/.claude/worktrees/
+/.colyseus-cloud.json
+# Server settlement journal and local runtime state
+/apps/server/data/
+.history-settlements/
+
+# EAS local credentials (certificates, profiles)
+apps/mobile/credentials.json
+apps/mobile/credentials/
+
+# Local checkouts and downloaded native builds must never be uploaded or committed.
+/.worktrees/
+*.ipa
+*.apk
+*.aab
+*.apks
+
+# Build uploads do not need repository history, reference art, or local tooling.
+# EAS checks the bare .git path when removing its temporary clone metadata.
+.git
+/docs/
+/render/
+/.agents/
+/.claude/
+/.pi/
+/.github/
+/.vscode/
+/.maestro/
+/apps/mobile/.maestro/
+/apps/mobile/test-results/
+/apps/mobile/playwright-report/
+coverage/

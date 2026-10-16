@@ -37,6 +37,9 @@ jest.mock("@/components/screens/game/primitives/seat-beam", () => ({
   SeatBeam: ({ children }) => children,
 }));
 
+// The felt mat under the portrait table is Skia decoration: tests see the table without it.
+jest.mock("@/components/screens/game/backdrop/felt-mat", () => ({ FeltMat: () => null }));
+
 // The wager button's off-turn glass dome is Skia decoration over a button tests drive directly.
 jest.mock("@/components/screens/game/betting/waiting-shield", () => ({ WaitingShield: () => null }));
 // Its housing is a Rive view, native-only: tests drive the button over no art.

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Word Poker felt background</title>
+  <style>
+    html, body { margin: 0; width: 1584px; height: 2816px; overflow: hidden; background: #160e0a; }
+    canvas { display: block; width: 1584px; height: 2816px; }
+  </style>
+</head>
+<body>
+  <canvas width="1584" height="2816" aria-label="Green felt mat on a warmly lit wooden tabletop"></canvas>
+  <script>
+    // Edit these values, then run npm run render:felt from the repository root.
+    const SETTINGS = {
+      wood: "../apps/mobile/assets/images/ui/v2/bgs/tabletop-portrait-6.jpg",
+      feltTexture: "../apps/mobile/assets/images/ui/v2/felt-mat.jpg",
+      matWidth: 0.86,
+      matHeight: 0.62,
+      matCenterY: 0.47,
+      radius: 0.40, // Fraction of mat width.
+      feltEdge: "#123a27",
+      glowX: 0.55,
+      glowY: 0.48,
+      glowStrength: 0.18,
+      shadowBlur: 28,
+      shadowOffsetY: 15,
+      stitchInset: 19,
+      vignetteStrength: 0.52,
+    };
+
+    const canvas = document.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width;
+    const H = canvas.height;
+    function layer(width = W, height = H) {
+      const result = document.createElement("canvas");
+      result.width = width;
+      result.height = height;
+      return result;
+    }
+    const mat = {
+      w: W * SETTINGS.matWidth,
+      h: H * SETTINGS.matHeight,
+    };
+    mat.x = (W - mat.w) / 2;
+    mat.y = H * SETTINGS.matCenterY - mat.h / 2;
+    mat.r = mat.w * SETTINGS.radius;
+    function matPath(inset = 0) {
+      const p = new Path2D();
+      p.roundRect(mat.x + inset, mat.y + inset, mat.w - inset * 2,
+        mat.h - inset * 2, Math.max(0, mat.r - inset));
+      return p;
+    }
+    function radial(x, y, radius, center, edge) {
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      gradient.addColorStop(0, center);
+      gradient.addColorStop(1, edge);
+      return gradient;
+    }
+
+    async function render() {
+      const wood = new Image();
+      const felt = new Image();
+      wood.src = SETTINGS.wood;
+      felt.src = SETTINGS.feltTexture;
+      await Promise.all([wood.decode(), felt.decode()]);
+      if (wood.naturalWidth !== W || wood.naturalHeight !== H) {
+        throw new Error(`Expected ${W}×${H} wood; got ${wood.naturalWidth}×${wood.naturalHeight}`);
+      }
+      ctx.drawImage(wood, 0, 0);
+
+      // Extend unpainted planks over the old green paint, with a feathered seam.
+      const repair = layer();
+      const repairCtx = repair.getContext("2d");
+      repairCtx.drawImage(wood, 0, H * 0.14, W, H * 0.22,
+        0, H * 0.59, W, H * 0.41);
+      const mask = layer();
+      const maskCtx = mask.getContext("2d");
+      maskCtx.filter = "blur(48px)";
+      maskCtx.fillStyle = "white";
+      maskCtx.beginPath();
+      maskCtx.moveTo(-150, H * 0.57);
+      maskCtx.bezierCurveTo(W * 0.22, H * 0.63, W * 0.62, H * 0.81, W + 150, H * 0.88);
+      maskCtx.lineTo(W + 150, H + 150);
+      maskCtx.lineTo(-150, H + 150);
+      maskCtx.closePath();
+      maskCtx.fill();
+      repairCtx.globalCompositeOperation = "destination-in";
+      repairCtx.drawImage(mask, 0, 0);
+      ctx.drawImage(repair, 0, 0);
+
+      ctx.save();
+      ctx.shadowColor = "rgba(30, 12, 4, 0.75)";
+      ctx.shadowBlur = SETTINGS.shadowBlur;
+      ctx.shadowOffsetY = SETTINGS.shadowOffsetY;
+      ctx.fillStyle = SETTINGS.feltEdge;
+      ctx.fill(matPath());
+      ctx.restore();
+
+      ctx.save();
+      ctx.clip(matPath());
+      ctx.fillStyle = SETTINGS.feltEdge;
+      ctx.fillRect(0, 0, W, H);
+      // Same texture and centered cover fit as FeltMatCanvas on the game screen.
+      const scale = Math.max(mat.w / felt.naturalWidth, mat.h / felt.naturalHeight);
+      const textureWidth = felt.naturalWidth * scale;
+      const textureHeight = felt.naturalHeight * scale;
+      ctx.drawImage(felt, mat.x + (mat.w - textureWidth) / 2,
+        mat.y + (mat.h - textureHeight) / 2, textureWidth, textureHeight);
+      const rim = ctx.createRadialGradient(W / 2, H * SETTINGS.matCenterY, 0,
+        W / 2, H * SETTINGS.matCenterY, Math.hypot(mat.w, mat.h) / 2);
+      rim.addColorStop(0, "rgba(0, 0, 0, 0)");
+      rim.addColorStop(0.55, "rgba(0, 0, 0, 0)");
+      rim.addColorStop(1, "rgba(0, 12, 4, 0.45)");
+      ctx.fillStyle = rim;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "soft-light";
+      ctx.fillStyle = radial(W * SETTINGS.glowX, H * SETTINGS.glowY, W * 0.65,
+        `rgba(255, 190, 110, ${SETTINGS.glowStrength})`, "rgba(255, 190, 110, 0)");
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = "rgba(177, 122, 65, 0.06)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "source-over";
+
+      // Cast the edge into the clip for a soft recessed/padded rim.
+      ctx.save();
+      ctx.strokeStyle = "rgba(0, 15, 7, 0.65)";
+      ctx.lineWidth = 16;
+      ctx.shadowColor = "rgba(0, 12, 6, 0.8)";
+      ctx.shadowBlur = 24;
+      ctx.stroke(matPath(-5));
+      ctx.restore();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(113, 151, 103, 0.30)";
+      ctx.stroke(matPath(9));
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(166, 188, 134, 0.25)";
+      ctx.setLineDash([3, 7]);
+      ctx.stroke(matPath(SETTINGS.stitchInset));
+      ctx.restore();
+
+      // One falloff across the entire composite joins felt and wood in the room.
+      ctx.save();
+      ctx.translate(W * SETTINGS.glowX, H * SETTINGS.glowY);
+      ctx.scale(W * 0.72, H * 0.66);
+      const vignette = ctx.createRadialGradient(0, 0, 0.24, 0, 0, 1);
+      vignette.addColorStop(0, "rgba(12, 7, 3, 0)");
+      vignette.addColorStop(0.65, "rgba(12, 7, 3, 0.12)");
+      vignette.addColorStop(1, `rgba(12, 7, 3, ${SETTINGS.vignetteStrength})`);
+      ctx.fillStyle = vignette;
+      ctx.fillRect(-3, -3, 6, 6);
+      ctx.restore();
+    }
+    window.renderReady = render();
+    window.renderReady.catch((error) => {
+      console.error(error);
+      document.body.dataset.renderError = error.message;
+    });
+  </script>
+</body>
+</html>

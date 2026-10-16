@@ -12,8 +12,7 @@ import { createContext, useCallback, useContext, useMemo } from "react";
 import { AccessibilityInfo, Platform, Pressable, Text, View } from "react-native";
 
 import { GameButton } from "@/components/ui/game-button";
-import { ShadowBox } from "@/components/ui/shadow-box";
-import { colors, radius } from "@/constants/theme";
+import { colors } from "@/constants/theme";
 
 import { useScreenScale } from "@/components/screens/game/screen-scale";
 import { DraftLine } from "./draft-line";
@@ -292,16 +291,16 @@ export function WordBuilder({
 export function WordHand({
   actions,
 }: {
-  /** The word's controls — shuffle and check — in a column at the tray's right end. */
+  /** The word's controls — shuffle and check — centred in a row under the slots. */
   actions?: ReactNode;
 }): JSX.Element {
   const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip, draft } =
     useWordBuilderScope();
   const bonus = draft.word.length === 0 ? 0 : (draft.score?.fullRackBonus ?? 0);
 
-  // The tray wraps the strip and never sizes it: the places and their step are the strip's own.
-  // The tray's seven places are the seven tiles a seat can play (§7); the ones not dealt yet
-  // draw as dashed slots, so a hand a street short of the river reads as one still filling.
+  // The hand lies straight on the felt mat: seven dashed card slots, one for each tile a seat can
+  // play (§7), with the tiles dealt so far sitting in theirs, so a hand a street short of the
+  // river reads as one still filling. The strip sizes itself; this only wraps it.
   return (
     <View>
       {/* The draft reads above the tray, on the wood: the tray is the tiles alone. The slot is
@@ -310,8 +309,7 @@ export function WordHand({
         <DraftPreview />
       </View>
       <BlankPicker />
-      <View style={styles.trayLip} testID="word-builder-tray">
-        <ShadowBox radius={radius.lg} shadows={[{ dy: 10, blur: 20, color: "rgba(30,14,0,0.7)" }]} />
+      <View style={styles.tray} testID="word-builder-tray">
         {bonus === 0 ? null : (
           <View style={styles.rackBonusPill}>
             <Text style={styles.rackBonus} testID="word-builder-full-rack">
@@ -319,23 +317,18 @@ export function WordHand({
             </Text>
           </View>
         )}
-        <View style={styles.trayFace}>
-          <View style={styles.trayHeader}>
-            <Text style={styles.trayLabel}>WORD BUILDER</Text>
-            {actions == null ? null : <View style={styles.trayActions}>{actions}</View>}
-          </View>
-          <TileStrip
-            flip={swapFlip}
-            held={held}
-            live={live}
-            onPick={pickTile}
-            onReorder={reorder}
-            onToggle={toggle}
-            places={WORD_PLACES}
-            sortable={sortable}
-            strip={strip}
-          />
-        </View>
+        <TileStrip
+          flip={swapFlip}
+          held={held}
+          live={live}
+          onPick={pickTile}
+          onReorder={reorder}
+          onToggle={toggle}
+          places={WORD_PLACES}
+          sortable={sortable}
+          strip={strip}
+        />
+        {actions == null ? null : <View style={styles.trayActions}>{actions}</View>}
       </View>
     </View>
   );

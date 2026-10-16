@@ -462,7 +462,6 @@ export function TileStrip({
   // A hand never holds more than the places (§7's seven), but cap the empties at 0 rather than
   // trust it: a negative count would draw nothing and shift every step.
   const laidOut = Math.max(places, data.length);
-  const empty = laidOut - data.length;
   const step = stepFor(laidOut, room, rack);
 
   return (
@@ -483,13 +482,14 @@ export function TileStrip({
           { height: stripHeight, width: rowWidth(laidOut, step, rack) },
         ]}
       >
-        {Array.from({ length: empty }, (_, index) => (
+        {/* Every place has its card slot, drawn under the tiles, so a lifted tile shows it. */}
+        {Array.from({ length: laidOut }, (_, index) => (
           <EmptyPlace
-            key={`empty-${data.length + index}`}
-            left={(data.length + index) * step}
+            key={`empty-${index}`}
+            left={index * step}
             rack={rack}
             step={step}
-            testID={`word-builder-place-${data.length + index}`}
+            testID={`word-builder-place-${index}`}
           />
         ))}
         {sortable && !picking ? (

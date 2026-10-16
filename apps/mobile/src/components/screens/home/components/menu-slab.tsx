@@ -7,9 +7,11 @@
  * "+100") hangs off the top-right corner.
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
+import { menuFeedback } from "@/lib/menu-feedback";
 import { webTestID } from "@/lib/web-id";
 
 export type MenuSlabTone = "gold" | "cream";
@@ -27,6 +29,10 @@ export interface MenuSlabProps {
   tilt: number;
   /** Nailed to the screen's left edge, so only the right end is rounded. A free slab rounds both. */
   attached?: boolean;
+  /** Greyed out and inert, with the reason in the tag corner (e.g. Play Online with no internet). */
+  disabled?: string;
+  /** Ringed in gold to draw the eye (the Tutorial slab on first launch). */
+  highlight?: boolean;
   onPress: () => void;
   testID?: string;
 }
@@ -45,6 +51,10 @@ const MENU = {
   creamInk: "#3a2410",
   green: "#1f4a33",
   greenLip: "#0f2a1c",
+  grey: "#b8b2a5",
+  greyEdge: "#a29c90",
+  greyLip: "#77726a",
+  greyInk: "#3d3a35",
 } as const;
 
 const LIP = 5;
@@ -52,34 +62,104 @@ const HEIGHT = 50;
 const RADIUS = 12;
 
 const tones = {
-  gold: { face: MENU.gold, pressed: MENU.goldPressed, edge: MENU.goldEdge, lip: MENU.goldLip, ink: MENU.goldInk },
-  cream: { face: MENU.cream, pressed: MENU.creamPressed, edge: MENU.creamEdge, lip: MENU.creamLip, ink: MENU.creamInk },
+  gold: {
+    face: MENU.gold,
+    pressed: MENU.goldPressed,
+    edge: MENU.goldEdge,
+    lip: MENU.goldLip,
+    ink: MENU.goldInk,
+  },
+  cream: {
+    face: MENU.cream,
+    pressed: MENU.creamPressed,
+    edge: MENU.creamEdge,
+    lip: MENU.creamLip,
+    ink: MENU.creamInk,
+  },
+  disabled: {
+    face: MENU.grey,
+    pressed: MENU.grey,
+    edge: MENU.greyEdge,
+    lip: MENU.greyLip,
+    ink: MENU.greyInk,
+  },
 } as const;
 
-export function MenuSlab({ label, letter, tone = "cream", tag, width, tilt, attached = true, onPress, testID }: MenuSlabProps) {
-  const t = tones[tone];
+export function MenuSlab({
+  label,
+  letter,
+  tone = "cream",
+  tag,
+  width,
+  tilt,
+  attached = true,
+  disabled,
+  highlight = false,
+  onPress,
+  testID,
+}: MenuSlabProps) {
+  const t = tones[disabled ? "disabled" : tone];
+  const note = disabled ?? tag;
+  const [hovered, setHovered] = useState(false);
+  const short = useWindowDimensions().height < 700;
 
   return (
     <Pressable
       accessibilityLabel={label}
+      accessibilityHint={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={!!disabled}
       hitSlop={4}
       onPress={onPress}
-      style={{ width, transform: [{ rotate: `${tilt}deg` }] }}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      style={({ pressed }) => [
+        { width, transform: [{ rotate: `${tilt}deg` }] },
+        !disabled && menuFeedback(hovered, pressed),
+      ]}
       id={webTestID(testID)}
       testID={testID}
     >
       {({ pressed }) => (
-        <View style={[styles.lip, !attached && styles.free, { backgroundColor: t.lip, marginTop: pressed ? LIP : 0, paddingBottom: pressed ? 0 : LIP }]}>
-          <View style={[styles.face, !attached && styles.freeFace, { backgroundColor: pressed ? t.pressed : t.face, borderColor: t.edge }]}>
-            <View style={styles.tile}>
+        <View
+          style={[
+            styles.lip,
+            !attached && styles.free,
+            {
+              backgroundColor: t.lip,
+              marginTop: pressed ? LIP : 0,
+              paddingBottom: pressed ? 0 : LIP,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.face,
+              short && styles.faceShort,
+              !attached && styles.freeFace,
+              {
+                backgroundColor: pressed ? t.pressed : t.face,
+                borderColor: t.edge,
+              },
+              highlight && !disabled && styles.highlight,
+            ]}
+            testID={testID && `${testID}-face`}
+          >
+            {/* <View style={[styles.tile, disabled && styles.dim]}>
               <Text style={styles.tileLetter}>{letter}</Text>
-            </View>
-            <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: t.ink }]}>{label.toUpperCase()}</Text>
+            </View> */}
+            <Text
+              maxFontSizeMultiplier={1.2}
+              numberOfLines={1}
+              style={[styles.label, short && styles.labelShort, { color: t.ink }]}
+            >
+              {label.toUpperCase()}
+            </Text>
           </View>
-          {tag ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
+          {note ? (
+            <View style={[styles.tag, disabled && styles.offTag]}>
+              <Text style={styles.tagText}>{note}</Text>
             </View>
           ) : null}
         </View>
@@ -94,7 +174,11 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: RADIUS,
   },
   free: { borderTopLeftRadius: RADIUS, borderBottomLeftRadius: RADIUS },
-  freeFace: { borderTopLeftRadius: RADIUS, borderBottomLeftRadius: RADIUS, borderLeftWidth: 1.5 },
+  freeFace: {
+    borderTopLeftRadius: RADIUS,
+    borderBottomLeftRadius: RADIUS,
+    borderLeftWidth: 1.5,
+  },
   face: {
     height: HEIGHT,
     flexDirection: "row",
@@ -107,6 +191,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderLeftWidth: 0,
   },
+  faceShort: { height: 42 },
+  labelShort: { fontSize: 15 },
   tile: {
     width: 32,
     height: 34,
@@ -131,4 +217,7 @@ const styles = StyleSheet.create({
     borderColor: MENU.cream,
   },
   tagText: { color: MENU.cream, fontFamily: fonts.arcade, fontSize: 12 },
+  highlight: { borderColor: MENU.gold, borderWidth: 3 },
+  offTag: { backgroundColor: MENU.greyInk },
+  dim: { opacity: 0.45 },
 });

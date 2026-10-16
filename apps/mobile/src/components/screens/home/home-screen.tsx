@@ -13,6 +13,7 @@
 import { Host } from "@expo/ui";
 import { isAccountEligible } from "@wordpoker/contracts";
 import { Image } from "expo-image";
+import { useNetworkState } from "expo-network";
 import { router, useFocusEffect, type Href } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -39,14 +40,13 @@ import {
   MenuSlab,
   type MenuSlabProps,
 } from "@/components/screens/home/components/menu-slab";
-import {
-  ModeVariants,
-  type ModeVariant,
-} from "@/components/screens/home/components/mode-variants";
+import type { ModeVariant } from "@/components/screens/home/components/mode-variants";
+import { OfflineTray } from "@/components/screens/home/components/offline-tray";
 import { HomeHeader } from "@/components/screens/home/home-header";
 import { StreetLogo } from "@/components/screens/home/street-logo";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
+import { readItem, TUTORIAL_DONE } from "@/lib/claim-store";
 import { formatCoins } from "@/lib/format";
 import { useQuests } from "@/lib/quests-provider";
 
@@ -87,11 +87,10 @@ const LOGO_MAX_WIDTH = 280;
 
 type Variant = ModeVariant & { href: Href };
 
-const OFFLINE_VARIANTS: readonly Variant[] = [
+const OFFLINE_VARIANTS: readonly [Variant, ...Variant[]] = [
   {
     key: "normal",
     href: "/offline",
-    art: require("@/assets/images/ui/icons/normal-mode.png"),
     label: "Normal",
     description: "Standard rules",
     testID: "offline-normal",
@@ -100,10 +99,8 @@ const OFFLINE_VARIANTS: readonly Variant[] = [
     key: "wild",
     // The table's power-ups switch (STO-484): the offline adapter reads it off the route.
     href: { pathname: "/offline", params: { powers: "wild" } },
-    art: require("@/assets/images/ui/icons/wildpower-mode.png"),
     label: "Wild Power",
     description: "Pick a power each hand",
-    tone: "featured",
     testID: "offline-wild",
   },
 ];
@@ -115,6 +112,8 @@ type Slab = Pick<
   key: string;
   /** The mode's screen; Offline has none of its own and opens its choices instead. */
   href?: Href;
+  /** Needs the server, so it greys out when the device is offline. */
+  online?: true;
 };
 
 /** Widest first, and each stays left of the doorway on a 375-point phone. */
@@ -127,6 +126,7 @@ const SLABS: readonly Slab[] = [
     width: 204,
     tilt: -0.8,
     href: "/online",
+    online: true,
   },
   // The lobby opens its create sheet; the dealt table carries the invite (STO-581).
   {
@@ -136,6 +136,7 @@ const SLABS: readonly Slab[] = [
     width: 190,
     tilt: 0.8,
     href: { pathname: "/online", params: { create: "1" } },
+    online: true,
   },
   {
     key: "tutorial",
@@ -172,6 +173,14 @@ export function HomeScreen() {
   const reduceMotion = useReducedMotion();
   const [box, setBox] = useState({ width: windowWidth, height: windowHeight });
   const [offlineOpen, setOfflineOpen] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(48);
+  const closeOffline = useCallback(() => setOfflineOpen(false), []);
+  // First launch: the Tutorial slab stands out until the guided hand has been played through.
+  const [tutorialDone, setTutorialDone] = useState(
+    () => readItem(TUTORIAL_DONE) !== null,
+  );
+  // Unknown until the first read, so the slabs start enabled.
+  const offline = useNetworkState().isConnected === false;
   const contentWidth = windowWidth - spacing.gutter * 2;
 
   /** 0 on the street, 1 through the door. */
@@ -182,11 +191,14 @@ export function HomeScreen() {
     useCallback(() => {
       leaving.current = false;
       enter.set(0);
+      setTutorialDone(readItem(TUTORIAL_DONE) !== null);
+      return () => setOfflineOpen(false);
     }, [enter]),
   );
 
   const go = (href: Href) => {
     if (leaving.current) return;
+    setOfflineOpen(false);
     if (reduceMotion) {
       router.push(href);
       return;
@@ -226,6 +238,8 @@ export function HomeScreen() {
       height: nativeEvent.layout.height,
     });
 
+  const headerTop = Math.max(insets.top + spacing.sm, box.height >= 700 ? 54 : 20);
+
   return (
     <View onLayout={onLayout} style={styles.root}>
       <Animated.View
@@ -243,23 +257,23 @@ export function HomeScreen() {
         />
       </Animated.View>
 
-      <Animated.View style={[styles.fill, uiFade]}>
+      <Animated.View
+        aria-hidden={offlineOpen}
+        accessibilityElementsHidden={offlineOpen}
+        importantForAccessibility={offlineOpen ? "no-hide-descendants" : "auto"}
+        style={[styles.fill, uiFade]}
+      >
         <ScrollView contentContainerStyle={styles.content}>
           <View
             style={[
               styles.menuTop,
               {
                 minHeight: wallY + WALL_PAD,
-                paddingTop: Math.max(
-                  insets.top + spacing.sm,
-                  box.height >= 700 ? 54 : 20,
-                ),
+                paddingTop: headerTop,
               },
             ]}
           >
-            <View style={styles.gutter}>
-              <HomeHeader width={contentWidth} />
-            </View>
+            <View style={{ height: headerHeight }} />
 
             <View style={[styles.gutter, styles.logo]}>
               <StreetLogo width={Math.min(contentWidth, LOGO_MAX_WIDTH)} />
@@ -302,12 +316,15 @@ export function HomeScreen() {
             ) : null}
           </View>
 
-          <View style={[styles.slabs, { marginLeft: slabsX }]}>
-            {SLABS.map(({ key, href, ...slab }) => (
+          {/* A short phone (375×667) closes the stack up so Offline clears the rack. */}
+          <View style={[styles.slabs, { marginLeft: slabsX, gap: box.height < 700 ? 8 : 14 }]}>
+            {SLABS.map(({ key, href, online, ...slab }) => (
               <MenuSlab
                 key={key}
                 {...slab}
                 attached={slabsX === 0}
+                disabled={online && offline ? "Offline" : undefined}
+                highlight={key === "tutorial" && !tutorialDone}
                 onPress={() =>
                   href ? go(href) : setOfflineOpen((open) => !open)
                 }
@@ -315,25 +332,23 @@ export function HomeScreen() {
               />
             ))}
           </View>
-
-          {offlineOpen ? (
-            <View
-              style={[
-                styles.variants,
-                {
-                  marginLeft: Math.max(spacing.gutter, slabsX),
-                  width: Math.min(contentWidth, 320),
-                },
-              ]}
-            >
-              <ModeVariants
-                onSelect={(variant) => go(variant.href)}
-                variants={OFFLINE_VARIANTS}
-                width={Math.min(contentWidth, 320) - spacing.md * 2}
-              />
-            </View>
-          ) : null}
         </ScrollView>
+      </Animated.View>
+
+      {offlineOpen ? (
+        <OfflineTray
+          variants={OFFLINE_VARIANTS}
+          onClose={closeOffline}
+          onDeal={(variant) => go(variant.href)}
+          maxHeight={Math.max(180, box.height - headerTop - headerHeight - 88)}
+        />
+      ) : null}
+
+      <Animated.View
+        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
+        style={[styles.header, { top: headerTop }, uiFade]}
+      >
+        <HomeHeader width={contentWidth} />
       </Animated.View>
 
       <Animated.View
@@ -372,12 +387,8 @@ const styles = StyleSheet.create({
   menuTop: { gap: spacing.md, paddingBottom: spacing.md },
   gutter: { paddingHorizontal: spacing.gutter },
   logo: { alignItems: "center" },
-  slabs: { gap: 14, alignItems: "flex-start" },
-  variants: {
-    padding: spacing.md,
-    borderRadius: radius.card,
-    backgroundColor: "rgba(12, 10, 28, 0.72)",
-  },
+  slabs: { alignItems: "flex-start" },
+  header: { position: "absolute", left: spacing.gutter, right: spacing.gutter },
   banner: {
     marginHorizontal: spacing.gutter,
     backgroundColor: colors.goldDeep,

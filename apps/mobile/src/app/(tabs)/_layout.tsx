@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Tabs } from "expo-router";
 import type { ComponentProps } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 
@@ -12,6 +12,9 @@ import { coinStoreEnabled } from "@/lib/coin-store";
 import { webTestID } from "@/lib/web-id";
 
 const CHIP = 60;
+// A short phone (iPhone SE, 667pt) shrinks the rack so the menu above it still fits.
+const SHORT = 700;
+const SHORT_SCALE = 0.8;
 const CREAM = "#f7e7b5";
 const TABS = {
   index: { label: "Home", tone: "red", color: "#a82118", suit: "♠" },
@@ -23,23 +26,25 @@ const GLOW = [
   { dy: 0, blur: 16, color: "rgba(247,215,122,0.45)" },
 ];
 
-function Chip({ tone, color, suit, selected = false }: {
+function Chip({ tone, color, suit, selected = false, k = 1 }: {
   tone?: ChipSpriteTone;
   color: string;
   suit: string;
   selected?: boolean;
+  k?: number;
 }) {
+  const size = CHIP * k;
   return (
-    <View pointerEvents="none" style={[styles.chip, selected && styles.lifted]}>
-      {selected ? <ShadowBox radius={CHIP / 2} shadows={GLOW} /> : null}
-      {tone ? <ChipSprite tone={tone} pose="face" size={CHIP} /> : (
+    <View pointerEvents="none" style={[styles.chip, { width: size, height: size }, selected && styles.lifted]}>
+      {selected ? <ShadowBox radius={size / 2} shadows={GLOW} /> : null}
+      {tone ? <ChipSprite tone={tone} pose="face" size={size} /> : (
         // The shared atlas has no black row yet (STO-597); keep this fallback local to Store.
-        <Svg width={CHIP} height={CHIP} viewBox="0 0 60 60">
+        <Svg width={size} height={size} viewBox="0 0 60 60">
           <Circle cx={30} cy={30} r={29} fill={color} stroke="#17130e" strokeWidth={2} />
           <Circle cx={30} cy={30} r={24} fill="none" stroke={CREAM} strokeWidth={9} strokeDasharray={[9.42, 9.42]} />
         </Svg>
       )}
-      <View style={[styles.suitDisc, { backgroundColor: color }]}>
+      <View style={[styles.suitDisc, { backgroundColor: color, transform: [{ scale: k }] }]}>
         <Svg width={28} height={28} viewBox="0 0 28 28">
           <SvgText x={14} y={22} fontSize={24} fill={CREAM} textAnchor="middle">{suit}</SvgText>
         </Svg>
@@ -51,8 +56,9 @@ function Chip({ tone, color, suit, selected = false }: {
 const NavRack: NonNullable<ComponentProps<typeof Tabs>["tabBar"]> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   const storeEnabled = coinStoreEnabled();
+  const k = useWindowDimensions().height < SHORT ? SHORT_SCALE : 1;
   return (
-    <View style={[styles.rack, { height: 120 + insets.bottom }]}>
+    <View style={[styles.rack, { height: 120 * k + insets.bottom }]}>
       <LinearGradient colors={["#b77a42", "#82451e", "#6a3619"]} locations={[0, 0.28, 1]} style={[StyleSheet.absoluteFill, styles.tray]} />
       <View style={styles.tabs}>
         {state.routes.map((route, index) => {
@@ -76,9 +82,9 @@ const NavRack: NonNullable<ComponentProps<typeof Tabs>["tabBar"]> = ({ state, de
               onLongPress={() => navigation.emit({ type: "tabLongPress", target: route.key })}
               style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
             >
-              <Chip {...tab} selected={selected} />
+              <Chip {...tab} k={k} selected={selected} />
               {badge != null ? <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View> : null}
-              <Text maxFontSizeMultiplier={1.2} style={[styles.label, selected && styles.selectedLabel]}>{tab.label.toUpperCase()}</Text>
+              <Text maxFontSizeMultiplier={1.2} style={[styles.label, k !== 1 && styles.labelShort, selected && styles.selectedLabel]}>{tab.label.toUpperCase()}</Text>
             </Pressable>
           );
         })}
@@ -92,8 +98,8 @@ const NavRack: NonNullable<ComponentProps<typeof Tabs>["tabBar"]> = ({ state, de
           id={webTestID("tab-store")}
           style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
         >
-          <Chip color="#29251e" suit="♦" />
-          <Text maxFontSizeMultiplier={1.2} style={[styles.label, !storeEnabled && styles.disabledLabel]}>STORE</Text>
+          <Chip color="#29251e" suit="♦" k={k} />
+          <Text maxFontSizeMultiplier={1.2} style={[styles.label, k !== 1 && styles.labelShort,!storeEnabled && styles.disabledLabel]}>STORE</Text>
         </Pressable>
       </View>
     </View>
@@ -116,7 +122,8 @@ const styles = StyleSheet.create({
   rack: { marginTop: -42, zIndex: 1 },
   tray: { top: 42, borderTopLeftRadius: 14, borderTopRightRadius: 14, borderTopWidth: 2, borderColor: "#d6a56a" },
   tabs: { position: "absolute", top: 0, left: 16, right: 16, flexDirection: "row" },
-  tab: { flex: 1, alignItems: "center", paddingTop: 6, minHeight: 106 },
+  tab: { flex: 1, alignItems: "center", paddingTop: 6, minHeight: 84 },
+  labelShort: { fontSize: 11, marginTop: 4 },
   pressed: { transform: [{ translateY: 4 }], opacity: 0.8 },
   chip: { width: CHIP, height: CHIP },
   lifted: { transform: [{ translateY: -12 }] },

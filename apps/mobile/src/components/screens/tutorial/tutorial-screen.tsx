@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
@@ -19,6 +20,7 @@ import {
 import { colors, type } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useTutorialGame } from "@/features/tutorial/use-tutorial-game";
+import { TUTORIAL_DONE, writeItem } from "@/lib/claim-store";
 
 /**
  * The guided first hand (STO-251): the offline table, played to a script, with the coach pointing
@@ -54,6 +56,10 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
   const { game, words, results } = lesson;
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
+  const finished = game.phase === "payout" && results !== null;
+  useEffect(() => {
+    if (finished) writeItem(TUTORIAL_DONE, "1");
+  }, [finished]);
 
   return (
     <WordBuilder
@@ -110,7 +116,7 @@ function TutorialTable({ dictionary }: { dictionary: Dictionary }) {
       </CoachProvider>
       {/* The lesson's payoff is the real one: the settled hand, its words and its pot. Its deal
           replays the lesson from the start (STO-510 grows this into the hand-off to practice). */}
-      {game.phase === "payout" && results !== null && !celebratingWin ? (
+      {finished && !celebratingWin ? (
         <ResultsScreen onDeal={lesson.restart} onExit={leave} snapshot={results} />
       ) : null}
     </WordBuilder>

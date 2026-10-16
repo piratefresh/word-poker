@@ -5,6 +5,9 @@
 
 import { Storage } from "expo-sqlite/kv-store";
 
+/** Set once the guided hand reaches its payout; until then the street menu highlights Tutorial (STO-597). */
+export const TUTORIAL_DONE = "tutorial-done";
+
 export function readItem(key: string): string | null {
   return Storage.getItemSync(key);
 }

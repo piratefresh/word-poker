@@ -94,3 +94,10 @@ sentry-wizard-installation-error-*.log
 # EAS local credentials (certificates, profiles)
 apps/mobile/credentials.json
 apps/mobile/credentials/
+
+# Local checkouts and downloaded native builds must never be uploaded or committed.
+/.worktrees/
+*.ipa
+*.apk
+*.aab
+*.apks
