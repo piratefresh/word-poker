@@ -52,7 +52,7 @@ const NavRack: NonNullable<ComponentProps<typeof Tabs>["tabBar"]> = ({ state, de
   const insets = useSafeAreaInsets();
   const storeEnabled = coinStoreEnabled();
   return (
-    <View style={[styles.rack, { height: 78 + insets.bottom }]}>
+    <View style={[styles.rack, { height: 120 + insets.bottom }]}>
       <LinearGradient colors={["#b77a42", "#82451e", "#6a3619"]} locations={[0, 0.28, 1]} style={[StyleSheet.absoluteFill, styles.tray]} />
       <View style={styles.tabs}>
         {state.routes.map((route, index) => {
@@ -102,7 +102,7 @@ const NavRack: NonNullable<ComponentProps<typeof Tabs>["tabBar"]> = ({ state, de
 
 export default function TabLayout() {
   return (
-    <Tabs backBehavior="initialRoute" tabBar={NavRack} screenOptions={{ headerShown: false }}>
+    <Tabs backBehavior="initialRoute" tabBar={(props) => <NavRack {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="friends" options={{ title: "Friends" }} />
       <Tabs.Screen name="history" options={{ title: "Game History" }} />
@@ -112,9 +112,10 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  rack: { backgroundColor: "#6a3619", zIndex: 1 },
-  tray: { borderTopLeftRadius: 14, borderTopRightRadius: 14, borderTopWidth: 2, borderColor: "#d6a56a" },
-  tabs: { position: "absolute", top: -42, left: 16, right: 16, flexDirection: "row" },
+  // Overlap the scene while keeping the whole chip inside the native touchable bounds.
+  rack: { marginTop: -42, zIndex: 1 },
+  tray: { top: 42, borderTopLeftRadius: 14, borderTopRightRadius: 14, borderTopWidth: 2, borderColor: "#d6a56a" },
+  tabs: { position: "absolute", top: 0, left: 16, right: 16, flexDirection: "row" },
   tab: { flex: 1, alignItems: "center", paddingTop: 6, minHeight: 106 },
   pressed: { transform: [{ translateY: 4 }], opacity: 0.8 },
   chip: { width: CHIP, height: CHIP },

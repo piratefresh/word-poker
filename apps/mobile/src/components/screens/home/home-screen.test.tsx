@@ -92,6 +92,8 @@ afterEach(() => {
 
 test("shows the four mode slabs", async () => {
   const view = await render(<HomeScreen />);
+  expect(view.getByTestId("street-logo")).toBeTruthy();
+  expect(view.queryByTestId("tile-logo")).toBeNull();
 
   for (const label of ["Play Online", "Play a Friend", "Tutorial", "Offline"]) {
     expect(view.getByLabelText(label)).toBeTruthy();

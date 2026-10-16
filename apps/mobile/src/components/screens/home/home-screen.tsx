@@ -66,7 +66,7 @@ const STREETS = {
     doorLeft: 600,
   },
   landscape: {
-    source: require("@/assets/images/ui/v2/bgs/main-menu-bg-dusk-landscape.jpg"),
+    source: require("@/assets/images/ui/v2/bgs/main-menu-bg-landscape.jpg"),
     width: 2048,
     height: 1152,
     door: { x: 1205, y: 826 },
@@ -172,8 +172,6 @@ export function HomeScreen() {
   const reduceMotion = useReducedMotion();
   const [box, setBox] = useState({ width: windowWidth, height: windowHeight });
   const [offlineOpen, setOfflineOpen] = useState(false);
-  /** Where the slab stack starts before it is pushed down onto the wall. */
-  const [slabsY, setSlabsY] = useState<number | null>(null);
   const contentWidth = windowWidth - spacing.gutter * 2;
 
   /** 0 on the street, 1 through the door. */
@@ -202,13 +200,16 @@ export function HomeScreen() {
 
   const street = box.width > box.height ? STREETS.landscape : STREETS.portrait;
   // Continue the art behind the rack so its doorway keeps the full-screen proportions.
-  const artBox = { width: box.width, height: Math.max(box.height, windowHeight - insets.top) };
+  const artBox = {
+    width: box.width,
+    height: Math.max(box.height, windowHeight - insets.top),
+  };
   const door = artPoint(street, artBox, street.door);
   const wallY = artPoint(street, artBox, { x: 0, y: street.wallTop }).y;
-  const toWall = slabsY == null ? 0 : Math.max(0, wallY + WALL_PAD - slabsY);
   // A wide wall centres the stack left of the door; a phone's is too narrow, so it stays on the edge.
   const doorLeft = artPoint(street, artBox, { x: street.doorLeft, y: 0 }).x;
-  const slabsX = box.width > box.height ? Math.max(0, (doorLeft - SLAB_MAX_WIDTH) / 2) : 0;
+  const slabsX =
+    box.width > box.height ? Math.max(0, (doorLeft - SLAB_MAX_WIDTH) / 2) : 0;
   const zoom = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(enter.get(), [0, 1], [1, ENTER_ZOOM]) }],
   }));
@@ -243,60 +244,65 @@ export function HomeScreen() {
       </Animated.View>
 
       <Animated.View style={[styles.fill, uiFade]}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingTop: Math.max(insets.top + spacing.sm, box.height >= 700 ? 54 : 20) },
-          ]}
-        >
-          <View style={styles.gutter}>
-            <HomeHeader width={contentWidth} />
-          </View>
-
-          <View style={[styles.gutter, styles.logo]}>
-            <StreetLogo width={Math.min(contentWidth, LOGO_MAX_WIDTH)} />
-          </View>
-
-          {/* A guest's placeholder address can't be verified; they make an account to claim one. A
-              Game Center account is already eligible and its placeholder is never shown. */}
-          {session?.user &&
-          !isAccountEligible(session.user) &&
-          !session.user.isAnonymous ? (
-            <View style={styles.gutter}>
-              <Host
-                colorScheme="dark"
-                matchContents={{ vertical: true }}
-                seedColor={colors.gold}
-                style={{ width: contentWidth }}
-              >
-                <VerifyEmailCard
-                  email={session.user.email}
-                  testID="home-verify"
-                />
-              </Host>
-            </View>
-          ) : null}
-
-          {streakBanner ? (
-            <Banner
-              onPress={dismissStreakBanner}
-              testID="quest-streak-banner"
-              text={`DAY ${streakBanner.day} STREAK · +${formatCoins(streakBanner.reward)} COINS`}
-            />
-          ) : null}
-
-          {levelUp ? (
-            <Banner
-              onPress={dismissLevelUp}
-              testID="level-up-banner"
-              text={`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
-            />
-          ) : null}
-
+        <ScrollView contentContainerStyle={styles.content}>
           <View
-            onLayout={(event) => setSlabsY(event.nativeEvent.layout.y)}
-            style={[styles.slabs, { paddingTop: toWall, marginLeft: slabsX }]}
+            style={[
+              styles.menuTop,
+              {
+                minHeight: wallY + WALL_PAD,
+                paddingTop: Math.max(
+                  insets.top + spacing.sm,
+                  box.height >= 700 ? 54 : 20,
+                ),
+              },
+            ]}
           >
+            <View style={styles.gutter}>
+              <HomeHeader width={contentWidth} />
+            </View>
+
+            <View style={[styles.gutter, styles.logo]}>
+              <StreetLogo width={Math.min(contentWidth, LOGO_MAX_WIDTH)} />
+            </View>
+
+            {/* A guest's placeholder address can't be verified; they make an account to claim one. A
+              Game Center account is already eligible and its placeholder is never shown. */}
+            {session?.user &&
+            !isAccountEligible(session.user) &&
+            !session.user.isAnonymous ? (
+              <View style={styles.gutter}>
+                <Host
+                  colorScheme="dark"
+                  matchContents={{ vertical: true }}
+                  seedColor={colors.gold}
+                  style={{ width: contentWidth }}
+                >
+                  <VerifyEmailCard
+                    email={session.user.email}
+                    testID="home-verify"
+                  />
+                </Host>
+              </View>
+            ) : null}
+
+            {streakBanner ? (
+              <Banner
+                onPress={dismissStreakBanner}
+                testID="quest-streak-banner"
+                text={`DAY ${streakBanner.day} STREAK · +${formatCoins(streakBanner.reward)} COINS`}
+              />
+            ) : null}
+
+            {levelUp ? (
+              <Banner
+                onPress={dismissLevelUp}
+                testID="level-up-banner"
+                text={`LEVEL ${levelUp.level} REACHED · +${formatCoins(levelUp.reward)} COINS`}
+              />
+            ) : null}
+          </View>
+
+          <View style={[styles.slabs, { marginLeft: slabsX }]}>
             {SLABS.map(({ key, href, ...slab }) => (
               <MenuSlab
                 key={key}
@@ -362,10 +368,11 @@ function Banner({
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: "hidden", backgroundColor: colors.bg },
   fill: { flex: 1 },
-  content: { gap: spacing.md, paddingBottom: spacing.lg },
+  content: { paddingBottom: spacing.lg },
+  menuTop: { gap: spacing.md, paddingBottom: spacing.md },
   gutter: { paddingHorizontal: spacing.gutter },
   logo: { alignItems: "center" },
-  slabs: { gap: 14, marginTop: spacing.sm, alignItems: "flex-start" },
+  slabs: { gap: 14, alignItems: "flex-start" },
   variants: {
     padding: spacing.md,
     borderRadius: radius.card,
