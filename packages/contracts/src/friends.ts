@@ -72,8 +72,8 @@ export type FriendStatus = (typeof FRIEND_STATUSES)[number];
 /** A friend's invitation to their table, delivered on the invitee's next heartbeat. */
 export interface TableInvite { readonly fromName: string; readonly roomId: string }
 
-/** `POST /api/friends/presence`: the invites that were waiting for this player. */
-export interface PresenceResponse { readonly invites: TableInvite[] }
+/** `POST /api/friends/presence`: the invites waiting for this player, and whether their email is verified (STO-627). */
+export interface PresenceResponse { readonly invites: TableInvite[]; readonly emailVerified: boolean }
 
 export const TABLE_STARTED_MESSAGE = "That table has already started.";
 
@@ -93,6 +93,6 @@ export function isTableInvite(value: unknown): value is TableInvite {
 
 export function isPresenceResponse(value: unknown): value is PresenceResponse {
   if (typeof value !== "object" || value === null) return false;
-  const invites = (value as Record<string, unknown>).invites;
-  return Array.isArray(invites) && invites.length <= 100 && invites.every(isTableInvite);
+  const { invites, emailVerified } = value as Record<string, unknown>;
+  return Array.isArray(invites) && invites.length <= 100 && invites.every(isTableInvite) && typeof emailVerified === "boolean";
 }

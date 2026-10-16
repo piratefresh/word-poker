@@ -25,7 +25,9 @@ test("validates presence statuses and table invites", () => {
   assert.equal(isTableInvite({ fromName: "Ada", roomId: "abc_123-X" }), true);
   assert.equal(isTableInvite({ fromName: "Ada", roomId: "a b" }), false);
   assert.equal(isTableInvite({ fromName: "Ada", roomId: "x".repeat(65) }), false);
-  assert.equal(isPresenceResponse({ invites: [{ fromName: "Ada", roomId: "abc" }] }), true);
-  assert.equal(isPresenceResponse({ invites: [{ fromName: 1, roomId: "abc" }] }), false);
+  assert.equal(isPresenceResponse({ invites: [{ fromName: "Ada", roomId: "abc" }], emailVerified: true }), true);
+  assert.equal(isPresenceResponse({ invites: [], emailVerified: "yes" }), false);
+  assert.equal(isPresenceResponse({ invites: [] }), false);
+  assert.equal(isPresenceResponse({ invites: [{ fromName: 1, roomId: "abc" }], emailVerified: false }), false);
   assert.equal(isPresenceResponse({}), false);
 });

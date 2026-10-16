@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<Response> {
       const list = await friendList(user.id).catch(() => null);
       if (list) void notifyUsers(list.friends.map((friend) => friend.userId), "friendOnline", { title: "Friend online", body: `${user.name} is online` });
     }
-    return Response.json({ invites: await takeInvites(user.id) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ invites: await takeInvites(user.id), emailVerified: user.emailVerified === true }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Presence isn't available right now." }, { status: 503 });
   }
