@@ -6,7 +6,8 @@
 
 import { act, fireEvent, render, type RenderResult } from "@testing-library/react-native";
 
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { BackHandler, StyleSheet } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
 
@@ -29,6 +30,16 @@ jest.mock("@/auth/client/auth-client", () => ({
     signOut: jest.fn(),
     sendVerificationEmail: jest.fn(),
   },
+}));
+
+let mockConnected: boolean | undefined;
+jest.mock("expo-network", () => ({ useNetworkState: () => ({ isConnected: mockConnected }) }));
+
+const mockDisk = new Map<string, string>();
+jest.mock("@/lib/claim-store", () => ({
+  TUTORIAL_DONE: "tutorial-done",
+  readItem: (key: string) => mockDisk.get(key) ?? null,
+  writeItem: (key: string, value: string) => mockDisk.set(key, value),
 }));
 
 const mockDismissStreakBanner = jest.fn();
@@ -77,6 +88,9 @@ const saved = process.env.EXPO_PUBLIC_COIN_STORE;
 
 beforeEach(() => {
   mockSessionUser = { email: "ada@example.com", emailVerified: true };
+  mockConnected = undefined;
+  mockDisk.clear();
+  jest.mocked(useFocusEffect).mockClear();
   mockStreakBanner = null;
   mockLevelUp = null;
   mockDismissStreakBanner.mockReset();
@@ -92,10 +106,23 @@ afterEach(() => {
 
 test("shows the four mode slabs", async () => {
   const view = await render(<HomeScreen />);
+  expect(view.getByTestId("street-logo")).toBeTruthy();
+  expect(view.queryByTestId("tile-logo")).toBeNull();
 
   for (const label of ["Play Online", "Play a Friend", "Tutorial", "Offline"]) {
     expect(view.getByLabelText(label)).toBeTruthy();
   }
+});
+
+test("rings the Tutorial slab until the guided hand has been played", async () => {
+  const ringed = (view: RenderResult) =>
+    JSON.stringify(StyleSheet.flatten(view.getByTestId("home-slab-tutorial-face").props.style)).includes(
+      '"borderWidth":3',
+    );
+
+  expect(ringed(await render(<HomeScreen />))).toBe(true);
+  mockDisk.set("tutorial-done", "1");
+  expect(ringed(await render(<HomeScreen />))).toBe(false);
 });
 
 test("walks through the door, then opens the mode", async () => {
@@ -110,13 +137,35 @@ test("walks through the door, then opens the mode", async () => {
   jest.useRealTimers();
 });
 
+test("greys out the server modes with no internet, but Offline still opens", async () => {
+  mockConnected = false;
+  const view = await render(<HomeScreen />);
+
+  for (const key of ["online", "friend"]) {
+    expect(view.getByTestId(`home-slab-${key}`).props.accessibilityState.disabled).toBe(true);
+  }
+  expect(view.getAllByText("Offline")).toHaveLength(2);
+  expect(view.getByTestId("home-slab-tutorial").props.accessibilityState.disabled).toBe(false);
+
+  await fireEvent.press(view.getByTestId("home-slab-online"));
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByTestId("offline-wild")).toBeTruthy();
+  expect(router.push).not.toHaveBeenCalled();
+});
+
 test("opens Offline's choices, and Wild Power starts a wild table", async () => {
   jest.useFakeTimers();
   const view = await render(<HomeScreen />);
   expect(view.queryByTestId("offline-wild")).toBeNull();
 
   await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByTestId("offline-normal").props.accessibilityState.checked).toBe(true);
   await fireEvent.press(view.getByTestId("offline-wild"));
+  expect(view.getByTestId("offline-normal").props.accessibilityState.checked).toBe(false);
+  expect(view.getByTestId("offline-wild").props.accessibilityState.checked).toBe(true);
+  expect(view.getByText("DEAL · WILD POWER")).toBeTruthy();
+  expect(router.push).not.toHaveBeenCalled();
+  await fireEvent.press(view.getByTestId("offline-deal"));
   await act(async () => jest.runAllTimers());
 
   expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { powers: "wild" } });
@@ -189,4 +238,58 @@ test("keeps the prompt off a verified player's Home, and a signed-out visitor's"
   mockSessionUser = null;
 
   expect((await render(<HomeScreen />)).queryByTestId("home-verify")).toBeNull();
+});
+
+for (const testID of ["offline-close", "offline-backdrop"]) {
+  test(testID + " dismisses the tray without navigating", async () => {
+    const view = await render(<HomeScreen />);
+    await fireEvent.press(view.getByTestId("home-slab-offline"));
+    await fireEvent.press(view.getByTestId(testID));
+    expect(view.queryByTestId("offline-tray")).toBeNull();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+}
+
+test("restores the selected mode when the picker opens again", async () => {
+  const view = await render(<HomeScreen />);
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  await fireEvent.press(view.getByTestId("offline-wild"));
+  await fireEvent.press(view.getByTestId("offline-close"));
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByText("DEAL · WILD POWER")).toBeTruthy();
+  expect(mockDisk.get("offline-mode")).toBe("wild");
+});
+
+test("DEAL defaults to the normal offline route", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByText("DEAL · NORMAL")).toBeTruthy();
+  await fireEvent.press(view.getByTestId("offline-deal"));
+  await act(async () => jest.runAllTimers());
+  expect(router.push).toHaveBeenCalledWith("/offline");
+  jest.useRealTimers();
+});
+
+test("device back dismisses the tray and removes its listener", async () => {
+  const remove = jest.fn();
+  const listener = jest.spyOn(BackHandler, "addEventListener").mockReturnValue({ remove });
+  const view = await render(<HomeScreen />);
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  const focus = jest.mocked(useFocusEffect).mock.calls.at(-1)?.[0];
+  const cleanup = focus?.();
+  const onBack = listener.mock.calls[0]?.[1];
+  await act(async () => expect(onBack?.({ type: "hardwareBackPress", timeStamp: 0 })).toBe(true));
+  expect(view.queryByTestId("offline-tray")).toBeNull();
+  if (typeof cleanup === "function") cleanup();
+  expect(remove).toHaveBeenCalled();
+  listener.mockRestore();
+});
+
+test("leaving the Home tab closes the tray", async () => {
+  const view = await render(<HomeScreen />);
+  const blur = jest.mocked(useFocusEffect).mock.calls[0]?.[0]();
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  await act(async () => { if (typeof blur === "function") blur(); });
+  expect(view.queryByTestId("offline-tray")).toBeNull();
 });

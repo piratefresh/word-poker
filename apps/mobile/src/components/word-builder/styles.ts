@@ -127,48 +127,21 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.small,
     lineHeight: 19,
   },
-  // The cream tray the strip sits in (STO-538), built like the buttons: a face standing on a
-  // darker lip. Its back edge recedes into the tabletop, with the front edge anchored.
-  trayLip: {
-    alignSelf: "stretch",
-    backgroundColor: "#bc7d39",
-    borderRadius: radius.lg,
-    marginHorizontal: 12,
-    transform: [{ perspective: 500 }, { rotateX: "16deg" }],
-    transformOrigin: "center bottom",
-  },
-  // The strip's row keeps a band under the tiles for a choice tile's face chips, so the face
-  // takes no bottom padding of its own: the band is the room.
-  trayFace: {
-    backgroundColor: "#ffe0b0",
-    borderColor: "#fff3dc",
-    borderRadius: radius.lg,
-    borderWidth: border.hairline,
-    marginBottom: 4,
-    paddingBottom: spacing.xxs,
-    paddingHorizontal: 6,
-    paddingTop: spacing.xs,
-  },
-  // The tray's header: the label at the left, the word's controls at the right, tiles below.
-  trayHeader: {
-    alignItems: "center",
+  // The hand's place on the felt mat (STO-538): no tray of its own, just the card slots and,
+  // under them, the word's controls.
+  // Inset past the mat's stitch, with room under the controls for the mat's tilt and the betting
+  // row's overlap, so the whole hand lies on the felt.
+  tray: { alignSelf: "stretch", marginHorizontal: 24, paddingBottom: 18, paddingTop: spacing.xs },
+  trayActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: spacing.xs,
+    gap: spacing.sm,
+    justifyContent: "center",
+    marginTop: spacing.xxs,
   },
-  trayActions: { flexDirection: "row", gap: spacing.xs },
-  trayLabel: {
-    color: "#4a3018",
-    fontFamily: fonts.sansBlack,
-    fontSize: 14,
-    letterSpacing: 0.3,
-    marginBottom: spacing.xs,
-    marginLeft: spacing.xxs,
-  },
-  // A place no tile has been dealt to: a dashed outline the size of a tile.
+  // A card slot stitched into the felt, the size of a tile; a dealt tile sits over its slot.
   emptyPlace: {
-    backgroundColor: "rgba(150,100,40,0.1)",
-    borderColor: "#bf9a68",
+    backgroundColor: "rgba(0,24,10,0.22)",
+    borderColor: "rgba(214,236,214,0.4)",
     borderStyle: "dashed",
     borderWidth: 1.25,
     position: "absolute",

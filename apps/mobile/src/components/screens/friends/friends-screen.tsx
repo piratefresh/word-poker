@@ -8,6 +8,7 @@ import { authClient } from "@/auth/client/auth-client";
 import { colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
 import { acceptFriend, addFriend, getFriends, removeFriend } from "@/lib/friends-client";
 import { friendLinkFor } from "@/lib/invite-link";
+import { menuFeedback } from "@/lib/menu-feedback";
 import { webTestID } from "@/lib/web-id";
 
 const titleText = { color: colors.goldHi, fontFamily: fonts.serifBold, fontSize: fontSize.h2 } satisfies UniversalTextStyle;
@@ -126,8 +127,17 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
 
 /** Native controls keep their testID; Maestro web reads the surrounding DOM id first. */
 function Button(props: ComponentProps<typeof ExpoButton>) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
   return <RNHostView matchContents>
-    <View id={webTestID(props.testID)}>
+    <View
+      id={webTestID(props.testID)}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => { setHovered(false); setPressed(false); }}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      style={props.disabled ? undefined : menuFeedback(hovered, pressed)}
+    >
       <Host matchContents colorScheme="dark" seedColor={colors.gold}><ExpoButton {...props} /></Host>
     </View>
   </RNHostView>;

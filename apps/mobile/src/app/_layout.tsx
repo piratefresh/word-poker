@@ -101,6 +101,7 @@ export function RootLayout() {
   // The design system asks for these families by name (`fonts.*`), so they have to
   // be registered before the first frame paints.
   const [fontsLoaded] = useFonts({
+    Rubik_500Medium: require("@/assets/fonts/rubik-medium.ttf"),
     Fredoka_600SemiBold,
     Fredoka_700Bold,
     RobotoSlab_800ExtraBold,

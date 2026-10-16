@@ -39,9 +39,24 @@ tags:
 - assertVisible: "Wild Power: Pick a power each hand"
 - takeScreenshot: home-menu-offline
 
-# And tappable: Normal walks through the door to the offline table.
+# Choosing a card updates the deal; dismissing preserves the choice.
+- tapOn:
+    id: "offline-wild"
+- assertVisible: "DEAL · WILD POWER"
+- tapOn:
+    id: "offline-close"
+- assertNotVisible:
+    id: "offline-tray"
+- tapOn:
+    id: "home-slab-offline"
+- assertVisible: "DEAL · WILD POWER"
+
+# Normal walks through the door only after DEAL.
 - tapOn:
     id: "offline-normal"
+- assertVisible: "DEAL · NORMAL"
+- tapOn:
+    id: "offline-deal"
 - extendedWaitUntil:
     visible: "PREFLOP"
     timeout: 90000

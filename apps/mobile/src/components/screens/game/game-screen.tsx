@@ -24,6 +24,8 @@ import {
   TableBackdrop,
 } from "./backdrop";
 import { CoinBowlGameContext } from "./backdrop/coin-bowl-motion";
+import { FeltMat } from "./backdrop/felt-mat";
+import { matBox } from "./backdrop/felt-mat-box";
 import { BettingControls, bettingRowStyle, useRaiseAmount } from "./betting";
 import type { GamePlayer, GameScreenState, LetterTileData } from "./game-types";
 import {
@@ -171,6 +173,9 @@ function GameScreenBody({
   const scale = useScreenScale();
   const tight = useCompactControls();
   const [controlsHeight, setControlsHeight] = useState(0);
+  // The word builder's height at the top of the controls: the mat ends where it does. A height,
+  // not the betting row's `y` — the web's onLayout fires on a resize, not a move.
+  const [rackHeight, setRackHeight] = useState<number | null>(null);
   // Portrait's controls reach into the home indicator's band: half of it stays clear for the
   // swipe, the rest goes to the felt instead of standing empty under the action row.
   const bottomInset = landscape ? insets.bottom : Math.round(insets.bottom / 2);
@@ -286,6 +291,18 @@ function GameScreenBody({
       {/* The backdrop's coin bowl and the pot bowl both play the table's turns. */}
       <CoinBowlGameContext.Provider value={game}>
       <TableBackdrop />
+      {/* The mat starts under the HUD and its hanging mode tag, so the opponents sit on it. */}
+      {landscape ? null : (
+        <FeltMat
+          box={matBox(
+            window,
+            insets.top + hudHeight + (modeTag ? MODE_TAG_BLOCK : 0) + 4,
+            rackHeight == null ? undefined : height - bottomInset - controlsHeight + rackHeight,
+          )}
+          height={height}
+          width={window.width}
+        />
+      )}
       {/* Above the HUD, so the community label reads over the timer banner's hanging tip; the
           layer takes no touches of its own, so the HUD's buttons stay pressable. */}
       <View
@@ -393,7 +410,9 @@ function GameScreenBody({
           </View>
         ) : (
           <View testID="game-controls" onLayout={(event: LayoutChangeEvent) => setControlsHeight(event.nativeEvent.layout.height)}>
-            {rackBlock}
+            <View onLayout={(event: LayoutChangeEvent) => setRackHeight(event.nativeEvent.layout.height)}>
+              {rackBlock}
+            </View>
             {bettingBlock}
           </View>
         )}

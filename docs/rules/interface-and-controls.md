@@ -43,6 +43,12 @@ The seated game view displays:
 
 Wallet Balance may be shown in a secondary location, but it must not appear as part of the available betting balance.
 
+## Results Tiles
+
+Results cards show each played tile at the small size. Double-letter and triple-letter tiles keep
+the shared gold `2×` and red `3×` badges, floating just outside the top-left corner so the badge
+does not cover the letter. Choice-face chips remain below the tile.
+
 ---
 
 # 31. Betting Control Requirements

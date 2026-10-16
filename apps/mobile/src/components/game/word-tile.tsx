@@ -6,7 +6,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import {
   Pressable,
@@ -89,6 +88,8 @@ export interface TileProps {
    * showdown, which says a power made the tile and nothing about what it replaced.
    */
   powered?: boolean;
+  /** Results float the multiplier clear of the smaller tile's letter. */
+  multiplierBadgePlacement?: "inset" | "outside";
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -262,6 +263,7 @@ export function Tile({
   animation = "flip",
   dealDelayMs = 0,
   powered = false,
+  multiplierBadgePlacement = "inset",
   onPress,
   onFlipComplete,
   accessibilityLabel,
@@ -520,6 +522,31 @@ export function Tile({
   const multiplierLabel = tile.multiplier
     ? MULTIPLIER_LABEL[tile.multiplier]
     : null;
+  const multiplierBadge = multiplierLabel ? (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.multiplierBadge,
+        tile.multiplier === "triple-letter" && styles.tripleBadge,
+        multiplierBadgePlacement === "outside"
+          ? { left: -metrics.inset * 2, top: -metrics.inset * 2 }
+          : { left: metrics.inset, top: metrics.inset },
+      ]}
+    >
+      <Text
+        style={[
+          styles.multiplier,
+          {
+            fontSize: multiplierBadgePlacement === "outside"
+              ? Math.max(9, metrics.badgeSize)
+              : metrics.badgeSize,
+          },
+        ]}
+      >
+        {multiplierLabel}
+      </Text>
+    </View>
+  ) : null;
   const setPressed = (pressed: boolean) => {
     pressScale.set(
       withTiming(pressed ? 0.95 : 1, {
@@ -664,26 +691,14 @@ export function Tile({
                 <Bolt size={metrics.badgeSize + 3} />
               </View>
             ) : null}
-            {multiplierLabel ? (
-              <View
-                style={[
-                  styles.multiplierBadge,
-                  tile.multiplier === "triple-letter" && styles.tripleBadge,
-                  { left: metrics.inset, top: metrics.inset },
-                ]}
-              >
-                <Text
-                  style={[styles.multiplier, { fontSize: metrics.badgeSize }]}
-                >
-                  {multiplierLabel}
-                </Text>
-              </View>
-            ) : null}
+            {multiplierBadgePlacement === "inset" ? multiplierBadge : null}
             {/* A badge in the corner would sit on a wide letter's arm, so the letter steps down. */}
             <View
               style={[
                 styles.letters,
-                (multiplierLabel || powered) && { marginTop: Math.round(metrics.badgeSize * 0.5) },
+                ((multiplierLabel && multiplierBadgePlacement === "inset") || powered) && {
+                  marginTop: Math.round(metrics.badgeSize * 0.5),
+                },
               ]}
             >
               <Text
@@ -796,6 +811,15 @@ export function Tile({
         ) : null}
         </View>
         </MultiplierBeam>
+        {multiplierBadgePlacement === "outside" && multiplierBadge !== null ? (
+          <Animated.View
+            aria-hidden
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.outsideBadgeFace, frontMotion]}
+          >
+            {multiplierBadge}
+          </Animated.View>
+        ) : null}
       </Animated.View>
     </Pressable>
   );
@@ -804,6 +828,7 @@ export function Tile({
 const styles = StyleSheet.create({
   outer: { overflow: "visible" },
   shell: { overflow: "visible" },
+  outsideBadgeFace: { backfaceVisibility: "hidden" },
   // The dark rim shows only where the face does not cover the slab: its foot and corners.
   slab: { ...StyleSheet.absoluteFill, borderWidth: border.hairline },
   /** The face's frame: the ownership border, sitting above the slab it leaves the foot of. */
