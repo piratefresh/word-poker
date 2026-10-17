@@ -101,7 +101,9 @@ export function RootLayout() {
   // The design system asks for these families by name (`fonts.*`), so they have to
   // be registered before the first frame paints.
   const [fontsLoaded] = useFonts({
+    Rubik_400Regular: require("@/assets/fonts/rubik-regular.ttf"),
     Rubik_500Medium: require("@/assets/fonts/rubik-medium.ttf"),
+    Rubik_600SemiBold: require("@/assets/fonts/rubik-semibold.ttf"),
     Fredoka_600SemiBold,
     Fredoka_700Bold,
     RobotoSlab_800ExtraBold,
@@ -159,6 +161,9 @@ export function RootLayout() {
                   <Stack.Screen name="online" />
                   <Stack.Screen name="friend/[code]" />
                   <Stack.Screen name="online/[roomId]" />
+                </Stack.Protected>
+                <Stack.Protected guard={__DEV__}>
+                  <Stack.Screen name="dev-ledger" />
                 </Stack.Protected>
                 {/* Outside the guards: the emailed reset link may land while a stale
                     session is still on the device, and the reset has to win. */}

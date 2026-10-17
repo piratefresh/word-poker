@@ -1,0 +1,45 @@
+import { useId, useState } from "react";
+import { ScrollView, StyleSheet, View, type ScrollViewProps } from "react-native";
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
+import { colors, gradients, radius } from "@/constants/theme";
+
+/** Fixed felt; tinted text belongs below 35% of the viewport or inside a panel/card. */
+export function LedgerPage({ children, gap = 10, style, contentContainerStyle, ...props }: ScrollViewProps & { gap?: number }) {
+  const id = useId().replace(/:/g, "");
+  const [size, setSize] = useState({ width: 375, height: 812 });
+  const horizontalFade = Math.min(.5, 60 / Math.max(1, size.width));
+  const verticalFade = Math.min(.5, 60 / Math.max(1, size.height));
+  return (
+    <View style={[styles.page, style]} onLayout={(event) => setSize(event.nativeEvent.layout)}>
+      <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%">
+        <Defs>
+          <RadialGradient id={`${id}felt`} gradientUnits="userSpaceOnUse" cx={0} cy={0} fx={0} fy={0} r={1}
+            gradientTransform={`translate(${size.width / 2},0) scale(${size.width * 1.3},${size.height * .7})`}>
+            {gradients.table.colors.map((color, i) => <Stop key={color} offset={i / 2} stopColor={color} />)}
+          </RadialGradient>
+          <LinearGradient id={`${id}spine`}>
+            <Stop stopColor={colors.surfaceStrong} /><Stop offset="1" stopColor="transparent" />
+          </LinearGradient>
+          <LinearGradient id={`${id}horizontal`}>
+            <Stop stopColor={colors.scrim} /><Stop offset={horizontalFade} stopColor="transparent" /><Stop offset={1 - horizontalFade} stopColor="transparent" /><Stop offset="1" stopColor={colors.scrim} />
+          </LinearGradient>
+          <LinearGradient id={`${id}vertical`} x2="0%" y2="100%">
+            <Stop stopColor={colors.scrim} /><Stop offset={verticalFade} stopColor="transparent" /><Stop offset={1 - verticalFade} stopColor="transparent" /><Stop offset="1" stopColor={colors.scrim} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${id}felt)`} />
+        <Rect width="100%" height="100%" fill={`url(#${id}horizontal)`} />
+        <Rect width="100%" height="100%" fill={`url(#${id}vertical)`} />
+        <Rect width="14" height="100%" fill={`url(#${id}spine)`} />
+      </Svg>
+      <ScrollView {...props} contentContainerStyle={[styles.content, { gap }, contentContainerStyle]}>
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: { flex: 1, overflow: "hidden", backgroundColor: gradients.table.colors[2], borderTopLeftRadius: radius.xs, borderBottomLeftRadius: radius.xs, borderTopRightRadius: radius.md, borderBottomRightRadius: radius.md },
+  content: { paddingTop: 60, paddingHorizontal: 14, paddingBottom: 150 },
+});
