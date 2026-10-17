@@ -160,6 +160,29 @@ export const colors = {
   ],
 } as const;
 
+/** The Hand Ledger (History) book: ink on parchment cards and on the felt pages. */
+export const ledger = {
+  ink: "#3a2210",
+  inkBody: "#5a3a1c",
+  inkSoft: "#7a5634",
+  inkMuted: "#a58a68",
+  onFelt: "#f3e6c4",
+  onFeltDim: "#b9c2b4",
+  parchment: "#f7e7b5",
+  goldText: "#f7d77a",
+  goldEdge: "#e0974a",
+  goldButton: ["#ffd877", "#e6a73e"] as const,
+  goldButtonEdge: "#9a5f1c",
+  modeTile: "#1f4a33",
+  modeTileEdge: "#0e2a1c",
+  synced: "#3fae6a",
+  syncing: "#e6a73e",
+  offline: "#8a8a80",
+  rejectedLink: "#a3271e",
+  rejectedBg: "#f3d0c6",
+  rejectedInk: "#6e1d16",
+} as const;
+
 /* ── gradients (expo-linear-gradient: {...gradients.felt}) ───────── */
 
 export const gradients = {
@@ -277,6 +300,10 @@ export const fonts = {
   uiMedium: "Fredoka_600SemiBold",
   /** Wooden-sign slab for panel headings. */
   slab: "RobotoSlab_800ExtraBold",
+  /** Body face of the menus and the Hand Ledger; bundled in app/_layout.tsx. */
+  rubik: "Rubik_400Regular",
+  rubikMedium: "Rubik_500Medium",
+  rubikSemiBold: "Rubik_600SemiBold",
 } as const;
 
 export const fontSize = {

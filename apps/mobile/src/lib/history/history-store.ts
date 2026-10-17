@@ -27,6 +27,10 @@ export function sessionStatus(session: HistorySession, uploadingSessionId: strin
   if (session.pending) return uploadingSessionId === session.sessionId ? "uploading" : "onDevice";
   return "verified";
 }
+export function sessionName(session: HistorySession): string {
+  return session.latest.hand.tableName ?? (session.latest.hand.mode === "offline" ? "Practice vs bots" : "Online session");
+}
+
 export interface SessionCursor { endedAtMs: number; sessionId: string }
 export interface HandCursor { endedAtMs: number; id: string }
 
@@ -67,6 +71,9 @@ export const historyRow = readHistoryRow;
 export const pendingHistory = readPendingRows;
 export const pendingSessionCount = countPendingSessions;
 export const historySessions = readSessionPage;
+export async function historySession(ownerId: string, sessionId: string): Promise<HistorySession | null> {
+  return (await readSessionPage(ownerId, null, 1, sessionId))[0] ?? null;
+}
 export const sessionHands = readHandPage;
 export const historyCursor = readHistoryCursor;
 export const setHistoryCursor = writeHistoryCursor;

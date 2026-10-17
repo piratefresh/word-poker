@@ -1,14 +1,15 @@
-import { useEffect, useRef } from "react";
-import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import { useEffect, useRef, type ReactNode } from "react";
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 
 /** Activate with the page, not with viewport visibility; scrolling never replays the deal. */
 export function DealIn({ children, index, baseDelay = 0, active = true }: {
-  children: React.ReactNode;
+  children: ReactNode;
   index: number;
   baseDelay?: number;
   active?: boolean;
 }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useReduceMotion();
   const progress = useSharedValue(reducedMotion ? 1 : 0);
   const opacity = useSharedValue(reducedMotion ? 1 : 0);
   // Stay hidden until the first deal, or the cover/page turn reveals the rows before they deal in.

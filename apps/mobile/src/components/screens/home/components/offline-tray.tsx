@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "center", gap: 4 },
   headingCopy: { flex: 1 },
   title: { fontFamily: fonts.arcade, fontSize: 25, color: "#f7e7b5" },
-  subline: { fontFamily: "Rubik_500Medium", fontSize: 12, lineHeight: 18, color: "#d8ccaf" },
+  subline: { fontFamily: fonts.rubikMedium, fontSize: 12, lineHeight: 18, color: "#d8ccaf" },
   close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   closeText: { fontSize: 28, lineHeight: 34, textAlign: "center", color: "#f7e7b5", width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.25)" },
   deal: { borderRadius: 12, overflow: "hidden", borderBottomWidth: 5, borderBottomColor: "#9a5f1c" },

@@ -14,14 +14,7 @@ export const ledgerRouter: typeof StackRouter = (options) => {
     getRehydratedState(state, config) {
       if (state.stale === false) return stack.getRehydratedState(state, config);
       const current = state.routes[state.index ?? state.routes.length - 1];
-      const root = state.routes.find((route) => route.name === "index") ?? { name: "index" };
-      const routes = current && current.name !== "index" ? [root, current] : [root];
-      if (current?.name === "[sessionId]/[handId]") {
-        const sessionId = stringParam(current.params, "sessionId");
-        const hands = state.routes.find((route) => route.name === "[sessionId]" && stringParam(route.params, "sessionId") === sessionId)
-          ?? { name: "[sessionId]", params: { sessionId } };
-        routes.splice(1, 0, hands);
-      }
+      const routes = current ? ledgerStack(state.routes, current, (name, params) => ({ name, params })) : [{ name: "index" }];
       return stack.getRehydratedState({ ...state, routes, index: routes.length - 1 }, config);
     },
     getStateForAction(state, action, config) {
@@ -29,18 +22,28 @@ export const ledgerRouter: typeof StackRouter = (options) => {
       if (!next || next.stale !== false) return next;
       const current = next.routes[next.index];
       if (current.name === "index") return next;
-      const root = next.routes.find((route) => route.name === "index") ?? { key: `${current.key}-sessions`, name: "index" };
-      const routes = [root, current];
-      if (current.name === "[sessionId]/[handId]") {
-        const sessionId = stringParam(current.params, "sessionId");
-        const hands = next.routes.find((route) => route.name === "[sessionId]" && stringParam(route.params, "sessionId") === sessionId)
-          ?? { key: `${current.key}-hands`, name: "[sessionId]", params: { sessionId } };
-        routes.splice(1, 0, hands);
-      }
-      return { ...next, routes, index: routes.indexOf(current) };
+      const routes = ledgerStack(next.routes, current, (name, params) =>
+        ({ key: `${current.key}-${name === "index" ? "sessions" : "hands"}`, name, params }));
+      return { ...next, routes, index: routes.length - 1 };
     },
   };
 };
+
+/** Sessions, then the open session's hands, then `current`: reusing routes already on the stack. */
+function ledgerStack<R extends { name: string; params?: object }>(
+  routes: readonly R[],
+  current: R,
+  missing: (name: "index" | "[sessionId]", params?: { sessionId?: string }) => R,
+): R[] {
+  if (current.name === "index") return [current];
+  const stack = [routes.find((route) => route.name === "index") ?? missing("index")];
+  if (current.name === "[sessionId]/[handId]") {
+    const sessionId = stringParam(current.params, "sessionId");
+    stack.push(routes.find((route) => route.name === "[sessionId]" && stringParam(route.params, "sessionId") === sessionId)
+      ?? missing("[sessionId]", { sessionId }));
+  }
+  return [...stack, current];
+}
 
 function stringParam(params: object | undefined, key: string): string | undefined {
   if (!params || !(key in params)) return undefined;
@@ -64,14 +67,17 @@ function HistoryContent({ state, actions }: ContentProps) {
   const lastRoute = useRef(route.key);
   const locked = useRef(false);
   const release = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const claimTurn = useCallback(() => {
-    if (locked.current) return false;
-    locked.current = true;
-    // Lock synchronously, before Expo Router processes the push, including Reduce Motion.
+  const releaseAfterTurn = useCallback(() => {
     clearTimeout(release.current);
     release.current = setTimeout(() => { locked.current = false; }, reduced ? 0 : PAGE_TURN_MS);
-    return true;
   }, [reduced]);
+  const claimTurn = useCallback(() => {
+    if (locked.current) return false;
+    // Lock synchronously, before Expo Router processes the push, including Reduce Motion.
+    locked.current = true;
+    releaseAfterTurn();
+    return true;
+  }, [releaseAfterTurn]);
   useEffect(() => () => clearTimeout(release.current), []);
   useEffect(() => {
     if (reduced) locked.current = false;
@@ -79,10 +85,9 @@ function HistoryContent({ state, actions }: ContentProps) {
     lastRoute.current = route.key;
     locked.current = !reduced;
     const reveal = setTimeout(() => setRevealedRoute(route.key), reduced ? 0 : PAGE_REVEAL_MS);
-    clearTimeout(release.current);
-    release.current = setTimeout(() => { locked.current = false; }, reduced ? 0 : PAGE_TURN_MS);
+    releaseAfterTurn();
     return () => clearTimeout(reveal);
-  }, [route.key, reduced]);
+  }, [route.key, reduced, releaseAfterTurn]);
   const back = useCallback(() => {
     if (locked.current) return;
     if (level > 0) {
