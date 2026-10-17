@@ -1,0 +1,33 @@
+# Expo web, with a signed-in account. Ledger content is added in later stories.
+url: http://localhost:8081
+name: Ledger shell opens, reverses, and closes from the rack
+tags:
+  - web
+  - navigation
+---
+- runFlow: sign-in.yaml
+- tapOn:
+    id: "tab-history"
+- assertVisible:
+    id: "tab-home"
+- extendedWaitUntil:
+    visible:
+      id: "history-screen"
+    timeout: 5000
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "tab-history"
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "tab-history"
+- extendedWaitUntil:
+    visible:
+      id: "history-screen"
+    timeout: 5000
+- tapOn:
+    id: "tab-home"
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 5000
