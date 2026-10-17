@@ -23,7 +23,7 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 import { DEAL_MODE_NAMES, powersLabel } from "@/features/table/power-view";
 import {
   joinTable,
@@ -34,7 +34,7 @@ import {
   type TableSnapshot,
 } from "@/features/online/room-session";
 import { useDictionary } from "@/features/table/use-dictionary";
-import { fullWidth } from "@/lib/full-width";
+import { fullWidth } from "@/lib/ui/full-width";
 
 import { OnlineFelt } from "./online-felt";
 

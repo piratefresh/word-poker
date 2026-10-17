@@ -10,7 +10,7 @@ import {
 } from "react-native";
 
 import { CoachTarget } from "@/components/ui/coach";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 import { fonts, palette, radius } from "@/constants/theme";
 
 import type { BettingState } from "../game-types";

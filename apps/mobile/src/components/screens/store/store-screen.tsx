@@ -22,8 +22,8 @@ import { router } from "expo-router";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
-import { formatCoins } from "@/lib/format";
-import { fullWidth } from "@/lib/full-width";
+import { formatCoins } from "@/lib/ui/format";
+import { fullWidth } from "@/lib/ui/full-width";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 
 import type { CoinPackRow } from "./coin-packs";

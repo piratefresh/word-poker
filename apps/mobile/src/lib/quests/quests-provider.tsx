@@ -42,8 +42,8 @@ import { isAccountEligible, type QuestHandFacts, type QuestId, type QuestStateRe
 import { levelReward, xpForHand } from "@wordpoker/game-rules";
 
 import { authClient } from "@/auth/client/auth-client";
-import { readItem, writeItem } from "@/lib/claim-store";
-import { fetchQuestState, fetchWallet, QuestClaimRejectedError, sendQuestHandClaim } from "@/lib/wallet-client";
+import { readItem, writeItem } from "@/lib/storage/claim-store";
+import { fetchQuestState, fetchWallet, QuestClaimRejectedError, sendQuestHandClaim } from "@/lib/wallet/wallet-client";
 
 /** A streak reward paid by the most recent read — what the home banner announces. */
 export interface StreakBanner {

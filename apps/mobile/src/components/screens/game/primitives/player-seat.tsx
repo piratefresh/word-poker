@@ -16,7 +16,7 @@ import {
   layout,
   palette,
 } from "@/constants/theme";
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
 import { SeatBeam } from "./seat-beam";

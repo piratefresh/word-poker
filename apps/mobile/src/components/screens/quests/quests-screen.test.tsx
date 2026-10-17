@@ -15,7 +15,7 @@ let mockQuestsValue: {
   coins: number | null;
   state: unknown;
 } = { coins: null, state: null };
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ ...mockQuestsValue, refresh: mockRefresh }),
 }));
 

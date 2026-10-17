@@ -6,8 +6,8 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 
 import { ShadowBox } from "@/components/ui/shadow-box";
 import { fonts } from "@/constants/theme";
-import { readItem, writeItem } from "@/lib/claim-store";
-import { webTestID } from "@/lib/web-id";
+import { readItem, writeItem } from "@/lib/storage/claim-store";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { ModeVariants, type ModeVariant } from "./mode-variants";
 import { useTrayDismiss } from "./use-tray-dismiss";

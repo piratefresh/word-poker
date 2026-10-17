@@ -1,7 +1,7 @@
 import { isHistoryHand, isHistoryPage, type HistoryPage, type HandRecord } from "@wordpoker/contracts";
 import { authClient } from "@/auth/client/auth-client";
-import { apiBaseURL } from "@/lib/api-base-url";
-import { acceptHistoryHand, historyCursor, historyRetry, localHistory, localHistoryId, setHistoryCursor } from "./history-store";
+import { apiBaseURL } from "@/lib/network/api-base-url";
+import { acceptHistoryHand, historyCursor, historyRetry, localHistoryId, pendingHistory, setHistoryCursor } from "./history-store";
 
 async function request(ownerId: string, path: string, record?: HandRecord): Promise<Response> {
   // Refresh auth before each request. An account switch never sends another account's outbox.
@@ -31,8 +31,8 @@ export function syncHistory(ownerId: string, changed: () => void): Promise<void>
 }
 
 async function run(ownerId: string, changed: () => void): Promise<void> {
-  for (const row of await localHistory(ownerId)) {
-    if (row.status !== "pending" || !row.record || row.retryAtMs > Date.now()) continue;
+  for (const row of await pendingHistory(ownerId)) {
+    if (!row.record || row.retryAtMs > Date.now()) continue;
     try {
       const response = await request(ownerId, "", row.record);
       const body: unknown = await response.json().catch(() => null);

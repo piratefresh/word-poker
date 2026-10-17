@@ -10,7 +10,7 @@
 import type { PlatformAuthIntent } from "@wordpoker/contracts";
 import { Platform } from "react-native";
 
-import { pendingReferral } from "@/lib/pending-destination";
+import { pendingReferral } from "@/lib/navigation/pending-destination";
 
 import * as platformAuth from "../../../modules/platform-auth/src/platform-auth";
 import { authClient } from "./auth-client";

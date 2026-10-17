@@ -38,7 +38,7 @@ import {
   palette,
   radius,
 } from "@/constants/theme";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 export type GameButtonVariant = "gold" | "dark" | "danger" | "blue" | "green";
 

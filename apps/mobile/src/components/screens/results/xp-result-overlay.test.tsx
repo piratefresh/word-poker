@@ -4,7 +4,7 @@ import { seatFixture } from "./results-fixtures";
 import { XpResultOverlay } from "./xp-result-overlay";
 
 let mockOutcomes: Record<string, unknown> = {};
-jest.mock("@/lib/quests-provider", () => ({ useQuests: () => ({ claimOutcomes: mockOutcomes }) }));
+jest.mock("@/lib/quests/quests-provider", () => ({ useQuests: () => ({ claimOutcomes: mockOutcomes }) }));
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
 );

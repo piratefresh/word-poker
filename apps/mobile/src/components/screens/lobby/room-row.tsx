@@ -31,7 +31,7 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 import { powersLabel } from "@/features/table/power-view";
 import { spokenTable } from "./parlor-view";
 

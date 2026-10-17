@@ -26,6 +26,7 @@
     "@expo-google-fonts/roboto-slab": "^0.4.2",
     "@expo/ui": "~57.0.21",
     "@expo/vector-icons": "^15.1.1",
+    "@legendapp/list": "3.6.0",
     "@revenuecat/purchases-js": "^1.67.1",
     "@rive-app/canvas": "^2.44.0",
     "@rive-app/react-native": "^0.5.4",
@@ -103,7 +104,7 @@
       "**/*.test.tsx"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg))"
+      "node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|standard-navigation|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg))"
     ]
   }
 }

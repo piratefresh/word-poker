@@ -64,7 +64,7 @@ jest.mock("expo-router", () => ({
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: () => ({ data: null, isPending: false }) },
 }));
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
 }));
 

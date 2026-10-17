@@ -26,9 +26,9 @@ import { StyleSheet, View, Text as RNText } from "react-native";
 
 import { border, colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
-import { formatCoins } from "@/lib/format";
-import { fullWidth } from "@/lib/full-width";
-import { useQuests } from "@/lib/quests-provider";
+import { formatCoins } from "@/lib/ui/format";
+import { fullWidth } from "@/lib/ui/full-width";
+import { useQuests } from "@/lib/quests/quests-provider";
 
 export function QuestsScreen(): ReactElement {
   const { data: session } = authClient.useSession();

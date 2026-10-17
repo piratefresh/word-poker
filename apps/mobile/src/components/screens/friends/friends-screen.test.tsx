@@ -1,6 +1,6 @@
 import { act, render, waitFor, type RenderResult } from "@testing-library/react-native";
 import { useEffect as mockUseEffect } from "react";
-import { addFriend, getFriends, acceptFriend, removeFriend } from "@/lib/friends-client";
+import { addFriend, getFriends, acceptFriend, removeFriend } from "@/lib/friends/friends-client";
 import { FriendsScreen } from "./friends-screen";
 
 let mockGuest = false;
@@ -11,8 +11,8 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ add: mockCode }),
   useFocusEffect: (callback: () => () => void) => { mockUseEffect(callback, [callback]); },
 }));
-jest.mock("@/lib/friends-client", () => ({ getFriends: jest.fn(), addFriend: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
-jest.mock("@/lib/invite-link", () => ({ friendLinkFor: (code: string) => `https://play.test/friend/${code}` }));
+jest.mock("@/lib/friends/friends-client", () => ({ getFriends: jest.fn(), addFriend: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
+jest.mock("@/lib/navigation/invite-link", () => ({ friendLinkFor: (code: string) => `https://play.test/friend/${code}` }));
 
 beforeEach(() => {
   jest.resetAllMocks();

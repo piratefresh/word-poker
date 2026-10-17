@@ -1,13 +1,22 @@
-import { Button, Column, Host, Row, Spacer, Text } from "@expo/ui";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button, Column, Host, Text } from "@expo/ui";
+import type { ReactNode } from "react";
+import { StyleSheet, Text as NativeText, View } from "react-native";
 import type { HistoryHand } from "@wordpoker/contracts";
 import { colors, fonts, spacing } from "@/constants/theme";
 import { useHistory } from "@/lib/history/history-provider";
-import type { LocalHistoryHand } from "@/lib/history/history-store";
-import { localHistoryId } from "@/lib/history/history-store";
+import { localHistoryId, type LocalHistoryHand } from "@/lib/history/history-store";
+import { useHistoryHand, useHistorySessions, useSessionHands } from "@/lib/history/use-history-pages";
+import { DealIn } from "./ledger/deal-in";
+import { GoldBackButton } from "./ledger/gold-back-button";
+import { LedgerCard } from "./ledger/ledger-card";
+import { LedgerList } from "./ledger/ledger-page";
+import { PageStack } from "./ledger/page-stack";
+import { useLedgerReadable } from "./ledger/ledger-stage";
+import { useReduceMotion } from "@/components/hud/use-reduce-motion";
+
+const ROW_HEIGHT = 110;
+const ACTION_HEIGHT = 56;
+const DEALT_ROWS = 8;
 
 function status(row: LocalHistoryHand): string {
   if (row.status === "rejected") return "Upload rejected";
@@ -15,74 +24,76 @@ function status(row: LocalHistoryHand): string {
   return row.hand.ranked ? "Ranked online" : "Verified · Unranked offline";
 }
 
-export function HistoryScreen() {
+export function HistoryScreen({ level, sessionId, handId, revealed, back, openSession, openHand }: {
+  level: number;
+  sessionId?: string;
+  handId?: string;
+  revealed: boolean;
+  back: () => void;
+  openSession: (id: string) => void;
+  openHand: (id: string) => void;
+}) {
   const history = useHistory();
-  const { refresh } = history;
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-  const insets = useSafeAreaInsets();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [handId, setHandId] = useState<string | null>(null);
-  const selected = history.hands.find((row) => localHistoryId(row.hand) === handId);
-  const sessions = useMemo(() => {
-    const grouped = new Map<string, LocalHistoryHand[]>();
-    for (const row of history.hands) {
-      const group = grouped.get(row.hand.sessionId) ?? [];
-      group.push(row);
-      grouped.set(row.hand.sessionId, group);
-    }
-    return [...grouped.entries()];
-  }, [history.hands]);
-  const back = () => {
-    if (handId) setHandId(null);
-    else if (sessionId) setSessionId(null);
-  };
-  const rows = sessionId ? history.hands.filter((row) => row.hand.sessionId === sessionId) : [];
-  return (
-    <View style={[styles.screen, { paddingTop: insets.top + spacing.md }]} testID="history-screen">
-      <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark" seedColor={colors.gold}>
-        <Column spacing={spacing.sm} style={styles.header}>
-          <Row spacing={spacing.md}>
-            {handId || sessionId ? <Button label="Back" onPress={back} testID="history-back" /> : null}
-            <Spacer flexible />
-            <Button label={history.syncing ? "Syncing…" : "Sync"} onPress={history.refresh} disabled={history.syncing} testID="history-sync" />
-          </Row>
-          <Text textStyle={styles.title}>{selected ? `HAND #${selected.hand.handNo}` : "GAME HISTORY"}</Text>
-          {history.error ? <Text textStyle={styles.dim}>{history.error}</Text> : null}
-        </Column>
-      </Host>
-      {/* Host rows acquire their height from native layout; clipping them at zero height prevents measurement. */}
-      {selected ? <HandDetail row={selected} /> : sessionId ? (
-        <FlatList removeClippedSubviews={false} data={rows} keyExtractor={(row) => row.hand.id} renderItem={({ item }) => (
-          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark">
-            <Column spacing={spacing.xs} style={styles.card}>
-              <Text textStyle={styles.title}>{`Hand #${item.hand.handNo}`}</Text>
-              <Text textStyle={styles.dim}>{new Date(item.hand.endedAtMs).toLocaleString()}</Text>
-              <Text textStyle={styles.dim}>{status(item)}</Text>
-              <Text textStyle={styles.body}>{handLabel(item.hand)}</Text>
-              <Button label="View hand" onPress={() => setHandId(localHistoryId(item.hand))} testID={`history-hand-${item.hand.handNo}`} />
-            </Column>
-          </Host>
-        )} />
-      ) : (
-        <FlatList removeClippedSubviews={false} data={sessions} keyExtractor={([id]) => id} renderItem={({ item: [id, hands] }) => (
-          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark">
-            <Column spacing={spacing.xs} style={styles.card}>
-              <Text textStyle={styles.title}>{hands[0].hand.tableName ?? `${hands[0].hand.mode === "offline" ? "Offline" : "Online"} session`}</Text>
-              <Text textStyle={styles.dim}>{`${new Date(hands[0].hand.endedAtMs).toLocaleString()} · ${hands.length} hand${hands.length === 1 ? "" : "s"}`}</Text>
-              <Text textStyle={styles.dim}>{hands.some((hand) => hand.status === "pending") ? "Pending sync" : status(hands[0])}</Text>
-              <Button label="View session" onPress={() => setSessionId(id)} testID={`history-session-${id}`} />
-            </Column>
-          </Host>
-        )} ListEmptyComponent={
-          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.card} spacing={spacing.sm}>
-            <Text textStyle={styles.title}>{history.loading ? "Opening saved hands…" : "Your next hand starts here"}</Text>
-            <Text textStyle={styles.dim}>Finish an online or offline hand, then return here to see the result. Saved hands stay available without a connection.</Text>
-            <Button label="Play offline" onPress={() => router.push("/offline")} testID="history-play" />
-          </Column></Host>
-        } />
-      )}
-    </View>
-  );
+  const readable = useLedgerReadable();
+  const reduced = useReduceMotion();
+  const dealActive = revealed && readable && !reduced;
+  const sessions = useHistorySessions();
+  const hands = useSessionHands(sessionId);
+  const detail = useHistoryHand(handId);
+  const selected = detail.row?.hand.sessionId === sessionId ? detail.row : null;
+  const dealing = (page: number) => dealActive && page === level;
+  return <PageStack level={level}>{[
+    <LedgerList key="sessions" accessibilityLabel="Hand Ledger sessions" data={sessions.items} extraData={dealing(0)} onEndReached={sessions.loadMore} onEndReachedThreshold={0.5}
+      keyExtractor={(session) => session.sessionId} estimatedItemSize={ROW_HEIGHT}
+      ListHeaderComponent={<View style={styles.header}>
+        <NativeText style={styles.title}>HAND LEDGER</NativeText>
+        <Host matchContents={{ vertical: true }} colorScheme="dark">
+          <Button label={history.syncing ? "Syncing…" : "Sync"} onPress={history.refresh} disabled={history.syncing} testID="history-sync" />
+        </Host>
+        {history.error ? <NativeText style={styles.dim}>{history.error}</NativeText> : null}
+      </View>}
+      ListEmptyComponent={<NativeText style={styles.body}>{sessions.loading ? "Opening saved hands…" : "Your next hand starts here. Finish a hand to see it in your ledger."}</NativeText>}
+      renderItem={({ item: { sessionId: id, latest, hands: count, pending }, index }) => <Row index={index} active={dealing(0)}>
+        <LedgerCard accessibilityLabel={"View session " + (latest.hand.tableName ?? id)} onPress={() => openSession(id)}>
+          <NativeText style={styles.cardTitle}>{latest.hand.tableName ?? (latest.hand.mode === "offline" ? "Offline session" : "Online session")}</NativeText>
+          <NativeText>{new Date(latest.hand.endedAtMs).toLocaleString() + " · " + count + (count === 1 ? " hand" : " hands")}</NativeText>
+          <NativeText>{pending ? "Pending sync" : status(latest)}</NativeText>
+        </LedgerCard>
+      </Row>} />,
+    <LedgerList key={"hands-" + (sessionId ?? "")} accessibilityLabel="Hand Ledger hands" data={hands.items} extraData={dealing(1)} onEndReached={hands.loadMore} onEndReachedThreshold={0.5}
+      keyExtractor={(row) => localHistoryId(row.hand)} estimatedItemSize={ROW_HEIGHT}
+      ListHeaderComponent={<View style={styles.header}>
+        <GoldBackButton onPress={back} accessibilityLabel="Back to sessions" />
+        <NativeText style={styles.title}>SESSION HANDS</NativeText>
+      </View>}
+      ListEmptyComponent={<NativeText style={styles.body}>{hands.loading ? "Opening saved hands…" : "This session is not saved on this device."}</NativeText>}
+      renderItem={({ item: row, index }) => <Row index={index} active={dealing(1)}>
+        <LedgerCard accessibilityLabel={"View hand " + row.hand.handNo} onPress={() => openHand(localHistoryId(row.hand))}>
+          <NativeText style={styles.cardTitle}>{"Hand #" + row.hand.handNo}</NativeText>
+          <NativeText>{handLabel(row.hand)}</NativeText>
+          <NativeText>{status(row)}</NativeText>
+        </LedgerCard>
+      </Row>} />,
+    <LedgerList key={"detail-" + (sessionId ?? "") + "-" + (handId ?? "")} accessibilityLabel="Hand Ledger detail"
+      data={selected?.hand.actions ?? []} keyExtractor={(entry) => String(entry.sequence)} estimatedItemSize={ACTION_HEIGHT}
+      ListHeaderComponent={<View style={styles.header}>
+        <GoldBackButton onPress={back} accessibilityLabel="Back to hands" />
+        <NativeText style={styles.title}>{selected ? "HAND #" + selected.hand.handNo : "HAND DETAIL"}</NativeText>
+        <DealIn index={0} active={dealing(2)}>
+          {selected ? <HandSummary row={selected} /> : <NativeText style={styles.body}>{detail.loading ? "Opening saved hand…" : "This hand is not saved on this device."}</NativeText>}
+        </DealIn>
+      </View>}
+      renderItem={({ item }) => selected ? <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.action}>
+        <Text textStyle={styles.body}>{actionLabel(selected.hand, item)}</Text>
+        <Text textStyle={styles.dim}>{`${new Date(item.atMs).toLocaleTimeString()} · ${item.source}`}</Text>
+      </Column></Host> : null} />,
+  ]}</PageStack>;
+}
+
+// A virtualized row mounts as it scrolls in, so only the first screenful deals; later rows would replay on scroll.
+function Row({ index, active, children }: { index: number; active: boolean; children: ReactNode }) {
+  const row = <View style={styles.row}>{children}</View>;
+  return index < DEALT_ROWS ? <DealIn index={index} active={active}>{row}</DealIn> : row;
 }
 
 function handLabel(hand: HistoryHand): string {
@@ -92,36 +103,31 @@ function handLabel(hand: HistoryHand): string {
   return `${hero?.word ?? (hand.summary.outcome === "fold-out" ? "Fold-out" : "No submitted word")} · ${hero?.score ?? 0} points · ${delta >= 0 ? "+" : ""}${delta} chips`;
 }
 
-function HandDetail({ row }: { row: LocalHistoryHand }) {
+function HandSummary({ row }: { row: LocalHistoryHand }) {
   const hand = row.hand;
-  return <FlatList removeClippedSubviews={false} data={hand.actions} keyExtractor={(entry) => String(entry.sequence)} ListHeaderComponent={
-    <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column spacing={spacing.sm} style={styles.card}>
-      <Text textStyle={styles.title}>{handLabel(hand)}</Text>
-      <Text textStyle={styles.dim}>{status(row)}</Text>
-      {row.error ? <Text textStyle={styles.dim}>{row.error}</Text> : null}
-      <Text textStyle={styles.dim}>{`${new Date(hand.endedAtMs).toLocaleString()} · ${hand.dictionaryId}`}</Text>
-      <Text textStyle={styles.body}>{`Community: ${hand.summary.community.map((tile) => tile.letter).join(" ") || "Not revealed"}`}</Text>
-      {hand.seats.map((seat) => {
-        const result = hand.summary.seats.find((standing) => standing.playerId === seat.playerId);
-        const delta = (result?.finalStack ?? seat.initialStack) - seat.initialStack;
-        return <Column key={seat.playerId} spacing={spacing.xs}>
-          <Text textStyle={styles.title}>{seat.name}</Text>
-          <Text textStyle={styles.body}>{`${result?.word ?? "No revealed word"} · ${result?.score ?? 0} points${result?.reason ? ` · ${result.reason}` : ""}`}</Text>
-          <Text textStyle={styles.dim}>{`Tiles: ${result?.privateTiles.map((tile) => tile.letter).join(" ") || "Hidden"}`}</Text>
-          <Text textStyle={styles.dim}>{`${seat.initialStack} → ${result?.finalStack ?? seat.initialStack} chips (${delta >= 0 ? "+" : ""}${delta})`}</Text>
-        </Column>;
-      })}
-      <Text textStyle={styles.title}>POTS</Text>
-      {hand.summary.pots.map((pot, index) => <Text key={index} textStyle={styles.body}>
-        {`${pot.amount} chips → ${pot.winners.map((id) => hand.seats.find((seat) => seat.playerId === id)?.name ?? id).join(", ")}`}
-      </Text>)}
-      <Text textStyle={styles.dim}>Only your tiles and the tiles revealed at showdown are shown. Private drafts belong to their player.</Text>
-      <Text textStyle={styles.title}>ACTION LOG</Text>
-    </Column></Host>
-  } renderItem={({ item }) => <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.action}>
-    <Text textStyle={styles.body}>{actionLabel(hand, item)}</Text>
-    <Text textStyle={styles.dim}>{`${new Date(item.atMs).toLocaleTimeString()} · ${item.source}`}</Text>
-  </Column></Host>} />;
+  return <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column spacing={spacing.sm} style={styles.card}>
+    <Text textStyle={styles.title}>{handLabel(hand)}</Text>
+    <Text textStyle={styles.dim}>{status(row)}</Text>
+    {row.error ? <Text textStyle={styles.dim}>{row.error}</Text> : null}
+    <Text textStyle={styles.dim}>{`${new Date(hand.endedAtMs).toLocaleString()} · ${hand.dictionaryId}`}</Text>
+    <Text textStyle={styles.body}>{`Community: ${hand.summary.community.map((tile) => tile.letter).join(" ") || "Not revealed"}`}</Text>
+    {hand.seats.map((seat) => {
+      const result = hand.summary.seats.find((standing) => standing.playerId === seat.playerId);
+      const delta = (result?.finalStack ?? seat.initialStack) - seat.initialStack;
+      return <Column key={seat.playerId} spacing={spacing.xs}>
+        <Text textStyle={styles.title}>{seat.name}</Text>
+        <Text textStyle={styles.body}>{`${result?.word ?? "No revealed word"} · ${result?.score ?? 0} points${result?.reason ? ` · ${result.reason}` : ""}`}</Text>
+        <Text textStyle={styles.dim}>{`Tiles: ${result?.privateTiles.map((tile) => tile.letter).join(" ") || "Hidden"}`}</Text>
+        <Text textStyle={styles.dim}>{`${seat.initialStack} → ${result?.finalStack ?? seat.initialStack} chips (${delta >= 0 ? "+" : ""}${delta})`}</Text>
+      </Column>;
+    })}
+    <Text textStyle={styles.title}>POTS</Text>
+    {hand.summary.pots.map((pot, index) => <Text key={index} textStyle={styles.body}>
+      {`${pot.amount} chips → ${pot.winners.map((id) => hand.seats.find((seat) => seat.playerId === id)?.name ?? id).join(", ")}`}
+    </Text>)}
+    <Text textStyle={styles.dim}>Only your tiles and the tiles revealed at showdown are shown. Private drafts belong to their player.</Text>
+    <Text textStyle={styles.title}>ACTION LOG</Text>
+  </Column></Host>;
 }
 
 function actionLabel(hand: HistoryHand, entry: HistoryHand["actions"][number]): string {
@@ -132,9 +138,10 @@ function actionLabel(hand: HistoryHand, entry: HistoryHand["actions"][number]): 
 }
 
 const styles = StyleSheet.create({
+  cardTitle: { color: colors.onGold, fontFamily: fonts.serifBold, fontSize: 18 },
   host: { width: "100%" },
-  screen: { flex: 1, backgroundColor: colors.bg },
-  header: { padding: spacing.md },
+  header: { gap: 10, paddingBottom: 10 },
+  row: { paddingBottom: 10 },
   card: { padding: spacing.md, margin: spacing.sm, backgroundColor: colors.surface, borderRadius: 16 },
   action: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   title: { color: colors.gold, fontFamily: fonts.serifBold, fontSize: 18 },

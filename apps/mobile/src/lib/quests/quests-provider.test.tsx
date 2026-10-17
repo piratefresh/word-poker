@@ -2,19 +2,19 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { AppState } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
-import { readItem, writeItem } from "@/lib/claim-store";
-import { fetchQuestState, fetchWallet, QuestClaimRejectedError, sendQuestHandClaim } from "@/lib/wallet-client";
-import { QuestsProvider, useQuests } from "@/lib/quests-provider";
+import { readItem, writeItem } from "@/lib/storage/claim-store";
+import { fetchQuestState, fetchWallet, QuestClaimRejectedError, sendQuestHandClaim } from "@/lib/wallet/wallet-client";
+import { QuestsProvider, useQuests } from "@/lib/quests/quests-provider";
 
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: jest.fn() } }));
-jest.mock("@/lib/wallet-client", () => ({
+jest.mock("@/lib/wallet/wallet-client", () => ({
   fetchQuestState: jest.fn(),
   fetchWallet: jest.fn(),
   sendQuestHandClaim: jest.fn(),
   QuestClaimRejectedError: class QuestClaimRejectedError extends Error {},
 }));
 // The device store, in memory — it outlives a remount the way the disk outlives an app restart.
-jest.mock("@/lib/claim-store", () => {
+jest.mock("@/lib/storage/claim-store", () => {
   const disk = new Map<string, string>();
   return {
     readItem: jest.fn((key: string) => disk.get(key) ?? null),
@@ -60,7 +60,7 @@ function hook() {
 }
 
 beforeEach(() => {
-  (jest.requireMock("@/lib/claim-store") as { clear: () => void }).clear();
+  (jest.requireMock("@/lib/storage/claim-store") as { clear: () => void }).clear();
   jest.clearAllMocks();
   claim.mockReset();
   questState.mockReset();

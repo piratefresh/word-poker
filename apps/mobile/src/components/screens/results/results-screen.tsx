@@ -33,7 +33,7 @@ import {
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
-import { useQuests } from "@/lib/quests-provider";
+import { useQuests } from "@/lib/quests/quests-provider";
 import { useResultsEntrance } from "./use-results-entrance";
 
 import { RatingCard } from "./rating-card";

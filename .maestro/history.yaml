@@ -8,16 +8,16 @@ tags:
 - runFlow: offline-hand.yaml
 - openLink: http://localhost:8081/history
 - extendedWaitUntil:
-    visible: "View session"
+    visible: "View session .*"
     timeout: 30000
 - tapOn:
-    text: "View session"
+    text: "View session .*"
     index: 0
 - extendedWaitUntil:
-    visible: "View hand"
+    visible: "View hand .*"
     timeout: 30000
 - tapOn:
-    text: "View hand"
+    text: "View hand .*"
     index: 0
 - assertVisible: "HAND #1"
 - assertVisible:

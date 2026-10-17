@@ -6,10 +6,10 @@ import { SectionList, Share, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authClient } from "@/auth/client/auth-client";
 import { colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
-import { acceptFriend, addFriend, getFriends, removeFriend } from "@/lib/friends-client";
-import { friendLinkFor } from "@/lib/invite-link";
-import { menuFeedback } from "@/lib/menu-feedback";
-import { webTestID } from "@/lib/web-id";
+import { acceptFriend, addFriend, getFriends, removeFriend } from "@/lib/friends/friends-client";
+import { friendLinkFor } from "@/lib/navigation/invite-link";
+import { menuFeedback } from "@/lib/ui/menu-feedback";
+import { webTestID } from "@/lib/ui/web-id";
 
 const titleText = { color: colors.goldHi, fontFamily: fonts.serifBold, fontSize: fontSize.h2 } satisfies UniversalTextStyle;
 const bodyText = { color: colors.textBright, fontFamily: fonts.sans, fontSize: fontSize.body } satisfies UniversalTextStyle;

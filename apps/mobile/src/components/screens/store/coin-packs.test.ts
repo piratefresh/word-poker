@@ -3,7 +3,7 @@
  * the most coins per unit of price.
  */
 
-import type { CoinPackage } from "@/lib/coin-offering";
+import type { CoinPackage } from "@/lib/wallet/coin-offering";
 
 import { joinCoinPacks } from "./coin-packs";
 

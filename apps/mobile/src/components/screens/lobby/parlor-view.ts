@@ -17,7 +17,7 @@
 
 import { tableStatus, type RoomSummary, type TableStatus } from "@wordpoker/contracts";
 
-import { formatAmount, formatCoins } from "@/lib/format";
+import { formatAmount, formatCoins } from "@/lib/ui/format";
 import { powersLabel } from "@/features/table/power-view";
 
 /** One chip on the rail: a label, its figure, and the line under it. */

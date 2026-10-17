@@ -213,13 +213,13 @@ No `apps/server` change: online facts come from the reveal payload the room alre
 
 ### Step 6 — Client plumbing (`apps/mobile`)
 
-- `src/lib/wallet-client.ts` gains `fetchQuestState()` and `sendQuestHandClaim(claim)`, reusing its
+- `src/lib/wallet/wallet-client.ts` gains `fetchQuestState()` and `sendQuestHandClaim(claim)`, reusing its
   `sessionInit()` and `failure()` (401 → `WalletAuthError`, 403 → a typed `WalletUnverifiedError`).
-- `src/lib/quest-facts.ts` — pure `resultsFacts(snapshot, { wildTable, heroUsedPower }): QuestHandFacts`.
+- `src/lib/quests/quest-facts.ts` — pure `resultsFacts(snapshot, { wildTable, heroUsedPower }): QuestHandFacts`.
   Hero = `snapshot.seats.find(s => s.isYou)`; `heroWon = snapshot.revealed ? hero.place === 1 :
   hero.takesPot` (the fold-out card already sets `takesPot: true`, `results-snapshot.ts:165`); word, total,
   `decidedBy` (Step 7), `pot`, `revealed` straight across.
-- `src/lib/quests-provider.tsx` — context mounted once in `src/app/_layout.tsx`; no-ops without a session or
+- `src/lib/quests/quests-provider.tsx` — context mounted once in `src/app/_layout.tsx`; no-ops without a session or
   when unverified. Holds `state`, `coins` (from `fetchWallet()`), `lastCompletions`, and `streakBanner`
   (set when the GET's `streak.creditedToday` is non-null). `reportHand(facts)`: token
   `Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10)` (dedupe key, not a secret),
@@ -265,7 +265,7 @@ and in `use-online-game.ts`'s `SettledHand`. If the room's projection (`GameRoom
 - `packages/economy/src/wallet.ts` (`applyWalletChange`, `retryPending`) and `test/wallet.test.ts` (fakes).
 - `packages/db/src/wallet-event.ts` (`on conflict do nothing` writers),
   `src/migrations/Migration20261004120000_wallet_event.ts` (index style).
-- `apps/mobile/src/app/api/wallet+api.ts`, `src/lib/wallet-client.ts`, `src/lib/wallet-routes.test.ts`.
+- `apps/mobile/src/app/api/wallet+api.ts`, `src/lib/wallet/wallet-client.ts`, `src/lib/wallet/wallet-routes.test.ts`.
 - `apps/mobile/src/components/screens/results/results-snapshot.ts` — the shared settled-hand seam.
 - `apps/mobile/src/components/screens/home/home-screen.tsx` — `ModeKey`, `MODES`, the store flag.
 

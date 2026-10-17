@@ -41,7 +41,7 @@ import {
   tileMaterial,
 } from "@/constants/theme";
 import { ShadowBox } from "@/components/ui/shadow-box";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { TileChoiceBeam } from "./tile-choice-beam";
 import { MultiplierBeam } from "./tile-multiplier-beam";

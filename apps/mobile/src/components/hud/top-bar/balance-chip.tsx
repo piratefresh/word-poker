@@ -18,7 +18,7 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { formatAmount, formatAmountCompact } from "@/lib/format";
+import { formatAmount, formatAmountCompact } from "@/lib/ui/format";
 
 import type { BalanceView } from "../hud-types";
 import { GLASS_EDGE, GLASS_FILL } from "./glass";

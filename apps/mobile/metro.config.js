@@ -14,7 +14,7 @@ if (!config.resolver.assetExts.includes("riv")) {
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "ws") {
     return {
-      filePath: path.resolve(__dirname, "src/lib/ws-shim.ts"),
+      filePath: path.resolve(__dirname, "src/lib/network/ws-shim.ts"),
       type: "sourceFile",
     };
   }

@@ -8,7 +8,7 @@
 
 import { XP_PER_HAND, levelForXp } from "@wordpoker/game-rules";
 
-import type { ClaimOutcome, HandReport } from "@/lib/quests-provider";
+import type { ClaimOutcome, HandReport } from "@/lib/quests/quests-provider";
 
 import type { ResultsSeat } from "./results-types";
 

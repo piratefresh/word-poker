@@ -20,7 +20,7 @@ import {
 } from "@wordpoker/contracts";
 import { Platform } from "react-native";
 
-import { apiBaseURL } from "@/lib/api-base-url";
+import { apiBaseURL } from "@/lib/network/api-base-url";
 import { authClient } from "@/auth/client/auth-client";
 
 /** The route answered 401: no session, or an expired one. */

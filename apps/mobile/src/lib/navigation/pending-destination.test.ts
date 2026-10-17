@@ -1,6 +1,16 @@
 import { destinationFromURL, pendingReferral, referralFromURL, rememberDestination, rememberReferral, takeDestination } from "./pending-destination";
 
 describe("a link's destination", () => {
+  test("keeps ledger levels through sign-in for web and custom-scheme links", () => {
+    for (const base of ["https://play.wordpoker.dev/history", "wordpoker://history", "wordpoker:///history"]) {
+      expect(destinationFromURL(base)).toEqual({ pathname: "/history" });
+      expect(destinationFromURL(`${base}/s`)).toEqual({ pathname: "/history/[sessionId]", params: { sessionId: "s" } });
+      expect(destinationFromURL(`${base}/s/s%3A1`)).toEqual({ pathname: "/history/[sessionId]/[handId]", params: { sessionId: "s", handId: "s:1" } });
+      expect(destinationFromURL(`${base}/s/h/extra`)).toBeNull();
+      expect(destinationFromURL(`${base}/s/%ZZ`)).toBeNull();
+      expect(destinationFromURL(`${base}/s/a%2Fb`)).toBeNull();
+    }
+  });
   test("holds web and native friend links as an explicit add card", () => {
     for (const url of ["https://play.wordpoker.dev/friend/ABCD2345", "wordpoker://friend/ABCD2345", "wordpoker:///friend/ABCD2345"]) {
       expect(destinationFromURL(url)).toEqual({ pathname: "/friends", params: { add: "ABCD2345" } });

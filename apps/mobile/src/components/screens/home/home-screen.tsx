@@ -46,9 +46,9 @@ import { HomeHeader } from "@/components/screens/home/home-header";
 import { StreetLogo } from "@/components/screens/home/street-logo";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
-import { readItem, TUTORIAL_DONE } from "@/lib/claim-store";
-import { formatCoins } from "@/lib/format";
-import { useQuests } from "@/lib/quests-provider";
+import { readItem, TUTORIAL_DONE } from "@/lib/storage/claim-store";
+import { formatCoins } from "@/lib/ui/format";
+import { useQuests } from "@/lib/quests/quests-provider";
 
 /**
  * The street art for each window shape, in its own pixels: `door` is the doorway's centre (the

@@ -36,7 +36,7 @@ let mockConnected: boolean | undefined;
 jest.mock("expo-network", () => ({ useNetworkState: () => ({ isConnected: mockConnected }) }));
 
 const mockDisk = new Map<string, string>();
-jest.mock("@/lib/claim-store", () => ({
+jest.mock("@/lib/storage/claim-store", () => ({
   TUTORIAL_DONE: "tutorial-done",
   readItem: (key: string) => mockDisk.get(key) ?? null,
   writeItem: (key: string, value: string) => mockDisk.set(key, value),
@@ -46,7 +46,7 @@ const mockDismissStreakBanner = jest.fn();
 const mockDismissLevelUp = jest.fn();
 let mockStreakBanner: { day: number; reward: number } | null = null;
 let mockLevelUp: { level: number; reward: number } | null = null;
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({
     streakBanner: mockStreakBanner,
     dismissStreakBanner: mockDismissStreakBanner,

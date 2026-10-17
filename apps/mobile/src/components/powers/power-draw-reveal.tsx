@@ -25,7 +25,7 @@ import { POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
 
 import { colors, fonts, palette } from "@/constants/theme";
 import type { PowerView } from "@/features/table/power-view";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { POWER_CARD_ASPECT, PowerCard } from "./power-card";
 import { POWER_DRAW_MOTION, revealAtFor } from "./power-draw-motion";

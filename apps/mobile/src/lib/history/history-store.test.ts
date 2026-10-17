@@ -1,7 +1,7 @@
 import { createDictionary, DICTIONARIES, reduce, startHand } from "@wordpoker/game-rules";
 import { historyHand, type HandRecord } from "@wordpoker/contracts";
 import { OfflineHandRecorder } from "./hand-recorder";
-import { acceptHistoryHand, captureHistoryHand, historyRetry, localHistory, localHistoryId } from "./history-store";
+import { acceptHistoryHand, captureHistoryHand, historyRetry, localHistoryId } from "./history-store";
 import { syncHistory } from "./history-sync";
 import { authClient } from "@/auth/client/auth-client";
 
@@ -9,7 +9,11 @@ jest.mock("./history-storage", () => {
   const disk = new Map<string, unknown>();
   const cursors = new Map<string, string>();
   return {
-    readHistoryRows: async (owner: string) => [...disk.entries()].filter(([key]) => key.startsWith(`${owner}:`)).map(([, row]) => structuredClone(row)),
+    allRows: (owner: string) => [...disk.entries()].filter(([key]) => key.startsWith(`${owner}:`)).map(([, row]) => structuredClone(row)),
+    readHistoryRow: async (owner: string, id: string) => structuredClone(disk.get(`${owner}:${id}`) ?? null),
+    readPendingRows: async (owner: string) => jest.requireMock("./history-storage").allRows(owner)
+      .filter((row: { status: string }) => row.status === "pending")
+      .sort((a: { hand: { endedAtMs: number } }, b: { hand: { endedAtMs: number } }) => b.hand.endedAtMs - a.hand.endedAtMs),
     writeHistoryRow: async (owner: string, id: string, row: unknown) => { disk.set(`${owner}:${id}`, structuredClone(row)); },
     readHistoryCursor: async (owner: string) => cursors.get(owner) ?? null,
     writeHistoryCursor: async (owner: string, cursor: string) => { cursors.set(owner, cursor); },
@@ -17,7 +21,9 @@ jest.mock("./history-storage", () => {
   };
 });
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { getSession: jest.fn() } }));
-jest.mock("@/lib/api-base-url", () => ({ apiBaseURL: "https://api.test" }));
+jest.mock("@/lib/network/api-base-url", () => ({ apiBaseURL: "https://api.test" }));
+
+const localHistory = (owner: string): { hand: { sessionId: string }; status: string; attempts: number; error: string | null }[] => jest.requireMock("./history-storage").allRows(owner);
 
 function settled(): HandRecord {
   const dictionary = createDictionary({ id: "en_US-large", label: DICTIONARIES["en_US-large"].label,

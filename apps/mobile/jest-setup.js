@@ -62,7 +62,7 @@ jest.mock("@/components/game/tile-multiplier-beam", () => ({
 // Shadows under the tray, racks and tiles are Skia canvases, and decoration only.
 jest.mock("@/components/ui/shadow-box", () => ({ ShadowBox: () => null }));
 
-// RevenueCat's SDK is a native module; tests that buy coins mock `@/lib/revenuecat` itself, and this
+// RevenueCat's SDK is a native module; tests that buy coins mock `@/lib/wallet/revenuecat` itself, and this
 // keeps anything else that loads the SDK from reaching for a binding Node does not have.
 jest.mock("react-native-purchases", () => {
   const Purchases = {

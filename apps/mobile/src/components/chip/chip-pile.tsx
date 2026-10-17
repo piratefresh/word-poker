@@ -1,7 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { ShadowBox } from "@/components/ui/shadow-box";
-import { chipBreakdown } from "@/lib/chip-breakdown";
+import { chipBreakdown } from "@/lib/ui/chip-breakdown";
 
 import { ChipSprite } from "./chip-sprite";
 

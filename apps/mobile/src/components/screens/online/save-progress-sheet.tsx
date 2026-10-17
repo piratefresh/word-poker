@@ -11,7 +11,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GoldButton } from "@/components/ui/gold-button";
 import { colors, fonts, fontSize, palette, spacing } from "@/constants/theme";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 export function SaveProgressSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   return (

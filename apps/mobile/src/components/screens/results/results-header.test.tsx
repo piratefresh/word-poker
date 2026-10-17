@@ -12,7 +12,7 @@ import { StyleSheet } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 
 import { colors } from "@/constants/theme";
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 
 import { snapshotFixture } from "./results-fixtures";
 import { ResultsHeader } from "./results-header";

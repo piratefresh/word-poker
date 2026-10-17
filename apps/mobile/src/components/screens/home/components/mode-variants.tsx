@@ -3,7 +3,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 export type ModeVariant = {
   key: string;

@@ -12,7 +12,7 @@ import { AppState } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
 import { useActiveRoomId } from "@/features/online/room-session";
-import { beat, goOffline } from "@/lib/friends-client";
+import { beat, goOffline } from "@/lib/friends/friends-client";
 
 export const HEARTBEAT_MS = 20_000;
 

@@ -8,7 +8,7 @@
 
 import { RATING_TAGS, sendResultsRating, type ResultsRatingInput } from "./results-rating";
 
-jest.mock("@/lib/api-base-url", () => ({ apiBaseURL: "https://api.wordpoker.test" }));
+jest.mock("@/lib/network/api-base-url", () => ({ apiBaseURL: "https://api.wordpoker.test" }));
 
 /** One hand's report, as the card would hand it over: a level, two tags and a note. */
 const RATING: ResultsRatingInput = {

@@ -4,14 +4,14 @@
  * The card is a form, not a client: it never reaches for the network itself, so this module is
  * the one place that knows the route, the body's shape and the server's error shape. That keeps
  * the screen's tests off the network (they stub this module) and keeps the host resolution in a
- * single file - `@/lib/api-base-url`'s, which every route this app calls is served from.
+ * single file - `@/lib/network/api-base-url`'s, which every route this app calls is served from.
  *
  * The payload is the identity of the hand plus whatever the player left. The hand's number and
  * its seed are what make a report replayable: a bug report about "the deal animation" is only
  * actionable against the hand that was dealt, not against a screenshot of a score.
  */
 
-import { apiBaseURL } from "@/lib/api-base-url";
+import { apiBaseURL } from "@/lib/network/api-base-url";
 
 /** The six things a player can flag, in the order the card lays them out. */
 export const RATING_TAGS = [

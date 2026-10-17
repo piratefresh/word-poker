@@ -46,7 +46,7 @@ import {
 import { authClient } from "@/auth/client/auth-client";
 import { joinTable, useActiveRoomId } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
-import { useQuests } from "@/lib/quests-provider";
+import { useQuests } from "@/lib/quests/quests-provider";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
 import { ParlorBackground } from "./parlor-background";

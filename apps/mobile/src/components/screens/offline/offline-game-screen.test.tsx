@@ -67,7 +67,7 @@ jest.mock("react-native-reanimated", () => ({
 // `reportHand` once per settled hand, and the real module pulls in Better Auth's client, which
 // Jest cannot parse.
 const mockReportHand = jest.fn();
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ reportHand: mockReportHand, lastCompletions: [] }),
 }));
 

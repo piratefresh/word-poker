@@ -41,7 +41,7 @@ import {
   screenScale,
 } from "@/components/screens/game/screen-scale";
 import { colors, glow, layout, spacing } from "@/constants/theme";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { haptic } from "./haptics";
 import { styles } from "./styles";

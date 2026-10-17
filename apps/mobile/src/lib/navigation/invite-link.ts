@@ -9,7 +9,7 @@
 
 import { Platform } from "react-native";
 
-import { apiBaseURL } from "./api-base-url";
+import { apiBaseURL } from "@/lib/network/api-base-url";
 
 function webOrigin(): string {
   const configured = process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/+$/, "");

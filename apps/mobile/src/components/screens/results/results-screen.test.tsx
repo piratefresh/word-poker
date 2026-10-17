@@ -36,7 +36,7 @@ jest.mock("./results-rating", () => ({
 // `lastCompletions` it holds, and the real module pulls in Better Auth's client, which Jest
 // cannot parse.
 let mockLastCompletions: readonly string[] = [];
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: mockLastCompletions }),
 }));
 

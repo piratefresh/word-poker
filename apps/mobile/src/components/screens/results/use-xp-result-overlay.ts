@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { resultsFacts } from "@/lib/quest-facts";
-import { useQuests, type HandReport } from "@/lib/quests-provider";
+import { resultsFacts } from "@/lib/quests/quest-facts";
+import { useQuests, type HandReport } from "@/lib/quests/quests-provider";
 
 import type { ResultsSeat, ResultsSnapshot } from "./results-types";
 

@@ -7,14 +7,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 
 import { ChipSprite, type ChipSpriteTone } from "@/components/chip/chip-sprite";
-import { ShadowBox } from "@/components/ui/shadow-box";
-import { fonts } from "@/constants/theme";
-import { coinStoreEnabled } from "@/lib/coin-store";
-import { webTestID } from "@/lib/web-id";
 import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 import { LedgerStage } from "@/components/screens/history/ledger/ledger-stage";
+import { ShadowBox } from "@/components/ui/shadow-box";
+import { fonts } from "@/constants/theme";
+import { coinStoreEnabled } from "@/lib/wallet/coin-store";
+import { webTestID } from "@/lib/ui/web-id";
 
 const CHIP = 60;
+// The rack height, and how far its chips rise over the scene above.
+const RACK = 128;
+const RACK_OVERLAP = 42;
 // A short phone (iPhone SE, 667pt) shrinks the rack so the menu above it still fits.
 const SHORT = 700;
 const SHORT_SCALE = 0.8;
@@ -72,7 +75,7 @@ const NavRack = ({ state, descriptors, navigation }: Omit<TabLayoutProps, "child
   const storeEnabled = coinStoreEnabled();
   const k = useWindowDimensions().height < SHORT ? SHORT_SCALE : 1;
   return (
-    <View style={[styles.rack, { height: 128 * k + insets.bottom }]}>
+    <View style={[styles.rack, { height: RACK * k + insets.bottom }]}>
       <LinearGradient colors={["#b77a42", "#82451e", "#6a3619"]} locations={[0, 0.28, 1]} style={[StyleSheet.absoluteFill, styles.tray]} />
       <View style={styles.tabs}>
         {state.routes.map((route, index) => {
@@ -125,7 +128,7 @@ const NavRack = ({ state, descriptors, navigation }: Omit<TabLayoutProps, "child
 const TabScenes: NonNullable<ComponentProps<typeof Tabs>["layout"]> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   const k = useWindowDimensions().height < SHORT ? SHORT_SCALE : 1;
-  const sceneBottom = 128 * k + insets.bottom - 42;
+  const sceneBottom = RACK * k + insets.bottom - RACK_OVERLAP;
   const active = state.routes[state.index].name;
   const home = state.routes.find((route) => route.name === "index");
   const history = state.routes.find((route) => route.name === "history");

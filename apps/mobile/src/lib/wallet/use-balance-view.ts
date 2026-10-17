@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 
 import { authClient } from "@/auth/client/auth-client";
 import type { BalanceView } from "@/components/hud";
-import { fetchWallet, WalletAuthError } from "@/lib/wallet-client";
+import { fetchWallet, WalletAuthError } from "@/lib/wallet/wallet-client";
 
 /**
  * Reads the signed-in player's coins, and reads them again whenever the session's player

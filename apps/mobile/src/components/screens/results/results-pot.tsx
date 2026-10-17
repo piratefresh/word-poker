@@ -39,7 +39,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { colors, fonts, resultsEntrance, spacing } from "@/constants/theme";
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 import { beatProgress } from "./use-results-entrance";
 
 /**
