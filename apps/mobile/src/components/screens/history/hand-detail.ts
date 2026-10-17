@@ -1,4 +1,5 @@
 import { POWER_UPS, type HandRecordAction, type HistoryHand, type Tile } from "@wordpoker/contracts";
+import { resolveSubmission } from "@wordpoker/game-rules";
 
 import { ledger } from "@/constants/theme";
 import type { LocalHistoryHand } from "@/lib/history/history-store";
@@ -22,6 +23,22 @@ const standing = (hand: HistoryHand, playerId: string) => hand.summary.seats.fin
 const potLabel = (index: number) => (index === 0 ? "main pot" : "side pot");
 // Timeouts and disconnects are both the clock acting for the seat.
 const sourceOf = (source: HandRecordAction["source"]): LogSource => (source === "disconnect" ? "timeout" : source);
+
+/** Resolve by tile ID so repeated letters and choice faces retain the right multiplier. */
+export function historyWordTiles(hand: HistoryHand, playerId: string): readonly Pick<Tile, "letter" | "multiplier">[] {
+  const seat = standing(hand, playerId);
+  if (!seat?.word) return [];
+  if (seat.submission) {
+    const resolved = resolveSubmission({
+      available: [...seat.privateTiles, ...hand.summary.community],
+      submission: seat.submission,
+    });
+    if (resolved.ok && resolved.word === seat.word) {
+      return resolved.tiles.flatMap((tile) => tile.letters.map(({ letter }) => ({ letter, multiplier: tile.multiplier })));
+    }
+  }
+  return [...seat.word].map((letter) => ({ letter }));
+}
 
 /** The log wording for one stored event; null for events that are never shown (drafts, checks). */
 export function describeAction(hand: HistoryHand, entry: HandRecordAction): Omit<LogLine, "key" | "atMs"> | null {

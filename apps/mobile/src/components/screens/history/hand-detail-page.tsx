@@ -10,8 +10,9 @@ import { localHistoryId, type LocalHistoryHand } from "@/lib/history/history-sto
 import { chipColor, signedChips } from "@/utils/chips";
 import { clock, clockSeconds, dayLabel } from "@/utils/date";
 
-import { heroUsedTiles, logLines, netsBalance, recordBadge, seatViews, type LogLine, type SeatView } from "./hand-detail";
+import { heroUsedTiles, historyWordTiles, logLines, netsBalance, recordBadge, seatViews, type LogLine, type SeatView } from "./hand-detail";
 import { isLetter } from "./hands-page";
+import { HistoryWordReview } from "./history-word-review";
 import { DealIn } from "./ledger/deal-in";
 import { FeltPanel } from "./ledger/felt-panel";
 import { GoldBackButton } from "./ledger/gold-back-button";
@@ -110,14 +111,14 @@ function Board({ hand, hero }: { hand: HistoryHand; hero: SeatView }) {
         <Text style={styles.label}>COMMUNITY</Text>
         <View style={styles.tiles}>
           {hand.summary.community.length ? hand.summary.community.map((tile) => isLetter(tile.letter)
-            ? <MiniTile key={tile.id} letter={tile.letter} tone={used && !used.has(tile.id) ? "dim" : "cream"} />
+            ? <MiniTile key={tile.id} letter={tile.letter} multiplier={tile.multiplier} tone={used && !used.has(tile.id) ? "dim" : "cream"} />
             : null) : <Text style={styles.meta}>Not revealed</Text>}
         </View>
       </View>
       <View style={[styles.boardSide, styles.end]}>
         <Text style={styles.label}>YOUR RACK</Text>
         <View style={styles.tiles}>
-          {hero.tiles.map((tile) => isLetter(tile.letter) ? <MiniTile key={tile.id} letter={tile.letter} tone="gold" /> : null)}
+          {hero.tiles.map((tile) => isLetter(tile.letter) ? <MiniTile key={tile.id} letter={tile.letter} multiplier={tile.multiplier} tone="gold" /> : null)}
         </View>
       </View>
     </FeltPanel>
@@ -127,7 +128,7 @@ function Board({ hand, hero }: { hand: HistoryHand; hero: SeatView }) {
 function Seat({ hand, seat }: { hand: HistoryHand; seat: SeatView }) {
   const index = hand.seats.findIndex((entry) => entry.playerId === seat.playerId);
   const winner = seat.won > 0;
-  const word = seat.word && !seat.folded ? [...seat.word].filter(isLetter) : [];
+  const word = seat.word && !seat.folded ? historyWordTiles(hand, seat.playerId) : [];
   return (
     <LedgerCard size="row" tone={winner ? "winner" : seat.folded && !seat.isHero ? "muted" : "default"}>
       <View style={styles.seat}>
@@ -146,10 +147,15 @@ function Seat({ hand, seat }: { hand: HistoryHand; seat: SeatView }) {
           </View>
         </View>
         <View style={styles.note}>
-          {word.map((letter, i) => <MiniTile key={i} letter={letter} size="sm" />)}
-          {seat.folded && seat.isHero ? seat.tiles.map((tile) => isLetter(tile.letter)
-            ? <MiniTile key={tile.id} letter={tile.letter} size="sm" opacity={0.55} /> : null) : null}
+          {word.length || (seat.folded && seat.isHero) ? (
+            <View style={styles.felt}>
+              {word.map((tile, i) => isLetter(tile.letter) ? <MiniTile key={i} letter={tile.letter} multiplier={tile.multiplier} size="sm" /> : null)}
+              {seat.folded && seat.isHero ? seat.tiles.map((tile) => isLetter(tile.letter)
+                ? <MiniTile key={tile.id} letter={tile.letter} multiplier={tile.multiplier} size="sm" opacity={0.55} /> : null) : null}
+            </View>
+          ) : null}
           <Text style={styles.stack}>{seat.folded ? (seat.isHero ? "You folded" : "Folded · rack stays private") : word.length ? `${seat.score} pts` : "No word"}</Text>
+          {seat.isHero ? <HistoryWordReview key={localHistoryId(hand)} hand={hand} /> : null}
         </View>
       </View>
     </LedgerCard>
@@ -207,6 +213,7 @@ const styles = StyleSheet.create({
   result: { marginLeft: "auto", alignItems: "flex-end", gap: 2 },
   net: { fontFamily: fonts.arcade, fontSize: 15 },
   stack: { fontFamily: fonts.rubikMedium, fontSize: 10.5, color: ledger.inkSoft, fontVariant: ["tabular-nums"] },
+  felt: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 2, paddingHorizontal: 6, paddingBottom: 4, borderRadius: 10, borderWidth: 1, borderColor: ledger.modeTileEdge, backgroundColor: ledger.modeTile },
   note: { minHeight: 21, marginLeft: 38, flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   pots: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pot: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 999, paddingVertical: 6, paddingRight: 12, paddingLeft: 6, backgroundColor: "rgba(0,0,0,.28)", borderWidth: 2, borderColor: ledger.goldEdge },

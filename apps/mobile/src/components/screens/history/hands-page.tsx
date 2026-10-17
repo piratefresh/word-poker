@@ -19,6 +19,7 @@ import {
 import { chipColor, signedChips } from "@/utils/chips";
 import { clock, dayLabel } from "@/utils/date";
 
+import { historyWordTiles } from "./hand-detail";
 import { DealIn } from "./ledger/deal-in";
 import { GoldBackButton } from "./ledger/gold-back-button";
 import { LedgerCard } from "./ledger/ledger-card";
@@ -165,14 +166,12 @@ export function HandRow({
           <Text style={styles.number}>{`#${hand.handNo}`}</Text>
           <Text style={styles.small}>{clock(hand.startedAtMs)}</Text>
         </View>
-        {/* Long words clip at the edge rather than push the chips off the card. */}
-        <View style={styles.word}>
+        {/* Keep the standard game tiles readable; longer words wrap beside the result. */}
+        <View style={[styles.word, word && !folded && styles.felt]}>
           {word && !folded ? (
-            [...word]
-              .filter(isLetter)
-              .map((letter, i) => (
-                <MiniTile key={i} letter={letter} size="sm" />
-              ))
+            historyWordTiles(hand, hand.heroId).map((tile, i) => isLetter(tile.letter) ? (
+              <MiniTile key={i} letter={tile.letter} multiplier={tile.multiplier} size="sm" />
+            ) : null)
           ) : (
             <Text style={styles.folded}>{folded ? "FOLDED" : "NO WORD"}</Text>
           )}
@@ -211,7 +210,7 @@ const styles = StyleSheet.create({
   },
   empty: { fontFamily: fonts.rubikMedium, fontSize: 13, color: ledger.onFelt },
   gap: { paddingBottom: 8 },
-  row: { height: 54, flexDirection: "row", alignItems: "center", gap: 10 },
+  row: { minHeight: 54, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 10 },
   when: { width: 46, gap: 2 },
   number: { fontFamily: fonts.arcade, fontSize: 15, color: ledger.ink },
   small: { fontFamily: fonts.rubikMedium, fontSize: 10, color: ledger.inkSoft },
@@ -219,8 +218,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 2,
-    overflow: "hidden",
+  },
+  felt: {
+    paddingHorizontal: 6,
+    paddingBottom: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ledger.modeTileEdge,
+    backgroundColor: ledger.modeTile,
   },
   folded: {
     fontFamily: fonts.arcade,

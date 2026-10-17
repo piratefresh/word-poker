@@ -10,9 +10,9 @@ import { HandRow, handRowLabel, sessionMeta } from "./hands-page";
 
 jest.mock("@/lib/history/history-provider", () => ({ useHistory: () => ({ uploadingSessionId: null }) }));
 jest.mock("./ledger/mini-tile", () => ({
-  MiniTile: ({ letter }: { letter: string }) => {
+  MiniTile: ({ letter, multiplier }: { letter: string; multiplier?: string }) => {
     const { Text: MockText } = jest.requireActual<typeof import("react-native")>("react-native");
-    return <MockText testID="mini-tile">{letter}</MockText>;
+    return <MockText testID="mini-tile" accessibilityLabel={`${letter}, ${multiplier ?? "plain"}`}>{letter}</MockText>;
   },
 }));
 
@@ -58,6 +58,21 @@ test("a folded hand shows FOLDED, no word and minus-sign chips", async () => {
   expect(view.getByText("no word")).toBeOnTheScreen();
   expect(view.getByText("−40")).toHaveStyle({ color: colors.chipDownOnTile });
   expect(view.queryByTestId("mini-tile")).toBeNull();
+});
+
+test("word tiles keep the submitted tile's multiplier, including repeated and chosen letters", async () => {
+  const saved = hand({ word: "EEL" });
+  const value: HistoryHand = { ...saved, summary: { ...saved.summary,
+    community: [{ id: "plain-e", letter: "E", points: 1 }, { id: "l", letter: "L", points: 1, multiplier: "triple-letter" }],
+    seats: [{ ...saved.summary.seats[0],
+      privateTiles: [{ id: "choice", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1, multiplier: "double-letter" }],
+      submission: { plays: [{ tileId: "choice", chosenFace: "E" }, { tileId: "plain-e" }, { tileId: "l" }] },
+    }],
+  } };
+  const view = await render(<HandRow row={row(value)} open={jest.fn()} />);
+  expect(view.getAllByTestId("mini-tile").map((tile) => tile.props.accessibilityLabel)).toEqual([
+    "E, double-letter", "E, plain", "L, triple-letter",
+  ]);
 });
 
 test("session meta names the status and marks offline sessions unranked", () => {
