@@ -8,13 +8,23 @@ const cardGradients = {
   muted: [gradients.tileDim.colors[0], gradients.tileDim.colors[1]] as const,
 } as const;
 
-type LedgerCardProps = Omit<PressableProps, "children" | "style"> & {
+type LedgerCardProps = {
   children: React.ReactNode;
   size?: "card" | "row";
   tone?: keyof typeof cardGradients;
+  accessibilityLabel?: PressableProps["accessibilityLabel"];
+  onPress?: PressableProps["onPress"];
+  onLongPress?: PressableProps["onLongPress"];
 };
 
-export function LedgerCard({ children, size = "card", tone = "default", onPress, ...props }: LedgerCardProps) {
+export function LedgerCard({
+  children,
+  size = "card",
+  tone = "default",
+  accessibilityLabel,
+  onPress,
+  onLongPress,
+}: LedgerCardProps) {
   const row = size === "row";
   const cardRadius = row ? radius.md : radius.card;
   const surface = (pressed: boolean) => (
@@ -27,11 +37,17 @@ export function LedgerCard({ children, size = "card", tone = "default", onPress,
       ],
     }]}>{children}</LinearGradient>
   );
-  return onPress ? (
-    <Pressable {...props} onPress={onPress} accessibilityRole="button" style={styles.target}>
+  return onPress || onLongPress ? (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      style={styles.target}
+    >
       {({ pressed }) => surface(pressed)}
     </Pressable>
-  ) : <View {...props}>{surface(false)}</View>;
+  ) : <View accessibilityLabel={accessibilityLabel}>{surface(false)}</View>;
 }
 
 const styles = StyleSheet.create({

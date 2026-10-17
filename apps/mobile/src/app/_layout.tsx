@@ -162,6 +162,9 @@ export function RootLayout() {
                   <Stack.Screen name="friend/[code]" />
                   <Stack.Screen name="online/[roomId]" />
                 </Stack.Protected>
+                <Stack.Protected guard={__DEV__}>
+                  <Stack.Screen name="dev-ledger" />
+                </Stack.Protected>
                 {/* Outside the guards: the emailed reset link may land while a stale
                     session is still on the device, and the reset has to win. */}
                 <Stack.Screen name="reset-password" />
