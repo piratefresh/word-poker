@@ -3,12 +3,14 @@ import { router } from "expo-router";
 
 import TabLayout from "../../../app/(tabs)/_layout";
 
+jest.mock("@/components/hud/use-reduce-motion", () => ({ useReduceMotion: () => false }));
+
 const mockNavigate = jest.fn();
 const mockEmit = jest.fn(() => ({ defaultPrevented: false }));
 jest.mock("expo-router", () => ({
   router: { push: jest.fn() },
   Tabs: Object.assign(
-    ({ tabBar }: { tabBar: (props: unknown) => unknown }) => tabBar({
+    ({ layout }: { layout: (props: unknown) => unknown }) => layout({
       state: {
         index: 0,
         routes: [
@@ -19,9 +21,9 @@ jest.mock("expo-router", () => ({
         ],
       },
       descriptors: {
-        home: { options: {} },
-        friends: { options: { tabBarBadge: 3 } },
-        history: { options: {} },
+        home: { options: {}, render: () => null, navigation: { emit: mockEmit } },
+        friends: { options: { tabBarBadge: 3 }, render: () => null, navigation: { emit: mockEmit } },
+        history: { options: {}, render: () => null, navigation: { emit: mockEmit } },
       },
       navigation: { navigate: mockNavigate, emit: mockEmit },
     }),
@@ -62,7 +64,7 @@ test("Store is visible but only opens while the existing feature flag is enabled
   expect(disabled.getByTestId("tab-store").props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(disabled.getByTestId("tab-store"));
   expect(router.push).not.toHaveBeenCalled();
-  disabled.unmount();
+  await disabled.unmount();
 
   process.env.EXPO_PUBLIC_COIN_STORE = "1";
   const enabled = await render(<TabLayout />);

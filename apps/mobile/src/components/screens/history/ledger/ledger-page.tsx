@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { ScrollView, StyleSheet, View, type ScrollViewProps } from "react-native";
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
-import { colors, gradients, radius } from "@/constants/theme";
+import { gradients, radius } from "@/constants/theme";
 
 /** Fixed felt; tinted text belongs below 35% of the viewport or inside a panel/card. */
 export function LedgerPage({ children, gap = 10, style, contentContainerStyle, ...props }: ScrollViewProps & { gap?: number }) {
@@ -18,13 +18,14 @@ export function LedgerPage({ children, gap = 10, style, contentContainerStyle, .
             {gradients.table.colors.map((color, i) => <Stop key={color} offset={i / 2} stopColor={color} />)}
           </RadialGradient>
           <LinearGradient id={`${id}spine`}>
-            <Stop stopColor={colors.surfaceStrong} /><Stop offset="1" stopColor="transparent" />
+            {/* Native SVG gradients take alpha from stopOpacity, ignoring the color's alpha. */}
+            <Stop stopColor="#000" stopOpacity={.35} /><Stop offset="1" stopColor="#000" stopOpacity={0} />
           </LinearGradient>
           <LinearGradient id={`${id}horizontal`}>
-            <Stop stopColor={colors.scrim} /><Stop offset={horizontalFade} stopColor="transparent" /><Stop offset={1 - horizontalFade} stopColor="transparent" /><Stop offset="1" stopColor={colors.scrim} />
+            <Stop stopColor="#020a07" stopOpacity={.7} /><Stop offset={horizontalFade} stopColor="#020a07" stopOpacity={0} /><Stop offset={1 - horizontalFade} stopColor="#020a07" stopOpacity={0} /><Stop offset="1" stopColor="#020a07" stopOpacity={.7} />
           </LinearGradient>
           <LinearGradient id={`${id}vertical`} x2="0%" y2="100%">
-            <Stop stopColor={colors.scrim} /><Stop offset={verticalFade} stopColor="transparent" /><Stop offset={1 - verticalFade} stopColor="transparent" /><Stop offset="1" stopColor={colors.scrim} />
+            <Stop stopColor="#020a07" stopOpacity={.7} /><Stop offset={verticalFade} stopColor="#020a07" stopOpacity={0} /><Stop offset={1 - verticalFade} stopColor="#020a07" stopOpacity={0} /><Stop offset="1" stopColor="#020a07" stopOpacity={.7} />
           </LinearGradient>
         </Defs>
         <Rect width="100%" height="100%" fill={`url(#${id}felt)`} />

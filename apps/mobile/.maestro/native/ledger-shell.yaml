@@ -1,0 +1,36 @@
+# Attach to a signed-in development build already open on Home.
+appId: com.wordpoker.wordpoker
+name: Ledger rack navigation, rapid reversals, and Android Back
+tags:
+  - native
+  - history
+---
+- assertVisible:
+    id: "tab-history"
+- tapOn:
+    id: "tab-history"
+- assertVisible:
+    id: "tab-home"
+- extendedWaitUntil:
+    visible:
+      id: "history-screen"
+    timeout: 5000
+- back
+- extendedWaitUntil:
+    visible: "OFFLINE"
+    timeout: 5000
+- tapOn:
+    id: "tab-history"
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "tab-history"
+- extendedWaitUntil:
+    visible:
+      id: "history-screen"
+    timeout: 5000
+- tapOn:
+    id: "tab-home"
+- extendedWaitUntil:
+    visible: "OFFLINE"
+    timeout: 5000
