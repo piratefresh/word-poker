@@ -144,6 +144,8 @@ export const colors = {
   info: palette.blue400,
   chipUp: palette.green400,
   chipDown: palette.red400,
+  chipUpOnTile: "#28683f",
+  chipDownOnTile: "#a22e25",
 
   // player accent wheel (assign by index for avatars, seats, rows)
   players: [
