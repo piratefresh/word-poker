@@ -3,7 +3,7 @@ import { AppState } from "react-native";
 import * as Network from "expo-network";
 import type { HandRecord } from "@wordpoker/contracts";
 import { authClient } from "@/auth/client/auth-client";
-import { captureHistoryHand, pendingHistory } from "./history-store";
+import { captureHistoryHand, pendingSessionCount } from "./history-store";
 import { syncHistory } from "./history-sync";
 
 interface HistoryValue {
@@ -49,8 +49,8 @@ function AccountHistory({ ownerId, children }: { ownerId: string | null; childre
 
   useEffect(() => {
     let active = true;
-    if (ownerId) void pendingHistory(ownerId).then((rows) => {
-      if (active) setPendingSessions(new Set(rows.map((row) => row.hand.sessionId)).size);
+    if (ownerId) void pendingSessionCount(ownerId).then((count) => {
+      if (active) setPendingSessions(count);
     }).catch(() => undefined);
     return () => { active = false; };
   }, [ownerId, revision]);

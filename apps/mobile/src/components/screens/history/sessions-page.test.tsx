@@ -1,7 +1,7 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import { router } from "expo-router";
 
-import { type HistorySession, sessionStatus } from "@/lib/history/history-store";
+import type { HistorySession } from "@/lib/history/history-store";
 
 import { SessionCard, SessionsPage, SyncPill, offlineBanner, syncLabel } from "./sessions-page";
 
@@ -29,7 +29,7 @@ jest.mock("@/lib/history/use-history-pages", () => ({
 jest.mock("expo-router", () => ({ router: { navigate: jest.fn() } }));
 jest.mock("./ledger/mini-tile", () => ({ MiniTile: () => null }));
 jest.mock("./ledger/ledger-page", () => ({
-  LedgerFlatList: ({
+  LedgerList: ({
     ListHeaderComponent,
     ListEmptyComponent,
   }: {
@@ -87,30 +87,13 @@ beforeEach(() => {
   };
 });
 
-test("maps all five session states, including rejection of an older hand and only the active upload", () => {
-  expect(sessionStatus(session("online"))).toBe("synced");
-  expect(sessionStatus({ ...session(), pending: true })).toBe("onDevice");
-  expect(sessionStatus({ ...session(), pending: true }, "s")).toBe("uploading");
-  expect(sessionStatus({ ...session(), pending: true }, "another-session")).toBe("onDevice");
-  expect(sessionStatus(session())).toBe("verified");
-  expect(
-    sessionStatus(
-      {
-        ...session(),
-        pending: true,
-        rejected: [{ handNo: 1, reason: "Mismatch" }],
-      },
-      "s",
-    ),
-  ).toBe("rejected");
-});
-
 test("offline banner counts sessions with singular and plural copy", () => {
   expect(offlineBanner(0)).toBe("You're offline. Saved hands are still here.");
   expect(offlineBanner(1)).toContain("1 session will upload");
   expect(offlineBanner(3)).toContain("3 sessions will upload");
-  expect(syncLabel(false, false, 0, 120000)).toBe("Synced 2 minutes ago. Double tap to sync.");
-  expect(syncLabel(false, false, null)).toBe("Not synced yet. Double tap to sync.");
+  expect(syncLabel(false, false, false, 0, 120000)).toBe("Synced 2 minutes ago. Double tap to sync.");
+  expect(syncLabel(false, false, false, null)).toBe("Not synced yet. Double tap to sync.");
+  expect(syncLabel(false, false, true, 0)).toBe("Last sync failed. Double tap to retry.");
 });
 
 test("sync is tappable only when connected and idle", async () => {
@@ -127,7 +110,7 @@ test("sync is tappable only when connected and idle", async () => {
   expect(view.getByTestId("history-sync")).toBeDisabled();
 });
 
-test("rejected details stop propagation and show the stored reason while offline sessions stay unranked", async () => {
+test("rejected details toggle without opening the session and show the stored reason while offline sessions stay unranked", async () => {
   const open = jest.fn();
   const toggle = jest.fn();
   const rejected = {
@@ -144,11 +127,7 @@ test("rejected details stop propagation and show the stored reason while offline
     />,
   );
   expect(view.getByText("UNRANKED")).toBeOnTheScreen();
-  const stopPropagation = jest.fn();
-  await fireEvent.press(view.getByRole("button", { name: "1 hand rejected · Details" }), {
-    stopPropagation,
-  });
-  expect(stopPropagation).toHaveBeenCalledTimes(1);
+  await fireEvent.press(view.getByRole("button", { name: "1 hand rejected · Details" }));
   expect(toggle).toHaveBeenCalledTimes(1);
   expect(open).not.toHaveBeenCalled();
   await view.rerender(

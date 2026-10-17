@@ -43,6 +43,7 @@ import {
 import type { ModeVariant } from "@/components/screens/home/components/mode-variants";
 import { OfflineTray } from "@/components/screens/home/components/offline-tray";
 import { HomeHeader } from "@/components/screens/home/home-header";
+import { LEDGER_CLOSE_MS } from "@/components/screens/history/ledger/ledger-stage";
 import { StreetLogo } from "@/components/screens/home/street-logo";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
@@ -203,7 +204,7 @@ export function HomeScreen() {
     const timer = setTimeout(() => {
       setOfflineOpen(true);
       router.setParams({ offline: undefined });
-    }, reduceMotion ? 0 : 1250);
+    }, reduceMotion ? 0 : LEDGER_CLOSE_MS);
     return () => clearTimeout(timer);
   }, [requestedOffline, reduceMotion]));
 

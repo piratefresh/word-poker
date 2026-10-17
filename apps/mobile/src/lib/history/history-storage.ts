@@ -19,6 +19,11 @@ async function db(): Promise<SQLiteDatabase> {
         CREATE INDEX history_rows_status ON history_rows(owner, status);
         PRAGMA user_version = 2;`);
     });
+    if (version < 3) await value.withTransactionAsync(async () => {
+      await value.execAsync(`ALTER TABLE history_rows ADD COLUMN started_at INTEGER;
+        UPDATE history_rows SET started_at = json_extract(payload, '$.hand.startedAtMs');
+        PRAGMA user_version = 3;`);
+    });
     return value;
   }).catch((error) => { database = undefined; throw error; });
   return database;
@@ -42,7 +47,7 @@ export async function readSessionPage(owner: string, after: SessionCursor | null
     `SELECT (SELECT latest.payload FROM history_rows latest WHERE latest.owner = history_rows.owner
        AND latest.session_id = history_rows.session_id ORDER BY latest.ended_at DESC, latest.id DESC LIMIT 1) AS payload,
      session_id AS sessionId, MAX(ended_at) AS endedAtMs,
-     MIN(json_extract(payload, '$.hand.startedAtMs')) AS startedAtMs,
+     MIN(started_at) AS startedAtMs,
      COUNT(*) AS hands, SUM(status = 'pending') AS pending,
      json_group_array(json_object('handNo', json_extract(payload, '$.hand.handNo'),
        'reason', COALESCE(json_extract(payload, '$.error'), 'The hand could not be verified. It stays on this device, unranked.')))
@@ -50,7 +55,11 @@ export async function readSessionPage(owner: string, after: SessionCursor | null
      FROM history_rows WHERE owner = ? GROUP BY session_id
      HAVING ? IS NULL OR MAX(ended_at) < ? OR (MAX(ended_at) = ? AND session_id < ?)
      ORDER BY endedAtMs DESC, session_id DESC LIMIT ?`, owner, at, at, at, id, limit);
-  return rows.map(({ payload, pending, rejected, ...session }) => ({ ...session, pending: pending > 0, rejected: JSON.parse(rejected), latest: JSON.parse(payload) }));
+  return rows.map(({ payload, pending, rejected, ...session }) => ({ ...session, pending: pending > 0, rejected: (JSON.parse(rejected) as HistorySession["rejected"]).sort((a, b) => b.handNo - a.handNo), latest: JSON.parse(payload) }));
+}
+export async function countPendingSessions(owner: string): Promise<number> {
+  return (await (await db()).getFirstAsync<{ n: number }>(
+    "SELECT COUNT(DISTINCT session_id) AS n FROM history_rows WHERE owner = ? AND status = 'pending'", owner))?.n ?? 0;
 }
 export async function readHandPage(owner: string, sessionId: string, after: HandCursor | null, limit: number): Promise<LocalHistoryHand[]> {
   const at = after?.endedAtMs ?? null;
@@ -60,10 +69,10 @@ export async function readHandPage(owner: string, sessionId: string, after: Hand
      ORDER BY ended_at DESC, id DESC LIMIT ?`, owner, sessionId, at, at, at, after?.id ?? null, limit));
 }
 export async function writeHistoryRow(owner: string, id: string, row: LocalHistoryHand): Promise<void> {
-  await (await db()).runAsync(`INSERT INTO history_rows(owner, id, payload, session_id, ended_at, status) VALUES (?, ?, ?, ?, ?, ?)
+  await (await db()).runAsync(`INSERT INTO history_rows(owner, id, payload, session_id, ended_at, started_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(owner, id) DO UPDATE SET payload = excluded.payload, session_id = excluded.session_id,
-      ended_at = excluded.ended_at, status = excluded.status`,
-    owner, id, JSON.stringify(row), row.hand.sessionId, row.hand.endedAtMs, row.status);
+      ended_at = excluded.ended_at, started_at = excluded.started_at, status = excluded.status`,
+    owner, id, JSON.stringify(row), row.hand.sessionId, row.hand.endedAtMs, row.hand.startedAtMs, row.status);
 }
 export async function readHistoryCursor(owner: string): Promise<string | null> {
   return (await (await db()).getFirstAsync<{ cursor: string | null }>("SELECT cursor FROM history_cursors WHERE owner = ?", owner))?.cursor ?? null;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -23,10 +23,13 @@ import { clock, dayLabel } from "@/utils/date";
 
 import { DealIn } from "./ledger/deal-in";
 import { LedgerCard } from "./ledger/ledger-card";
-import { LedgerFlatList } from "./ledger/ledger-page";
+import { LedgerList } from "./ledger/ledger-page";
 import { MiniTile } from "./ledger/mini-tile";
 import { StatusPill } from "./ledger/status-pill";
 import { UnrankedLabel } from "./ledger/unranked-label";
+
+/** Collapsed session card plus its bottom gap; LegendList measures the real heights. */
+const ROW_HEIGHT = 90;
 
 export function offlineBanner(waiting: number): string {
   return (
@@ -40,11 +43,13 @@ export function offlineBanner(waiting: number): string {
 export function syncLabel(
   offline: boolean,
   syncing: boolean,
+  failed: boolean,
   lastSyncedAt: number | null,
   now = Date.now(),
 ): string {
   if (offline) return "Offline. Saved hands are still here.";
   if (syncing) return "Syncing saved hands.";
+  if (failed) return "Last sync failed. Double tap to retry.";
   const minutes =
     lastSyncedAt === null ? null : Math.max(0, Math.floor((now - lastSyncedAt) / 60_000));
   return (
@@ -78,15 +83,17 @@ export function SessionsPage({
       returning: entrance.returning || (!active && entrance.entered),
     });
   const baseDelay = entrance.returning ? 90 : 520;
+  const extraData = useMemo(
+    () => ({ active, expanded, uploading: history.uploadingSessionId }),
+    [active, expanded, history.uploadingSessionId],
+  );
   return (
-    <LedgerFlatList
+    <LedgerList
       accessibilityLabel="Hand Ledger sessions"
       data={sessions.items}
-      extraData={{ active, expanded, uploading: history.uploadingSessionId }}
+      extraData={extraData}
       keyExtractor={(session) => session.sessionId}
-      initialNumToRender={10}
-      maxToRenderPerBatch={10}
-      windowSize={7}
+      estimatedItemSize={ROW_HEIGHT}
       onEndReached={sessions.loadMore}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
@@ -220,10 +227,7 @@ export function SessionCard({
             accessibilityRole="button"
             accessibilityState={{ expanded }}
             style={styles.detailsTarget}
-            onPress={(event) => {
-              event.stopPropagation();
-              toggle();
-            }}
+            onPress={toggle}
           >
             <Text style={styles.details}>
               {expanded
@@ -292,7 +296,13 @@ function TitleTile({
 }
 
 export function SyncPill() {
-  const { offline, syncing, refresh, lastSyncedAt } = useHistory();
+  const { offline, syncing, refresh, lastSyncedAt, error } = useHistory();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const failed = error !== null;
   const reduced = useReduceMotion();
   const rotation = useSharedValue(0);
   useEffect(() => {
@@ -315,7 +325,7 @@ export function SyncPill() {
     <Pressable
       testID="history-sync"
       accessibilityRole="button"
-      accessibilityLabel={syncLabel(offline, syncing, lastSyncedAt)}
+      accessibilityLabel={syncLabel(offline, syncing, failed, lastSyncedAt, now)}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={refresh}
@@ -330,7 +340,7 @@ export function SyncPill() {
             },
           ]}
         />
-        <Text style={styles.syncText}>{offline ? "OFFLINE" : syncing ? "SYNCING…" : "SYNCED"}</Text>
+        <Text style={styles.syncText}>{offline ? "OFFLINE" : syncing ? "SYNCING…" : failed ? "RETRY" : lastSyncedAt === null ? "NOT SYNCED" : "SYNCED"}</Text>
         <Animated.Text style={[styles.syncArrow, motion]}>↻</Animated.Text>
       </View>
     </Pressable>

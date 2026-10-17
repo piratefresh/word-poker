@@ -1,6 +1,8 @@
 import { LegendList } from "@legendapp/list/react-native";
 import { render } from "@testing-library/react-native";
 
+import { ledgerListAccessibilityProps as nativeProps } from "./ledger-list-accessibility";
+import { ledgerListAccessibilityProps as webProps } from "./ledger-list-accessibility.web";
 import { LedgerList } from "./ledger-page";
 
 jest.mock("@legendapp/list/react-native", () => {
@@ -28,4 +30,10 @@ test("keeps the native accessible label on the LegendList scroll host", async ()
 
   expect(getByLabelText("Hand Ledger hands")).toBeTruthy();
   expect(list.mock.calls[0]?.[0].accessibilityLabel).toBe("Hand Ledger hands");
+});
+
+test("web maps the label to aria-label so no React Native-only prop reaches the DOM", () => {
+  expect(webProps("Hand Ledger hands")).toEqual({ "aria-label": "Hand Ledger hands" });
+  expect(webProps()).toEqual({});
+  expect(nativeProps("Hand Ledger hands")).toEqual({ accessibilityLabel: "Hand Ledger hands" });
 });

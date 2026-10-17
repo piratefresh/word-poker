@@ -21,12 +21,19 @@ async function request(ownerId: string, path: string, record?: HandRecord): Prom
   });
 }
 
-const running = new Map<string, Promise<void>>();
-export function syncHistory(ownerId: string, changed: () => void, uploading: (sessionId: string | null) => void = () => {}): Promise<void> {
+type Uploading = (sessionId: string | null) => void;
+const running = new Map<string, { sync: Promise<void>; watchers: Set<Uploading> }>();
+export function syncHistory(ownerId: string, changed: () => void, uploading: Uploading = () => {}): Promise<void> {
   const current = running.get(ownerId);
-  if (current) return current;
-  const sync = run(ownerId, changed, uploading).finally(() => { uploading(null); running.delete(ownerId); });
-  running.set(ownerId, sync);
+  if (current) {
+    // Joining callers still see which session is uploading.
+    current.watchers.add(uploading);
+    return current.sync.finally(() => uploading(null));
+  }
+  const watchers = new Set<Uploading>([uploading]);
+  const notify: Uploading = (sessionId) => watchers.forEach((watch) => watch(sessionId));
+  const sync = run(ownerId, changed, notify).finally(() => { notify(null); running.delete(ownerId); });
+  running.set(ownerId, { sync, watchers });
   return sync;
 }
 

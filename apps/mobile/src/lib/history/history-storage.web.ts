@@ -43,6 +43,9 @@ export async function readHistoryRow(owner: string, id: string): Promise<LocalHi
 export async function readPendingRows(owner: string): Promise<LocalHistoryHand[]> {
   return (await ownerRows(owner)).filter((row) => row.status === "pending").sort(newestFirst);
 }
+export async function countPendingSessions(owner: string): Promise<number> {
+  return new Set((await readPendingRows(owner)).map((row) => row.hand.sessionId)).size;
+}
 export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number): Promise<HistorySession[]> {
   const sessions = new Map<string, HistorySession>();
   for (const row of (await ownerRows(owner)).sort(newestFirst)) {

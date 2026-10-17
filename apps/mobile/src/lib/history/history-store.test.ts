@@ -1,7 +1,7 @@
 import { createDictionary, DICTIONARIES, reduce, startHand } from "@wordpoker/game-rules";
 import { historyHand, type HandRecord } from "@wordpoker/contracts";
 import { OfflineHandRecorder } from "./hand-recorder";
-import { acceptHistoryHand, captureHistoryHand, historyRetry, localHistoryId } from "./history-store";
+import { acceptHistoryHand, captureHistoryHand, historyRetry, localHistoryId, sessionStatus, type HistorySession } from "./history-store";
 import { syncHistory } from "./history-sync";
 import { authClient } from "@/auth/client/auth-client";
 
@@ -97,4 +97,15 @@ test("a non-JSON gateway failure remains retryable with the upload error", async
   });
   await expect(syncHistory("a", () => {})).rejects.toThrow("Hand upload failed.");
   expect((await localHistory("a"))[0]).toMatchObject({ status: "pending", error: "Hand upload failed.", attempts: 1 });
+});
+
+test("sessionStatus maps all five states, including an older rejection and only the active upload", () => {
+  const session = (mode: "offline" | "online", extra: Partial<HistorySession> = {}) =>
+    ({ sessionId: "s", pending: false, rejected: [], latest: { hand: { mode } }, ...extra }) as unknown as HistorySession;
+  expect(sessionStatus(session("online"))).toBe("synced");
+  expect(sessionStatus(session("offline", { pending: true }))).toBe("onDevice");
+  expect(sessionStatus(session("offline", { pending: true }), "s")).toBe("uploading");
+  expect(sessionStatus(session("offline", { pending: true }), "another-session")).toBe("onDevice");
+  expect(sessionStatus(session("offline"))).toBe("verified");
+  expect(sessionStatus(session("offline", { pending: true, rejected: [{ handNo: 1, reason: "Mismatch" }] }), "s")).toBe("rejected");
 });

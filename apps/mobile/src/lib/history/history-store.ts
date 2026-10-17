@@ -1,5 +1,5 @@
 import { historyHand, type HandRecord, type HistoryHand } from "@wordpoker/contracts";
-import { readHandPage, readHistoryRow, readPendingRows, readSessionPage, writeHistoryRow, readHistoryCursor, writeHistoryCursor } from "./history-storage";
+import { countPendingSessions, readHandPage, readHistoryRow, readPendingRows, readSessionPage, writeHistoryRow, readHistoryCursor, writeHistoryCursor } from "./history-storage";
 
 export interface LocalHistoryHand {
   hand: HistoryHand;
@@ -65,6 +65,7 @@ export async function historyRetry(ownerId: string, id: string, error: string, p
 
 export const historyRow = readHistoryRow;
 export const pendingHistory = readPendingRows;
+export const pendingSessionCount = countPendingSessions;
 export const historySessions = readSessionPage;
 export const sessionHands = readHandPage;
 export const historyCursor = readHistoryCursor;
