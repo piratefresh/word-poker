@@ -11,8 +11,8 @@ import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 import { LedgerStage } from "@/components/screens/history/ledger/ledger-stage";
 import { ShadowBox } from "@/components/ui/shadow-box";
 import { fonts } from "@/constants/theme";
-import { coinStoreEnabled } from "@/lib/coin-store";
-import { webTestID } from "@/lib/web-id";
+import { coinStoreEnabled } from "@/lib/wallet/coin-store";
+import { webTestID } from "@/lib/ui/web-id";
 
 const CHIP = 60;
 // The rack height, and how far its chips rise over the scene above.

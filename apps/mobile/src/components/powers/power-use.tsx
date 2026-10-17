@@ -8,7 +8,7 @@ import { useCompactControls, useScreenScale } from "@/components/screens/game/sc
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, glow, palette, radius, spacing } from "@/constants/theme";
 import type { PowerView } from "@/features/table/power-view";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { POWER_CARD_ASPECT, PowerCard, PowerCardMini, powerCardLabel } from "./power-card";
 import type { PowerTargeting } from "./use-power-targeting";

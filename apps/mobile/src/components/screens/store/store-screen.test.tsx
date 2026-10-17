@@ -6,10 +6,10 @@
 import { act, render, waitFor, type RenderResult } from "@testing-library/react-native";
 
 import { authClient } from "@/auth/client/auth-client";
-import type { CoinPackage } from "@/lib/coin-offering";
-import { fetchCoinOffering, purchaseCoinPack, revenuecatAvailable } from "@/lib/revenuecat";
-import { useRevenueCatReady } from "@/lib/use-revenuecat";
-import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-client";
+import type { CoinPackage } from "@/lib/wallet/coin-offering";
+import { fetchCoinOffering, purchaseCoinPack, revenuecatAvailable } from "@/lib/wallet/revenuecat";
+import { useRevenueCatReady } from "@/lib/wallet/use-revenuecat";
+import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet/wallet-client";
 
 import { StoreScreen } from "./store-screen";
 
@@ -17,13 +17,13 @@ jest.mock("expo-router", () => ({ router: { back: jest.fn(), canGoBack: jest.fn(
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: jest.fn(), sendVerificationEmail: jest.fn() },
 }));
-jest.mock("@/lib/revenuecat", () => ({
+jest.mock("@/lib/wallet/revenuecat", () => ({
   revenuecatAvailable: jest.fn(),
   fetchCoinOffering: jest.fn(),
   purchaseCoinPack: jest.fn(),
 }));
-jest.mock("@/lib/use-revenuecat", () => ({ useRevenueCatReady: jest.fn() }));
-jest.mock("@/lib/wallet-client", () => {
+jest.mock("@/lib/wallet/use-revenuecat", () => ({ useRevenueCatReady: jest.fn() }));
+jest.mock("@/lib/wallet/wallet-client", () => {
   class WalletAuthError extends Error {}
   return { WalletAuthError, fetchWallet: jest.fn(), fetchCoinCatalog: jest.fn() };
 });

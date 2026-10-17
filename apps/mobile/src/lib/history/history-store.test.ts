@@ -21,7 +21,7 @@ jest.mock("./history-storage", () => {
   };
 });
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { getSession: jest.fn() } }));
-jest.mock("@/lib/api-base-url", () => ({ apiBaseURL: "https://api.test" }));
+jest.mock("@/lib/network/api-base-url", () => ({ apiBaseURL: "https://api.test" }));
 
 const localHistory = (owner: string): { hand: { sessionId: string }; status: string; attempts: number; error: string | null }[] => jest.requireMock("./history-storage").allRows(owner);
 

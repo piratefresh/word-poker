@@ -24,7 +24,7 @@ jest.mock("react-native-reanimated", () => ({
 
 // The results surface this screen presents reads the provider for its completion chips; the
 // real module pulls in Better Auth's client, which Jest cannot parse.
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
 }));
 

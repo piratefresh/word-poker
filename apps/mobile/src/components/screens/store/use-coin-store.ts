@@ -8,9 +8,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { fetchCoinOffering, purchaseCoinPack, revenuecatAvailable } from "@/lib/revenuecat";
-import { useRevenueCatReady } from "@/lib/use-revenuecat";
-import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet-client";
+import { fetchCoinOffering, purchaseCoinPack, revenuecatAvailable } from "@/lib/wallet/revenuecat";
+import { useRevenueCatReady } from "@/lib/wallet/use-revenuecat";
+import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet/wallet-client";
 
 import { joinCoinPacks, type CoinPackRow } from "./coin-packs";
 

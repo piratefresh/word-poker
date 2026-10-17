@@ -210,7 +210,7 @@ event recorded once, unrelated type no-op, 500 on store failure.
 
 - `pnpm --filter @wordpoker/mobile add react-native-purchases` (10.x; Virtual Currency needs ≥ 9.1.0). No
   `react-native-purchases-ui`. Purchases need a development build; Expo Go gets the SDK's preview mode.
-- `src/lib/revenuecat.ts` — the only module that imports the SDK:
+- `src/lib/wallet/revenuecat.ts` — the only module that imports the SDK:
   - `revenuecatAvailable()`: iOS/Android with the platform key set.
   - `configureRevenueCat()`: idempotent; `EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY` /
     `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY`.
@@ -218,11 +218,11 @@ event recorded once, unrelated type no-op, 500 on store failure.
     `{ packs: { [productId]: { label?, badge? } } }`.
   - `purchaseCoinPack(pkg)`: `"purchased" | "cancelled"`.
   - On web or without keys, each throws `StoreUnavailableError`.
-- `src/lib/use-revenuecat.ts` — `useRevenueCatIdentity(userId)`, called once in `RootLayout` beside
+- `src/lib/wallet/use-revenuecat.ts` — `useRevenueCatIdentity(userId)`, called once in `RootLayout` beside
   `authClient.useSession()`: configure once, `Purchases.logIn(userId)` when an id appears,
   `Purchases.logOut()` when it goes. Exposes `ready` so buy buttons stay disabled until `logIn` resolves.
   The E2E bypass build has no session, so it does nothing.
-- `src/lib/wallet-client.ts` — like `results-rating.ts` (`apiBaseURL`, typed failures, the server's
+- `src/lib/wallet/wallet-client.ts` — like `results-rating.ts` (`apiBaseURL`, typed failures, the server's
   `{ error }` surfaced): `fetchWallet()` and `fetchCoinCatalog()`. Authenticated per Better Auth's Expo docs:
   on native, `authClient.getCookie()` as a `cookie` header with `credentials: "omit"`; on web,
   `credentials: "include"`. 401 → `WalletAuthError`.
@@ -247,7 +247,7 @@ event recorded once, unrelated type no-op, 500 on store failure.
   `fetchWallet()`, retrying briefly until the balance rises, then flashes "+N COINS ADDED". An error shows
   inline and keeps the balance.
 - Home: add `"store"` to `ModeKey` and its `MODES` entry only when `EXPO_PUBLIC_COIN_STORE === "1"`.
-- `store-screen.test.tsx` (mocks `@/lib/revenuecat` and `@/lib/wallet-client`): unavailable, signed-out and
+- `store-screen.test.tsx` (mocks `@/lib/wallet/revenuecat` and `@/lib/wallet/wallet-client`): unavailable, signed-out and
   unverified states; packs render with catalog amounts; a pack missing from the catalog is hidden; buy →
   purchase then refetch; cancel → no refetch. Home test: no store card without the flag.
 

@@ -11,9 +11,9 @@ import {
   sendQuestHandClaim,
   WalletAuthError,
   WalletUnverifiedError,
-} from "@/lib/wallet-client";
+} from "@/lib/wallet/wallet-client";
 
-jest.mock("@/lib/api-base-url", () => ({ apiBaseURL: "http://api.test" }));
+jest.mock("@/lib/network/api-base-url", () => ({ apiBaseURL: "http://api.test" }));
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { getCookie: jest.fn(() => "better-auth.session=abc") } }));
 
 const fetchMock = jest.fn();

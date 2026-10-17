@@ -5,7 +5,7 @@ import type { ResultsSnapshot } from "./results-types";
 import { useXpResultOverlay } from "./use-xp-result-overlay";
 
 const mockReportHand = jest.fn();
-jest.mock("@/lib/quests-provider", () => ({ useQuests: () => ({ reportHand: mockReportHand }) }));
+jest.mock("@/lib/quests/quests-provider", () => ({ useQuests: () => ({ reportHand: mockReportHand }) }));
 
 const extra = { wildTable: false, heroUsedPower: false };
 const loss = (hand: number) => snapshotFixture({ hand, seats: [

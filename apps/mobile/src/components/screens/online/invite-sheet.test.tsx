@@ -1,13 +1,13 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 
-import { getFriends, inviteFriend } from "@/lib/friends-client";
+import { getFriends, inviteFriend } from "@/lib/friends/friends-client";
 import { InviteSheet } from "./invite-sheet";
 
 let mockGuest = false;
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: () => ({ data: { user: { id: "caller", isAnonymous: mockGuest } } }) },
 }));
-jest.mock("@/lib/friends-client", () => ({ getFriends: jest.fn(), inviteFriend: jest.fn(async () => {}) }));
+jest.mock("@/lib/friends/friends-client", () => ({ getFriends: jest.fn(), inviteFriend: jest.fn(async () => {}) }));
 jest.mock("react-native-qrcode-svg", () => ({ __esModule: true, default: () => null }));
 jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn() }));
 

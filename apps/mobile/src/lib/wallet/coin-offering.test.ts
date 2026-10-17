@@ -2,7 +2,7 @@
  * The Offering's metadata is dashboard-authored JSON: only the expected strings are kept.
  */
 
-import { packDisplayFromMetadata } from "@/lib/coin-offering";
+import { packDisplayFromMetadata } from "@/lib/wallet/coin-offering";
 
 describe("packDisplayFromMetadata", () => {
   test("reads each pack's label and badge", () => {

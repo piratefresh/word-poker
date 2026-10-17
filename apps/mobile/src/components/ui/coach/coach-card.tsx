@@ -16,7 +16,7 @@ import { Image, type ImageSource } from "expo-image";
 import { type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 import { border, colors, elevation, fonts, fontSize, opacity, palette, radius, spacing } from "@/constants/theme";
 
 export type CoachKind = "coach" | "helper";

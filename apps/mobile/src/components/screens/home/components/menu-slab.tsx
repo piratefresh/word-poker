@@ -11,8 +11,8 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
-import { menuFeedback } from "@/lib/menu-feedback";
-import { webTestID } from "@/lib/web-id";
+import { menuFeedback } from "@/lib/ui/menu-feedback";
+import { webTestID } from "@/lib/ui/web-id";
 
 export type MenuSlabTone = "gold" | "cream";
 

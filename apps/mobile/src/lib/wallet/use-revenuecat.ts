@@ -9,7 +9,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import { logInRevenueCat, logOutRevenueCat, revenuecatAvailable } from "@/lib/revenuecat";
+import { logInRevenueCat, logOutRevenueCat, revenuecatAvailable } from "@/lib/wallet/revenuecat";
 
 /** The user id RevenueCat is logged in as, once `logIn` has resolved. */
 let readyFor: string | null = null;

@@ -32,8 +32,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { levelForXp } from "@wordpoker/game-rules";
 
 import { fonts, palette } from "@/constants/theme";
-import { useQuests, type HandReport } from "@/lib/quests-provider";
-import { webTestID } from "@/lib/web-id";
+import { useQuests, type HandReport } from "@/lib/quests/quests-provider";
+import { webTestID } from "@/lib/ui/web-id";
 
 import type { ResultsSeat } from "./results-types";
 import { placementLabel, xpBreakdown, xpSteps, xpView } from "./xp-overlay-model";

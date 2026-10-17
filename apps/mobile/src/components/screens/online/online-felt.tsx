@@ -66,7 +66,7 @@ import {
   useRoomConnection,
   type RoomConnectionLike,
 } from "@/features/online/use-room-connection";
-import { useBalanceView } from "@/lib/use-balance-view";
+import { useBalanceView } from "@/lib/wallet/use-balance-view";
 
 import { InviteSheet } from "./invite-sheet";
 import { SaveProgressSheet } from "./save-progress-sheet";

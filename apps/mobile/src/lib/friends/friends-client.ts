@@ -1,7 +1,7 @@
 import { isFriendsPage, isFriendRequestResult, isPresenceResponse, type FriendsPage, type PresenceResponse } from "@wordpoker/contracts";
 import { Platform } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
-import { apiBaseURL } from "./api-base-url";
+import { apiBaseURL } from "@/lib/network/api-base-url";
 
 async function call(path: string, method = "GET", body?: unknown): Promise<unknown> {
   const cookie = Platform.OS === "web" ? null : await authClient.getCookie();

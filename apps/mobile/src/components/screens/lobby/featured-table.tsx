@@ -20,7 +20,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { type ReactElement, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 import { powersLabel } from "@/features/table/power-view";
 
 import {

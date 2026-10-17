@@ -1,10 +1,10 @@
 import { act, renderHook } from "@testing-library/react-native";
 import { AppState } from "react-native";
 
-import { beat, goOffline } from "@/lib/friends-client";
+import { beat, goOffline } from "@/lib/friends/friends-client";
 import { HEARTBEAT_MS, usePresence } from "./use-presence";
 
-jest.mock("@/lib/friends-client", () => ({ beat: jest.fn(), goOffline: jest.fn() }));
+jest.mock("@/lib/friends/friends-client", () => ({ beat: jest.fn(), goOffline: jest.fn() }));
 jest.mock("@/features/online/room-session", () => ({ useActiveRoomId: () => "room1" }));
 const mockSession: { verified: boolean; refetch: jest.Mock } = { verified: false, refetch: jest.fn() };
 jest.mock("@/auth/client/auth-client", () => ({

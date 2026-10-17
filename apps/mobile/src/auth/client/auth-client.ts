@@ -3,7 +3,7 @@ import { anonymousClient, inferAdditionalFields } from "better-auth/client/plugi
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
 
-import { apiBaseURL } from "@/lib/api-base-url";
+import { apiBaseURL } from "@/lib/network/api-base-url";
 
 import { platformAuthClient } from "./platform-auth-client";
 

@@ -65,7 +65,7 @@ whose version matches the `chromedriver` on `PATH`. Each flow's header documents
 it needs.
 
 A flow names a control by `id:`, and on the web that id is the element's *test id* wherever the component
-has one — `webTestID` (`apps/mobile/src/lib/web-id.ts`) keeps the DOM element's own `id` in step with
+has one — `webTestID` (`apps/mobile/src/lib/ui/web-id.ts`) keeps the DOM element's own `id` in step with
 `testID`, because Maestro reads the DOM id before the aria-label and the label would otherwise hide the
 test id from the web (its injected `maestro-web.js` falls back to `data-testid` last). Labels are for the
 elements that carry no test id at all. A control prints its label and its amount as separate text nodes,
@@ -169,7 +169,7 @@ an EAS workflow job gets — a job's paths resolve from there, not from the repo
 The build under test is eas.json's `e2e-test` profile: an .apk for Android, a simulator .app for
 iOS, and `EXPO_PUBLIC_E2E_AUTH_BYPASS=1`. The table lives behind the sign-in guard and a device has
 no auth server to reach, so that flag makes the guard take the seat as signed in
-(`apps/mobile/src/lib/e2e.ts`). Never set it outside that profile — a build with it boots past the
+(`apps/mobile/src/lib/testing/e2e.ts`). Never set it outside that profile — a build with it boots past the
 guard. Nothing else is missing on a device: the dictionary ships in the bundle, the bots run
 in-process, and the seed is the whole of the table's randomness.
 

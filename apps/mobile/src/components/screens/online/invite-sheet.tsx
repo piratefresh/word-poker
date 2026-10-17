@@ -16,9 +16,9 @@ import QRCode from "react-native-qrcode-svg";
 import { authClient } from "@/auth/client/auth-client";
 import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
-import { getFriends, inviteFriend } from "@/lib/friends-client";
-import { inviteLinkFor } from "@/lib/invite-link";
-import { webTestID } from "@/lib/web-id";
+import { getFriends, inviteFriend } from "@/lib/friends/friends-client";
+import { inviteLinkFor } from "@/lib/navigation/invite-link";
+import { webTestID } from "@/lib/ui/web-id";
 
 const QR_SIZE = 200;
 

@@ -22,14 +22,14 @@ jest.mock("@/auth/client/session-coordinator", () => ({
 }));
 
 const mockOrder: string[] = [];
-jest.mock("@/lib/use-push-registration", () => ({
+jest.mock("@/lib/friends/use-push-registration", () => ({
   unregisterPush: jest.fn(async () => { mockOrder.push("unregister"); }),
 }));
 jest.mock("expo-notifications", () => ({
   getPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
 }));
 
-jest.mock("@/lib/quests-provider", () => ({
+jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ coins: 1250, state: { xp: 50 } }),
 }));
 

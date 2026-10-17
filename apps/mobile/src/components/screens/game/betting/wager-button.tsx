@@ -16,7 +16,7 @@ import type { TurnTimerView } from "@/components/hud/turn-clock";
 import { ArcadeDigits } from "@/components/hud/top-bar/arcade-digits";
 import { haptic } from "@/components/word-builder/haptics";
 import { fonts, opacity } from "@/constants/theme";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { WagerArt } from "./wager-art";
 import { WaitingShield } from "./waiting-shield";

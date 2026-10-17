@@ -20,7 +20,7 @@ import {
 import { colors, type } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useTutorialGame } from "@/features/tutorial/use-tutorial-game";
-import { TUTORIAL_DONE, writeItem } from "@/lib/claim-store";
+import { TUTORIAL_DONE, writeItem } from "@/lib/storage/claim-store";
 
 /**
  * The guided first hand (STO-251): the offline table, played to a script, with the coach pointing

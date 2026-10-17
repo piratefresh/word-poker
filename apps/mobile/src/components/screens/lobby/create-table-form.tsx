@@ -40,7 +40,7 @@ import {
 
 import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
-import { formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/ui/format";
 import { DEAL_MODE_NAMES } from "@/features/table/power-view";
 import { createTable } from "@/features/online/room-session";
 

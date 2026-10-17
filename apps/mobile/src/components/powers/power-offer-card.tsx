@@ -15,7 +15,7 @@ import Animated, {
 import type { PowerUpId } from "@wordpoker/contracts";
 
 import { palette } from "@/constants/theme";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { POWER_CARD_ASPECT, PowerCard, powerCardLabel } from "./power-card";
 import { POWER_DRAW_MOTION, revealAtFor } from "./power-draw-motion";

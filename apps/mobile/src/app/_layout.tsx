@@ -32,19 +32,19 @@ import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, restoreWithGameCenter } from "@/auth/client/game-center";
 import { changeSessionIfSignedOut } from "@/auth/client/session-coordinator";
 import { colors } from "@/constants/theme";
-import { E2E_AUTH_BYPASS } from "@/lib/e2e";
+import { E2E_AUTH_BYPASS } from "@/lib/testing/e2e";
 import {
   destinationFromURL,
   rememberDestination,
   rememberReferral,
   takeDestination,
   type Destination,
-} from "@/lib/pending-destination";
+} from "@/lib/navigation/pending-destination";
 import { leaveTable } from "@/features/online/room-session";
-import { QuestsProvider } from "@/lib/quests-provider";
-import { useRevenueCatIdentity } from "@/lib/use-revenuecat";
-import { usePresence } from "@/lib/use-presence";
-import { usePushRegistration } from "@/lib/use-push-registration";
+import { QuestsProvider } from "@/lib/quests/quests-provider";
+import { useRevenueCatIdentity } from "@/lib/wallet/use-revenuecat";
+import { usePresence } from "@/lib/friends/use-presence";
+import { usePushRegistration } from "@/lib/friends/use-push-registration";
 import { TableInviteBanner } from "@/components/ui/table-invite-banner";
 
 Sentry.init({
@@ -93,7 +93,7 @@ export function RootLayout() {
   usePushRegistration(account);
 
   // E2E builds have no auth server and no account: the guard takes their word for it instead
-  // of holding the table behind a session nothing can start (`src/lib/e2e.ts`).
+  // of holding the table behind a session nothing can start (`src/lib/testing/e2e.ts`).
   const authed = E2E_AUTH_BYPASS || !!session;
   // A guest can still reach sign-up: the results screen offers to turn the guest into an account.
   const showAuth = !authed || !!session?.user.isAnonymous;

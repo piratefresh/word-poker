@@ -7,7 +7,7 @@ QR code (or open a link) and play in the browser using the Expo web build, with 
 
 Everything needed already exists except the invite and the guest path: tables are created through
 the lobby (`CreateTableForm` → `createTable`), `/online/<roomId>` joins cold from a URL
-(`destinationFromURL` in `src/lib/pending-destination.ts` parses both `/online/<id>` and the
+(`destinationFromURL` in `src/lib/navigation/pending-destination.ts` parses both `/online/<id>` and the
 shareable `/online?room=<id>`), and the Colyseus `GameRoom` seats anonymous connections — `onJoin`
 keys a seat by `client.sessionId`; there is no `onAuth`/identity. The only auth barrier is the
 client-side guard in `apps/mobile/src/app/_layout.tsx`. So this feature is: an invite surface
@@ -52,7 +52,7 @@ New test `apps/mobile/src/lib/guest.test.ts` (`@testing-library/react-native`'s 
 `endGuest()` flips back; idempotent repeats do not re-publish (listener called once per real
 change).
 
-### 3. New `apps/mobile/src/lib/invite-link.ts` — the shareable web URL
+### 3. New `apps/mobile/src/lib/navigation/invite-link.ts` — the shareable web URL
 
 ```ts
 export function inviteLinkFor(roomId: string): string;
@@ -67,7 +67,7 @@ Builds `${origin}/online?room=${encodeURIComponent(roomId)}` where origin resolv
    a friend's phone can open);
 4. fallback `http://localhost:8081`.
 
-New test `apps/mobile/src/lib/invite-link.test.ts`: `jest.mock("expo-constants", ...)` and
+New test `apps/mobile/src/lib/navigation/invite-link.test.ts`: `jest.mock("expo-constants", ...)` and
 `jest.mock("react-native", () => ({ Platform: { OS: "web" | "ios" } }))` per case, stub
 `global.window` when needed, and reset `process.env.EXPO_PUBLIC_WEB_URL` between cases. Assert:
 env var wins and loses its trailing slash; web uses `window.location.origin`; native dev uses
@@ -199,7 +199,7 @@ there; `seated-screen.test.tsx` stubs `useDictionary` to null so `OnlineFelt` ne
 
 - `apps/mobile/src/app/_layout.tsx` — guard (line 38), splash wait (58), `DeepLinks` (97–147):
   the `authed` rename and guest wiring; the load-bearing change of the feature.
-- `apps/mobile/src/lib/pending-destination.ts` — read-only reference: proves
+- `apps/mobile/src/lib/navigation/pending-destination.ts` — read-only reference: proves
   `/online?room=<id>` from any origin parses to `/online/[roomId]`.
 - `apps/mobile/src/components/screens/online/online-felt.tsx` — waiting branch (103–116),
   `ReadyControls` (202–233): where `onInvite` lands.

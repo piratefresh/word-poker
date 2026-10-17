@@ -10,7 +10,7 @@ import * as SecureStore from "expo-secure-store";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 
-import { registerPushToken, unregisterPushToken } from "@/lib/friends-client";
+import { registerPushToken, unregisterPushToken } from "@/lib/friends/friends-client";
 
 /** The token this device last registered, kept across restarts so sign-out can take it back. */
 const TOKEN_KEY = "push-token";

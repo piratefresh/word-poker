@@ -1,6 +1,6 @@
 import { isHistoryHand, isHistoryPage, type HistoryPage, type HandRecord } from "@wordpoker/contracts";
 import { authClient } from "@/auth/client/auth-client";
-import { apiBaseURL } from "@/lib/api-base-url";
+import { apiBaseURL } from "@/lib/network/api-base-url";
 import { acceptHistoryHand, historyCursor, historyRetry, localHistoryId, pendingHistory, setHistoryCursor } from "./history-store";
 
 async function request(ownerId: string, path: string, record?: HandRecord): Promise<Response> {

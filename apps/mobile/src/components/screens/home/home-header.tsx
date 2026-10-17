@@ -5,10 +5,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
-import { coinStoreEnabled } from "@/lib/coin-store";
-import { formatCoins } from "@/lib/format";
-import { unregisterPush } from "@/lib/use-push-registration";
-import { useQuests } from "@/lib/quests-provider";
+import { coinStoreEnabled } from "@/lib/wallet/coin-store";
+import { formatCoins } from "@/lib/ui/format";
+import { unregisterPush } from "@/lib/friends/use-push-registration";
+import { useQuests } from "@/lib/quests/quests-provider";
 import { levelForXp } from "@wordpoker/game-rules";
 
 import { AccountMenu } from "./account-menu";

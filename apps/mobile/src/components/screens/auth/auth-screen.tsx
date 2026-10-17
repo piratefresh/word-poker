@@ -15,7 +15,7 @@ import { GAME_CENTER_AVAILABLE, signInWithGameCenter } from "@/auth/client/game-
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
 import { pendingHistory } from "@/lib/history/history-store";
 import { syncHistory } from "@/lib/history/history-sync";
-import { pendingReferral } from "@/lib/pending-destination";
+import { pendingReferral } from "@/lib/navigation/pending-destination";
 
 /** `type` is the token group's own name: rename it so it reads as a style set. */
 const { type: typography } = theme;

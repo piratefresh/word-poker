@@ -8,7 +8,7 @@
 import { renderHook, waitFor } from "@testing-library/react-native";
 
 import { authClient } from "@/auth/client/auth-client";
-import { fetchWallet, WalletAuthError, WalletUnverifiedError } from "@/lib/wallet-client";
+import { fetchWallet, WalletAuthError, WalletUnverifiedError } from "@/lib/wallet/wallet-client";
 
 import { useBalanceView } from "./use-balance-view";
 
@@ -17,7 +17,7 @@ jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: jest.f
 
 // `instanceof` decides the signed-out read, so the error classes stay real; only the fetch
 // itself is stood in.
-jest.mock("@/lib/wallet-client", () => ({
+jest.mock("@/lib/wallet/wallet-client", () => ({
   WalletAuthError: class extends Error {},
   WalletUnverifiedError: class extends Error {},
   fetchWallet: jest.fn(),

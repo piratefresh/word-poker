@@ -27,8 +27,8 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
-import { formatCoins } from "@/lib/format";
-import { fullWidth } from "@/lib/full-width";
+import { formatCoins } from "@/lib/ui/format";
+import { fullWidth } from "@/lib/ui/full-width";
 
 export function VerifyEmailCard({
   email,

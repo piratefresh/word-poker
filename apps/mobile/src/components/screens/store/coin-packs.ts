@@ -8,7 +8,7 @@
 
 import type { CoinCatalog } from "@wordpoker/contracts";
 
-import type { CoinPackage, PackDisplay } from "@/lib/coin-offering";
+import type { CoinPackage, PackDisplay } from "@/lib/wallet/coin-offering";
 
 export const BEST_VALUE = "Best Value";
 

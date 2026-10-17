@@ -15,7 +15,7 @@ import { POWER_UPS } from "@wordpoker/contracts";
 import { useScreenScale } from "@/components/screens/game/screen-scale";
 import { colors, fonts, spacing } from "@/constants/theme";
 import type { PowerUsedNotice } from "@/features/table/power-view";
-import { webTestID } from "@/lib/web-id";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { PowerCard } from "./power-card";
 
