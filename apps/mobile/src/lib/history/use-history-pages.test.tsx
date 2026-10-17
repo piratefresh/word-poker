@@ -2,7 +2,8 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { useSessionHands } from "./use-history-pages";
 
 let mockRevision = 0;
-jest.mock("./history-provider", () => ({ useHistory: () => ({ ownerId: "a", revision: mockRevision }) }));
+let mockOwner = "a";
+jest.mock("./history-provider", () => ({ useHistory: () => ({ ownerId: mockOwner, revision: mockRevision }) }));
 const mockPage = jest.fn();
 jest.mock("./history-store", () => ({
   ...jest.requireActual("./history-store"),
@@ -14,10 +15,23 @@ const row = (n: number) => ({ hand: { sessionId: "s", handNo: n, endedAtMs: 1000
 const rows = Array.from({ length: 45 }, (_, n) => row(n));
 beforeEach(() => {
   mockRevision = 0;
+  mockOwner = "a";
   mockPage.mockReset().mockImplementation(async (_o: string, _s: string, after: { id: string } | null, limit: number) => {
     const start = after ? Number(after.id.split(":")[1]) + 1 : 0;
     return rows.slice(start, start + limit);
   });
+});
+
+test("an account switch hides old rows immediately and ignores its late read", async () => {
+  let resolveOld: (rows: unknown[]) => void = () => {};
+  mockPage.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
+  const { result, rerender } = await renderHook(() => useSessionHands("s"));
+  mockOwner = "b";
+  mockPage.mockResolvedValueOnce([row(99)]);
+  await rerender({});
+  await waitFor(() => expect(result.current.items).toEqual([row(99)]));
+  await act(async () => resolveOld(rows));
+  expect(result.current.items).toEqual([row(99)]);
 });
 
 test("loads a page, appends the next on demand, and stops at the end", async () => {

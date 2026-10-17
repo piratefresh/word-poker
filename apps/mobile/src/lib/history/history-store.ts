@@ -14,9 +14,18 @@ export interface LocalHistoryHand {
 export interface HistorySession {
   sessionId: string;
   endedAtMs: number;
+  startedAtMs: number;
   hands: number;
   pending: boolean;
+  rejected: { handNo: number; reason: string }[];
   latest: LocalHistoryHand;
+}
+
+export function sessionStatus(session: HistorySession, uploadingSessionId: string | null = null): "synced" | "onDevice" | "uploading" | "verified" | "rejected" {
+  if (session.latest.hand.mode === "online") return "synced";
+  if (session.rejected.length) return "rejected";
+  if (session.pending) return uploadingSessionId === session.sessionId ? "uploading" : "onDevice";
+  return "verified";
 }
 export interface SessionCursor { endedAtMs: number; sessionId: string }
 export interface HandCursor { endedAtMs: number; id: string }

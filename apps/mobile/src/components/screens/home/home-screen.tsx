@@ -14,7 +14,7 @@ import { Host } from "@expo/ui";
 import { isAccountEligible } from "@wordpoker/contracts";
 import { Image } from "expo-image";
 import { useNetworkState } from "expo-network";
-import { router, useFocusEffect, type Href } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   Pressable,
@@ -172,6 +172,7 @@ export function HomeScreen() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const [box, setBox] = useState({ width: windowWidth, height: windowHeight });
+  const { offline: requestedOffline } = useLocalSearchParams<{ offline?: string }>();
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(48);
   const closeOffline = useCallback(() => setOfflineOpen(false), []);
@@ -195,6 +196,16 @@ export function HomeScreen() {
       return () => setOfflineOpen(false);
     }, [enter]),
   );
+
+  // Reveal the tray after the book finishes closing over the street.
+  useFocusEffect(useCallback(() => {
+    if (requestedOffline !== "1") return;
+    const timer = setTimeout(() => {
+      setOfflineOpen(true);
+      router.setParams({ offline: undefined });
+    }, reduceMotion ? 0 : 1250);
+    return () => clearTimeout(timer);
+  }, [requestedOffline, reduceMotion]));
 
   const go = (href: Href) => {
     if (leaving.current) return;

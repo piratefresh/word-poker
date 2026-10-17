@@ -34,16 +34,23 @@ export async function readPendingRows(owner: string): Promise<LocalHistoryHand[]
   return parse(await (await db()).getAllAsync<{ payload: string }>(
     "SELECT payload FROM history_rows WHERE owner = ? AND status = 'pending' ORDER BY ended_at DESC, id DESC", owner));
 }
-/** Newest session first. `payload` is the session's latest hand: a bare column beside a lone MAX() takes that row's value. */
+/** Newest session first, with account-scoped aggregates across every hand. */
 export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number): Promise<HistorySession[]> {
   const at = after?.endedAtMs ?? null;
   const id = after?.sessionId ?? null;
-  const rows = await (await db()).getAllAsync<{ payload: string; sessionId: string; endedAtMs: number; hands: number; pending: number }>(
-    `SELECT payload, session_id AS sessionId, MAX(ended_at) AS endedAtMs, COUNT(*) AS hands, SUM(status = 'pending') AS pending
+  const rows = await (await db()).getAllAsync<{ payload: string; sessionId: string; endedAtMs: number; startedAtMs: number; hands: number; pending: number; rejected: string }>(
+    `SELECT (SELECT latest.payload FROM history_rows latest WHERE latest.owner = history_rows.owner
+       AND latest.session_id = history_rows.session_id ORDER BY latest.ended_at DESC, latest.id DESC LIMIT 1) AS payload,
+     session_id AS sessionId, MAX(ended_at) AS endedAtMs,
+     MIN(json_extract(payload, '$.hand.startedAtMs')) AS startedAtMs,
+     COUNT(*) AS hands, SUM(status = 'pending') AS pending,
+     json_group_array(json_object('handNo', json_extract(payload, '$.hand.handNo'),
+       'reason', COALESCE(json_extract(payload, '$.error'), 'The hand could not be verified. It stays on this device, unranked.')))
+       FILTER (WHERE status = 'rejected') AS rejected
      FROM history_rows WHERE owner = ? GROUP BY session_id
      HAVING ? IS NULL OR MAX(ended_at) < ? OR (MAX(ended_at) = ? AND session_id < ?)
      ORDER BY endedAtMs DESC, session_id DESC LIMIT ?`, owner, at, at, at, id, limit);
-  return rows.map(({ payload, pending, ...session }) => ({ ...session, pending: pending > 0, latest: JSON.parse(payload) }));
+  return rows.map(({ payload, pending, rejected, ...session }) => ({ ...session, pending: pending > 0, rejected: JSON.parse(rejected), latest: JSON.parse(payload) }));
 }
 export async function readHandPage(owner: string, sessionId: string, after: HandCursor | null, limit: number): Promise<LocalHistoryHand[]> {
   const at = after?.endedAtMs ?? null;

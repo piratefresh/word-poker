@@ -19,7 +19,10 @@ jest.mock("@/auth/client/session-coordinator", () => ({
   setAutoRestore: jest.fn(async () => {}),
 }));
 
-jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useFocusEffect: jest.fn() }));
+let mockRequestedOffline: string | undefined;
+jest.mock("expo-router", () => ({ router: { push: jest.fn(), setParams: jest.fn() }, useFocusEffect: jest.fn(),
+  useLocalSearchParams: () => ({ offline: mockRequestedOffline }),
+}));
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
 );
@@ -87,6 +90,7 @@ function press(view: RenderResult, testID: string) {
 const saved = process.env.EXPO_PUBLIC_COIN_STORE;
 
 beforeEach(() => {
+  mockRequestedOffline = undefined;
   mockSessionUser = { email: "ada@example.com", emailVerified: true };
   mockConnected = undefined;
   mockDisk.clear();
@@ -97,6 +101,21 @@ beforeEach(() => {
   mockDismissLevelUp.mockReset();
   jest.mocked(router.push).mockReset();
   jest.mocked(authClient.sendVerificationEmail).mockReset();
+});
+
+test("the ledger's offline entry waits for the book to close and consumes the request", async () => {
+  jest.useFakeTimers();
+  mockRequestedOffline = "1";
+  const view = await render(<HomeScreen />);
+  const focus = jest.mocked(useFocusEffect).mock.calls.at(-1)?.[0];
+  const cleanup = focus?.();
+  await act(async () => jest.advanceTimersByTime(1249));
+  expect(view.queryByTestId("offline-tray")).toBeNull();
+  await act(async () => jest.advanceTimersByTime(1));
+  expect(view.getByTestId("offline-tray")).toBeOnTheScreen();
+  expect(router.setParams).toHaveBeenCalledWith({ offline: undefined });
+  if (typeof cleanup === "function") cleanup();
+  jest.useRealTimers();
 });
 
 afterEach(() => {

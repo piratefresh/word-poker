@@ -1,17 +1,27 @@
 import { LegendList, type LegendListProps } from "@legendapp/list/react-native";
 import { useId, useState, type ReactNode } from "react";
-import { ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
+import { FlatList, ScrollView, StyleSheet, View, type FlatListProps, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
 import { gradients, radius } from "@/constants/theme";
+import { ledgerListAccessibilityProps } from "./ledger-list-accessibility";
 
 /** Fixed felt; tinted text belongs below 35% of the viewport or inside a panel/card. */
-function LedgerFelt({ style, children }: { style?: StyleProp<ViewStyle>; children: ReactNode }) {
+function LedgerFelt({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
   const id = useId().replace(/:/g, "");
   const [size, setSize] = useState({ width: 375, height: 812 });
   const horizontalFade = Math.min(.5, 60 / Math.max(1, size.width));
   const verticalFade = Math.min(.5, 60 / Math.max(1, size.height));
   return (
-    <View style={[styles.page, style]} onLayout={(event) => setSize(event.nativeEvent.layout)}>
+    <View
+      style={[styles.page, style]}
+      onLayout={(event) => setSize(event.nativeEvent.layout)}
+    >
       <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%">
         <Defs>
           <RadialGradient id={`${id}felt`} gradientUnits="userSpaceOnUse" cx={0} cy={0} fx={0} fy={0} r={1}
@@ -50,12 +60,27 @@ export function LedgerPage({ children, gap = 10, style, contentContainerStyle, .
 }
 
 /** Virtualized page for long histories. List items are absolutely positioned, so rows add their own bottom gap. */
-export function LedgerList<T>({ style, contentContainerStyle, ...props }: LegendListProps<T>) {
+export function LedgerList<T>({
+  style,
+  contentContainerStyle,
+  accessibilityLabel,
+  ...props
+}: LegendListProps<T>) {
   return (
     <LedgerFelt style={style as StyleProp<ViewStyle>}>
-      <LegendList<T> {...props} contentContainerStyle={[styles.content, contentContainerStyle]} />
+      <LegendList<T>
+        {...props}
+        {...(ledgerListAccessibilityProps(accessibilityLabel) as Partial<LegendListProps<T>>)}
+        contentContainerStyle={[styles.content, contentContainerStyle]}
+      />
     </LedgerFelt>
   );
+}
+
+export function LedgerFlatList<T>({ style, contentContainerStyle, ...props }: FlatListProps<T>) {
+  return <LedgerFelt style={style}>
+    <FlatList {...props} contentContainerStyle={[styles.content, contentContainerStyle]} />
+  </LedgerFelt>;
 }
 
 const styles = StyleSheet.create({

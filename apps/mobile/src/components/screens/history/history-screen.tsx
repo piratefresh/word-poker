@@ -1,11 +1,11 @@
-import { Button, Column, Host, Text } from "@expo/ui";
+import { Column, Host, Text } from "@expo/ui";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as NativeText, View } from "react-native";
 import type { HistoryHand } from "@wordpoker/contracts";
 import { colors, fonts, spacing } from "@/constants/theme";
-import { useHistory } from "@/lib/history/history-provider";
 import { localHistoryId, type LocalHistoryHand } from "@/lib/history/history-store";
-import { useHistoryHand, useHistorySessions, useSessionHands } from "@/lib/history/use-history-pages";
+import { useHistoryHand, useSessionHands } from "@/lib/history/use-history-pages";
+import { SessionsPage } from "./sessions-page";
 import { DealIn } from "./ledger/deal-in";
 import { GoldBackButton } from "./ledger/gold-back-button";
 import { LedgerCard } from "./ledger/ledger-card";
@@ -33,33 +33,15 @@ export function HistoryScreen({ level, sessionId, handId, revealed, back, openSe
   openSession: (id: string) => void;
   openHand: (id: string) => void;
 }) {
-  const history = useHistory();
   const readable = useLedgerReadable();
   const reduced = useReduceMotion();
   const dealActive = revealed && readable && !reduced;
-  const sessions = useHistorySessions();
   const hands = useSessionHands(sessionId);
   const detail = useHistoryHand(handId);
   const selected = detail.row?.hand.sessionId === sessionId ? detail.row : null;
   const dealing = (page: number) => dealActive && page === level;
   return <PageStack level={level}>{[
-    <LedgerList key="sessions" accessibilityLabel="Hand Ledger sessions" data={sessions.items} extraData={dealing(0)} onEndReached={sessions.loadMore} onEndReachedThreshold={0.5}
-      keyExtractor={(session) => session.sessionId} estimatedItemSize={ROW_HEIGHT}
-      ListHeaderComponent={<View style={styles.header}>
-        <NativeText style={styles.title}>HAND LEDGER</NativeText>
-        <Host matchContents={{ vertical: true }} colorScheme="dark">
-          <Button label={history.syncing ? "Syncing…" : "Sync"} onPress={history.refresh} disabled={history.syncing} testID="history-sync" />
-        </Host>
-        {history.error ? <NativeText style={styles.dim}>{history.error}</NativeText> : null}
-      </View>}
-      ListEmptyComponent={<NativeText style={styles.body}>{sessions.loading ? "Opening saved hands…" : "Your next hand starts here. Finish a hand to see it in your ledger."}</NativeText>}
-      renderItem={({ item: { sessionId: id, latest, hands: count, pending }, index }) => <Row index={index} active={dealing(0)}>
-        <LedgerCard accessibilityLabel={"View session " + (latest.hand.tableName ?? id)} onPress={() => openSession(id)}>
-          <NativeText style={styles.cardTitle}>{latest.hand.tableName ?? (latest.hand.mode === "offline" ? "Offline session" : "Online session")}</NativeText>
-          <NativeText>{new Date(latest.hand.endedAtMs).toLocaleString() + " · " + count + (count === 1 ? " hand" : " hands")}</NativeText>
-          <NativeText>{pending ? "Pending sync" : status(latest)}</NativeText>
-        </LedgerCard>
-      </Row>} />,
+    <SessionsPage key="sessions" active={dealing(0)} openSession={openSession} />,
     <LedgerList key={"hands-" + (sessionId ?? "")} accessibilityLabel="Hand Ledger hands" data={hands.items} extraData={dealing(1)} onEndReached={hands.loadMore} onEndReachedThreshold={0.5}
       keyExtractor={(row) => localHistoryId(row.hand)} estimatedItemSize={ROW_HEIGHT}
       ListHeaderComponent={<View style={styles.header}>

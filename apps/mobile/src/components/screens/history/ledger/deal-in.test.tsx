@@ -34,3 +34,13 @@ test("caps stagger and replays on page activation, without replaying on rerender
   await screen.rerender(<DealIn index={199} baseDelay={100}><Text>Hand</Text></DealIn>);
   expect(withTiming).toHaveBeenCalledTimes(4);
 });
+
+test("stays hidden while inactive until its first deal", async () => {
+  jest.mocked(useReducedMotion).mockReturnValue(false);
+  jest.mocked(withTiming).mockClear();
+  const screen = await render(<DealIn index={0} active={false}><Text>Hand</Text></DealIn>);
+  expect(screen.toJSON()).toMatchObject({ props: { style: { opacity: 0 } } });
+  expect(withTiming).not.toHaveBeenCalled();
+  await screen.rerender(<DealIn index={0}><Text>Hand</Text></DealIn>);
+  expect(withTiming).toHaveBeenCalledTimes(2);
+});
