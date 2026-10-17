@@ -27,6 +27,7 @@ export function MiniTile({ letter, size = "md", tone = "cream", opacity = 1, mul
         scale={SIZES[size] / TILE_METRICS.small.width}
         ownership={tone === "gold" ? "private" : "neutral"}
         dimmed={tone === "dim"}
+        fill={tone === "gold" ? "gold" : "ivory"}
         shadow={false}
         animation="none"
       />
