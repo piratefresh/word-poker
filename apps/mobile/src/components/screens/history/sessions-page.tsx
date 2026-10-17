@@ -15,9 +15,9 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useReduceMotion } from "@/components/hud/use-reduce-motion";
-import { fonts } from "@/constants/theme";
+import { colors, fonts, ledger } from "@/constants/theme";
 import { useHistory } from "@/lib/history/history-provider";
-import { type HistorySession, sessionStatus } from "@/lib/history/history-store";
+import { type HistorySession, sessionName, sessionStatus } from "@/lib/history/history-store";
 import { useHistorySessions } from "@/lib/history/use-history-pages";
 import { clock, dayLabel } from "@/utils/date";
 
@@ -144,7 +144,7 @@ export function SessionsPage({
                   accessibilityLabel="Play offline"
                   onPress={() => router.navigate({ pathname: "/", params: { offline: "1" } })}
                 >
-                  <LinearGradient colors={["#ffd877", "#e6a73e"]} style={styles.play}>
+                  <LinearGradient colors={ledger.goldButton} style={styles.play}>
                     <Text style={styles.playText}>PLAY OFFLINE</Text>
                   </LinearGradient>
                 </Pressable>
@@ -198,7 +198,7 @@ export function SessionCard({
   toggle: () => void;
 }) {
   const offline = session.latest.hand.mode === "offline";
-  const name = session.latest.hand.tableName ?? (offline ? "Practice vs bots" : "Online session");
+  const name = sessionName(session);
   return (
     <LedgerCard>
       <Pressable
@@ -336,7 +336,7 @@ export function SyncPill() {
           style={[
             styles.dot,
             {
-              backgroundColor: offline ? "#8a8a80" : syncing ? "#e6a73e" : "#3fae6a",
+              backgroundColor: offline ? ledger.offline : syncing ? ledger.syncing : ledger.synced,
             },
           ]}
         />
@@ -366,26 +366,26 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderWidth: 2,
-    borderColor: "#e0974a",
-    backgroundColor: "rgba(0,0,0,.28)",
+    borderColor: ledger.goldEdge,
+    backgroundColor: colors.surface,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   syncText: {
     fontFamily: fonts.arcade,
     fontSize: 12,
     letterSpacing: 0.48,
-    color: "#f7e7b5",
+    color: ledger.parchment,
   },
-  syncArrow: { fontFamily: "Rubik_600SemiBold", fontSize: 14, color: "#f7d77a" },
+  syncArrow: { fontFamily: fonts.rubikSemiBold, fontSize: 14, color: ledger.goldText },
   banner: {
     borderRadius: 10,
     paddingVertical: 9,
     paddingHorizontal: 12,
-    backgroundColor: "rgba(0,0,0,.25)",
-    fontFamily: "Rubik_500Medium",
+    backgroundColor: colors.surface,
+    fontFamily: fonts.rubikMedium,
     fontSize: 11.5,
     lineHeight: 16.1,
-    color: "#f3e6c4",
+    color: ledger.onFelt,
   },
   cardGap: { paddingBottom: 10 },
   cardRow: {
@@ -398,20 +398,20 @@ const styles = StyleSheet.create({
     width: 34,
     height: 38,
     borderRadius: 6,
-    backgroundColor: "#1f4a33",
+    backgroundColor: ledger.modeTile,
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0px 3px 0px #0e2a1c",
+    boxShadow: `0px 3px 0px ${ledger.modeTileEdge}`,
   },
-  modeLetter: { fontFamily: fonts.arcade, fontSize: 22, color: "#f7e7b5" },
+  modeLetter: { fontFamily: fonts.arcade, fontSize: 22, color: ledger.parchment },
   description: { flex: 1, gap: 4 },
   name: {
     fontFamily: fonts.arcade,
     fontSize: 17,
     lineHeight: 18,
-    color: "#3a2210",
+    color: ledger.ink,
   },
-  meta: { fontFamily: "Rubik_500Medium", fontSize: 11.5, color: "#7a5634" },
+  meta: { fontFamily: fonts.rubikMedium, fontSize: 11.5, color: ledger.inkSoft },
   status: { alignItems: "flex-end", gap: 4 },
   rejected: { marginLeft: 44, gap: 6 },
   detailsTarget: {
@@ -420,9 +420,9 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   details: {
-    fontFamily: "Rubik_600SemiBold",
+    fontFamily: fonts.rubikSemiBold,
     fontSize: 11,
-    color: "#a3271e",
+    color: ledger.rejectedLink,
     textDecorationLine: "underline",
   },
   errorBox: {
@@ -430,18 +430,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     gap: 6,
-    backgroundColor: "#f3d0c6",
+    backgroundColor: ledger.rejectedBg,
   },
   errorText: {
-    fontFamily: "Rubik_500Medium",
+    fontFamily: fonts.rubikMedium,
     fontSize: 11.5,
     lineHeight: 16.1,
-    color: "#6e1d16",
+    color: ledger.rejectedInk,
   },
   loading: { gap: 10 },
   placeholder: {
     height: 90,
-    backgroundColor: "#f7e7b5",
+    backgroundColor: ledger.parchment,
     opacity: 0.5,
     borderRadius: 12,
   },
@@ -452,24 +452,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  emptyTitle: { fontFamily: fonts.arcade, fontSize: 26, color: "#3a2210" },
+  emptyTitle: { fontFamily: fonts.arcade, fontSize: 26, color: ledger.ink },
   emptyCopy: {
-    fontFamily: "Rubik_400Regular",
+    fontFamily: fonts.rubik,
     fontSize: 13,
     lineHeight: 19.5,
     textAlign: "center",
-    color: "#5a3a1c",
+    color: ledger.inkBody,
   },
   play: {
     paddingVertical: 10,
     paddingHorizontal: 22,
     borderRadius: 999,
-    boxShadow: "0px 4px 0px #9a5f1c",
+    boxShadow: `0px 4px 0px ${ledger.goldButtonEdge}`,
   },
   playText: {
     fontFamily: fonts.arcade,
     fontSize: 18,
     letterSpacing: 0.72,
-    color: "#3a2210",
+    color: ledger.ink,
   },
 });

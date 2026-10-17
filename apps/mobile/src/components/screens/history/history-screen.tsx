@@ -1,22 +1,20 @@
 import { Column, Host, Text } from "@expo/ui";
-import type { ReactNode } from "react";
 import { StyleSheet, Text as NativeText, View } from "react-native";
 import type { HistoryHand } from "@wordpoker/contracts";
 import { colors, fonts, spacing } from "@/constants/theme";
-import { localHistoryId, type LocalHistoryHand } from "@/lib/history/history-store";
-import { useHistoryHand, useSessionHands } from "@/lib/history/use-history-pages";
+import { type LocalHistoryHand } from "@/lib/history/history-store";
+import { useHistoryHand } from "@/lib/history/use-history-pages";
+import { signedChips } from "@/utils/chips";
+import { HandsPage, handResult } from "./hands-page";
 import { SessionsPage } from "./sessions-page";
 import { DealIn } from "./ledger/deal-in";
 import { GoldBackButton } from "./ledger/gold-back-button";
-import { LedgerCard } from "./ledger/ledger-card";
 import { LedgerList } from "./ledger/ledger-page";
 import { PageStack } from "./ledger/page-stack";
 import { useLedgerReadable } from "./ledger/ledger-stage";
 import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 
-const ROW_HEIGHT = 110;
 const ACTION_HEIGHT = 56;
-const DEALT_ROWS = 8;
 
 function status(row: LocalHistoryHand): string {
   if (row.status === "rejected") return "Upload rejected";
@@ -36,26 +34,12 @@ export function HistoryScreen({ level, sessionId, handId, revealed, back, openSe
   const readable = useLedgerReadable();
   const reduced = useReduceMotion();
   const dealActive = revealed && readable && !reduced;
-  const hands = useSessionHands(sessionId);
   const detail = useHistoryHand(handId);
   const selected = detail.row?.hand.sessionId === sessionId ? detail.row : null;
   const dealing = (page: number) => dealActive && page === level;
   return <PageStack level={level}>{[
     <SessionsPage key="sessions" active={dealing(0)} openSession={openSession} />,
-    <LedgerList key={"hands-" + (sessionId ?? "")} accessibilityLabel="Hand Ledger hands" data={hands.items} extraData={dealing(1)} onEndReached={hands.loadMore} onEndReachedThreshold={0.5}
-      keyExtractor={(row) => localHistoryId(row.hand)} estimatedItemSize={ROW_HEIGHT}
-      ListHeaderComponent={<View style={styles.header}>
-        <GoldBackButton onPress={back} accessibilityLabel="Back to sessions" />
-        <NativeText style={styles.title}>SESSION HANDS</NativeText>
-      </View>}
-      ListEmptyComponent={<NativeText style={styles.body}>{hands.loading ? "Opening saved hands…" : "This session is not saved on this device."}</NativeText>}
-      renderItem={({ item: row, index }) => <Row index={index} active={dealing(1)}>
-        <LedgerCard accessibilityLabel={"View hand " + row.hand.handNo} onPress={() => openHand(localHistoryId(row.hand))}>
-          <NativeText style={styles.cardTitle}>{"Hand #" + row.hand.handNo}</NativeText>
-          <NativeText>{handLabel(row.hand)}</NativeText>
-          <NativeText>{status(row)}</NativeText>
-        </LedgerCard>
-      </Row>} />,
+    <HandsPage key={"hands-" + (sessionId ?? "")} sessionId={sessionId} active={dealing(1)} back={back} openHand={openHand} />,
     <LedgerList key={"detail-" + (sessionId ?? "") + "-" + (handId ?? "")} accessibilityLabel="Hand Ledger detail"
       data={selected?.hand.actions ?? []} keyExtractor={(entry) => String(entry.sequence)} estimatedItemSize={ACTION_HEIGHT}
       ListHeaderComponent={<View style={styles.header}>
@@ -72,17 +56,9 @@ export function HistoryScreen({ level, sessionId, handId, revealed, back, openSe
   ]}</PageStack>;
 }
 
-// A virtualized row mounts as it scrolls in, so only the first screenful deals; later rows would replay on scroll.
-function Row({ index, active, children }: { index: number; active: boolean; children: ReactNode }) {
-  const row = <View style={styles.row}>{children}</View>;
-  return index < DEALT_ROWS ? <DealIn index={index} active={active}>{row}</DealIn> : row;
-}
-
 function handLabel(hand: HistoryHand): string {
-  const hero = hand.summary.seats.find((seat) => seat.playerId === hand.heroId);
-  const initial = hand.seats.find((seat) => seat.playerId === hand.heroId)?.initialStack ?? 0;
-  const delta = (hero?.finalStack ?? initial) - initial;
-  return `${hero?.word ?? (hand.summary.outcome === "fold-out" ? "Fold-out" : "No submitted word")} · ${hero?.score ?? 0} points · ${delta >= 0 ? "+" : ""}${delta} chips`;
+  const { word, score, net } = handResult(hand);
+  return `${word ?? (hand.summary.outcome === "fold-out" ? "Fold-out" : "No submitted word")} · ${score} points · ${signedChips(net)} chips`;
 }
 
 function HandSummary({ row }: { row: LocalHistoryHand }) {
@@ -120,10 +96,8 @@ function actionLabel(hand: HistoryHand, entry: HistoryHand["actions"][number]): 
 }
 
 const styles = StyleSheet.create({
-  cardTitle: { color: colors.onGold, fontFamily: fonts.serifBold, fontSize: 18 },
   host: { width: "100%" },
   header: { gap: 10, paddingBottom: 10 },
-  row: { paddingBottom: 10 },
   card: { padding: spacing.md, margin: spacing.sm, backgroundColor: colors.surface, borderRadius: 16 },
   action: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   title: { color: colors.gold, fontFamily: fonts.serifBold, fontSize: 18 },

@@ -91,5 +91,5 @@ const styles = StyleSheet.create({
   coin: { position: "absolute", right: 0, bottom: 0, width: 27, height: 27, borderRadius: 14, backgroundColor: "#f6cf67", borderBottomWidth: 3, borderBottomColor: "#a9772b", alignItems: "center", justifyContent: "center" },
   spark: { color: "#56401d", fontSize: 19 },
   label: { color: "#f7e7b5", fontFamily: fonts.arcade, fontSize: 19, textAlign: "center" },
-  description: { color: "#d8ccaf", fontFamily: "Rubik_500Medium", fontSize: 13, lineHeight: 18, textAlign: "center", minHeight: 36 },
+  description: { color: "#d8ccaf", fontFamily: fonts.rubikMedium, fontSize: 13, lineHeight: 18, textAlign: "center", minHeight: 36 },
 });

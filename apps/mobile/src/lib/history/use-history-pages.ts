@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHistory } from "./history-provider";
-import { historyRow, historySessions, localHistoryId, sessionHands, type HandCursor, type HistorySession, type LocalHistoryHand, type SessionCursor } from "./history-store";
+import { historyRow, historySession, historySessions, localHistoryId, sessionHands, type HandCursor, type HistorySession, type LocalHistoryHand, type SessionCursor } from "./history-store";
 
 const PAGE = 20;
 type Load<T, C> = (after: C | null, limit: number) => Promise<T[]>;
@@ -63,17 +63,26 @@ export function useSessionHands(sessionId: string | undefined): Paged<LocalHisto
   return usePaged(ownerId && sessionId ? load : null, handCursor, revision);
 }
 
-/** One saved hand by its local id (`sessionId:handNo`). */
-export function useHistoryHand(handId: string | undefined): { row: LocalHistoryHand | null; loading: boolean } {
+/** One saved value by id, re-read on each revision; stale reads for an old id are dropped. */
+function useOne<T>(id: string | undefined, read: (ownerId: string, id: string) => Promise<T | null>): { row: T | null; loading: boolean } {
   const { ownerId, revision } = useHistory();
-  const [found, setFound] = useState<{ key: string; row: LocalHistoryHand | null } | null>(null);
-  const key = ownerId && handId ? `${ownerId}/${handId}` : null;
+  const [found, setFound] = useState<{ key: string; row: T | null } | null>(null);
+  const key = ownerId && id ? `${ownerId}/${id}` : null;
   useEffect(() => {
-    if (!ownerId || !handId) return;
+    if (!ownerId || !id) return;
     let active = true;
-    historyRow(ownerId, handId).then((row) => { if (active) setFound({ key: `${ownerId}/${handId}`, row }); }, () => undefined);
+    read(ownerId, id).then((row) => { if (active) setFound({ key: `${ownerId}/${id}`, row }); }, () => undefined);
     return () => { active = false; };
-  }, [ownerId, handId, revision]);
+  }, [ownerId, id, read, revision]);
   const current = key !== null && found?.key === key ? found : null;
   return { row: current?.row ?? null, loading: key !== null && current === null };
+}
+
+/** One saved hand by its local id (`sessionId:handNo`). */
+export function useHistoryHand(handId: string | undefined): { row: LocalHistoryHand | null; loading: boolean } {
+  return useOne(handId, historyRow);
+}
+
+export function useHistorySession(sessionId: string | undefined): { row: HistorySession | null; loading: boolean } {
+  return useOne(sessionId, historySession);
 }
