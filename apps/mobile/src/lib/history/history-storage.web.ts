@@ -43,12 +43,22 @@ export async function readHistoryRow(owner: string, id: string): Promise<LocalHi
 export async function readPendingRows(owner: string): Promise<LocalHistoryHand[]> {
   return (await ownerRows(owner)).filter((row) => row.status === "pending").sort(newestFirst);
 }
+export async function countPendingSessions(owner: string): Promise<number> {
+  return new Set((await readPendingRows(owner)).map((row) => row.hand.sessionId)).size;
+}
 export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number): Promise<HistorySession[]> {
   const sessions = new Map<string, HistorySession>();
   for (const row of (await ownerRows(owner)).sort(newestFirst)) {
     const session = sessions.get(row.hand.sessionId);
-    if (session) { session.hands += 1; session.pending ||= row.status === "pending"; }
-    else sessions.set(row.hand.sessionId, { sessionId: row.hand.sessionId, endedAtMs: row.hand.endedAtMs, hands: 1, pending: row.status === "pending", latest: row });
+    if (session) {
+      session.hands += 1;
+      session.pending ||= row.status === "pending";
+      session.startedAtMs = Math.min(session.startedAtMs, row.hand.startedAtMs);
+    } else sessions.set(row.hand.sessionId, { sessionId: row.hand.sessionId, endedAtMs: row.hand.endedAtMs,
+      startedAtMs: row.hand.startedAtMs, hands: 1, pending: row.status === "pending", rejected: [], latest: row });
+    if (row.status === "rejected") sessions.get(row.hand.sessionId)?.rejected.push({
+      handNo: row.hand.handNo, reason: row.error ?? "The hand could not be verified. It stays on this device, unranked.",
+    });
   }
   return [...sessions.values()]
     .sort((a, b) => b.endedAtMs - a.endedAtMs || (a.sessionId < b.sessionId ? 1 : -1))

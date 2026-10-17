@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 
 /** Activate with the page, not with viewport visibility; scrolling never replays the deal. */
@@ -11,8 +11,12 @@ export function DealIn({ children, index, baseDelay = 0, active = true }: {
   const reducedMotion = useReducedMotion();
   const progress = useSharedValue(reducedMotion ? 1 : 0);
   const opacity = useSharedValue(reducedMotion ? 1 : 0);
+  // Stay hidden until the first deal, or the cover/page turn reveals the rows before they deal in.
+  const dealt = useRef(false);
   // Synchronizes the UI-thread animation with page visibility.
   useEffect(() => {
+    if (!reducedMotion && !active && !dealt.current) return;
+    dealt.current = true;
     if (reducedMotion || !active) {
       progress.value = 1;
       opacity.value = 1;

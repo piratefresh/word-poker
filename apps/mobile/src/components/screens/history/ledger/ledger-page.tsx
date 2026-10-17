@@ -3,6 +3,7 @@ import { useId, useState, type ReactNode } from "react";
 import { ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
 import { gradients, radius } from "@/constants/theme";
+import { ledgerListAccessibilityProps } from "./ledger-list-accessibility";
 
 /** Fixed felt; tinted text belongs below 35% of the viewport or inside a panel/card. */
 function LedgerFelt({ style, children }: { style?: StyleProp<ViewStyle>; children: ReactNode }) {
@@ -50,10 +51,14 @@ export function LedgerPage({ children, gap = 10, style, contentContainerStyle, .
 }
 
 /** Virtualized page for long histories. List items are absolutely positioned, so rows add their own bottom gap. */
-export function LedgerList<T>({ style, contentContainerStyle, ...props }: LegendListProps<T>) {
+export function LedgerList<T>({ style, contentContainerStyle, accessibilityLabel, ...props }: LegendListProps<T>) {
   return (
     <LedgerFelt style={style as StyleProp<ViewStyle>}>
-      <LegendList<T> {...props} contentContainerStyle={[styles.content, contentContainerStyle]} />
+      <LegendList<T>
+        {...props}
+        {...(ledgerListAccessibilityProps(accessibilityLabel) as Partial<LegendListProps<T>>)}
+        contentContainerStyle={[styles.content, contentContainerStyle]}
+      />
     </LedgerFelt>
   );
 }

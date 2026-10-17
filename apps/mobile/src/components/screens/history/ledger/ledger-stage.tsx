@@ -12,6 +12,11 @@ const HOME = Easing.bezier(.3, .7, .2, 1);
 const LedgerReadable = createContext(true);
 export function useLedgerReadable(): boolean { return useContext(LedgerReadable); }
 
+/** The book is fully closed once the drop has run. */
+const CLOSE_DROP_DELAY_MS = 600;
+const CLOSE_DROP_MS = 650;
+export const LEDGER_CLOSE_MS = CLOSE_DROP_DELAY_MS + CLOSE_DROP_MS;
+
 /** Home never unmounts; only the ledger's pages reset after a completed close. */
 export function LedgerStage({ open, home, children }: { open: boolean; home: ReactNode; children: ReactNode }) {
   const reduced = useReduceMotion();
@@ -45,7 +50,7 @@ export function LedgerStage({ open, home, children }: { open: boolean; home: Rea
       dim.value = withTiming(open ? 1 : 0, { duration: 500, easing: HOME });
       scale.value = withTiming(open ? .96 : 1, { duration: 600, easing: HOME });
       angle.value = withDelay(freshOpen ? 550 : 0, withTiming(open ? -176 : 0, { duration: 800, easing: SWING }));
-      drop.value = withDelay(open ? 0 : 600, withTiming(open ? 1 : 0, { duration: 650, easing: DROP }, (finished) => {
+      drop.value = withDelay(open ? 0 : CLOSE_DROP_DELAY_MS, withTiming(open ? 1 : 0, { duration: CLOSE_DROP_MS, easing: DROP }, (finished) => {
         if (finished && !open) runOnJS(setClosed)(true);
       }));
     }

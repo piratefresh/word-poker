@@ -1,5 +1,5 @@
 import { historyHand, type HandRecord, type HistoryHand } from "@wordpoker/contracts";
-import { readHandPage, readHistoryRow, readPendingRows, readSessionPage, writeHistoryRow, readHistoryCursor, writeHistoryCursor } from "./history-storage";
+import { countPendingSessions, readHandPage, readHistoryRow, readPendingRows, readSessionPage, writeHistoryRow, readHistoryCursor, writeHistoryCursor } from "./history-storage";
 
 export interface LocalHistoryHand {
   hand: HistoryHand;
@@ -14,9 +14,18 @@ export interface LocalHistoryHand {
 export interface HistorySession {
   sessionId: string;
   endedAtMs: number;
+  startedAtMs: number;
   hands: number;
   pending: boolean;
+  rejected: { handNo: number; reason: string }[];
   latest: LocalHistoryHand;
+}
+
+export function sessionStatus(session: HistorySession, uploadingSessionId: string | null = null): "synced" | "onDevice" | "uploading" | "verified" | "rejected" {
+  if (session.latest.hand.mode === "online") return "synced";
+  if (session.rejected.length) return "rejected";
+  if (session.pending) return uploadingSessionId === session.sessionId ? "uploading" : "onDevice";
+  return "verified";
 }
 export interface SessionCursor { endedAtMs: number; sessionId: string }
 export interface HandCursor { endedAtMs: number; id: string }
@@ -56,6 +65,7 @@ export async function historyRetry(ownerId: string, id: string, error: string, p
 
 export const historyRow = readHistoryRow;
 export const pendingHistory = readPendingRows;
+export const pendingSessionCount = countPendingSessions;
 export const historySessions = readSessionPage;
 export const sessionHands = readHandPage;
 export const historyCursor = readHistoryCursor;
