@@ -1,4 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View, type PressableProps } from "react-native";
 import { colors, gradients, radius, tileMaterial } from "@/constants/theme";
 
@@ -9,7 +10,7 @@ const cardGradients = {
 } as const;
 
 type LedgerCardProps = {
-  children: React.ReactNode;
+  children: ReactNode;
   size?: "card" | "row";
   tone?: keyof typeof cardGradients;
   accessibilityLabel?: PressableProps["accessibilityLabel"];
@@ -28,7 +29,7 @@ export function LedgerCard({
   const row = size === "row";
   const cardRadius = row ? radius.md : radius.card;
   const surface = (pressed: boolean) => (
-    <LinearGradient colors={cardGradients[tone]} style={[styles.face, {
+    <LinearGradient colors={cardGradients[tone]} style={[styles.face, row && styles.row, {
       borderRadius: cardRadius,
       transform: [{ translateY: pressed ? 2 : 0 }],
       boxShadow: [
@@ -52,5 +53,6 @@ export function LedgerCard({
 
 const styles = StyleSheet.create({
   face: { padding: 12, gap: 8 },
+  row: { paddingVertical: 0 },
   target: { minHeight: 44, justifyContent: "center" },
 });

@@ -39,8 +39,8 @@ export async function readPendingRows(owner: string): Promise<LocalHistoryHand[]
   return parse(await (await db()).getAllAsync<{ payload: string }>(
     "SELECT payload FROM history_rows WHERE owner = ? AND status = 'pending' ORDER BY ended_at DESC, id DESC", owner));
 }
-/** Newest session first, with account-scoped aggregates across every hand. */
-export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number): Promise<HistorySession[]> {
+/** Newest session first, with account-scoped aggregates across every hand; `only` reads one session. */
+export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number, only: string | null = null): Promise<HistorySession[]> {
   const at = after?.endedAtMs ?? null;
   const id = after?.sessionId ?? null;
   const rows = await (await db()).getAllAsync<{ payload: string; sessionId: string; endedAtMs: number; startedAtMs: number; hands: number; pending: number; rejected: string }>(
@@ -52,9 +52,9 @@ export async function readSessionPage(owner: string, after: SessionCursor | null
      json_group_array(json_object('handNo', json_extract(payload, '$.hand.handNo'),
        'reason', COALESCE(json_extract(payload, '$.error'), 'The hand could not be verified. It stays on this device, unranked.')))
        FILTER (WHERE status = 'rejected') AS rejected
-     FROM history_rows WHERE owner = ? GROUP BY session_id
+     FROM history_rows WHERE owner = ? AND (? IS NULL OR session_id = ?) GROUP BY session_id
      HAVING ? IS NULL OR MAX(ended_at) < ? OR (MAX(ended_at) = ? AND session_id < ?)
-     ORDER BY endedAtMs DESC, session_id DESC LIMIT ?`, owner, at, at, at, id, limit);
+     ORDER BY endedAtMs DESC, session_id DESC LIMIT ?`, owner, only, only, at, at, at, id, limit);
   return rows.map(({ payload, pending, rejected, ...session }) => ({ ...session, pending: pending > 0, rejected: (JSON.parse(rejected) as HistorySession["rejected"]).sort((a, b) => b.handNo - a.handNo), latest: JSON.parse(payload) }));
 }
 export async function countPendingSessions(owner: string): Promise<number> {

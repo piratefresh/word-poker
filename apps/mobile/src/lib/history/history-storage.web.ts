@@ -46,9 +46,9 @@ export async function readPendingRows(owner: string): Promise<LocalHistoryHand[]
 export async function countPendingSessions(owner: string): Promise<number> {
   return new Set((await readPendingRows(owner)).map((row) => row.hand.sessionId)).size;
 }
-export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number): Promise<HistorySession[]> {
+export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number, only: string | null = null): Promise<HistorySession[]> {
   const sessions = new Map<string, HistorySession>();
-  for (const row of (await ownerRows(owner)).sort(newestFirst)) {
+  for (const row of (await ownerRows(owner)).filter((row) => only === null || row.hand.sessionId === only).sort(newestFirst)) {
     const session = sessions.get(row.hand.sessionId);
     if (session) {
       session.hands += 1;

@@ -11,6 +11,10 @@ const statuses = {
 
 export type StatusVariant = keyof typeof statuses;
 
+export function statusLabel(variant: StatusVariant): string {
+  return statuses[variant].label;
+}
+
 export function StatusPill({ variant, text }: { variant: StatusVariant; text?: string }) {
   const status = statuses[variant];
   return (
