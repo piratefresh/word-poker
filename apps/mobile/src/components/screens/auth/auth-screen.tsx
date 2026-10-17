@@ -13,7 +13,7 @@ import { colors, theme } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, signInWithGameCenter } from "@/auth/client/game-center";
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
-import { localHistory } from "@/lib/history/history-store";
+import { pendingHistory } from "@/lib/history/history-store";
 import { syncHistory } from "@/lib/history/history-sync";
 import { pendingReferral } from "@/lib/pending-destination";
 
@@ -39,7 +39,7 @@ const UNSAVED_HANDS = "Your guest hands are still saving — check your connecti
  */
 async function guestHandsSaved(guestId: string): Promise<boolean> {
   await syncHistory(guestId, () => {}).catch(() => {});
-  return !(await localHistory(guestId)).some((row) => row.status === "pending");
+  return (await pendingHistory(guestId)).length === 0;
 }
 
 const Copy: Record<

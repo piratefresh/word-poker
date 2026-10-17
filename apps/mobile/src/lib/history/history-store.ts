@@ -1,5 +1,5 @@
 import { historyHand, type HandRecord, type HistoryHand } from "@wordpoker/contracts";
-import { readHistoryRows, writeHistoryRow, readHistoryCursor, writeHistoryCursor } from "./history-storage";
+import { readHandPage, readHistoryRow, readPendingRows, readSessionPage, writeHistoryRow, readHistoryCursor, writeHistoryCursor } from "./history-storage";
 
 export interface LocalHistoryHand {
   hand: HistoryHand;
@@ -10,6 +10,17 @@ export interface LocalHistoryHand {
   retryAtMs: number;
 }
 
+/** A session's card: its newest hand plus the counts the list shows. */
+export interface HistorySession {
+  sessionId: string;
+  endedAtMs: number;
+  hands: number;
+  pending: boolean;
+  latest: LocalHistoryHand;
+}
+export interface SessionCursor { endedAtMs: number; sessionId: string }
+export interface HandCursor { endedAtMs: number; id: string }
+
 export function localHistoryId(hand: Pick<HistoryHand, "sessionId" | "handNo">): string {
   return `${hand.sessionId}:${hand.handNo}`;
 }
@@ -17,7 +28,7 @@ export function localHistoryId(hand: Pick<HistoryHand, "sessionId" | "handNo">):
 /** Resolves only after commit; the table holds settlement until then. */
 export async function captureHistoryHand(ownerId: string, record: HandRecord): Promise<void> {
   const id = localHistoryId(record);
-  const existing = (await readHistoryRows(ownerId)).find((row) => localHistoryId(row.hand) === id);
+  const existing = await readHistoryRow(ownerId, id);
   if (existing) {
     if (existing.record && JSON.stringify(existing.record) !== JSON.stringify(record)) throw new Error("Conflicting saved hand.");
     return;
@@ -28,10 +39,6 @@ export async function captureHistoryHand(ownerId: string, record: HandRecord): P
   });
 }
 
-export async function localHistory(ownerId: string): Promise<LocalHistoryHand[]> {
-  return (await readHistoryRows(ownerId)).sort((a, b) => b.hand.endedAtMs - a.hand.endedAtMs || b.hand.id.localeCompare(a.hand.id));
-}
-
 export async function acceptHistoryHand(ownerId: string, hand: HistoryHand): Promise<void> {
   await writeHistoryRow(ownerId, localHistoryId(hand), {
     hand, record: null, status: "synced", error: null, attempts: 0, retryAtMs: 0,
@@ -39,7 +46,7 @@ export async function acceptHistoryHand(ownerId: string, hand: HistoryHand): Pro
 }
 
 export async function historyRetry(ownerId: string, id: string, error: string, permanent: boolean, attempts: number): Promise<void> {
-  const row = (await readHistoryRows(ownerId)).find((entry) => localHistoryId(entry.hand) === id);
+  const row = await readHistoryRow(ownerId, id);
   if (!row || row.status === "synced") return;
   await writeHistoryRow(ownerId, id, {
     ...row, status: permanent ? "rejected" : "pending", error, attempts,
@@ -47,5 +54,9 @@ export async function historyRetry(ownerId: string, id: string, error: string, p
   });
 }
 
+export const historyRow = readHistoryRow;
+export const pendingHistory = readPendingRows;
+export const historySessions = readSessionPage;
+export const sessionHands = readHandPage;
 export const historyCursor = readHistoryCursor;
 export const setHistoryCursor = writeHistoryCursor;

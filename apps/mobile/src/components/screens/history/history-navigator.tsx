@@ -48,9 +48,9 @@ function stringParam(params: object | undefined, key: string): string | undefine
   return typeof value === "string" ? value : undefined;
 }
 
-type ContentProps = NavigatorContentProps<object, Record<string, never>, object, { reset: () => void }>;
+type ContentProps = NavigatorContentProps<object, Record<string, never>, object>;
 
-function HistoryContent({ state, actions, reset }: ContentProps) {
+function HistoryContent({ state, actions }: ContentProps) {
   const route = state.routes[state.index];
   const level = route.name === "[sessionId]/[handId]" ? 2 : route.name === "[sessionId]" ? 1 : 0;
   const reduced = useReduceMotion();
@@ -83,10 +83,6 @@ function HistoryContent({ state, actions, reset }: ContentProps) {
     release.current = setTimeout(() => { locked.current = false; }, reduced ? 0 : PAGE_TURN_MS);
     return () => clearTimeout(reveal);
   }, [route.key, reduced]);
-  // The tab navigator owns closing the cover. Reset its nested route when leaving History.
-  const resetRef = useRef(reset);
-  useEffect(() => { resetRef.current = reset; }, [reset]);
-  useFocusEffect(useCallback(() => () => resetRef.current(), []));
   const back = useCallback(() => {
     if (locked.current) return;
     if (level > 0) {
@@ -119,9 +115,7 @@ function EdgeBack({ onBack }: { onBack: () => void }) {
   return <GestureDetector gesture={swipe}><View style={styles.edge} /></GestureDetector>;
 }
 
-const LedgerNavigator = unstable_createStandardRouterNavigator(HistoryContent, ledgerRouter, {
-  createProps: ({ state, dispatch }) => ({ reset: () => dispatch({ type: "POP_TO_TOP", target: state.key }) }),
-});
+const LedgerNavigator = unstable_createStandardRouterNavigator(HistoryContent, ledgerRouter);
 
 export function HistoryNavigator() {
   return <LedgerNavigator initialRouteName="index" />;

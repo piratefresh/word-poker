@@ -3,13 +3,13 @@ import { AppState } from "react-native";
 import * as Network from "expo-network";
 import type { HandRecord } from "@wordpoker/contracts";
 import { authClient } from "@/auth/client/auth-client";
-import { captureHistoryHand, localHistory, type LocalHistoryHand } from "./history-store";
+import { captureHistoryHand } from "./history-store";
 import { syncHistory } from "./history-sync";
 
 interface HistoryValue {
   ownerId: string | null;
-  hands: readonly LocalHistoryHand[];
-  loading: boolean;
+  /** Bumps when saved hands change; paged views reload their loaded rows. */
+  revision: number;
   syncing: boolean;
   error: string | null;
   capture: (record: HandRecord) => Promise<void>;
@@ -24,12 +24,10 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 }
 
 function AccountHistory({ ownerId, children }: { ownerId: string | null; children: ReactNode }) {
-  const [hands, setHands] = useState<LocalHistoryHand[]>([]);
-  const [version, setVersion] = useState(0);
-  const [loading, setLoading] = useState(ownerId !== null);
+  const [revision, setRevision] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const changed = useCallback(() => setVersion((value) => value + 1), []);
+  const changed = useCallback(() => setRevision((value) => value + 1), []);
   const refresh = useCallback(() => {
     if (!ownerId) return;
     setSyncing(true);
@@ -37,17 +35,6 @@ function AccountHistory({ ownerId, children }: { ownerId: string | null; childre
       setError(cause instanceof Error ? cause.message : "Waiting for connection.");
     }).finally(() => { setSyncing(false); changed(); });
   }, [changed, ownerId]);
-
-  useEffect(() => {
-    let active = true;
-    if (!ownerId) return;
-    void localHistory(ownerId).then((rows) => {
-      if (active) { setHands(rows); setLoading(false); }
-    }, (cause: unknown) => {
-      if (active) { setError(cause instanceof Error ? cause.message : "Saved history could not be opened."); setLoading(false); }
-    });
-    return () => { active = false; };
-  }, [ownerId, version]);
 
   useEffect(() => {
     let active = true;
@@ -65,8 +52,8 @@ function AccountHistory({ ownerId, children }: { ownerId: string | null; childre
     changed();
     refresh();
   }, [changed, ownerId, refresh]);
-  const value = useMemo(() => ({ ownerId, hands, loading, syncing, error, capture, refresh }),
-    [ownerId, hands, loading, syncing, error, capture, refresh]);
+  const value = useMemo(() => ({ ownerId, revision, syncing, error, capture, refresh }),
+    [ownerId, revision, syncing, error, capture, refresh]);
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;
 }
 

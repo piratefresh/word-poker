@@ -15,8 +15,8 @@ export function useLedgerReadable(): boolean { return useContext(LedgerReadable)
 /** Home never unmounts; only the ledger's pages reset after a completed close. */
 export function LedgerStage({ open, home, children }: { open: boolean; home: ReactNode; children: ReactNode }) {
   const reduced = useReduceMotion();
-  const window = useWindowDimensions();
-  const [size, setSize] = useState({ width: window.width, height: window.height });
+  const screen = useWindowDimensions();
+  const [size, setSize] = useState({ width: screen.width, height: screen.height });
   const [closed, setClosed] = useState(!open);
   if (open && closed) setClosed(false);
   else if (!open && reduced && !closed) setClosed(true);
@@ -67,7 +67,7 @@ export function LedgerStage({ open, home, children }: { open: boolean; home: Rea
   }));
 
   return (
-    <View style={styles.stage} onLayout={(event) => setSize(event.nativeEvent.layout)}>
+    <View style={styles.stage} onLayout={({ nativeEvent: { layout } }) => setSize((prev) => prev.width === layout.width && prev.height === layout.height ? prev : { width: layout.width, height: layout.height })}>
       <Animated.View testID="ledger-home" pointerEvents={open ? "none" : "auto"} aria-hidden={open} accessibilityElementsHidden={open} importantForAccessibility={open ? "no-hide-descendants" : "auto"} style={[StyleSheet.absoluteFill, homeStyle]}>{home}</Animated.View>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} />
       <Animated.View testID="ledger-book" pointerEvents={visible ? "auto" : "none"} aria-hidden={!open || !readable} accessibilityElementsHidden={!open || !readable} importantForAccessibility={open && readable ? "auto" : "no-hide-descendants"} style={[StyleSheet.absoluteFill, styles.book, !visible && styles.hidden, bookStyle]}>

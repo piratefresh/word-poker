@@ -1,4 +1,4 @@
-import type { LocalHistoryHand } from "./history-store";
+import type { HandCursor, HistorySession, LocalHistoryHand, SessionCursor } from "./history-store";
 
 let database: Promise<IDBDatabase> | undefined;
 function db(): Promise<IDBDatabase> {
@@ -28,9 +28,37 @@ async function transaction<T>(store: string, mode: IDBTransactionMode, work: (st
   });
 }
 
-export async function readHistoryRows(owner: string): Promise<LocalHistoryHand[]> {
+// IndexedDB has no group-by, so the web fork reads the account's rows and pages them in memory;
+// the same cursors as the native store keep callers identical.
+async function ownerRows(owner: string): Promise<LocalHistoryHand[]> {
   const rows = await transaction<{ row: LocalHistoryHand }[]>("hands", "readonly", (store) => store.index("owner").getAll(owner));
   return rows.map((entry) => entry.row);
+}
+const rowId = (row: LocalHistoryHand) => `${row.hand.sessionId}:${row.hand.handNo}`;
+const newestFirst = (a: LocalHistoryHand, b: LocalHistoryHand) => b.hand.endedAtMs - a.hand.endedAtMs || (rowId(a) < rowId(b) ? 1 : -1);
+
+export async function readHistoryRow(owner: string, id: string): Promise<LocalHistoryHand | null> {
+  return (await transaction<{ row: LocalHistoryHand } | undefined>("hands", "readonly", (store) => store.get(`${owner}:${id}`)))?.row ?? null;
+}
+export async function readPendingRows(owner: string): Promise<LocalHistoryHand[]> {
+  return (await ownerRows(owner)).filter((row) => row.status === "pending").sort(newestFirst);
+}
+export async function readSessionPage(owner: string, after: SessionCursor | null, limit: number): Promise<HistorySession[]> {
+  const sessions = new Map<string, HistorySession>();
+  for (const row of (await ownerRows(owner)).sort(newestFirst)) {
+    const session = sessions.get(row.hand.sessionId);
+    if (session) { session.hands += 1; session.pending ||= row.status === "pending"; }
+    else sessions.set(row.hand.sessionId, { sessionId: row.hand.sessionId, endedAtMs: row.hand.endedAtMs, hands: 1, pending: row.status === "pending", latest: row });
+  }
+  return [...sessions.values()]
+    .sort((a, b) => b.endedAtMs - a.endedAtMs || (a.sessionId < b.sessionId ? 1 : -1))
+    .filter((session) => !after || session.endedAtMs < after.endedAtMs || (session.endedAtMs === after.endedAtMs && session.sessionId < after.sessionId))
+    .slice(0, limit);
+}
+export async function readHandPage(owner: string, sessionId: string, after: HandCursor | null, limit: number): Promise<LocalHistoryHand[]> {
+  return (await ownerRows(owner)).filter((row) => row.hand.sessionId === sessionId).sort(newestFirst)
+    .filter((row) => !after || row.hand.endedAtMs < after.endedAtMs || (row.hand.endedAtMs === after.endedAtMs && rowId(row) < after.id))
+    .slice(0, limit);
 }
 export async function writeHistoryRow(owner: string, id: string, row: LocalHistoryHand): Promise<void> {
   await transaction("hands", "readwrite", (store) => store.put({ key: `${owner}:${id}`, owner, row }));

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 import { PageInteraction } from "./page-interaction";
@@ -19,7 +19,8 @@ function TurningPage({ index, level, reduced, children }: { index: number; level
   const turned = level > index;
   const current = level === index;
   const angle = useSharedValue(turned ? -176 : 0);
-  const [width, setWidth] = useState(0);
+  // Seed from the window so a cold detail link's turned pages pivot on the spine from the first frame.
+  const [width, setWidth] = useState(useWindowDimensions().width);
   useEffect(() => {
     cancelAnimation(angle);
     const target = turned ? -176 : 0;

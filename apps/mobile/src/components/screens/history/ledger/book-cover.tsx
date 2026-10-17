@@ -123,10 +123,4 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 0,
   },
-  subtitle: {
-    fontFamily: "Rubik_600SemiBold",
-    fontSize: 11,
-    letterSpacing: 2.64,
-    color: "#f7d77a",
-  },
 });

@@ -1,10 +1,11 @@
-import { useId, useState } from "react";
-import { ScrollView, StyleSheet, View, type ScrollViewProps } from "react-native";
+import { LegendList, type LegendListProps } from "@legendapp/list/react-native";
+import { useId, useState, type ReactNode } from "react";
+import { ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
 import { gradients, radius } from "@/constants/theme";
 
 /** Fixed felt; tinted text belongs below 35% of the viewport or inside a panel/card. */
-export function LedgerPage({ children, gap = 10, style, contentContainerStyle, ...props }: ScrollViewProps & { gap?: number }) {
+function LedgerFelt({ style, children }: { style?: StyleProp<ViewStyle>; children: ReactNode }) {
   const id = useId().replace(/:/g, "");
   const [size, setSize] = useState({ width: 375, height: 812 });
   const horizontalFade = Math.min(.5, 60 / Math.max(1, size.width));
@@ -33,10 +34,27 @@ export function LedgerPage({ children, gap = 10, style, contentContainerStyle, .
         <Rect width="100%" height="100%" fill={`url(#${id}vertical)`} />
         <Rect width="14" height="100%" fill={`url(#${id}spine)`} />
       </Svg>
+      {children}
+    </View>
+  );
+}
+
+export function LedgerPage({ children, gap = 10, style, contentContainerStyle, ...props }: ScrollViewProps & { gap?: number }) {
+  return (
+    <LedgerFelt style={style}>
       <ScrollView {...props} contentContainerStyle={[styles.content, { gap }, contentContainerStyle]}>
         {children}
       </ScrollView>
-    </View>
+    </LedgerFelt>
+  );
+}
+
+/** Virtualized page for long histories. List items are absolutely positioned, so rows add their own bottom gap. */
+export function LedgerList<T>({ style, contentContainerStyle, ...props }: LegendListProps<T>) {
+  return (
+    <LedgerFelt style={style as StyleProp<ViewStyle>}>
+      <LegendList<T> {...props} contentContainerStyle={[styles.content, contentContainerStyle]} />
+    </LedgerFelt>
   );
 }
 
