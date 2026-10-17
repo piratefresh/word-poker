@@ -47,7 +47,7 @@ tags:
     timeout: 30000
 - openLink: wordpoker://history
 - extendedWaitUntil:
-    visible: "GAME HISTORY"
+    visible: "HAND LEDGER"
     timeout: 30000
 - back
 - extendedWaitUntil:
@@ -92,13 +92,13 @@ tags:
 - assertNotVisible: "Pending sync"
 - assertVisible: ".* · 1 hand"
 - tapOn:
-    text: "View session"
+    text: "View session .*"
     index: 0
 - extendedWaitUntil:
-    visible: "View hand"
+    visible: "View hand .*"
     timeout: 30000
 - tapOn:
-    text: "View hand"
+    text: "View hand .*"
     index: 0
 - assertVisible: "HAND #1"
 - assertVisible:

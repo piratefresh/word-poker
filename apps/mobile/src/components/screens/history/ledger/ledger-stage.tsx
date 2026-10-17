@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { cancelAnimation, Easing, runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
@@ -9,6 +9,8 @@ import { BookCover } from "./book-cover";
 const DROP = Easing.bezier(.3, 1.25, .5, 1);
 const SWING = Easing.bezier(.5, .05, .25, 1);
 const HOME = Easing.bezier(.3, .7, .2, 1);
+const LedgerReadable = createContext(true);
+export function useLedgerReadable(): boolean { return useContext(LedgerReadable); }
 
 /** Home never unmounts; only the ledger's pages reset after a completed close. */
 export function LedgerStage({ open, home, children }: { open: boolean; home: ReactNode; children: ReactNode }) {
@@ -71,7 +73,7 @@ export function LedgerStage({ open, home, children }: { open: boolean; home: Rea
       <Animated.View testID="ledger-book" pointerEvents={visible ? "auto" : "none"} aria-hidden={!open || !readable} accessibilityElementsHidden={!open || !readable} importantForAccessibility={open && readable ? "auto" : "no-hide-descendants"} style={[StyleSheet.absoluteFill, styles.book, !visible && styles.hidden, bookStyle]}>
         <LinearGradient colors={["#3b1a0b", "#5e2d15", "#4a220f"]} locations={[0, .08, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[StyleSheet.absoluteFill, styles.body]} />
         <View pointerEvents="none" style={styles.edges}>{Array.from({ length: 8 }, (_, i) => <View key={i} style={{ width: 1, backgroundColor: i % 2 ? "#cdb88e" : "#efe2c4" }} />)}</View>
-        <View testID="ledger-pages" pointerEvents={open && readable ? "auto" : "none"} style={styles.pages}>{visible ? children : null}</View>
+        <View testID="ledger-pages" pointerEvents={open && readable ? "auto" : "none"} style={styles.pages}><LedgerReadable value={open && readable}>{visible ? children : null}</LedgerReadable></View>
         <Animated.View testID="ledger-cover-front" pointerEvents="none" style={[styles.cover, frontStyle]}><BookCover /></Animated.View>
         <Animated.View testID="ledger-cover-back" pointerEvents="none" style={[styles.cover, backStyle]}><BookCover inside /></Animated.View>
       </Animated.View>

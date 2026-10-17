@@ -27,7 +27,10 @@ const ROOM_PARAM = "room";
 export type Destination =
   | { readonly pathname: "/friends"; readonly params: { readonly add: string } }
   | { readonly pathname: "/online" }
-  | { readonly pathname: "/online/[roomId]"; readonly params: { readonly roomId: string } };
+  | { readonly pathname: "/online/[roomId]"; readonly params: { readonly roomId: string } }
+  | { readonly pathname: "/history" }
+  | { readonly pathname: "/history/[sessionId]"; readonly params: { readonly sessionId: string } }
+  | { readonly pathname: "/history/[sessionId]/[handId]"; readonly params: { readonly sessionId: string; readonly handId: string } };
 
 /** A link's screen and the table it named, before either is known to be ours. */
 interface Link {
@@ -118,6 +121,16 @@ export function destinationFromURL(url: string | null | undefined): Destination 
   try {
     const parsed = new URL(url);
     const segments = parsed.pathname.split("/").filter(Boolean);
+    const historySegments = parsed.protocol === "wordpoker:" && parsed.hostname === "history"
+      ? ["history", ...segments] : segments;
+    if (historySegments[0] === "history") {
+      if (historySegments.length === 1) return { pathname: "/history" };
+      const [sessionId, handId] = historySegments.slice(1).map(decodeURIComponent);
+      if (!sessionId || /[/.]/.test(sessionId) || (handId && /[/.]/.test(handId))) return null;
+      if (historySegments.length === 2) return { pathname: "/history/[sessionId]", params: { sessionId } };
+      return historySegments.length === 3 && handId
+        ? { pathname: "/history/[sessionId]/[handId]", params: { sessionId, handId } } : null;
+    }
     const friendSegments = parsed.protocol === "wordpoker:" && parsed.hostname === "friend"
       ? ["friend", ...segments] : segments;
     if (friendSegments[0] === "friend") {

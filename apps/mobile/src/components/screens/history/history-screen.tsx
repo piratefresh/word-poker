@@ -1,13 +1,18 @@
-import { Button, Column, Host, Row, Spacer, Text } from "@expo/ui";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button, Column, Host, Text } from "@expo/ui";
+import { useMemo } from "react";
+import { StyleSheet, Text as NativeText, View } from "react-native";
 import type { HistoryHand } from "@wordpoker/contracts";
 import { colors, fonts, spacing } from "@/constants/theme";
 import { useHistory } from "@/lib/history/history-provider";
 import type { LocalHistoryHand } from "@/lib/history/history-store";
 import { localHistoryId } from "@/lib/history/history-store";
+import { DealIn } from "./ledger/deal-in";
+import { GoldBackButton } from "./ledger/gold-back-button";
+import { LedgerCard } from "./ledger/ledger-card";
+import { LedgerPage } from "./ledger/ledger-page";
+import { PageStack } from "./ledger/page-stack";
+import { useLedgerReadable } from "./ledger/ledger-stage";
+import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 
 function status(row: LocalHistoryHand): string {
   if (row.status === "rejected") return "Upload rejected";
@@ -15,14 +20,19 @@ function status(row: LocalHistoryHand): string {
   return row.hand.ranked ? "Ranked online" : "Verified · Unranked offline";
 }
 
-export function HistoryScreen() {
+export function HistoryScreen({ level, sessionId, handId, revealed, back, openSession, openHand }: {
+  level: number;
+  sessionId?: string;
+  handId?: string;
+  revealed: boolean;
+  back: () => void;
+  openSession: (id: string) => void;
+  openHand: (id: string) => void;
+}) {
   const history = useHistory();
-  const { refresh } = history;
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-  const insets = useSafeAreaInsets();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [handId, setHandId] = useState<string | null>(null);
-  const selected = history.hands.find((row) => localHistoryId(row.hand) === handId);
+  const readable = useLedgerReadable();
+  const reduced = useReduceMotion();
+  const dealActive = revealed && readable && !reduced;
   const sessions = useMemo(() => {
     const grouped = new Map<string, LocalHistoryHand[]>();
     for (const row of history.hands) {
@@ -32,57 +42,44 @@ export function HistoryScreen() {
     }
     return [...grouped.entries()];
   }, [history.hands]);
-  const back = () => {
-    if (handId) setHandId(null);
-    else if (sessionId) setSessionId(null);
-  };
-  const rows = sessionId ? history.hands.filter((row) => row.hand.sessionId === sessionId) : [];
-  return (
-    <View style={[styles.screen, { paddingTop: insets.top + spacing.md }]} testID="history-screen">
-      <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark" seedColor={colors.gold}>
-        <Column spacing={spacing.sm} style={styles.header}>
-          <Row spacing={spacing.md}>
-            {handId || sessionId ? <Button label="Back" onPress={back} testID="history-back" /> : null}
-            <Spacer flexible />
-            <Button label={history.syncing ? "Syncing…" : "Sync"} onPress={history.refresh} disabled={history.syncing} testID="history-sync" />
-          </Row>
-          <Text textStyle={styles.title}>{selected ? `HAND #${selected.hand.handNo}` : "GAME HISTORY"}</Text>
-          {history.error ? <Text textStyle={styles.dim}>{history.error}</Text> : null}
-        </Column>
+  const rows = history.hands.filter((row) => row.hand.sessionId === sessionId);
+  const selected = rows.find((row) => row.hand.id === handId || localHistoryId(row.hand) === handId);
+  return <PageStack level={level}>{[
+    <LedgerPage key="sessions" accessibilityLabel="Hand Ledger sessions">
+      <NativeText style={styles.title}>HAND LEDGER</NativeText>
+      <Host matchContents={{ vertical: true }} colorScheme="dark">
+        <Button label={history.syncing ? "Syncing…" : "Sync"} onPress={history.refresh} disabled={history.syncing} testID="history-sync" />
       </Host>
-      {/* Host rows acquire their height from native layout; clipping them at zero height prevents measurement. */}
-      {selected ? <HandDetail row={selected} /> : sessionId ? (
-        <FlatList removeClippedSubviews={false} data={rows} keyExtractor={(row) => row.hand.id} renderItem={({ item }) => (
-          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark">
-            <Column spacing={spacing.xs} style={styles.card}>
-              <Text textStyle={styles.title}>{`Hand #${item.hand.handNo}`}</Text>
-              <Text textStyle={styles.dim}>{new Date(item.hand.endedAtMs).toLocaleString()}</Text>
-              <Text textStyle={styles.dim}>{status(item)}</Text>
-              <Text textStyle={styles.body}>{handLabel(item.hand)}</Text>
-              <Button label="View hand" onPress={() => setHandId(localHistoryId(item.hand))} testID={`history-hand-${item.hand.handNo}`} />
-            </Column>
-          </Host>
-        )} />
-      ) : (
-        <FlatList removeClippedSubviews={false} data={sessions} keyExtractor={([id]) => id} renderItem={({ item: [id, hands] }) => (
-          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark">
-            <Column spacing={spacing.xs} style={styles.card}>
-              <Text textStyle={styles.title}>{hands[0].hand.tableName ?? `${hands[0].hand.mode === "offline" ? "Offline" : "Online"} session`}</Text>
-              <Text textStyle={styles.dim}>{`${new Date(hands[0].hand.endedAtMs).toLocaleString()} · ${hands.length} hand${hands.length === 1 ? "" : "s"}`}</Text>
-              <Text textStyle={styles.dim}>{hands.some((hand) => hand.status === "pending") ? "Pending sync" : status(hands[0])}</Text>
-              <Button label="View session" onPress={() => setSessionId(id)} testID={`history-session-${id}`} />
-            </Column>
-          </Host>
-        )} ListEmptyComponent={
-          <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.card} spacing={spacing.sm}>
-            <Text textStyle={styles.title}>{history.loading ? "Opening saved hands…" : "Your next hand starts here"}</Text>
-            <Text textStyle={styles.dim}>Finish an online or offline hand, then return here to see the result. Saved hands stay available without a connection.</Text>
-            <Button label="Play offline" onPress={() => router.push("/offline")} testID="history-play" />
-          </Column></Host>
-        } />
-      )}
-    </View>
-  );
+      {history.error ? <NativeText style={styles.dim}>{history.error}</NativeText> : null}
+      {sessions.map(([id, hands], index) => <DealIn key={id} index={index} active={level === 0 && dealActive}>
+        <LedgerCard accessibilityLabel={"View session " + (hands[0].hand.tableName ?? id)} onPress={() => openSession(id)}>
+          <NativeText style={styles.cardTitle}>{hands[0].hand.tableName ?? (hands[0].hand.mode === "offline" ? "Offline session" : "Online session")}</NativeText>
+          <NativeText>{new Date(hands[0].hand.endedAtMs).toLocaleString() + " · " + hands.length + (hands.length === 1 ? " hand" : " hands")}</NativeText>
+          <NativeText>{status(hands[0])}</NativeText>
+        </LedgerCard>
+      </DealIn>)}
+      {!sessions.length ? <NativeText style={styles.body}>{history.loading ? "Opening saved hands…" : "Your next hand starts here. Finish a hand to see it in your ledger."}</NativeText> : null}
+    </LedgerPage>,
+    <LedgerPage key={"hands-" + (sessionId ?? "")} accessibilityLabel="Hand Ledger hands">
+      <GoldBackButton onPress={back} accessibilityLabel="Back to sessions" />
+      <NativeText style={styles.title}>SESSION HANDS</NativeText>
+      {rows.map((row, index) => <DealIn key={localHistoryId(row.hand)} index={index} active={level === 1 && dealActive}>
+        <LedgerCard accessibilityLabel={"View hand " + row.hand.handNo} onPress={() => openHand(row.hand.id)}>
+          <NativeText style={styles.cardTitle}>{"Hand #" + row.hand.handNo}</NativeText>
+          <NativeText>{handLabel(row.hand)}</NativeText>
+          <NativeText>{status(row)}</NativeText>
+        </LedgerCard>
+      </DealIn>)}
+      {!rows.length ? <NativeText style={styles.body}>{history.loading ? "Opening saved hands…" : "This session is not saved on this device."}</NativeText> : null}
+    </LedgerPage>,
+    <LedgerPage key={"detail-" + (sessionId ?? "") + "-" + (handId ?? "")} accessibilityLabel="Hand Ledger detail">
+      <GoldBackButton onPress={back} accessibilityLabel="Back to hands" />
+      <NativeText style={styles.title}>{selected ? "HAND #" + selected.hand.handNo : "HAND DETAIL"}</NativeText>
+      <DealIn index={0} active={level === 2 && dealActive}>
+        {selected ? <HandDetail row={selected} /> : <NativeText style={styles.body}>{history.loading ? "Opening saved hand…" : "This hand is not saved on this device."}</NativeText>}
+      </DealIn>
+    </LedgerPage>,
+  ]}</PageStack>;
 }
 
 function handLabel(hand: HistoryHand): string {
@@ -94,7 +91,7 @@ function handLabel(hand: HistoryHand): string {
 
 function HandDetail({ row }: { row: LocalHistoryHand }) {
   const hand = row.hand;
-  return <FlatList removeClippedSubviews={false} data={hand.actions} keyExtractor={(entry) => String(entry.sequence)} ListHeaderComponent={
+  return <View>
     <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column spacing={spacing.sm} style={styles.card}>
       <Text textStyle={styles.title}>{handLabel(hand)}</Text>
       <Text textStyle={styles.dim}>{status(row)}</Text>
@@ -118,10 +115,11 @@ function HandDetail({ row }: { row: LocalHistoryHand }) {
       <Text textStyle={styles.dim}>Only your tiles and the tiles revealed at showdown are shown. Private drafts belong to their player.</Text>
       <Text textStyle={styles.title}>ACTION LOG</Text>
     </Column></Host>
-  } renderItem={({ item }) => <Host matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.action}>
+  {hand.actions.map((item) => <Host key={item.sequence} matchContents={{ vertical: true }} style={styles.host} colorScheme="dark"><Column style={styles.action}>
     <Text textStyle={styles.body}>{actionLabel(hand, item)}</Text>
     <Text textStyle={styles.dim}>{`${new Date(item.atMs).toLocaleTimeString()} · ${item.source}`}</Text>
-  </Column></Host>} />;
+  </Column></Host>)}
+  </View>;
 }
 
 function actionLabel(hand: HistoryHand, entry: HistoryHand["actions"][number]): string {
@@ -132,6 +130,7 @@ function actionLabel(hand: HistoryHand, entry: HistoryHand["actions"][number]): 
 }
 
 const styles = StyleSheet.create({
+  cardTitle: { color: colors.onGold, fontFamily: fonts.serifBold, fontSize: 18 },
   host: { width: "100%" },
   screen: { flex: 1, backgroundColor: colors.bg },
   header: { padding: spacing.md },
