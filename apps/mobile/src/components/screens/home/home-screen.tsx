@@ -393,7 +393,8 @@ function Banner({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, overflow: "hidden", backgroundColor: colors.bg },
+  // Visible so the street art (sized to the window) runs on behind the nav rack.
+  root: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
   content: { paddingBottom: spacing.lg },
   menuTop: { gap: spacing.md, paddingBottom: spacing.md },
