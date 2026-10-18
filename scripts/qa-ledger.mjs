@@ -2,6 +2,7 @@
 // Uses the shared E2E account; fixtures stay in each disposable browser's IndexedDB.
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { chromium, webkit } from "playwright";
 
 const baseURL = process.env.LEDGER_URL ?? "http://localhost:8081";
@@ -75,7 +76,7 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         assert(await page.getByText("HAND #200", { exact: true }).isVisible());
         assert(!(await page.getByTestId("ledger-home").getByRole("button", { name: "Offline", exact: true }).isVisible()) ||
           await page.getByTestId("ledger-home").getAttribute("aria-hidden") === "true");
-        await page.screenshot({ path: new URL(`${engine}-${width}-${reducedMotion}-detail.png`, output).pathname.replace(/^\/(\w:)/, "$1") });
+        await page.screenshot({ path: fileURLToPath(new URL(`${engine}-${width}-${reducedMotion}-detail.png`, output)) });
         await page.goBack();
         await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Back to sessions");
         await page.getByTestId("history-back-sessions").click();
