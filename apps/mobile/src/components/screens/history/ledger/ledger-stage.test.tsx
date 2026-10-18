@@ -34,6 +34,9 @@ test("reduced motion swaps instantly, preserves Home state and resets pages afte
   expect(view.getByTestId("ledger-pages").props.pointerEvents).toBe("auto");
   expect(withTiming).not.toHaveBeenCalled();
   expect(withDelay).not.toHaveBeenCalled();
+  for (const face of ["ledger-cover-front", "ledger-cover-back"]) {
+    expect(view.getByTestId(face, { includeHiddenElements: true }).props.importantForAccessibility).toBe("no-hide-descendants");
+  }
   await view.rerender(<Stage open={false} />);
   expect(view.getByTestId("ledger-book", { includeHiddenElements: true }).props.pointerEvents).toBe("none");
   expect(view.getByText("Home: 1")).toBeOnTheScreen();

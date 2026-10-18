@@ -10,8 +10,9 @@ const SIZES = {
   sm: "small",
 } as const;
 
-export function MiniTile({ letter, size = "md", tone = "cream", opacity = 1, multiplier }: {
+export function MiniTile({ letter, size = "md", tone = "cream", opacity = 1, multiplier, points = LETTER_VALUES[letter] }: {
   letter: Letter;
+  points?: number;
   size?: keyof typeof SIZES;
   tone?: "cream" | "dim" | "gold";
   opacity?: number;
@@ -20,7 +21,7 @@ export function MiniTile({ letter, size = "md", tone = "cream", opacity = 1, mul
   return (
     <View style={{ opacity, paddingTop: 14 }}>
       <Tile
-        tile={{ id: `ledger-${letter}`, letter, points: LETTER_VALUES[letter], multiplier }}
+        tile={{ id: `ledger-${letter}`, letter, points, multiplier }}
         multiplierBadgePlacement="outside"
         side="front"
         size={SIZES[size]}

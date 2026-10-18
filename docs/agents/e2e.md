@@ -26,10 +26,10 @@ the API verifies and accepts them. The public reader hides replay seeds, opponen
 and unrevealed racks. The local store uses SQLite on native and IndexedDB on web; SDK 57's SQLite
 worker failed to bundle on this Windows setup, so the browser uses its native transactional store.
 
-`.maestro/history.yaml` extends the web offline hand through history. The native equivalent is
-`apps/mobile/.maestro/native/history.yaml` and requires a real signed-in development build;
+`.maestro/history.yaml` extends the web offline hand through the ledger. The native equivalent is
+`apps/mobile/.maestro/native/history-offline.yaml` (`history.yaml` remains an alias) and requires a real signed-in development build;
 the auth-bypass E2E build has no account to own history. Run it on Android with
-`node scripts/smoke-online-native.mjs android .maestro/native/history.yaml`: it signs in, plays
+`node scripts/smoke-online-native.mjs android .maestro/native/history-offline.yaml`: it signs in, plays
 the offline hand in airplane mode, sees it pending, kills the app, turns airplane mode off, cold
 starts and waits for the hand to verify. Airplane mode does not cut `adb reverse`, so the runner
 removes the game and API mappings while it is on. Native cached sessions remain readable on network failure; uploads always revalidate the
@@ -44,9 +44,15 @@ errors from covering CALL without leaving the history upload URL reachable. Ever
 checks the mappings and repairs missing ones when airplane mode is off; it does not rebind healthy
 connections. The native hand follows the seeded streets explicitly, so a fold-out
 fails at the next street instead of waiting forever for RIVER.
-History's React Native lists keep Expo UI hosts attached until their native height is measured,
-and the hosts fill the row width while matching only content height. Clipping these initially
-zero-height hosts left a blank native list even when SQLite had the completed hand.
+The ledger uses measured, virtualized LegendList rows; large fonts can increase row heights.
+`history-ledger.yaml` composes the offline/reconnect setup and then tests Home → History →
+session → hand → back → back → Home using stable IDs. Run it with the same native smoke runner
+on Android, or on macOS with `ios`. These flows require real auth and history APIs and cannot
+run in the existing offline-only, auth-bypass EAS job. Do not count a unit test or web fixture
+run as device performance evidence. For STO-638, record native Perf Monitor screenshots while
+opening/closing, turning both pages and scrolling 500 sessions / 200 hands, plus VoiceOver /
+TalkBack and the largest OS text setting. Check Chrome and WebKit at desktop and 375px with
+normal/reduced motion, browser Back and keyboard focus; the Home scene must stay mounted.
 The table's clock and Rive art keep animating; native taps request a 500 ms settle budget and use
 explicit state assertions. This is not a hard command deadline: Maestro can still block inside
 an accessibility hierarchy read longer than that budget.

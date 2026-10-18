@@ -1,15 +1,17 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { colors, fontSize, fonts, gradients, radius, tileMaterial } from "@/constants/theme";
+import { usePageFocus } from "./use-page-focus";
 
 export function GoldBackButton({ onPress, accessibilityLabel }: {
   onPress: () => void;
   accessibilityLabel: "Back to sessions" | "Back to hands";
 }) {
+  const ref = usePageFocus();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={styles.target}>
+    <Pressable ref={ref} testID={accessibilityLabel === "Back to sessions" ? "history-back-sessions" : "history-back-hands"} accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={styles.target}>
       {({ pressed }) => <LinearGradient colors={gradients.goldButton.colors} style={[styles.face, { transform: [{ translateY: pressed ? 2 : 0 }] }]}>
-        <Text style={styles.text}>‹</Text>
+        <Text allowFontScaling={false} style={styles.text}>‹</Text>
       </LinearGradient>}
     </Pressable>
   );

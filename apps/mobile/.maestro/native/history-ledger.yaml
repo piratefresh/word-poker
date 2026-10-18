@@ -1,0 +1,31 @@
+# Signed-in build and a saved hand (history-offline.yaml supplies both).
+appId: com.wordpoker.wordpoker
+name: Hand ledger opens, turns both pages and returns Home
+tags:
+  - native
+  - history
+---
+- runFlow: history-offline.yaml
+- tapOn:
+    id: "tab-history"
+- extendedWaitUntil:
+    visible: "Hand ledger"
+    timeout: 30000
+- tapOn:
+    id: "history-session-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "history-hand-.*"
+    timeout: 30000
+- tapOn:
+    id: "history-hand-.*"
+    index: 0
+- assertVisible: "HAND #.*"
+- tapOn:
+    id: "history-back-hands"
+- tapOn:
+    id: "history-back-sessions"
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline"

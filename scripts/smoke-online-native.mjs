@@ -44,7 +44,8 @@ const gamePort = Number(process.env.SMOKE_GAME_PORT ?? 2567);
 const metroPort = Number(process.env.SMOKE_METRO_PORT ?? 8081);
 // History must lose its API connection without breaking development-only asset loading.
 // A second device port forwards to the same Metro API; no extra host server is needed.
-const androidHistory = platform === "android" && normalize(flow) === normalize(".maestro/native/history.yaml");
+const androidHistory = platform === "android" && ["history.yaml", "history-offline.yaml", "history-ledger.yaml"]
+  .some((name) => normalize(flow) === normalize(`.maestro/native/${name}`));
 const deviceApiPort = androidHistory
   ? Number(process.env.SMOKE_DEVICE_API_PORT ?? metroPort + 1) : metroPort;
 if ([gamePort, metroPort].some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || gamePort === metroPort) {

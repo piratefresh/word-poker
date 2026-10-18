@@ -14,6 +14,7 @@ type LedgerCardProps = {
   size?: "card" | "row";
   tone?: keyof typeof cardGradients;
   accessibilityLabel?: PressableProps["accessibilityLabel"];
+  testID?: string;
   onPress?: PressableProps["onPress"];
   onLongPress?: PressableProps["onLongPress"];
 };
@@ -23,13 +24,14 @@ export function LedgerCard({
   size = "card",
   tone = "default",
   accessibilityLabel,
+  testID,
   onPress,
   onLongPress,
 }: LedgerCardProps) {
   const row = size === "row";
   const cardRadius = row ? radius.md : radius.card;
   const surface = (pressed: boolean) => (
-    <LinearGradient colors={cardGradients[tone]} style={[styles.face, row && styles.row, {
+    <LinearGradient aria-hidden={!!accessibilityLabel} accessibilityElementsHidden={!!accessibilityLabel} importantForAccessibility={accessibilityLabel ? "no-hide-descendants" : "auto"} colors={cardGradients[tone]} style={[styles.face, row && styles.row, {
       borderRadius: cardRadius,
       transform: [{ translateY: pressed ? 2 : 0 }],
       boxShadow: [
@@ -40,6 +42,7 @@ export function LedgerCard({
   );
   return onPress || onLongPress ? (
     <Pressable
+      testID={testID}
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityLabel={accessibilityLabel}
@@ -48,7 +51,7 @@ export function LedgerCard({
     >
       {({ pressed }) => surface(pressed)}
     </Pressable>
-  ) : <View accessibilityLabel={accessibilityLabel}>{surface(false)}</View>;
+  ) : <View accessible={!!accessibilityLabel} accessibilityLabel={accessibilityLabel}>{surface(false)}</View>;
 }
 
 const styles = StyleSheet.create({

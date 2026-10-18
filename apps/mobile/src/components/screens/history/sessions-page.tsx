@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -25,8 +25,9 @@ import { DealIn } from "./ledger/deal-in";
 import { LedgerCard } from "./ledger/ledger-card";
 import { LedgerList } from "./ledger/ledger-page";
 import { MiniTile } from "./ledger/mini-tile";
-import { StatusPill } from "./ledger/status-pill";
+import { StatusPill, statusLabel } from "./ledger/status-pill";
 import { UnrankedLabel } from "./ledger/unranked-label";
+import { usePageFocus } from "./ledger/use-page-focus";
 
 /** Collapsed session card plus its bottom gap; LegendList measures the real heights. */
 const ROW_HEIGHT = 90;
@@ -68,6 +69,7 @@ export function SessionsPage({
   active: boolean;
   openSession: (id: string) => void;
 }) {
+  const focusRef = usePageFocus();
   const sessions = useHistorySessions();
   const history = useHistory();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -99,7 +101,8 @@ export function SessionsPage({
       ListHeaderComponent={
         <View style={styles.header}>
           <View style={styles.heading}>
-            <View accessible accessibilityLabel="History" style={styles.tiles}>
+            <View ref={focusRef} accessible accessibilityRole="header" accessibilityLabel="Hand ledger" tabIndex={-1} style={styles.tiles}>
+              <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.tiles}>
               {(["H", "I", "S", "T", "O", "R", "Y"] as const).map((letter, i) => (
                 <TitleTile
                   key={i}
@@ -108,6 +111,7 @@ export function SessionsPage({
                   active={active && !entrance.returning}
                 />
               ))}
+              </View>
             </View>
             <SyncPill />
           </View>
@@ -199,16 +203,19 @@ export function SessionCard({
 }) {
   const offline = session.latest.hand.mode === "offline";
   const name = sessionName(session);
+  const largeText = useWindowDimensions().fontScale > 1.3;
+  const label = `View session ${name}, ${dayLabel(session.startedAtMs)}, ${clock(session.startedAtMs)}, ${session.hands} ${session.hands === 1 ? "hand" : "hands"}, ${statusLabel(sessionStatus(session, uploadingSessionId))}${offline ? ", unranked" : ""}${session.rejected.length ? `, ${session.rejected.length} rejected` : ""}`;
   return (
     <LedgerCard>
       <Pressable
+        testID={`history-session-${session.sessionId}`}
         accessibilityRole="button"
-        accessibilityLabel={`View session ${name}`}
+        accessibilityLabel={label}
         onPress={open}
-        style={styles.cardRow}
       >
+        <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.cardRow, largeText && styles.largeRow]}>
         <View style={styles.mode}>
-          <Text style={styles.modeLetter}>{offline ? "B" : "O"}</Text>
+          <Text allowFontScaling={false} style={styles.modeLetter}>{offline ? "B" : "O"}</Text>
         </View>
         <View style={styles.description}>
           <Text style={styles.name}>{name}</Text>
@@ -216,9 +223,10 @@ export function SessionCard({
             style={styles.meta}
           >{`${dayLabel(session.startedAtMs)} · ${clock(session.startedAtMs)} · ${session.hands} ${session.hands === 1 ? "hand" : "hands"}`}</Text>
         </View>
-        <View style={styles.status}>
+        <View style={[styles.status, largeText && styles.largeStatus]}>
           <StatusPill variant={sessionStatus(session, uploadingSessionId)} />
           {offline ? <UnrankedLabel /> : null}
+        </View>
         </View>
       </Pressable>
       {session.rejected.length ? (
@@ -303,6 +311,14 @@ export function SyncPill() {
     return () => clearInterval(timer);
   }, []);
   const failed = error !== null;
+  const announcement = offline ? "Offline" : syncing ? "Syncing" : failed ? "Sync failed" : lastSyncedAt === null ? "Not synced yet" : "Synced";
+  const previousAnnouncement = useRef(announcement);
+  useEffect(() => {
+    if (previousAnnouncement.current !== announcement) {
+      AccessibilityInfo.announceForAccessibility(announcement);
+      previousAnnouncement.current = announcement;
+    }
+  }, [announcement]);
   const reduced = useReduceMotion();
   const rotation = useSharedValue(0);
   useEffect(() => {
@@ -340,7 +356,7 @@ export function SyncPill() {
             },
           ]}
         />
-        <Text style={styles.syncText}>{offline ? "OFFLINE" : syncing ? "SYNCING…" : failed ? "RETRY" : lastSyncedAt === null ? "NOT SYNCED" : "SYNCED"}</Text>
+        <Text aria-live="polite" style={styles.syncText}>{offline ? "OFFLINE" : syncing ? "SYNCING…" : failed ? "RETRY" : lastSyncedAt === null ? "NOT SYNCED" : "SYNCED"}</Text>
         <Animated.Text style={[styles.syncArrow, motion]}>↻</Animated.Text>
       </View>
     </Pressable>
@@ -394,6 +410,8 @@ const styles = StyleSheet.create({
     gap: 10,
     minHeight: 44,
   },
+  largeRow: { flexWrap: "wrap" },
+  largeStatus: { width: "100%", alignItems: "flex-start" },
   mode: {
     width: 34,
     height: 38,

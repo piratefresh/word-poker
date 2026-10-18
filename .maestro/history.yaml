@@ -14,14 +14,14 @@ tags:
     text: "View session .*"
     index: 0
 - extendedWaitUntil:
-    visible: "View hand .*"
+    visible: "Hand [0-9]+,.*"
     timeout: 30000
 - tapOn:
-    text: "View hand .*"
+    text: "Hand [0-9]+,.*"
     index: 0
 - assertVisible: "HAND #1"
 - assertVisible:
-    text: "Verified · Unranked offline|Pending sync · Unranked offline"
+    text: "VERIFIED · UNRANKED|ON DEVICE · UNRANKED"
 - scrollUntilVisible:
     element:
       text: "ACTION LOG"

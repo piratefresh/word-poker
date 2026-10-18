@@ -1,0 +1,123 @@
+# A signed-in development build with real auth. The E2E auth-bypass build has no history owner.
+appId: com.wordpoker.wordpoker
+name: Completed hand is readable from saved native history
+tags:
+  - native
+  - history
+---
+- runFlow:
+    when:
+      true: ${typeof ATTACH === 'undefined'}
+    commands:
+      - launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH !== 'undefined'}
+    commands:
+      # The runner opened the dev client on its Metro; relaunching would drop that URL.
+      # The dev menu's first-run sheet sits over the app until dismissed.
+      - tapOn:
+          text: "Continue"
+          optional: true
+      - runFlow:
+          when:
+            visible: "Open React Native dev menu"
+          commands:
+            - back
+# A fresh Metro compiles the auth route on first use, so the session check can take minutes.
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT|Offline"
+    timeout: 300000
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: _sign-in.yaml
+
+# Development Metro serves routes and the dictionary as lazy chunks, so open the table once while
+# online; once loaded they stay in memory for the offline hand.
+# Pop the warm-up table before opening history. A deep link pushes another screen and leaves
+# the old table's timer running; its eventual payout modal can cover the actual test hand.
+- openLink: wordpoker://offline?seed=7578&turn=300000
+- extendedWaitUntil:
+    visible: "PREFLOP"
+    timeout: 90000
+- back
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 30000
+- openLink: wordpoker://history
+- extendedWaitUntil:
+    visible: "Hand ledger"
+    timeout: 30000
+- back
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 30000
+
+# Offline: the runner removes the game and API reverse mappings while airplane mode is on.
+# Metro's separate asset connection stays up; auth and history cannot upload through it.
+- setAirplaneMode: enabled
+- runFlow:
+    file: offline-hand.yaml
+- back
+- openLink: wordpoker://history
+- extendedWaitUntil:
+    visible: ".*ON DEVICE.*"
+    timeout: 30000
+- assertVisible: "You're offline.*"
+
+# The hand must survive a kill before connectivity returns, then upload on the cold start.
+- killApp
+- setAirplaneMode: disabled
+# Give the runner's loop (every 3 s) time to restore the reverse mapping.
+- extendedWaitUntil:
+    visible: "never shown, only a pause"
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      true: ${typeof ATTACH === 'undefined'}
+    commands:
+      - launchApp
+- runFlow:
+    when:
+      true: ${typeof ATTACH !== 'undefined'}
+    commands:
+      - openLink: ${DEV_LINK}
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 300000
+- openLink: wordpoker://history
+- extendedWaitUntil:
+    visible: ".*VERIFIED.*"
+    timeout: 10000
+- assertNotVisible: ".*ON DEVICE.*"
+- tapOn:
+    id: "history-session-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "history-hand-.*"
+    timeout: 30000
+- tapOn:
+    id: "history-hand-.*"
+    index: 0
+- assertVisible: "HAND #1"
+- assertVisible:
+    text: "VERIFIED · UNRANKED"
+- assertVisible: "You,.*ZIG, 14 points.*"
+- scrollUntilVisible:
+    element:
+      text: "ACTION LOG"
+    direction: DOWN
+    timeout: 10000
+- assertVisible: "ACTION LOG"
+# The seeded river: the hero opens with a $20 bet.
+- scrollUntilVisible:
+    element:
+      text: ".*You bet 20.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline"

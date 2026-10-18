@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { PageInteraction } from "./page-interaction";
+import { CurrentLedgerPage } from "./use-page-focus";
 
 export const PAGE_TURN_MS = 750;
 export const PAGE_REVEAL_MS = 450;
@@ -96,7 +97,7 @@ function TurningPage({
       ]}
     >
       <PageInteraction active={current}>
-        <Animated.View style={[styles.face, front]}>{children}</Animated.View>
+        <Animated.View style={[styles.face, front]}><CurrentLedgerPage value={current}>{children}</CurrentLedgerPage></Animated.View>
         {index < 2 ? (
           <Animated.View
             pointerEvents="none"
