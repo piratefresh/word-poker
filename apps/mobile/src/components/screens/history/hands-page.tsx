@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import type { HistoryHand } from "@wordpoker/contracts";
 import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
@@ -27,7 +27,7 @@ import { LedgerList } from "./ledger/ledger-page";
 import { MiniTile } from "./ledger/mini-tile";
 import { statusLabel } from "./ledger/status-pill";
 
-/** Fixed 54 row plus its 8 gap. */
+/** Only the first screenful deals; later virtualized rows render at rest. */
 const DEALT_ROWS = 10;
 
 export interface HandResult {
@@ -154,15 +154,17 @@ export function HandRow({
   open: () => void;
 }) {
   const hand = row.hand;
+  const largeText = useWindowDimensions().fontScale > 1.3;
   const { word, folded, score, net } = handResult(hand);
   return (
     <LedgerCard
+      testID={`history-hand-${hand.handNo}`}
       size="row"
       accessibilityLabel={handRowLabel(hand)}
       onPress={open}
     >
-      <View style={styles.row}>
-        <View style={styles.when}>
+      <View style={[styles.row, largeText && styles.largeRow]}>
+        <View style={[styles.when, largeText && styles.largeWhen]}>
           <Text style={styles.number}>{`#${hand.handNo}`}</Text>
           <Text style={styles.small}>{clock(hand.startedAtMs)}</Text>
         </View>
@@ -212,6 +214,8 @@ const styles = StyleSheet.create({
   gap: { paddingBottom: 8 },
   row: { minHeight: 54, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 10 },
   when: { width: 46, gap: 2 },
+  largeRow: { flexWrap: "wrap" },
+  largeWhen: { width: "100%" },
   number: { fontFamily: fonts.arcade, fontSize: 15, color: ledger.ink },
   small: { fontFamily: fonts.rubikMedium, fontSize: 10, color: ledger.inkSoft },
   word: {

@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { AccessibilityInfo } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 
 /**
  * The OS reduce-motion preference.
  *
- * Read from React Native rather than Reanimated: this value decides the shared
- * clock's tick cadence, and the clock has no business depending on an animation
- * library to know how fast to tick. Subscribing to the change event means a player
- * toggling the setting mid-hand is honoured without a remount.
+ * Reanimated supplies the synchronous initial preference, so cold links never
+ * animate a frame before the async native read. React Native's subscription also
+ * honours changes made while the app is mounted.
  */
 export function useReduceMotion(): boolean {
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const initial = useReducedMotion();
+  const [reduceMotion, setReduceMotion] = useState(initial);
 
   useEffect(() => {
     let mounted = true;

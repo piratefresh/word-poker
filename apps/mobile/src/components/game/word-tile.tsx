@@ -533,7 +533,7 @@ export function Tile({
         styles.multiplierBadge,
         tile.multiplier === "triple-letter" && styles.tripleBadge,
         multiplierBadgePlacement === "outside"
-          ? { left: -metrics.inset * 2, top: -metrics.inset * 2 }
+          ? { left: -metrics.inset * 2, top: -Math.max(14, metrics.inset * 2) }
           : { left: metrics.inset, top: metrics.inset },
       ]}
     >

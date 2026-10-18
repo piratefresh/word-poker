@@ -45,19 +45,19 @@ test("row labels read the hand as one sentence", () => {
 test("a won hand shows its tiles, points and plus chips", async () => {
   const open = jest.fn();
   const view = await render(<HandRow row={row(hand({ word: "AARDVARKS" }))} open={open} />);
-  expect(view.getAllByTestId("mini-tile")).toHaveLength(9);
-  expect(view.getByText("37 pts")).toBeOnTheScreen();
-  expect(view.getByText("+330")).toHaveStyle({ color: colors.chipUpOnTile });
+  expect(view.getAllByTestId("mini-tile", HIDDEN)).toHaveLength(9);
+  expect(view.getByText("37 pts", HIDDEN)).toBeOnTheScreen();
+  expect(view.getByText("+330", HIDDEN)).toHaveStyle({ color: colors.chipUpOnTile });
   await fireEvent.press(view.getByRole("button"));
   expect(open).toHaveBeenCalledTimes(1);
 });
 
 test("a folded hand shows FOLDED, no word and minus-sign chips", async () => {
   const view = await render(<HandRow row={row(hand({ word: null, score: 0, finalStack: 960, folded: true }))} open={jest.fn()} />);
-  expect(view.getByText("FOLDED")).toBeOnTheScreen();
-  expect(view.getByText("no word")).toBeOnTheScreen();
-  expect(view.getByText("−40")).toHaveStyle({ color: colors.chipDownOnTile });
-  expect(view.queryByTestId("mini-tile")).toBeNull();
+  expect(view.getByText("FOLDED", HIDDEN)).toBeOnTheScreen();
+  expect(view.getByText("no word", HIDDEN)).toBeOnTheScreen();
+  expect(view.getByText("−40", HIDDEN)).toHaveStyle({ color: colors.chipDownOnTile });
+  expect(view.queryByTestId("mini-tile", HIDDEN)).toBeNull();
 });
 
 test("word tiles keep the submitted tile's multiplier, including repeated and chosen letters", async () => {
@@ -70,7 +70,7 @@ test("word tiles keep the submitted tile's multiplier, including repeated and ch
     }],
   } };
   const view = await render(<HandRow row={row(value)} open={jest.fn()} />);
-  expect(view.getAllByTestId("mini-tile").map((tile) => tile.props.accessibilityLabel)).toEqual([
+  expect(view.getAllByTestId("mini-tile", HIDDEN).map((tile) => tile.props.accessibilityLabel)).toEqual([
     "E, double-letter", "E, plain", "L, triple-letter",
   ]);
 });
@@ -81,3 +81,6 @@ test("session meta names the status and marks offline sessions unranked", () => 
   };
   expect(sessionMeta(session, null)).toMatch(/· 12 hands · VERIFIED · UNRANKED$/);
 });
+
+// Card contents are hidden from the a11y tree; the card carries one full label.
+const HIDDEN = { includeHiddenElements: true };

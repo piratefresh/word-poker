@@ -16,7 +16,7 @@ import { webTestID } from "@/lib/ui/web-id";
 
 const CHIP = 60;
 // The rack height, and how far its chips rise over the scene above.
-const RACK = 128;
+const RACK = 100;
 const RACK_OVERLAP = 42;
 // A short phone (iPhone SE, 667pt) shrinks the rack so the menu above it still fits.
 const SHORT = 700;

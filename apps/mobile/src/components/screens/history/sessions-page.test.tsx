@@ -1,5 +1,6 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import { router } from "expo-router";
+import { AccessibilityInfo } from "react-native";
 
 import type { HistorySession } from "@/lib/history/history-store";
 
@@ -110,6 +111,37 @@ test("sync is tappable only when connected and idle", async () => {
   expect(view.getByTestId("history-sync")).toBeDisabled();
 });
 
+test("announces sync state changes once, without announcing timestamp updates", async () => {
+  const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+  const view = await render(<SyncPill />);
+  expect(announce).not.toHaveBeenCalled();
+  mockHistory = { ...mockHistory, syncing: true };
+  await view.rerender(<SyncPill />);
+  expect(announce).toHaveBeenLastCalledWith("Syncing");
+  mockHistory = { ...mockHistory, syncing: false, lastSyncedAt: Date.now() };
+  await view.rerender(<SyncPill />);
+  expect(announce).toHaveBeenLastCalledWith("Synced");
+  mockHistory = { ...mockHistory, lastSyncedAt: Date.now() + 1000 };
+  await view.rerender(<SyncPill />);
+  expect(announce).toHaveBeenCalledTimes(2);
+  announce.mockRestore();
+});
+
+test.each([
+  ["online", false, null, false, "SYNCED"],
+  ["offline", true, null, false, "ON DEVICE"],
+  ["offline", true, "s", false, "UPLOADING…"],
+  ["offline", false, null, false, "VERIFIED"],
+  ["offline", false, null, true, "REJECTED"],
+] as const)("session card reads %s status %s %s %s as one label", async (mode, pending, uploading, rejected, status) => {
+  const value = { ...session(mode), pending, rejected: rejected ? [{ handNo: 1, reason: "Replay mismatch" }] : [] };
+  const view = await render(<SessionCard session={value} uploadingSessionId={uploading} expanded={false} open={jest.fn()} toggle={jest.fn()} />);
+  const card = view.getByRole("button", { name: /View session/ });
+  expect(card.props.accessibilityLabel).toContain("3 hands");
+  expect(card.props.accessibilityLabel).toContain(status);
+  if (mode === "offline") expect(card.props.accessibilityLabel).toContain("unranked");
+});
+
 test("rejected details toggle without opening the session and show the stored reason while offline sessions stay unranked", async () => {
   const open = jest.fn();
   const toggle = jest.fn();
@@ -126,7 +158,7 @@ test("rejected details toggle without opening the session and show the stored re
       toggle={toggle}
     />,
   );
-  expect(view.getByText("UNRANKED")).toBeOnTheScreen();
+  expect(view.getByText("UNRANKED", HIDDEN)).toBeOnTheScreen();
   await fireEvent.press(view.getByRole("button", { name: "1 hand rejected · Details" }));
   expect(toggle).toHaveBeenCalledTimes(1);
   expect(open).not.toHaveBeenCalled();
@@ -150,7 +182,7 @@ test("rejected details toggle without opening the session and show the stored re
       toggle={toggle}
     />,
   );
-  expect(view.queryByText("UNRANKED")).toBeNull();
+  expect(view.queryByText("UNRANKED", HIDDEN)).toBeNull();
 });
 
 test("shows three placeholders until hydrated, then a working offline entry; reconnect removes the banner", async () => {
@@ -171,3 +203,6 @@ test("shows three placeholders until hydrated, then a working offline entry; rec
   await view.rerender(<SessionsPage active={false} openSession={jest.fn()} />);
   expect(view.queryByText(offlineBanner(3))).toBeNull();
 });
+
+// Card contents are hidden from the a11y tree; the card carries one full label.
+const HIDDEN = { includeHiddenElements: true };
