@@ -42,10 +42,11 @@ export async function POST(request: Request): Promise<Response> {
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   const record = parseHandRecord(new TextDecoder().decode(bytes));
-  if (!record || record.mode !== "offline" || record.ranked ||
-    record.seats.filter((seat) => seat.userId !== null).length !== 1 ||
+  if (!record) return json({ error: "Invalid offline hand: the record failed validation." }, 400);
+  if (record.mode !== "offline" || record.ranked) return json({ error: "Invalid offline hand: not an unranked offline hand." }, 400);
+  if (record.seats.filter((seat) => seat.userId !== null).length !== 1 ||
     record.seats.find((seat) => seat.userId !== null)?.userId !== userId) {
-    return json({ error: "Invalid offline hand or account." }, 400);
+    return json({ error: "Invalid offline hand: it was recorded under a different account." }, 400);
   }
   try {
     const verified = verifyHandRecord(record, await loadDictionary(record.dictionaryId));

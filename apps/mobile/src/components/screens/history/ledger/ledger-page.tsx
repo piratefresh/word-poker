@@ -2,7 +2,7 @@ import { LegendList, type LegendListProps } from "@legendapp/list/react-native";
 import { useId, useState, type ReactNode } from "react";
 import { ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
-import { gradients, radius } from "@/constants/theme";
+import { gradients, radius, spacing } from "@/constants/theme";
 import { ledgerListAccessibilityProps } from "./ledger-list-accessibility";
 
 /** Fixed felt; tinted text belongs below 35% of the viewport or inside a panel/card. */
@@ -65,5 +65,5 @@ export function LedgerList<T>({ style, contentContainerStyle, accessibilityLabel
 
 const styles = StyleSheet.create({
   page: { flex: 1, overflow: "hidden", backgroundColor: gradients.table.colors[2], borderTopLeftRadius: radius.xs, borderBottomLeftRadius: radius.xs, borderTopRightRadius: radius.md, borderBottomRightRadius: radius.md },
-  content: { paddingTop: 60, paddingHorizontal: 14, paddingBottom: 150 },
+  content: { paddingTop: 60, paddingHorizontal: 14 + spacing.sm, paddingBottom: 150 },
 });

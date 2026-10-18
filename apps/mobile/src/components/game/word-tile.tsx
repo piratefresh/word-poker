@@ -36,6 +36,7 @@ import {
   easing as motionEasing,
   fonts,
   gradients,
+  ledger,
   opacity,
   palette,
   tileMaterial,
@@ -73,6 +74,8 @@ export interface TileProps {
    */
   chosenFace?: string;
   dimmed?: boolean;
+  /** The face's paint: the ledger's rack tiles are gold. */
+  fill?: "ivory" | "gold";
   disabled?: boolean;
   interactive?: boolean;
   animation?: "none" | "flip" | "deal";
@@ -258,6 +261,7 @@ export function Tile({
   selected = false,
   chosenFace,
   dimmed = false,
+  fill = "ivory",
   disabled = false,
   interactive = false,
   animation = "flip",
@@ -664,7 +668,7 @@ export function Tile({
             frontMotion,
           ]}
         >
-          <LinearGradient {...gradients.tile} style={styles.faceFill}>
+          <LinearGradient {...gradients.tile} colors={fill === "gold" ? ledger.goldButton : gradients.tile.colors} style={styles.faceFill}>
             {second === null ? null : (
               // §10: a choice tile has to look special. The pair wears an accent strip no
               // single letter does, over the tile's own ownership border.

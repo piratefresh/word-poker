@@ -5,11 +5,21 @@ import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
 
 import { fonts, ledger } from "@/constants/theme";
 import { useHistory } from "@/lib/history/history-provider";
-import { localHistoryId, sessionName, sessionStatus, type HistorySession, type LocalHistoryHand } from "@/lib/history/history-store";
-import { useHistorySession, useSessionHands } from "@/lib/history/use-history-pages";
+import {
+  localHistoryId,
+  sessionName,
+  sessionStatus,
+  type HistorySession,
+  type LocalHistoryHand,
+} from "@/lib/history/history-store";
+import {
+  useHistorySession,
+  useSessionHands,
+} from "@/lib/history/use-history-pages";
 import { chipColor, signedChips } from "@/utils/chips";
 import { clock, dayLabel } from "@/utils/date";
 
+import { historyWordTiles } from "./hand-detail";
 import { DealIn } from "./ledger/deal-in";
 import { GoldBackButton } from "./ledger/gold-back-button";
 import { LedgerCard } from "./ledger/ledger-card";
@@ -18,7 +28,6 @@ import { MiniTile } from "./ledger/mini-tile";
 import { statusLabel } from "./ledger/status-pill";
 
 /** Fixed 54 row plus its 8 gap. */
-const ROW_HEIGHT = 62;
 const DEALT_ROWS = 10;
 
 export interface HandResult {
@@ -31,10 +40,13 @@ export interface HandResult {
 /** The hero's side of a hand: their word, score and net chips. */
 export function handResult(hand: HistoryHand): HandResult {
   const hero = hand.summary.seats.find((seat) => seat.playerId === hand.heroId);
-  const initial = hand.seats.find((seat) => seat.playerId === hand.heroId)?.initialStack ?? 0;
+  const initial =
+    hand.seats.find((seat) => seat.playerId === hand.heroId)?.initialStack ?? 0;
   return {
     word: hero?.word ?? null,
-    folded: hand.actions.some(({ action }) => action.type === "fold" && action.playerId === hand.heroId),
+    folded: hand.actions.some(
+      ({ action }) => action.type === "fold" && action.playerId === hand.heroId,
+    ),
     score: hero?.score ?? 0,
     net: (hero?.finalStack ?? initial) - initial,
   };
@@ -42,12 +54,16 @@ export function handResult(hand: HistoryHand): HandResult {
 
 export function handRowLabel(hand: HistoryHand): string {
   const { word, folded, score, net } = handResult(hand);
-  const chips = net === 0 ? "even" : `${net > 0 ? "won" : "lost"} ${Math.abs(net)} chips`;
+  const chips =
+    net === 0 ? "even" : `${net > 0 ? "won" : "lost"} ${Math.abs(net)} chips`;
   if (folded) return `Hand ${hand.handNo}, folded, ${chips}`;
   return `Hand ${hand.handNo}, ${clock(hand.startedAtMs)}, ${word ? `word ${word}, ${score} points` : "no word"}, ${chips}`;
 }
 
-export function sessionMeta(session: HistorySession, uploadingSessionId: string | null): string {
+export function sessionMeta(
+  session: HistorySession,
+  uploadingSessionId: string | null,
+): string {
   const parts = [
     dayLabel(session.startedAtMs),
     clock(session.startedAtMs),
@@ -58,9 +74,15 @@ export function sessionMeta(session: HistorySession, uploadingSessionId: string 
   return parts.join(" · ");
 }
 
-const isLetter = (value: string): value is Letter => value in LETTER_VALUES;
+export const isLetter = (value: string): value is Letter =>
+  value in LETTER_VALUES;
 
-export function HandsPage({ sessionId, active, back, openHand }: {
+export function HandsPage({
+  sessionId,
+  active,
+  back,
+  openHand,
+}: {
   sessionId: string | undefined;
   active: boolean;
   back: () => void;
@@ -75,29 +97,40 @@ export function HandsPage({ sessionId, active, back, openHand }: {
       data={hands.items}
       extraData={active}
       keyExtractor={(row) => localHistoryId(row.hand)}
-      estimatedItemSize={ROW_HEIGHT}
       onEndReached={hands.loadMore}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
         <View style={styles.header}>
-          <GoldBackButton onPress={back} accessibilityLabel="Back to sessions" />
+          <GoldBackButton
+            onPress={back}
+            accessibilityLabel="Back to sessions"
+          />
           {session.row ? (
             <View accessible style={styles.heading}>
-              <Text accessibilityRole="header" style={styles.name}>{sessionName(session.row)}</Text>
-              <Text style={styles.meta}>{sessionMeta(session.row, uploadingSessionId)}</Text>
+              <Text accessibilityRole="header" style={styles.name}>
+                {sessionName(session.row)}
+              </Text>
+              <Text style={styles.meta}>
+                {sessionMeta(session.row, uploadingSessionId)}
+              </Text>
             </View>
           ) : null}
         </View>
       }
       ListEmptyComponent={
         <Text style={styles.empty}>
-          {hands.loading ? "Opening saved hands…" : "This session is not saved on this device."}
+          {hands.loading
+            ? "Opening saved hands…"
+            : "This session is not saved on this device."}
         </Text>
       }
       renderItem={({ item, index }) => {
         const row = (
           <View style={styles.gap}>
-            <HandRow row={item} open={() => openHand(localHistoryId(item.hand))} />
+            <HandRow
+              row={item}
+              open={() => openHand(localHistoryId(item.hand))}
+            />
           </View>
         );
         // A virtualized row mounts as it scrolls in, so only the first screenful deals.
@@ -113,27 +146,43 @@ export function HandsPage({ sessionId, active, back, openHand }: {
   );
 }
 
-export function HandRow({ row, open }: { row: LocalHistoryHand; open: () => void }) {
+export function HandRow({
+  row,
+  open,
+}: {
+  row: LocalHistoryHand;
+  open: () => void;
+}) {
   const hand = row.hand;
   const { word, folded, score, net } = handResult(hand);
   return (
-    <LedgerCard size="row" accessibilityLabel={handRowLabel(hand)} onPress={open}>
+    <LedgerCard
+      size="row"
+      accessibilityLabel={handRowLabel(hand)}
+      onPress={open}
+    >
       <View style={styles.row}>
         <View style={styles.when}>
           <Text style={styles.number}>{`#${hand.handNo}`}</Text>
           <Text style={styles.small}>{clock(hand.startedAtMs)}</Text>
         </View>
-        {/* Long words clip at the edge rather than push the chips off the card. */}
-        <View style={styles.word}>
+        {/* Keep the standard game tiles readable; longer words wrap beside the result. */}
+        <View style={[styles.word, word && !folded && styles.felt]}>
           {word && !folded ? (
-            [...word].filter(isLetter).map((letter, i) => <MiniTile key={i} letter={letter} size="sm" />)
+            historyWordTiles(hand, hand.heroId).map((tile, i) => isLetter(tile.letter) ? (
+              <MiniTile key={i} letter={tile.letter} multiplier={tile.multiplier} size="sm" />
+            ) : null)
           ) : (
             <Text style={styles.folded}>{folded ? "FOLDED" : "NO WORD"}</Text>
           )}
         </View>
         <View style={styles.result}>
-          <Text style={[styles.net, { color: chipColor(net, "card") }]}>{signedChips(net)}</Text>
-          <Text style={styles.small}>{word && !folded ? `${score} pts` : "no word"}</Text>
+          <Text style={[styles.net, { color: chipColor(net, "card") }]}>
+            {signedChips(net)}
+          </Text>
+          <Text style={styles.small}>
+            {word && !folded ? `${score} pts` : "no word"}
+          </Text>
         </View>
       </View>
     </LedgerCard>
@@ -141,18 +190,51 @@ export function HandRow({ row, open }: { row: LocalHistoryHand; open: () => void
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 6 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingBottom: 6,
+  },
   heading: { flex: 1, gap: 3 },
-  name: { fontFamily: fonts.arcade, fontSize: 20, lineHeight: 21, color: ledger.onFelt },
-  meta: { fontFamily: fonts.rubikMedium, fontSize: 11.5, color: ledger.onFeltDim },
+  name: {
+    fontFamily: fonts.arcade,
+    fontSize: 20,
+    lineHeight: 21,
+    color: ledger.onFelt,
+  },
+  meta: {
+    fontFamily: fonts.rubikMedium,
+    fontSize: 11.5,
+    color: ledger.onFeltDim,
+  },
   empty: { fontFamily: fonts.rubikMedium, fontSize: 13, color: ledger.onFelt },
   gap: { paddingBottom: 8 },
-  row: { height: 54, flexDirection: "row", alignItems: "center", gap: 10 },
+  row: { minHeight: 54, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 10 },
   when: { width: 46, gap: 2 },
   number: { fontFamily: fonts.arcade, fontSize: 15, color: ledger.ink },
   small: { fontFamily: fonts.rubikMedium, fontSize: 10, color: ledger.inkSoft },
-  word: { flex: 1, flexDirection: "row", alignItems: "center", gap: 2, overflow: "hidden" },
-  folded: { fontFamily: fonts.arcade, fontSize: 13, letterSpacing: 0.78, color: ledger.inkMuted },
+  word: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 2,
+  },
+  felt: {
+    paddingHorizontal: 6,
+    paddingBottom: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ledger.modeTileEdge,
+    backgroundColor: ledger.modeTile,
+  },
+  folded: {
+    fontFamily: fonts.arcade,
+    fontSize: 13,
+    letterSpacing: 0.78,
+    color: ledger.inkMuted,
+  },
   result: { alignItems: "flex-end", gap: 2 },
   net: { fontFamily: fonts.arcade, fontSize: 16, color: ledger.ink },
 });
