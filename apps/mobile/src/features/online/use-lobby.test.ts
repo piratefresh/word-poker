@@ -112,6 +112,29 @@ test("opens on the lobby room and holds the screen until its first list arrives"
   expect(view.result.current.error).toBeUndefined();
 });
 
+test("night lobby data follows live fills and removals without another subscription", async () => {
+  const { lobby, view } = await opened();
+  expect(view.result.current.loading).toBe(true);
+  expect(view.result.current.headliner).toBeUndefined();
+
+  await push(lobby, ROOMS, [listing("alpha"), listing("beta")]);
+  expect(view.result.current.loading).toBe(false);
+  expect(view.result.current.headliner?.roomId).toBe("alpha");
+  expect(view.result.current.listRooms.map((room) => room.roomId)).toEqual(["beta"]);
+  expect(view.result.current.readout).toBe("2 live · 10 open seats");
+
+  await push(lobby, ADDED, ["alpha", listing("alpha", { clients: 6 })]);
+  expect(view.result.current.headliner?.roomId).toBe("beta");
+  expect(view.result.current.listRooms.map((room) => room.roomId)).toEqual(["alpha"]);
+  expect(view.result.current.readout).toBe("2 live · 5 open seats");
+
+  await push(lobby, REMOVED, "beta");
+  expect(view.result.current.headliner).toBeUndefined();
+  expect(view.result.current.listRooms.map((room) => room.roomId)).toEqual(["alpha"]);
+  expect(view.result.current.readout).toBe("1 live · 0 open seats");
+  expect(joinOrCreate).toHaveBeenCalledTimes(1);
+});
+
 test("refreshes after joining so a listing that raced the join is not lost", async () => {
   const lobby = subscription(true);
   // A LobbyRoom can send its initial listing while the join handshake is still settling. The

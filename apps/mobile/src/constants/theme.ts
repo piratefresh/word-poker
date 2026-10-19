@@ -183,6 +183,27 @@ export const ledger = {
   rejectedInk: "#6e1d16",
 } as const;
 
+/** STO-688 design 2a. Scoped so the night lobby doesn't recolour existing screens. */
+export const nightLobby = {
+  text: { cream: ledger.onFelt, muted: "#aab3d6", label: "#9aa6cf" },
+  gold: {
+    light: ledger.goldText,
+    ring: ledger.goldEdge,
+    button: ledger.goldButton,
+    buttonEdge: ledger.goldButtonEdge,
+    buttonText: ledger.ink,
+  },
+  panel: {
+    navy: ["#141f45", "#0a1028"],
+    headliner: ["#1b2650", "#0f1734"],
+    row: "rgba(14,22,48,0.88)",
+  },
+  border: { subtle: "rgba(243,230,196,0.12)" },
+  status: { open: "#8fd19e", live: "#ff5a4a", full: "#7d86a8" },
+  sky: ["#02030a", "#050a1c", "#0a1532", "#0d1a3c"],
+  coin: { gradient: ["#ffe28a", "#c98a2c"], text: ledger.parchment },
+} as const;
+
 /* ── gradients (expo-linear-gradient: {...gradients.felt}) ───────── */
 
 export const gradients = {

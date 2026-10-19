@@ -212,13 +212,12 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     prep: "word",
     holds: true,
     // Recorded off `/dev-word-demo` on the web build: the lesson's own tiles, tapped and dragged
-    // into BROWN. Re-record it there when the strip's look or the deal changes.
-    // TODO(STO-579): the deal is now seed 999's CLOTH; this GIF still shows seed 34's BROWN.
+    // into CLOTH. Re-record it there when the strip's look or the deal changes.
     media: {
       // Relative, not `@/assets`: Jest maps `@/` to `src/` alone.
       source: require("../../../assets/images/tutorial/spell-word.gif"),
       aspectRatio: 412 / 260,
-      label: "Tapping W, B, N, R and O, then dragging W and N into place to spell BROWN",
+      label: "Tapping C, L, O, T and H, then dragging C and H into place to spell CLOTH",
     },
   },
   {

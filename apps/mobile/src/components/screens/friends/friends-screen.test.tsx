@@ -1,5 +1,7 @@
 import { act, render, waitFor, type RenderResult } from "@testing-library/react-native";
 import { useEffect as mockUseEffect } from "react";
+import { Share } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { addFriend, getFriends, acceptFriend, removeFriend } from "@/lib/friends/friends-client";
 import { router } from "expo-router";
 import { FriendsScreen } from "./friends-screen";
@@ -14,6 +16,9 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("@/lib/friends/friends-client", () => ({ getFriends: jest.fn(), addFriend: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
 jest.mock("@/lib/navigation/invite-link", () => ({ friendLinkFor: (code: string) => `https://play.test/friend/${code}` }));
+jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn() }));
+
+afterEach(() => jest.restoreAllMocks());
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -30,6 +35,57 @@ async function press(view: RenderResult, id: string) {
     (node.props.onButtonPress ?? node.props.onPress ?? node.props.onClick)?.();
   });
 }
+
+test("unavailable browser sharing leaves a selectable friend link and copy action", async () => {
+  jest.spyOn(Share, "share").mockRejectedValue(new Error("Share is not supported in this browser"));
+  jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friends-share")).toBeTruthy());
+  await press(view, "friends-share");
+  const link = view.getByTestId("friends-link");
+  expect(link.props.selectable).toBe(true);
+  expect(link.props.children).toBe("https://play.test/friend/WXYZ2345");
+  await press(view, "friends-copy");
+  expect(Clipboard.setStringAsync).toHaveBeenCalledWith(link.props.children);
+  expect(JSON.stringify(view.getByTestId("friends-message").props)).toContain("Link copied.");
+});
+
+test("cancelling browser sharing is quiet", async () => {
+  jest.spyOn(Share, "share").mockRejectedValue(Object.assign(new Error("Cancelled"), { name: "AbortError" }));
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friends-share")).toBeTruthy());
+  await press(view, "friends-share");
+  expect(JSON.stringify(view.getByTestId("friends-message").props)).not.toContain("Couldn't share");
+  expect(view.queryByTestId("friends-link")).toBeNull();
+});
+
+test.each(["refused", "rejected"])("clipboard %s keeps the friend link available for manual selection", async (failure) => {
+  jest.spyOn(Share, "share").mockRejectedValue(new Error("Permission denied"));
+  if (failure === "refused") jest.mocked(Clipboard.setStringAsync).mockResolvedValue(false);
+  else jest.mocked(Clipboard.setStringAsync).mockRejectedValue(new Error("Permission denied"));
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friends-share")).toBeTruthy());
+  await press(view, "friends-share");
+  await press(view, "friends-copy");
+  expect(JSON.stringify(view.getByTestId("friends-message").props)).toContain("Couldn't copy. Select the link instead.");
+  expect(view.getByTestId("friends-link").props.selectable).toBe(true);
+});
+
+test("only one share opens at a time and successful sharing needs no fallback", async () => {
+  let finish: ((result: Awaited<ReturnType<typeof Share.share>>) => void) | undefined;
+  const share = jest.spyOn(Share, "share").mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friends-share")).toBeTruthy());
+  await press(view, "friends-share");
+  await press(view, "friends-share");
+  expect(share).toHaveBeenCalledTimes(1);
+  expect(share).toHaveBeenCalledWith({ message: "https://play.test/friend/WXYZ2345" });
+  await act(async () => { finish?.({ action: Share.sharedAction }); });
+  expect(view.queryByTestId("friends-link")).toBeNull();
+  await press(view, "friends-share");
+  expect(share).toHaveBeenCalledTimes(2);
+  await act(async () => { finish?.({ action: Share.sharedAction }); });
+});
 
 test("opening a profile link needs an explicit press to request", async () => {
   const view = await render(<FriendsScreen />);

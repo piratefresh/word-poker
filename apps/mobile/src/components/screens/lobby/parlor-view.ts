@@ -19,6 +19,9 @@ import { tableStatus, type RoomSummary, type TableStatus } from "@wordpoker/cont
 
 import { formatAmount, formatCoins } from "@/lib/ui/format";
 import { powersLabel } from "@/features/table/power-view";
+import { isJoinable, openSeats } from "@/features/online/lobby-view";
+
+export { isJoinable, openSeats } from "@/features/online/lobby-view";
 
 /** One chip on the rail: a label, its figure, and the line under it. */
 export interface ParlorStat {
@@ -45,20 +48,6 @@ export interface ParlorView {
   /** Every listed table but the featured one, in the server's own order. */
   readonly others: RoomSummary[];
   readonly stats: ParlorStat[];
-}
-
-/**
- * Seats still free at a table. Clamped at zero because a listing can, for the instant between a
- * seat being taken and the room publishing its new cap, report more clients than its cap allows —
- * and a `-1` beside "seats open" is a figure no player can act on.
- */
-export function openSeats(room: RoomSummary): number {
-  return Math.max(0, room.maxClients - room.clients);
-}
-
-/** Whether a seat at this table can be taken right now. */
-export function isJoinable(room: RoomSummary): boolean {
-  return !room.locked && room.clients < room.maxClients;
 }
 
 /**

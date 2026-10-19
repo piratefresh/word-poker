@@ -17,6 +17,7 @@ import { LOBBY_ROOM_NAME, roomSummaryFromListing, type RoomSummary } from "@word
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { gameClient } from "./game-client";
+import { lobbyView } from "./lobby-view";
 
 export type LobbyStatus =
   /** Nothing has arrived yet — not a lobby with no tables in it. */
@@ -29,6 +30,11 @@ export type LobbyStatus =
 export interface LobbyView {
   readonly status: LobbyStatus;
   readonly rooms: RoomSummary[];
+  /** Night lobby (STO-688); the existing Parlor remains free to use its own ranking. */
+  readonly headliner: RoomSummary | undefined;
+  readonly listRooms: RoomSummary[];
+  readonly readout: string;
+  readonly loading: boolean;
   /**
    * A refresh is in the air: the list has been asked for and the server has not answered yet. The
    * subscription is live, so this is the only thing that can tell a pull-to-refresh that its
@@ -147,5 +153,13 @@ export function useLobby(): LobbyView {
     setAttempt((current) => current + 1);
   }, []);
 
-  return { status, rooms, refreshing, error, refresh };
+  return {
+    status,
+    rooms,
+    ...lobbyView(rooms),
+    loading: status === "loading",
+    refreshing,
+    error,
+    refresh,
+  };
 }
