@@ -1,8 +1,9 @@
 import { Button as ExpoButton, Column, Host, RNHostView, Row, Text, type UniversalTextStyle } from "@expo/ui";
 import { isFriendCode, type Friend, type FriendsPage } from "@wordpoker/contracts";
+import * as Clipboard from "expo-clipboard";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState, type ComponentProps } from "react";
-import { Share, StyleSheet, View } from "react-native";
+import { Share, StyleSheet, Text as NativeText, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { authClient } from "@/auth/client/auth-client";
 import { TRAY_EXIT_MS, TrayFrame } from "@/components/screens/home/components/tray-frame";
@@ -30,6 +31,9 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
   const [page, setPage] = useState<FriendsPage | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [showShareLink, setShowShareLink] = useState(false);
+  const sharePending = useRef(false);
   const acting = useRef(false);
   const generation = useRef(0);
   useFocusEffect(useCallback(() => {
@@ -80,6 +84,34 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
     { title: "SENT", kind: "outgoing", data: page.outgoing },
   ] : [];
 
+  const shareLink = async () => {
+    if (!page || sharePending.current) return;
+    sharePending.current = true;
+    setSharing(true);
+    setMessage("");
+    try {
+      await Share.share({ message: friendLinkFor(page.code) });
+    } catch (error) {
+      // Browsers reject with AbortError when the player dismisses the share sheet.
+      if (error instanceof Error && error.name === "AbortError") return;
+      setShowShareLink(true);
+      setMessage("Sharing isn't available. Copy or select your link below.");
+    } finally {
+      sharePending.current = false;
+      setSharing(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!page) return;
+    try {
+      const copied = await Clipboard.setStringAsync(friendLinkFor(page.code));
+      setMessage(copied ? "Link copied." : "Couldn't copy. Select the link instead.");
+    } catch {
+      setMessage("Couldn't copy. Select the link instead.");
+    }
+  };
+
   // The tab is the tray: it rises when the tab gains focus and returns to Home when closed.
   const reduceMotion = useReducedMotion();
   const [shown, setShown] = useState(false);
@@ -108,9 +140,13 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
           </> : <>
             {page ? <Text textStyle={bodyText}>{`YOUR CODE: ${page.code}`}</Text> : null}
             {page && page.referrals > 0 ? <Text textStyle={bodyText} testID="friends-referrals">{`${page.referrals} ${page.referrals === 1 ? "friend" : "friends"} joined through you`}</Text> : null}
-            {page ? <Button label="SHARE" testID="friends-share" onPress={() => {
-              void Share.share({ message: friendLinkFor(page.code) }).catch(() => setMessage("Couldn't share. Try again."));
-            }} /> : null}
+            {page ? <Button label="SHARE" testID="friends-share" disabled={sharing} onPress={() => { void shareLink(); }} /> : null}
+            {page && showShareLink ? <>
+              <RNHostView matchContents>
+                <NativeText selectable style={bodyText} testID="friends-link" id={webTestID("friends-link")}>{friendLinkFor(page.code)}</NativeText>
+              </RNHostView>
+              <Button label="COPY LINK" testID="friends-copy" onPress={() => { void copyLink(); }} />
+            </> : null}
             {code ? <>
               <Text textStyle={bodyText}>{`Add the player with code ${code}?`}</Text>
               <Button label="ADD" testID="friend-add" disabled={busy} onPress={() => { void act(() => addFriend(code)); }} />

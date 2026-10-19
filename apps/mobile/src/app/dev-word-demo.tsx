@@ -21,7 +21,7 @@ import { colors } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
 
 /**
- * Development stage for the lesson's "Spell your word" clip: the tutorial's own deal (W and B in
+ * Development stage for the lesson's "Spell your word" clip: the tutorial's own deal (H and L in
  * hand, the whole board out) on the real word builder, with nothing else on screen, so a recording
  * of the taps and the drag crops to the rack alone. Renders nothing in a release build.
  */
