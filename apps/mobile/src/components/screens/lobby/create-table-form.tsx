@@ -1,139 +1,42 @@
-/**
- * create-table-form.tsx — §2's create flow: a name, one of three fixed buy-ins, §5's seat cap, and
- * §40's power-ups — Classic, the default, or Wild.
- *
- * The form refuses before it spends a round trip: `validateRoomCreateOptions` is the same function
- * the server runs on the same options, so the field a refusal marks and the sentence it shows are
- * the ones the server would have given. A refusal that comes back from the server anyway (a socket
- * that closed, a create the server judged differently) is shown as the server's own sentence.
- *
- * There is no blinds field: they are derived from the buy-in server-side (`blindsFor`), so no
- * client can propose stakes §2 does not offer.
- *
- * The name field is a React Native `TextInput` hosted in the universal layout (`RNHostView`, the
- * library's bridge for that): the universal `TextInput` is a native control with no web build, and
- * this screen is driven on the web.
- */
-
-import {
-  BottomSheet,
-  Column,
-  Picker,
-  RNHostView,
-  Text,
-  type UniversalTextStyle,
-} from "@expo/ui";
+/** Create a table with the shared validator and the night lobby's visual controls. */
+import { BottomSheet } from "@expo/ui";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text as RNText, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, Text, StyleSheet, TextInput, View } from "react-native";
 
 import {
   BUY_IN_PRESETS,
   MAX_SEATS,
   MIN_SEATS,
-  POWER_UP_DEAL_MODES,
   validateRoomCreateOptions,
   type BuyInPreset,
   type PowerUpDealMode,
   type RoomCreateField,
 } from "@wordpoker/contracts";
 
-import { GoldButton } from "@/components/ui/gold-button";
-import { border, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
-import { formatAmount } from "@/lib/ui/format";
-import { DEAL_MODE_NAMES } from "@/features/table/power-view";
+import { fonts, nightLobby } from "@/constants/theme";
 import { createTable } from "@/features/online/room-session";
 
 import { CreateTableLayout } from "./create-table-layout";
+import { NightLobbyButton } from "./night-lobby-button";
 
-export type CreateTableFormProps = {
+export interface CreateTableFormProps {
   visible: boolean;
   onClose: () => void;
   onCreated?: (roomId: string) => void;
-};
-
-/**
- * A create's answer to show: the field it is about, or `null` for a sentence about the create as
- * a whole — the server's own refusal names no field we can mark.
- */
+}
 interface Refusal {
   readonly field: RoomCreateField | null;
   readonly message: string;
 }
 
-/** §5's cap, as a picker's options. */
 const SEAT_COUNTS = Array.from(
   { length: MAX_SEATS - MIN_SEATS + 1 },
   (_, index) => MIN_SEATS + index,
 );
-
-/**
- * A host opens as roomy a table as §5 allows: heads-up is a table two players agree on, not the
- * default a tap lands on.
- */
 const DEFAULT_SEATS = MAX_SEATS;
 
-const titleText = {
-  color: nightLobby.text.cream,
-  fontFamily: fonts.arcade,
-  fontSize: fontSize.h3,
-} satisfies UniversalTextStyle;
-
-const kickerText = {
-  color: nightLobby.gold.light,
-  fontFamily: fonts.rubikSemiBold,
-  fontSize: fontSize.micro,
-  letterSpacing: 2.2,
-} satisfies UniversalTextStyle;
-
-const fieldLabelText = {
-  color: nightLobby.text.label,
-  fontFamily: fonts.rubikSemiBold,
-  fontSize: fontSize.caption,
-  letterSpacing: 1.4,
-} satisfies UniversalTextStyle;
-
-const refusalText = {
-  color: "#ff9387",
-  fontFamily: fonts.sans,
-  fontSize: fontSize.small,
-  lineHeight: 19,
-} satisfies UniversalTextStyle;
-
-const styles = StyleSheet.create({
-  input: {
-    backgroundColor: "rgba(8,12,28,0.65)",
-    borderColor: "rgba(243,230,196,0.2)",
-    borderRadius: radius.sm,
-    borderWidth: border.hairline,
-    color: nightLobby.text.cream,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.body,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  actions: {
-    alignSelf: "stretch",
-    flexShrink: 0,
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  cancel: {
-    alignItems: "center",
-    paddingVertical: spacing.md,
-  },
-  cancelLabel: {
-    color: nightLobby.text.muted,
-    fontFamily: fonts.sansBold,
-    fontSize: fontSize.small,
-    letterSpacing: 1,
-  },
-});
-
-/**
- * §2's create, as a sheet the lobby opens: the options a table is made of, refused where they are
- * wrong and created where they are not, with the new table's own screen the way in.
- */
 export function CreateTableForm({ visible, onClose, onCreated }: CreateTableFormProps) {
   const [name, setName] = useState("");
   const [buyIn, setBuyIn] = useState<BuyInPreset>(BUY_IN_PRESETS[0]);
@@ -176,121 +79,160 @@ export function CreateTableForm({ visible, onClose, onCreated }: CreateTableForm
 
   return (
     <BottomSheet
-      containerColor={nightLobby.panel.navy[1]}
+      containerColor={nightLobby.panel.navy[0]}
+      contentPadding={0}
       isPresented={visible}
       onDismiss={dismiss}
+      showDragIndicator={false}
       snapPoints={["full"]}
       testID="create-table-sheet"
     >
       <CreateTableLayout
         actions={
-          <View style={styles.actions} testID="create-table-actions">
-            <GoldButton
-              disabled={submitting}
-              label={submitting ? "Creating…" : "Create"}
-              onPress={submit}
-              testID="create-table-submit"
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={dismiss}
-              style={styles.cancel}
-              testID="create-table-cancel"
-            >
-              <RNText style={styles.cancelLabel}>Cancel</RNText>
-            </Pressable>
-          </View>
+        <View style={styles.actions} testID="create-table-actions">
+          <NightLobbyButton
+            disabled={submitting}
+            label={submitting ? "CREATING…" : `CREATE · ${buyIn.toLocaleString("en-US")}`}
+            onPress={submit}
+            testID="create-table-submit"
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={dismiss}
+            style={styles.cancel}
+            testID="create-table-cancel"
+          >
+            <Text style={styles.cancelLabel}>CANCEL</Text>
+          </Pressable>
+        </View>
         }
       >
-        <Column alignment="start" spacing={spacing.lg}>
-          <Column alignment="start" spacing={spacing.xxs}>
-            <Text textStyle={titleText}>Create a table</Text>
-            <Text textStyle={kickerText}>STAKES AND SEATS</Text>
-          </Column>
-
-          <Column alignment="start" spacing={spacing.xs}>
-            <Text textStyle={fieldLabelText}>TABLE NAME</Text>
-            <RNHostView matchContents testID="create-table-name-host">
-              <TextInput
-                accessibilityLabel="Table name"
-                autoCapitalize="words"
-                autoCorrect={false}
-                onChangeText={setName}
-                placeholder="Sunday felt"
-                placeholderTextColor={nightLobby.text.label}
-                style={styles.input}
-                testID="create-table-name"
-                value={name}
-              />
-            </RNHostView>
+        <View style={styles.fields}>
+          <View>
+            <Text accessibilityRole="header" style={styles.title}>
+              CREATE A TABLE
+            </Text>
+            <Text style={styles.kicker}>STAKES AND SEATS</Text>
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>TABLE NAME</Text>
+            <TextInput
+              accessibilityLabel="Table name"
+              autoCapitalize="words"
+              autoCorrect={false}
+              onChangeText={setName}
+              placeholder="Sunday felt"
+              placeholderTextColor="#b09a74"
+              style={styles.input}
+              testID="create-table-name"
+              value={name}
+            />
             {refusal?.field === "name" ? (
-              <Text testID="create-table-name-refusal" textStyle={refusalText}>
+              <Text accessibilityRole="alert" style={styles.refusal} testID="create-table-name-refusal">
                 {refusal.message}
               </Text>
             ) : null}
-          </Column>
-
-          <Column alignment="start" spacing={spacing.xs}>
-            <Text textStyle={fieldLabelText}>BUY-IN</Text>
-            <Picker
-              onValueChange={(value) => setBuyIn(value as BuyInPreset)}
-              selectedValue={buyIn}
-              testID="create-table-buy-in"
-            >
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>BUY-IN</Text>
+            <View style={styles.choices} testID="create-table-buy-in">
               {BUY_IN_PRESETS.map((preset) => (
-                <Picker.Item key={preset} label={formatAmount(preset)} value={preset} />
+                <Pressable
+                  key={preset}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${preset.toLocaleString("en-US")} coins buy-in`}
+                  aria-checked={buyIn === preset}
+                  accessibilityState={{ checked: buyIn === preset }}
+                  onPress={() => setBuyIn(preset)}
+                  style={({ pressed }) => [styles.buyIn, buyIn === preset && styles.selected, pressed && styles.pressed]}
+                  testID={`create-table-buy-in-${preset}`}
+                >
+                  {buyIn === preset ? <LinearGradient colors={nightLobby.gold.button} style={StyleSheet.absoluteFill} /> : null}
+                  <View style={styles.coin} />
+                  <Text style={[styles.choiceText, buyIn === preset && styles.selectedText]}>
+                    {preset.toLocaleString("en-US")}
+                  </Text>
+                </Pressable>
               ))}
-            </Picker>
-            {refusal?.field === "buyIn" ? (
-              <Text testID="create-table-buy-in-refusal" textStyle={refusalText}>
-                {refusal.message}
-              </Text>
-            ) : null}
-          </Column>
-
-          <Column alignment="start" spacing={spacing.xs}>
-            <Text textStyle={fieldLabelText}>SEATS</Text>
-            <Picker
-              onValueChange={setMaxSeats}
-              selectedValue={maxSeats}
-              testID="create-table-seats"
-            >
+            </View>
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>SEATS</Text>
+            <View style={styles.choices} testID="create-table-seats">
               {SEAT_COUNTS.map((count) => (
-                <Picker.Item key={count} label={`${count} seats`} value={count} />
+                <Pressable
+                  key={count}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${count} seats`}
+                  aria-checked={maxSeats === count}
+                  accessibilityState={{ checked: maxSeats === count }}
+                  onPress={() => setMaxSeats(count)}
+                  style={({ pressed }) => [styles.seat, maxSeats === count && styles.selected, pressed && styles.pressed]}
+                  testID={`create-table-seats-${count}`}
+                >
+                  {maxSeats === count ? <LinearGradient colors={nightLobby.gold.button} style={StyleSheet.absoluteFill} /> : null}
+                  <Text style={[styles.seatText, maxSeats === count && styles.selectedText]}>{count}</Text>
+                </Pressable>
               ))}
-            </Picker>
-            {refusal?.field === "maxSeats" ? (
-              <Text testID="create-table-seats-refusal" textStyle={refusalText}>
-                {refusal.message}
-              </Text>
-            ) : null}
-          </Column>
-
-          <Column alignment="start" spacing={spacing.xs}>
-            <Text textStyle={fieldLabelText}>POWER-UPS</Text>
-            <Picker
-              onValueChange={(value) => setDeal(value as PowerUpDealMode)}
-              selectedValue={deal}
-              testID="create-table-power-ups"
-            >
-              {POWER_UP_DEAL_MODES.map((mode) => (
-                <Picker.Item key={mode} label={DEAL_MODE_NAMES[mode]} value={mode} />
+            </View>
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>POWER-UPS</Text>
+            <View style={styles.choices} testID="create-table-power-ups">
+              {(["off", "choose3"] as const).map((mode) => (
+                <Pressable
+                  key={mode}
+                  accessibilityRole="radio"
+                  accessibilityLabel={mode === "off" ? "Classic" : "Wild Power"}
+                  aria-checked={deal === mode}
+                  accessibilityState={{ checked: deal === mode }}
+                  onPress={() => setDeal(mode)}
+                  style={({ pressed }) => [styles.power, deal === mode && styles.powerSelected, pressed && styles.pressed]}
+                  testID={`create-table-power-ups-${mode}`}
+                >
+                  <Text style={styles.powerTitle}>
+                    {mode === "off" ? "CLASSIC" : "WILD POWER"}
+                  </Text>
+                  <Text style={styles.powerCopy}>
+                    {mode === "off" ? "Standard rules" : "Pick a power each hand"}
+                  </Text>
+                </Pressable>
               ))}
-            </Picker>
-            {refusal?.field === "powerUps" ? (
-              <Text testID="create-table-power-ups-refusal" textStyle={refusalText}>
-                {refusal.message}
-              </Text>
-            ) : null}
-          </Column>
-
-          {refusal !== null && refusal.field === null ? (
-            <Text testID="create-table-error" textStyle={refusalText}>
+            </View>
+          </View>
+          {refusal !== null && refusal.field !== "name" ? (
+            <Text accessibilityRole="alert" style={styles.refusal} testID="create-table-error">
               {refusal.message}
             </Text>
           ) : null}
-        </Column>
+        </View>
       </CreateTableLayout>
     </BottomSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  fields: { gap: 16, paddingBottom: 8 },
+  title: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: 28, letterSpacing: 0.6 },
+  kicker: { color: nightLobby.gold.light, fontFamily: fonts.rubikSemiBold, fontSize: 11, letterSpacing: 1.5 },
+  field: { gap: 8 },
+  fieldLabel: { color: nightLobby.text.label, fontFamily: fonts.rubikSemiBold, fontSize: 11, letterSpacing: 1.4 },
+  input: { backgroundColor: "#f3e6c4", color: "#3a2210", borderRadius: 12, borderBottomWidth: 4, borderBottomColor: "#c48743", fontFamily: fonts.arcade, fontSize: 18, minHeight: 52, paddingHorizontal: 14, paddingVertical: 12 },
+  choices: { flexDirection: "row", gap: 10 },
+  buyIn: { flex: 1, minHeight: 46, borderWidth: 2, borderBottomWidth: 4, borderColor: "#343c55", borderRadius: 12, backgroundColor: "#0a1028", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, overflow: "hidden" },
+  choiceText: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: 16 },
+  selected: { borderColor: "#c68d35", borderBottomColor: "#9a5f1c", backgroundColor: nightLobby.gold.button[0] },
+  selectedText: { color: nightLobby.gold.buttonText },
+  coin: { width: 11, height: 11, borderRadius: 6, backgroundColor: "#f7d77a", borderBottomWidth: 2, borderBottomColor: "#c98a2c" },
+  seat: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderBottomWidth: 4, borderColor: "#343c55", backgroundColor: "#0a1028", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  seatText: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: 21 },
+  power: { flex: 1, minHeight: 80, padding: 12, gap: 4, borderWidth: 2, borderRadius: 14, borderColor: "#343c55", backgroundColor: "#0a1028" },
+  powerSelected: { borderColor: "#f7d77a", backgroundColor: "rgba(247,215,122,0.12)" },
+  powerTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: 18 },
+  powerCopy: { color: nightLobby.text.muted, fontFamily: fonts.rubikMedium, fontSize: 12, lineHeight: 16 },
+  pressed: { opacity: 0.8 },
+  refusal: { color: "#ff9387", fontFamily: fonts.rubik, fontSize: 13, lineHeight: 18 },
+  actions: { paddingTop: 12, flexShrink: 0 },
+  cancel: { alignItems: "center", justifyContent: "center", minHeight: 48 },
+  cancelLabel: { color: nightLobby.text.muted, fontFamily: fonts.arcade, fontSize: 18, letterSpacing: 0.6 },
+});

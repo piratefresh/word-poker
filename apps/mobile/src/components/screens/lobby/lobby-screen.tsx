@@ -14,12 +14,13 @@ import { HomeNavRack, type HomeNavDestination } from "@/components/screens/home/
 import { artPoint, STREETS } from "@/components/screens/home/street-art";
 import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
+import { useQuests } from "@/lib/quests/quests-provider";
 import { filterLobbyRooms, LOBBY_FILTERS, type LobbyFilter } from "@/features/online/lobby-view";
 import { joinTable, useActiveRoomId, useHostedRoomIds } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
-import { useQuests } from "@/lib/quests/quests-provider";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
+import { NightLobbyButton } from "./night-lobby-button";
 import { ParlorBackground } from "./parlor-background";
 import { ParlorNav } from "./parlor-nav";
 import { RoomDetailsSheet } from "./room-details-sheet";
@@ -127,7 +128,7 @@ export function LobbyScreen() {
       <Animated.View style={[styles.scene, { transformOrigin: [door.x, door.y, 0] }, sceneZoom]}>
       <ParlorBackground />
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: insets.top + spacing.md }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 180, paddingTop: insets.top + spacing.md }}
         refreshControl={
           <RefreshControl colors={[colors.gold]} onRefresh={refresh} refreshing={refreshing} tintColor={nightLobby.gold.light} />
         }
@@ -139,14 +140,6 @@ export function LobbyScreen() {
           me={session?.user.isAnonymous ? "Guest" : session?.user.name?.trim() || session?.user.email}
           onBack={back}
           readout={currentReadout}
-        />
-
-        <GoldButton
-          icon="plus"
-          label="DEAL A NEW TABLE"
-          onPress={() => setCreating(true)}
-          style={styles.createButton}
-          testID="lobby-create"
         />
 
         {headliner ? (
@@ -220,9 +213,13 @@ export function LobbyScreen() {
         </View>
       </ScrollView>
 
+      <View style={[styles.createDock, { bottom: insets.bottom + 88 }]}>
+        <NightLobbyButton label="+ DEAL A NEW TABLE" onPress={() => setCreating(true)} testID="lobby-create" />
+      </View>
+
       {banner === null ? null : (
         <Text
-          style={[styles.banner, joiningRoom === undefined ? styles.bannerRefusal : styles.bannerNotice, { bottom: insets.bottom + 82 }]}
+          style={[styles.banner, joiningRoom === undefined ? styles.bannerRefusal : styles.bannerNotice, { bottom: insets.bottom + 158 }]}
           testID={joiningRoom === undefined ? "lobby-refusal" : "lobby-joining"}
         >
           {banner}
@@ -248,7 +245,7 @@ export function LobbyScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: nightLobby.sky[0], flex: 1 },
   scene: { flex: 1 },
-  createButton: { marginHorizontal: spacing.gutter, marginBottom: spacing.md },
+  createDock: { position: "absolute", left: spacing.gutter, right: spacing.gutter },
   empty: { alignItems: "center", gap: spacing.xs, marginHorizontal: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.xl },
   emptyTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h3, letterSpacing: 1 },
   emptyCopy: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.body, textAlign: "center" },

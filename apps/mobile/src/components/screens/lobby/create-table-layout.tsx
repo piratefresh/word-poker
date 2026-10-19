@@ -1,6 +1,9 @@
-import { Host, RNHostView } from "@expo/ui";
+import { RNHostView } from "@expo/ui";
+import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { nightLobby } from "@/constants/theme";
 
 export interface CreateTableLayoutProps {
   children: ReactNode;
@@ -9,17 +12,18 @@ export interface CreateTableLayoutProps {
 
 /** The sheet supplies the safe-area and keyboard bounds; only its fields scroll. */
 export function CreateTableLayout({ children, actions }: CreateTableLayoutProps) {
+  const insets = useSafeAreaInsets();
   return (
     <RNHostView>
-      <View style={styles.form}>
+      <View style={[styles.form, { paddingBottom: Math.max(8, insets.bottom) }]}>
+        <LinearGradient colors={nightLobby.panel.navy} style={StyleSheet.absoluteFill} />
+        <View style={styles.handle} />
         <ScrollView
           keyboardShouldPersistTaps="handled"
           style={styles.fields}
           testID="create-table-scroll"
         >
-          <Host matchContents ignoreSafeArea="all" style={styles.content}>
-            {children}
-          </Host>
+          {children}
         </ScrollView>
         {actions}
       </View>
@@ -28,7 +32,7 @@ export function CreateTableLayout({ children, actions }: CreateTableLayoutProps)
 }
 
 const styles = StyleSheet.create({
-  form: { flex: 1, minHeight: 0 },
+  form: { flex: 1, minHeight: 0, paddingHorizontal: 20, borderTopWidth: 2, borderTopColor: "#e0974a", borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden" },
+  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: "#59617b", alignSelf: "center", marginTop: 12, marginBottom: 16 },
   fields: { flex: 1, minHeight: 0 },
-  content: { width: "100%" },
 });
