@@ -7,6 +7,7 @@
  */
 
 import { Platform, TextStyle, ViewStyle } from "react-native";
+import { LOBBY_PLAYER_COLORS } from "@wordpoker/contracts";
 
 /* ── palette (raw ramps) ─────────────────────────────────────────── */
 
@@ -148,16 +149,7 @@ export const colors = {
   chipDownOnTile: "#a22e25",
 
   // player accent wheel (assign by index for avatars, seats, rows)
-  players: [
-    palette.amber400,
-    palette.blue400,
-    palette.green500,
-    palette.violet400,
-    palette.pink400,
-    "#e07a5f",
-    "#81b29a",
-    "#a8d0f0",
-  ],
+  players: LOBBY_PLAYER_COLORS,
 } as const;
 
 /** The Hand Ledger (History) book: ink on parchment cards and on the felt pages. */

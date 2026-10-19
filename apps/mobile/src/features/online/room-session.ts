@@ -88,6 +88,9 @@ let view: RoomSessionView = { status: "idle" };
 /** Rooms this device still owns. Creating a table may add a second room without dropping the first. */
 const heldRooms = new Map<string, Room>();
 let activeRoomId: string | null = null;
+/** Locally created ids; unlike a seat id, this remains meaningful when a host leaves the room. */
+let hostedRoomIds: ReadonlySet<string> = new Set();
+const EMPTY_HOSTED_ROOM_IDS: ReadonlySet<string> = new Set();
 const listeners = new Set<() => void>();
 
 /**
@@ -117,6 +120,21 @@ function subscribe(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+function rememberHostedRoom(roomId: string) {
+  if (hostedRoomIds.has(roomId)) return;
+  hostedRoomIds = new Set([...hostedRoomIds, roomId]);
+  listeners.forEach((listener) => listener());
+}
+
+/** Remove a local host hint after the lobby reports that the server disposed of the room. */
+export function forgetHostedRoom(roomId: string) {
+  if (!hostedRoomIds.has(roomId)) return;
+  const next = new Set(hostedRoomIds);
+  next.delete(roomId);
+  hostedRoomIds = next;
+  listeners.forEach((listener) => listener());
 }
 
 /** `onStateChange` hands us the decoded schema; the cast is where the wire meets the table. */
@@ -163,13 +181,13 @@ function createFailure(error: unknown): string {
 }
 
 /** Wire the room's own events to the session, so a dropped seat leaves the UI honestly. */
-function hold(room: Room, taken: number) {
+function hold(room: Room, taken: number): boolean {
   if (taken !== attempt) {
     // The device asked for something else while this seat was in the air — another table, or a
     // leave. The seat is not this request's to keep, so it goes back rather than counting as a
     // player nobody is driving. `inFlight` already belongs to the newer request.
     void room.leave();
-    return;
+    return false;
   }
 
   inFlight = null;
@@ -196,6 +214,7 @@ function hold(room: Room, taken: number) {
     if (heldRooms.get(room.roomId) !== room) return;
     console.warn("[room-session] room error", code, message);
   });
+  return true;
 }
 
 /**
@@ -254,6 +273,15 @@ export function useActiveRoomId(): string | null {
   );
 }
 
+/** Rooms this device created, kept separate from the seat it is currently occupying. */
+export function useHostedRoomIds(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    subscribe,
+    () => hostedRoomIds,
+    () => EMPTY_HOSTED_ROOM_IDS,
+  );
+}
+
 /**
  * The live `Room` this device holds for `roomId`, or null until the seat lands there. The online
  * felt subscribes to it directly — its synced state, its targeted `privateState`/`rejected`
@@ -284,7 +312,7 @@ export async function createTable(options: GameRoomCreateOptions): Promise<strin
   try {
     await authenticateTableClient();
     const room = await tableClient.create(GAME_ROOM_NAME, options);
-    hold(room, taken);
+    if (hold(room, taken)) rememberHostedRoom(room.roomId);
     return room.roomId;
   } catch (error) {
     if (taken !== attempt) throw error;

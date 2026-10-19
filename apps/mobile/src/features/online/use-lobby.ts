@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { gameClient } from "./game-client";
 import { lobbyView } from "./lobby-view";
+import { forgetHostedRoom, useHostedRoomIds } from "./room-session";
 
 export type LobbyStatus =
   /** Nothing has arrived yet — not a lobby with no tables in it. */
@@ -54,6 +55,7 @@ const UNREACHABLE = "Couldn't reach the lobby. Check your connection and try aga
  * them — ask the server for the list again, and re-subscribe after the subscription dropped.
  */
 export function useLobby(): LobbyView {
+  const hostedRoomIds = useHostedRoomIds();
   const [status, setStatus] = useState<LobbyStatus>("loading");
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -103,6 +105,7 @@ export function useLobby(): LobbyView {
 
     const drop = (roomId: unknown) => {
       if (cancelled || typeof roomId !== "string") return;
+      forgetHostedRoom(roomId);
       setRooms((current) => current.filter((row) => row.roomId !== roomId));
     };
 
@@ -156,7 +159,7 @@ export function useLobby(): LobbyView {
   return {
     status,
     rooms,
-    ...lobbyView(rooms),
+    ...lobbyView(rooms, hostedRoomIds),
     loading: status === "loading",
     refreshing,
     error,

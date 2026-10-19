@@ -1257,7 +1257,8 @@ describe("GameRoom", () => {
     it("publishes the config as the room's matchmaking metadata", async () => {
       const room = await colyseus.createRoom("game", { name: "Beginner", buyIn: 500, maxSeats: 2 });
 
-      assert.deepStrictEqual(room.metadata, {
+      const { createdAt, players, ...metadata } = room.metadata;
+      assert.deepStrictEqual(metadata, {
         name: "Beginner",
         buyIn: 500,
         smallBlind: 5,
@@ -1266,6 +1267,8 @@ describe("GameRoom", () => {
         powerUps: { deal: "off" },
         status: "waiting",
       });
+      assert.ok(Number.isSafeInteger(createdAt));
+      assert.deepStrictEqual(players, []);
     });
 
     it("publishes a Wild table's deal mode", async () => {
@@ -1398,7 +1401,8 @@ describe("GameRoom", () => {
       const listed = (await followed.until((rows) => rows.size > 0, "the new table"))!.get(table.roomId)!;
       assert.strictEqual(listed.clients, 0);
       assert.strictEqual(listed.maxClients, 3, "the seat cap the table was created with");
-      assert.deepStrictEqual(listed.metadata, {
+      const { createdAt, players, ...metadata } = listed.metadata!;
+      assert.deepStrictEqual(metadata, {
         name: "Sunset",
         buyIn: 5_000,
         smallBlind: 50,
@@ -1407,6 +1411,8 @@ describe("GameRoom", () => {
         powerUps: { deal: "off" },
         status: WAITING_PHASE,
       });
+      assert.ok(Number.isSafeInteger(createdAt));
+      assert.deepStrictEqual(players, []);
 
       await colyseus.connectTo(table);
       const seated = (await followed.until((rows) => rows.get(table.roomId)!.clients === 1, "a seat to fill"))!

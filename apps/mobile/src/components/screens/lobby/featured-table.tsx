@@ -1,170 +1,107 @@
-/**
- * featured-table.tsx — the table the room is talking about: the one card that gets the felt.
- *
- * §3's browser asks a card for a table's name, its fixed buy-in, its players of its cap, and a way
- * in, and this carries all four: the buy-in in the corner it sits in on the design, the name and
- * the opening bet under it, the seats drawn on the felt the game rooms already draw, and one gold
- * button whose words are the featured pick's own read of the seat (`featuredAction` in
- * `parlor-view.ts`). The button is the only control on the card — a card that also swallowed taps
- * would make the join ambiguous with the scroll. It carries the table's full sentence rather than
- * its own two words, so the offer sounds the same whether it is met on the card or on a row.
- *
- * The felt is `PokerTable` — the same component the online and offline rooms sit around — with the
- * library's own seat renderer: a place the listing says is taken is a seat with no face on it (the
- * lobby is not told who is sitting there, so it shows a numbered place and nothing invented), and a
- * place that is free is the OPEN seat the game rooms show. What the card does not carry is the rest
- * of what a hand holds: no pot, no word just played, no countdown. The listing does not know them.
- */
+/** The featured open room at the top of the night lobby. */
 
 import { LinearGradient } from "expo-linear-gradient";
-import { type ReactElement, useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { type ReactElement } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { formatAmount } from "@/lib/ui/format";
-import { powersLabel } from "@/features/table/power-view";
+import { MAX_SEATS, type RoomSummary } from "@wordpoker/contracts";
+import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
 
-import {
-  DefaultSeat,
-  PokerTable,
-  isSupportedSeatCount,
-  type SeatCount,
-  type SeatData,
-} from "@/components/table";
 import { GoldButton } from "@/components/ui/gold-button";
-import { border, colors, elevation, fonts, fontSize, radius, spacing } from "@/constants/theme";
-import { spokenTable, type FeaturedTable } from "./parlor-view";
-
-/**
- * The card's wash: gold at the top, falling into the room's dark. One-off from the design, like
- * the felt's own wood — it is the card's surface, not a token anything else in the app paints with.
- */
-const WASH = ["rgba(212,175,55,0.10)", "rgba(0,0,0,0.35)"] as const;
-const WASH_START = { x: 0.5, y: 0 } as const;
-const WASH_END = { x: 0.5, y: 1 } as const;
-
-/**
- * The felt's box on the card: room for the felt *and* the chrome the seats wear outside it — a
- * 320×220 felt plus an inset on every side — and capped so the table stays the size of a table on
- * a desktop window instead of becoming a room-sized oval.
- */
-const FELT_HEIGHT = 270;
-const FELT_MAX_WIDTH = 400;
-
-/** Space the seats' own labels and badges need around the felt inside that box. */
-const FELT_CHROME = 32;
-
-/**
- * The felt's geometry on the card, held still: the layout is memoised on these identities inside
- * `PokerTable`, so a card that re-renders on every listing push must not hand it new ones.
- */
-const FELT_LAYOUT = { potY: 0.5 };
-const NO_COMMUNITY: readonly never[] = [];
-const NO_COMMUNITY_SLOT = () => null;
-
-/**
- * The places the felt draws. A listing can only carry §5's 2–6 seats, but the felt places a fixed
- * set of counts without overlap — so an untrusted listing outside it is drawn at the nearest one
- * the table supports rather than as a pile of seats, and the figure in the middle still prints the
- * table's own numbers.
- */
-function seatCountFor(maxClients: number): SeatCount {
-  if (isSupportedSeatCount(maxClients)) return maxClients;
-  return maxClients < 2 ? 2 : 9;
-}
+import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
+import { formatAmount } from "@/lib/ui/format";
+import { isJoinable, openSeats } from "@/features/online/lobby-view";
+import { powersLabel } from "@/features/table/power-view";
+import { spokenTable } from "./parlor-view";
 
 export interface FeaturedTableCardProps {
-  readonly featured: FeaturedTable;
+  readonly room: RoomSummary;
   readonly onJoin: () => void;
-  /** A join is already in the air; the card keeps its words and stops taking taps. */
+  readonly onDetails: () => void;
   readonly joining?: boolean;
+  readonly yours?: boolean;
 }
 
 export function FeaturedTableCard({
-  featured,
+  room,
   onJoin,
+  onDetails,
   joining = false,
+  yours = false,
 }: FeaturedTableCardProps): ReactElement {
-  const { room, status, action } = featured;
-  const inHand = status === "in-hand";
-  const powers = powersLabel(room.metadata.powerUps);
-
-  // One place per seat the felt draws: the first `clients` of them taken, the rest the OPEN seats
-  // the rooms draw. The list is as long as the table is drawn, not as long as the listing claims.
-  const places = useMemo<(SeatData | null)[]>(() => {
-    const seats = seatCountFor(room.maxClients);
-
-    return Array.from({ length: seats }, (_, index) =>
-      index < room.clients
-        ? {
-            name: `Seat ${index + 1}`,
-            glyph: String(index + 1),
-            color: colors.players[index % colors.players.length],
-          }
-        : null,
-    );
-  }, [room.clients, room.maxClients]);
+  const lastWord = room.metadata.lastWord;
+  const players = room.metadata.players ?? [];
+  const seats = Math.min(room.maxClients, MAX_SEATS);
+  const mode = powersLabel(room.metadata.powerUps) ?? "Classic";
+  const canJoin = isJoinable(room) || yours;
 
   return (
     <View style={styles.card} testID="parlor-featured">
-      <LinearGradient
-        colors={WASH}
-        end={WASH_END}
-        start={WASH_START}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <View style={styles.top}>
-        <View style={styles.status}>
-          <View style={[styles.dot, inHand ? styles.dotLive : styles.dotOpen]} />
-          <Text style={[styles.statusText, inHand ? styles.live : styles.open]}>
-            {inHand ? "IN HAND" : "WAITING"}
-          </Text>
+      <LinearGradient colors={nightLobby.panel.headliner} end={{ x: 0.5, y: 1 }} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} />
+      <Pressable
+        accessibilityLabel={`${room.metadata.name}, featured room. ${spokenTable(room, yours)}. Show details.`}
+        accessibilityRole="button"
+        onPress={onDetails}
+        style={({ pressed }) => [styles.body, pressed && styles.pressed]}
+        testID="lobby-headliner-details"
+      >
+        <View style={styles.topline}>
+          <Text style={styles.kicker}>HEADLINER</Text>
+          <View style={styles.status}>
+            <View style={[styles.dot, styles.dotLive]} />
+            <Text style={[styles.statusText, styles.live]}>LIVE</Text>
+          </View>
         </View>
 
-        <View style={styles.stakes}>
-          <Text style={styles.stakesLabel}>BUY-IN</Text>
-          <Text style={styles.buyIn}>{formatAmount(room.metadata.buyIn)}</Text>
-        </View>
-      </View>
+        <Text numberOfLines={1} style={styles.name}>{room.metadata.name}</Text>
+        <Text numberOfLines={1} style={styles.subtitle}>
+          {mode} · {room.metadata.hostName ? `hosted by ${room.metadata.hostName}` : `${formatAmount(room.metadata.buyIn)} buy-in`}
+        </Text>
 
-      <Text numberOfLines={1} style={styles.name}>
-        {room.metadata.name}
-      </Text>
-      <View style={styles.termsRow}>
-        <Text style={styles.terms}>{`${formatAmount(room.metadata.smallBlind)} / ${formatAmount(room.metadata.bigBlind)} BLINDS`}</Text>
-        {powers === null ? null : (
-          <Text style={styles.powers} testID="parlor-featured-powers">
-            {powers.toUpperCase()}
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.felt}>
-        <PokerTable
-          chromeInset={FELT_CHROME}
-          community={NO_COMMUNITY}
-          layoutConfig={FELT_LAYOUT}
-          renderCommunity={NO_COMMUNITY_SLOT}
-          renderPot={() => (
-            <View style={styles.pot}>
-              <Text style={styles.feltLabel}>SEATS TAKEN</Text>
-              <Text style={styles.feltFigure}>
-                {room.clients} / {room.maxClients}
-              </Text>
+        {lastWord === undefined ? null : (
+          <View style={styles.lastWord}>
+            <View style={styles.wordBlock}>
+              <View style={styles.tiles}>
+                {Array.from(lastWord.word).slice(0, 12).map((letter, index) => (
+                  <View key={`${letter}-${index}`} style={styles.tile}>
+                    <Text style={styles.tileLetter}>{letter}</Text>
+                    <Text style={styles.tilePoints}>{LETTER_VALUES[letter as Letter] ?? ""}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text numberOfLines={1} style={styles.wordBy}>{lastWord.by}&apos;s last word</Text>
             </View>
-          )}
-          renderSeat={(slot) => <DefaultSeat {...slot} />}
-          seatCount={seatCountFor(room.maxClients)}
-          seats={places}
-          style={styles.table}
-          testID="parlor-featured-felt"
-        />
+            <Text style={styles.points}>+{lastWord.points}</Text>
+          </View>
+        )}
+      </Pressable>
+
+      <View style={styles.footer}>
+        <View style={styles.seatMarkers} accessibilityLabel={`${room.clients} seated, ${openSeats(room)} open`}>
+          {Array.from({ length: seats }, (_, index) => {
+            const player = players[index];
+            const taken = index < room.clients;
+            const color = player?.color ?? colors.players[index % colors.players.length];
+            return (
+              <View
+                key={player?.id ?? index}
+                style={[styles.seat, taken ? { backgroundColor: color, borderColor: "#e0974a" } : styles.seatOpen]}
+              >
+                <Text style={[styles.seatInitial, !taken && styles.seatInitialOpen]}>
+                  {taken ? player?.initial ?? "•" : ""}
+                </Text>
+              </View>
+            );
+          })}
+          <Text style={styles.openCount}>{room.locked ? "UNAVAILABLE" : `${openSeats(room)} OPEN`}</Text>
+        </View>
+        <Text style={styles.buyIn}>{formatAmount(room.metadata.buyIn)}</Text>
       </View>
 
       <GoldButton
-        accessibilityLabel={spokenTable(room, featured.yours)}
-        disabled={!action.enabled || joining}
-        label={joining ? "TAKING YOUR SEAT…" : action.label}
+        accessibilityLabel={spokenTable(room, yours)}
+        disabled={!canJoin || joining}
+        label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : `JOIN · ${formatAmount(room.metadata.buyIn)}`}
         onPress={onJoin}
         testID="parlor-featured-join"
       />
@@ -174,122 +111,39 @@ export function FeaturedTableCard({
 
 const styles = StyleSheet.create({
   card: {
-    ...elevation.card,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.lg,
-    borderWidth: border.hairline,
+    borderColor: "#e0974a",
+    borderRadius: 20,
+    borderWidth: border.thick,
+    gap: spacing.md,
     marginHorizontal: spacing.gutter,
     overflow: "hidden",
-    padding: spacing.lg,
+    padding: spacing.md,
   },
-  top: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  status: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-  },
-  dot: {
-    borderRadius: radius.pill,
-    height: 8,
-    width: 8,
-  },
-  dotLive: {
-    backgroundColor: colors.danger,
-  },
-  dotOpen: {
-    backgroundColor: colors.successHi,
-  },
-  statusText: {
-    fontFamily: fonts.mono,
-    fontSize: fontSize.caption,
-    letterSpacing: 1.6,
-  },
-  live: {
-    color: colors.danger,
-  },
-  open: {
-    color: colors.successHi,
-  },
-  stakes: {
-    alignItems: "flex-end",
-  },
-  stakesLabel: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.caption,
-    letterSpacing: 1.4,
-  },
-  buyIn: {
-    color: colors.gold,
-    fontFamily: fonts.serifBold,
-    fontSize: fontSize.title,
-  },
-  name: {
-    color: colors.textBright,
-    fontFamily: fonts.serifBold,
-    fontSize: fontSize.h3,
-    letterSpacing: -0.4,
-    marginTop: spacing.sm,
-  },
-  termsRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.md,
-    marginTop: spacing.xs,
-  },
-  terms: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.caption,
-    letterSpacing: 1.2,
-  },
-  /** §40's power-up setting, beside the blinds: only a table that deals powers carries it. */
-  powers: {
-    color: colors.gold,
-    fontFamily: fonts.monoBold,
-    fontSize: fontSize.caption,
-    letterSpacing: 1.6,
-  },
-  felt: {
-    paddingVertical: spacing.sm,
-  },
-  /**
-   * The felt draws itself into this box; the card is its frame, so it brings no skin of its own.
-   * The basis is the height because the component's own style is `flex: 1` — a flex item asking to
-   * fill a card that has no height of its own would measure zero and draw nothing.
-   */
-  table: {
-    alignSelf: "center",
-    backgroundColor: "transparent",
-    flexBasis: FELT_HEIGHT,
-    flexGrow: 0,
-    flexShrink: 0,
-    maxWidth: FELT_MAX_WIDTH,
-    width: "100%",
-  },
-  /**
-   * The felt centres its slots on a zero-sized anchor, so the figure has to bring its own width or
-   * its text wraps at nothing.
-   */
-  pot: {
-    alignItems: "center",
-    width: 170,
-  },
-  feltLabel: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.caption,
-    letterSpacing: 1.4,
-  },
-  feltFigure: {
-    color: colors.gold,
-    fontFamily: fonts.serifBold,
-    fontSize: fontSize.h3,
-    letterSpacing: -0.4,
-  },
+  body: { gap: spacing.xs },
+  pressed: { opacity: 0.82 },
+  topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  kicker: { color: nightLobby.gold.light, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.caption, letterSpacing: 1.8 },
+  status: { alignItems: "center", flexDirection: "row", gap: spacing.xs },
+  dot: { borderRadius: radius.pill, height: 7, width: 7 },
+  dotLive: { backgroundColor: nightLobby.status.live },
+  statusText: { fontFamily: fonts.rubikSemiBold, fontSize: fontSize.caption, letterSpacing: 1.2 },
+  live: { color: nightLobby.status.live },
+  name: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h2, letterSpacing: 0.8 },
+  subtitle: { color: nightLobby.text.muted, fontFamily: fonts.rubikMedium, fontSize: fontSize.small },
+  lastWord: { alignItems: "flex-end", flexDirection: "row", justifyContent: "space-between", paddingTop: spacing.sm },
+  wordBlock: { flex: 1, gap: spacing.xs, minWidth: 0 },
+  tiles: { flexDirection: "row", gap: 3 },
+  tile: { alignItems: "center", backgroundColor: "#f0dbb2", borderRadius: 4, height: 29, justifyContent: "center", position: "relative", width: 24 },
+  tileLetter: { color: "#2b1c10", fontFamily: fonts.arcade, fontSize: fontSize.bodyLg },
+  tilePoints: { bottom: 0, color: "#2b1c10", fontFamily: fonts.rubikSemiBold, fontSize: 7, position: "absolute", right: 2 },
+  wordBy: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.caption },
+  points: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.h2, paddingLeft: spacing.sm },
+  footer: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing.xs },
+  seatMarkers: { alignItems: "center", flexDirection: "row", gap: spacing.xs, flex: 1, minWidth: 0 },
+  seat: { alignItems: "center", borderRadius: radius.pill, borderWidth: border.thick, height: 29, justifyContent: "center", width: 29 },
+  seatOpen: { backgroundColor: "rgba(8,12,28,0.45)", borderColor: "rgba(243,230,196,0.45)", borderStyle: "dashed" },
+  seatInitial: { color: "#f4ecd8", fontFamily: fonts.arcade, fontSize: fontSize.small },
+  seatInitialOpen: { color: nightLobby.text.muted },
+  openCount: { color: nightLobby.status.open, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.caption, letterSpacing: 0.8, marginLeft: spacing.xs },
+  buyIn: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.h3 },
 });

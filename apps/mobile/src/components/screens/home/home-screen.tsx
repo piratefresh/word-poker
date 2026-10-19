@@ -43,39 +43,16 @@ import {
 import type { ModeVariant } from "@/components/screens/home/components/mode-variants";
 import { OfflineTray } from "@/components/screens/home/components/offline-tray";
 import { HomeHeader } from "@/components/screens/home/home-header";
+import { artPoint, STREETS } from "@/components/screens/home/street-art";
 import { LEDGER_CLOSE_MS } from "@/components/screens/history/ledger/ledger-stage";
 import { StreetLogo } from "@/components/screens/home/street-logo";
+import { ParlorBackground } from "@/components/screens/lobby/parlor-background";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 import { readItem, TUTORIAL_DONE } from "@/lib/storage/claim-store";
 import { formatCoins } from "@/lib/ui/format";
 import { useQuests } from "@/lib/quests/quests-provider";
 
-/**
- * The street art for each window shape, in its own pixels: `door` is the doorway's centre (the
- * point the walk-in zooms toward), `wallTop` the first brick row under the wall's coping (the
- * slabs always hang below it), `doorLeft` the doorframe's outer left edge (the slabs centre in
- * the wall left of it).
- */
-const STREETS = {
-  portrait: {
-    source: require("@/assets/images/ui/v2/bgs/main-menu-bg.jpg"),
-    width: 1152,
-    height: 2048,
-    door: { x: 762, y: 1440 },
-    wallTop: 820,
-    doorLeft: 600,
-  },
-  landscape: {
-    source: require("@/assets/images/ui/v2/bgs/main-menu-bg-landscape.jpg"),
-    width: 2048,
-    height: 1152,
-    door: { x: 1205, y: 826 },
-    wallTop: 420,
-    doorLeft: 1092,
-  },
-} as const;
-type Street = (typeof STREETS)[keyof typeof STREETS];
 const WALL_PAD = 12;
 /**
  * The interior's warm wood, which fills the screen at the threshold.
@@ -84,6 +61,7 @@ const WALL_PAD = 12;
 const INTERIOR = "#c98a4b";
 const ENTER_MS = 900;
 const ENTER_ZOOM = 3.4;
+const SKY_RISE_MS = 1_100;
 const LOGO_MAX_WIDTH = 280;
 
 type Variant = ModeVariant & { href: Href };
@@ -152,19 +130,6 @@ const SLABS: readonly Slab[] = [
 ];
 const SLAB_MAX_WIDTH = Math.max(...SLABS.map((slab) => slab.width));
 
-/** Where a point of the art lands in a box the art covers (centred, cropped to fill). */
-function artPoint(
-  art: Street,
-  box: { width: number; height: number },
-  point: { x: number; y: number },
-) {
-  const scale = Math.max(box.width / art.width, box.height / art.height);
-  return {
-    x: point.x * scale - (art.width * scale - box.width) / 2,
-    y: point.y * scale - (art.height * scale - box.height) / 2,
-  };
-}
-
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
   const { streakBanner, dismissStreakBanner, levelUp, dismissLevelUp } =
@@ -187,15 +152,18 @@ export function HomeScreen() {
 
   /** 0 on the street, 1 through the door. */
   const enter = useSharedValue(0);
+  /** 0 on the street, 1 in the night sky lobby. */
+  const skyRise = useSharedValue(0);
   const leaving = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
       leaving.current = false;
       enter.set(0);
+      skyRise.set(0);
       setTutorialDone(readItem(TUTORIAL_DONE) !== null);
       return () => setOfflineOpen(false);
-    }, [enter]),
+    }, [enter, skyRise]),
   );
 
   // Reveal the tray after the book finishes closing over the street.
@@ -208,7 +176,7 @@ export function HomeScreen() {
     return () => clearTimeout(timer);
   }, [requestedOffline, reduceMotion]));
 
-  const go = (href: Href) => {
+  const go = (href: Href, riseToSky = false) => {
     if (leaving.current) return;
     setOfflineOpen(false);
     if (reduceMotion) {
@@ -216,6 +184,11 @@ export function HomeScreen() {
       return;
     }
     leaving.current = true;
+    if (riseToSky) {
+      skyRise.set(withTiming(1, { duration: SKY_RISE_MS, easing: Easing.inOut(Easing.cubic) }));
+      setTimeout(() => router.push(href), SKY_RISE_MS);
+      return;
+    }
     enter.set(
       withTiming(1, { duration: ENTER_MS, easing: Easing.in(Easing.cubic) }),
     );
@@ -237,8 +210,21 @@ export function HomeScreen() {
   const zoom = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(enter.get(), [0, 1], [1, ENTER_ZOOM]) }],
   }));
+  const skyStreet = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(skyRise.get(), [0, 1], [0, box.height * 0.78]) },
+      { scale: interpolate(skyRise.get(), [0, 1], [1, 1.38]) },
+    ],
+  }));
+  const skyReveal = useAnimatedStyle(() => ({
+    opacity: interpolate(skyRise.get(), [0, 0.25, 1], [0, 0.2, 1], "clamp"),
+    transform: [{ scale: interpolate(skyRise.get(), [0, 1], [1.04, 1]) }],
+  }));
   const uiFade = useAnimatedStyle(() => ({
-    opacity: interpolate(enter.get(), [0, 0.3], [1, 0], "clamp"),
+    opacity:
+      interpolate(enter.get(), [0, 0.3], [1, 0], "clamp") *
+      interpolate(skyRise.get(), [0, 0.5, 1], [1, 0.25, 0], "clamp"),
+    transform: [{ translateY: interpolate(skyRise.get(), [0, 1], [0, 28]) }],
   }));
   const warm = useAnimatedStyle(() => ({
     opacity: interpolate(enter.get(), [0.5, 1], [0, 1], "clamp"),
@@ -262,11 +248,13 @@ export function HomeScreen() {
           zoom,
         ]}
       >
-        <Image
-          contentFit="cover"
-          source={street.source}
-          style={StyleSheet.absoluteFill}
-        />
+        <Animated.View style={[StyleSheet.absoluteFill, skyStreet]}>
+          <Image contentFit="cover" source={street.source} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      </Animated.View>
+
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, skyReveal]}>
+        <ParlorBackground />
       </Animated.View>
 
       <Animated.View
@@ -338,7 +326,7 @@ export function HomeScreen() {
                 disabled={online && offline ? "Offline" : undefined}
                 highlight={key === "tutorial" && !tutorialDone}
                 onPress={() =>
-                  href ? go(href) : setOfflineOpen((open) => !open)
+                  href ? go(href, online === true) : setOfflineOpen((open) => !open)
                 }
                 testID={`home-slab-${key}`}
               />
