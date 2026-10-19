@@ -159,7 +159,8 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  // Keep offscreen tray and ledger animations from expanding the web document.
+  root: { flex: 1, overflow: "hidden" },
   // Overlap the scene while keeping the whole chip inside the native touchable bounds.
   rack: { position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 },
   tray: { top: 42, borderTopLeftRadius: 14, borderTopRightRadius: 14, borderTopWidth: 2, borderColor: "#d6a56a" },
