@@ -134,6 +134,38 @@ async function mount(room: FakeRoom): Promise<Handle> {
 }
 
 describe("useOnlineGame", () => {
+  test.each([
+    { kind: "choice", tile: { id: "special", letter: "A", points: 1, alternativeLetter: "E", alternativePoints: 1 } satisfies Tile },
+    { kind: "blank", tile: { id: "special", letter: "?", points: 0, blank: true } satisfies Tile },
+  ])("checks an invalid river word built with a private $kind tile", async ({ tile }) => {
+    const room = makeRoom(HERO, liveState({
+      phase: "river",
+      betting: { active: false },
+      toActSeat: -1,
+      wordWindow: { active: true, status: "open", slots: [{ playerId: HERO, status: "drafting" }] },
+    }));
+    const handle = await mount(room);
+    const rack: readonly Tile[] = [tile, RACK[0]];
+    const plays = [{ tileId: "special", chosenFace: "E" }, { tileId: "t-g" }];
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({
+      rack,
+      word: { status: "drafting", draft: null, confirmed: null },
+      wordCheck: { checksRemaining: 3, result: null },
+    })));
+    await act(async () => handle.current.setDraft(plays));
+    expect(handle.current.words?.reason).toBeNull();
+    expect(handle.current.words?.word).toBe("EG");
+    await act(async () => handle.current.checkWord());
+    expect(room.sends).toContainEqual({ type: GAME_MESSAGES.checkWord, payload: { submission: { plays } } });
+    await act(async () => room.emit(GAME_EVENTS.privateState, privateState({
+      rack,
+      word: { status: "drafting", draft: null, confirmed: null },
+      wordCheck: { checksRemaining: 2, result: { submission: { plays }, word: "EG", valid: false, points: null } },
+    })));
+    expect(handle.current.wordCheck.result).toMatchObject({ word: "EG", valid: false });
+    expect(handle.current.words?.reason).toBeNull();
+  });
+
   test("counts replay requests live and moves only the hero who left results to readiness", async () => {
     const state = (heroSeen = false, opponentSeen = false, departed = false) => liveState({
       phase: "payout", betting: { active: false }, toActSeat: -1,

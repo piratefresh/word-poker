@@ -126,3 +126,13 @@ test("names a table that has already started as such", async () => {
   joinById.mockRejectedValue(Object.assign(new Error("That table has already started."), { code: 4211 }));
   await expect(joinTable("table-1")).rejects.toThrow("That table has already started.");
 });
+
+test("explains the unique-session refusal when the account already holds a seat", async () => {
+  joinById.mockRejectedValue(Object.assign(new Error("max sessions reached"), { code: 4400 }));
+  await expect(joinTable("table-1")).rejects.toThrow(
+    "Your account already has a seat. Leave your other table or browser tab before joining. If it disconnected, wait for that seat to expire.",
+  );
+  create.mockRejectedValue(Object.assign(new Error("max sessions reached"), { code: 4400 }));
+  await expect(createTable({ name: "Table", buyIn: 500, maxSeats: 2, powerUps: { deal: "off" } }))
+    .rejects.toThrow("Your account already has a seat.");
+});
