@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AppState } from "react-native";
 import * as Network from "expo-network";
 import type { HandRecord } from "@wordpoker/contracts";
 import { authClient } from "@/auth/client/auth-client";
@@ -55,22 +54,12 @@ function AccountHistory({ ownerId, children }: { ownerId: string | null; childre
     return () => { active = false; };
   }, [ownerId, revision]);
 
-  useEffect(() => {
-    let active = true;
-    void Network.getNetworkStateAsync().then((state) => { if (active && state.isConnected) refresh(); }).catch(() => undefined);
-    const app = AppState.addEventListener("change", (state) => { if (state === "active") refresh(); });
-    const network = Network.addNetworkStateListener((state) => { if (state.isConnected) refresh(); });
-    // Bounded, persisted retries also run while the app remains in the foreground.
-    const timer = setInterval(() => { if (AppState.currentState === "active") refresh(); }, 30_000);
-    return () => { active = false; app.remove(); network.remove(); clearInterval(timer); };
-  }, [refresh]);
-
+  // Sync is manual only: the sync pill calls `refresh`.
   const capture = useCallback(async (record: HandRecord) => {
     if (!ownerId) throw new Error("Sign in before starting a hand to save its history.");
     await captureHistoryHand(ownerId, record);
     changed();
-    refresh();
-  }, [changed, ownerId, refresh]);
+  }, [changed, ownerId]);
   const value = useMemo(() => ({ ownerId, revision, syncing, offline, lastSyncedAt, uploadingSessionId, pendingSessions, error, capture, refresh }),
     [ownerId, revision, syncing, offline, lastSyncedAt, uploadingSessionId, pendingSessions, error, capture, refresh]);
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;
