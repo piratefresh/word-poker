@@ -1,13 +1,14 @@
 import { act, render, waitFor, type RenderResult } from "@testing-library/react-native";
 import { useEffect as mockUseEffect } from "react";
 import { addFriend, getFriends, acceptFriend, removeFriend } from "@/lib/friends/friends-client";
+import { router } from "expo-router";
 import { FriendsScreen } from "./friends-screen";
 
 let mockGuest = false;
 let mockCode: string | undefined = "ABCD2345";
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: () => ({ data: { user: { id: "caller", isAnonymous: mockGuest } } }) } }));
 jest.mock("expo-router", () => ({
-  router: { dismissTo: jest.fn(), push: jest.fn() },
+  router: { dismissTo: jest.fn(), navigate: jest.fn(), push: jest.fn() },
   useLocalSearchParams: () => ({ add: mockCode }),
   useFocusEffect: (callback: () => () => void) => { mockUseEffect(callback, [callback]); },
 }));
@@ -75,4 +76,15 @@ test("shows each friend's presence", async () => {
   const view = await render(<FriendsScreen />);
   await waitFor(() => expect(view.getByTestId("friend-name-friend")).toBeTruthy());
   expect(JSON.stringify(view.getByTestId("friend-name-friend").props)).toContain("Bea · At a table");
+});
+
+test("the tab is a tray that closes back to Home", async () => {
+  jest.useFakeTimers();
+  const view = await render(<FriendsScreen />);
+  await waitFor(() => expect(view.getByTestId("friends-tray")).toBeTruthy());
+  await press(view, "friends-close");
+  expect(view.queryByTestId("friends-tray")).toBeNull();
+  await act(async () => { jest.advanceTimersByTime(300); });
+  expect(router.navigate).toHaveBeenCalledWith("/");
+  jest.useRealTimers();
 });

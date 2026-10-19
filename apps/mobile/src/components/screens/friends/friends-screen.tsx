@@ -2,16 +2,16 @@ import { Button as ExpoButton, Column, Host, RNHostView, Row, Text, type Univers
 import { isFriendCode, type Friend, type FriendsPage } from "@wordpoker/contracts";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState, type ComponentProps } from "react";
-import { SectionList, Share, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Share, StyleSheet, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { authClient } from "@/auth/client/auth-client";
-import { colors, fonts, fontSize, layout, radius, spacing } from "@/constants/theme";
+import { TRAY_EXIT_MS, TrayFrame } from "@/components/screens/home/components/tray-frame";
+import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
 import { acceptFriend, addFriend, getFriends, removeFriend } from "@/lib/friends/friends-client";
 import { friendLinkFor } from "@/lib/navigation/invite-link";
 import { menuFeedback } from "@/lib/ui/menu-feedback";
 import { webTestID } from "@/lib/ui/web-id";
 
-const titleText = { color: colors.goldHi, fontFamily: fonts.serifBold, fontSize: fontSize.h2 } satisfies UniversalTextStyle;
 const bodyText = { color: colors.textBright, fontFamily: fonts.sans, fontSize: fontSize.body } satisfies UniversalTextStyle;
 const sectionText = { color: colors.goldHi, fontFamily: fonts.monoBold, fontSize: fontSize.small, letterSpacing: 1.4 } satisfies UniversalTextStyle;
 const STATUS_LABEL = { online: "Online", "at-table": "At a table", offline: "Offline" } as const;
@@ -74,25 +74,39 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
     }
   };
 
-  const sections: Section[] = page ? [
+  const sections: Section[] = page && !anonymous ? [
     { title: "REQUESTS", kind: "incoming", data: page.incoming },
     { title: "FRIENDS", kind: "friends", data: page.friends },
     { title: "SENT", kind: "outgoing", data: page.outgoing },
   ] : [];
 
-  return <SafeAreaView edges={["top"]} style={styles.screen} testID="friends-screen">
-    <SectionList<Friend, Section>
-      contentContainerStyle={styles.content}
-      sections={anonymous ? [] : sections}
-      keyExtractor={(item) => item.userId}
-      ListHeaderComponent={<Host colorScheme="dark" matchContents={{ vertical: true }} style={{ width: "100%" }} seedColor={colors.gold}>
+  // The tab is the tray: it rises when the tab gains focus and returns to Home when closed.
+  const reduceMotion = useReducedMotion();
+  const [shown, setShown] = useState(false);
+  const [height, setHeight] = useState(0);
+  useFocusEffect(useCallback(() => {
+    setShown(true);
+    return () => setShown(false);
+  }, []));
+  const close = useCallback(() => {
+    setShown(false);
+    setTimeout(() => router.navigate("/"), reduceMotion ? 0 : TRAY_EXIT_MS);
+  }, [reduceMotion]);
+  const online = page?.friends.filter((friend) => friend.status === "online" || friend.status === "at-table").length ?? 0;
+  const subline = anonymous ? "Play together" : !page ? "Loading friends…" : page.friends.length === 0 ? "Add friends to play together"
+    : `${page.friends.length} ${page.friends.length === 1 ? "friend" : "friends"} · ${online} online`;
+
+  return <View style={styles.screen} testID="friends-screen" onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
+    {shown ? <TrayFrame id="friends" title="FRIENDS" subline={subline} closeLabel="Close friends" onClose={close}
+      // Clears the Home header, as the Offline tray does.
+      maxHeight={Math.max(180, height - 190)}>
+      <Host colorScheme="dark" matchContents={{ vertical: true }} style={{ width: "100%" }} seedColor={colors.gold}>
         <Column alignment="start" spacing={spacing.md}>
-          <Text textStyle={titleText}>Friends</Text>
           {anonymous ? <>
             <Text textStyle={bodyText}>Sign up to add friends.</Text>
             <Button label="Create account" onPress={() => router.push("/sign-up")} />
           </> : <>
-            <Text textStyle={bodyText}>{page ? `YOUR CODE: ${page.code}` : "Loading friends…"}</Text>
+            {page ? <Text textStyle={bodyText}>{`YOUR CODE: ${page.code}`}</Text> : null}
             {page && page.referrals > 0 ? <Text textStyle={bodyText} testID="friends-referrals">{`${page.referrals} ${page.referrals === 1 ? "friend" : "friends"} joined through you`}</Text> : null}
             {page ? <Button label="SHARE" testID="friends-share" onPress={() => {
               void Share.share({ message: friendLinkFor(page.code) }).catch(() => setMessage("Couldn't share. Try again."));
@@ -106,45 +120,49 @@ function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string 
             {page && sections.every((section) => section.data.length === 0) ? <Text textStyle={bodyText}>Share your code to add friends.</Text> : null}
           </>}
         </Column>
-      </Host>}
-      renderSectionHeader={({ section }) => section.data.length ? <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark"><Text textStyle={sectionText}>{section.title}</Text></Host> : null}
-      renderItem={({ item, section }) => <View style={styles.row}>
-        <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark" seedColor={colors.gold}>
-          <Column alignment="start" spacing={spacing.sm}>
-            <Text textStyle={bodyText} testID={`friend-name-${item.userId}`}>{item.status ? `${item.name} · ${STATUS_LABEL[item.status]}` : item.name}</Text>
-            <Row spacing={spacing.sm}>
-              {section.kind === "incoming" ? <Button label="Accept" disabled={busy} testID={`friend-accept-${item.userId}`} onPress={() => { void act(() => acceptFriend(item.userId)); }} /> : null}
-              <Button label={section.kind === "incoming" ? "Decline" : section.kind === "outgoing" ? "Cancel" : "Remove"} disabled={busy}
-                testID={`friend-${section.kind === "incoming" ? "decline" : section.kind === "outgoing" ? "cancel" : "remove"}-${item.userId}`}
-                onPress={() => { void act(() => removeFriend(item.userId)); }} variant="outlined" />
-            </Row>
-          </Column>
-        </Host>
-      </View>}
-    />
-  </SafeAreaView>;
-}
-
-/** Native controls keep their testID; Maestro web reads the surrounding DOM id first. */
-function Button(props: ComponentProps<typeof ExpoButton>) {
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-  return <RNHostView matchContents>
-    <View
-      id={webTestID(props.testID)}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => { setHovered(false); setPressed(false); }}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      style={props.disabled ? undefined : menuFeedback(hovered, pressed)}
-    >
-      <Host matchContents colorScheme="dark" seedColor={colors.gold}><ExpoButton {...props} /></Host>
-    </View>
-  </RNHostView>;
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  content: { alignSelf: "center", width: "100%", maxWidth: layout.maxContentWidth, padding: spacing.gutter, paddingTop: spacing.xxxl, gap: spacing.md },
-  row: { padding: spacing.md, borderRadius: radius.card, backgroundColor: colors.surfaceStrong },
-});
+      </Host>
+      {/* ponytail: a plain map, fine for a friends list; virtualize if lists grow past a few hundred. */}
+      {sections.filter((section) => section.data.length).map((section) => <View key={section.kind} style={styles.section}>
+        <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark"><Text textStyle={sectionText}>{section.title}</Text></Host>
+        {section.data.map((item) => <View key={item.userId} style={styles.row}>
+          <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark" seedColor={colors.gold}>
+            <Column alignment="start" spacing={spacing.sm}>
+              <Text textStyle={bodyText} testID={`friend-name-${item.userId}`}>{item.status ? `${item.name} · ${STATUS_LABEL[item.status]}` : item.name}</Text>
+              <Row spacing={spacing.sm}>
+                {section.kind === "incoming" ? <Button label="Accept" disabled={busy} testID={`friend-accept-${item.userId}`} onPress={() => { void act(() => acceptFriend(item.userId)); }} /> : null}
+                <Button label={section.kind === "incoming" ? "Decline" : section.kind === "outgoing" ? "Cancel" : "Remove"} disabled={busy}
+                  testID={`friend-${section.kind === "incoming" ? "decline" : section.kind === "outgoing" ? "cancel" : "remove"}-${item.userId}`}
+                  onPress={() => { void act(() => removeFriend(item.userId)); }} variant="outlined" />
+              </Row>
+            </Column>
+          </Host>
+        </View>)}
+      </View>)}
+    </TrayFrame> : null}
+  </View>;
+  }
+  
+  /** Native controls keep their testID; Maestro web reads the surrounding DOM id first. */
+  function Button(props: ComponentProps<typeof ExpoButton>) {
+    const [hovered, setHovered] = useState(false);
+    const [pressed, setPressed] = useState(false);
+    return <RNHostView matchContents>
+      <View
+        id={webTestID(props.testID)}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => { setHovered(false); setPressed(false); }}
+        onPointerDown={() => setPressed(true)}
+        onPointerUp={() => setPressed(false)}
+        style={props.disabled ? undefined : menuFeedback(hovered, pressed)}
+      >
+        <Host matchContents colorScheme="dark" seedColor={colors.gold}><ExpoButton {...props} /></Host>
+      </View>
+    </RNHostView>;
+  }
+  
+  const styles = StyleSheet.create({
+    // Transparent, so the Home street shows behind the tray.
+    screen: { flex: 1 },
+    section: { gap: spacing.sm },
+    row: { padding: spacing.md, borderRadius: radius.card, backgroundColor: "rgba(0,0,0,0.2)" },
+  });
