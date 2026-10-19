@@ -994,7 +994,7 @@ function decodeStanding(value: unknown): ResultStandingView {
   };
 }
 
-/** Rebuild a domain `Tile` from the flat `TileState` the schema broadcasts (inverse of the server). */
+/** Public tiles use the schema's `kind`; private messages carry domain tiles directly. */
 function decodeTile(value: unknown): Tile {
   const record = isRecord(value) ? value : {};
   const id = stringOf(record.id);
@@ -1010,7 +1010,9 @@ function decodeTile(value: unknown): Tile {
     ...(multiplier !== undefined ? { multiplier } : {}),
   };
 
-  if (record.kind === "choice") {
+  if (record.blank === true) return { ...base, letter: "?", points: 0, blank: true };
+
+  if (record.kind === "choice" || stringOf(record.alternativeLetter).length > 0) {
     return {
       ...base,
       alternativeLetter: stringOf(record.alternativeLetter),

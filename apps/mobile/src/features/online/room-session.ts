@@ -34,6 +34,7 @@ const MATCHMAKE_NO_HANDLER = 520;
 const MATCHMAKE_INVALID_CRITERIA = 521;
 const MATCHMAKE_INVALID_ROOM_ID = 522;
 const MATCHMAKE_EXPIRED = 524;
+const UNIQUE_SESSION_LIMIT = 4400;
 
 /** The table as the synced state mirrors it — enough to seat a screen, nothing more. */
 export interface TableSnapshot {
@@ -165,6 +166,9 @@ function joinFailure(error: unknown): string {
   if (code === 401) return "Sign in to join an online table.";
   if (code === 503) return "Sign-in could not be verified. Try again.";
   if (code === 409) return "Your account already has a seat at that table.";
+  if (code === UNIQUE_SESSION_LIMIT) {
+    return "Your account already has a seat. Leave your other table or browser tab before joining. If it disconnected, wait for that seat to expire.";
+  }
   if (error instanceof Error && error.message === TABLE_STARTED_MESSAGE) return TABLE_STARTED_MESSAGE;
   if (code === MATCHMAKE_INVALID_ROOM_ID) return "That table is full or has just closed.";
   if (code === MATCHMAKE_NO_HANDLER || code === MATCHMAKE_INVALID_CRITERIA) {
@@ -176,6 +180,7 @@ function joinFailure(error: unknown): string {
 
 /** A create's refusal is our own validator's sentence, so the server's words are the ones shown. */
 function createFailure(error: unknown): string {
+  if ((error as { code?: unknown } | null)?.code === UNIQUE_SESSION_LIMIT) return joinFailure(error);
   const message = error instanceof Error ? error.message : undefined;
   return message && message.length > 0 ? message : "Couldn't create that table.";
 }
@@ -318,7 +323,7 @@ export async function createTable(options: GameRoomCreateOptions): Promise<strin
     if (taken !== attempt) throw error;
     inFlight = null;
     const message = createFailure(error);
-    console.warn("[room-session] create failed", message);
+    console.warn("[room-session] create failed", (error as { code?: unknown } | null)?.code, message);
     publish({ status: "error", error: message });
     throw new Error(message);
   }
@@ -351,7 +356,7 @@ export async function joinTable(roomId: string): Promise<void> {
     if (taken !== attempt) throw error;
     inFlight = null;
     const message = joinFailure(error);
-    console.warn("[room-session] join failed", roomId, message);
+    console.warn("[room-session] join failed", roomId, (error as { code?: unknown } | null)?.code, message);
     publish({ status: "error", roomId, error: message });
     throw new Error(message);
   }

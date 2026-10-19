@@ -3,12 +3,11 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { LOBBY_ROOM_NAME, WAITING_PHASE, type RoomSummary } from "@wordpoker/contracts";
 
 import { useLobby } from "./use-lobby";
+import { gameClient } from "./game-client";
 
 // The socket itself is the test's to drive: `joinOrCreate` hands back a subscription whose
 // messages the test pushes by hand, so nothing here waits on a server.
 jest.mock("./game-client", () => ({ gameClient: { joinOrCreate: jest.fn() } }));
-
-import { gameClient } from "./game-client";
 
 const joinOrCreate = gameClient.joinOrCreate as unknown as jest.Mock;
 
@@ -62,14 +61,14 @@ function listing(roomId: string, overrides: Partial<RoomSummary> = {}) {
   return {
     roomId,
     clients: 1,
-    maxClients: 6,
+    maxClients: 4,
     locked: false,
     metadata: {
       name: `Table ${roomId}`,
       buyIn: 500,
       smallBlind: 5,
       bigBlind: 10,
-      maxSeats: 6,
+      maxSeats: 4,
       powerUps: { deal: "off" },
       status: WAITING_PHASE,
     },
@@ -121,12 +120,12 @@ test("night lobby data follows live fills and removals without another subscript
   expect(view.result.current.loading).toBe(false);
   expect(view.result.current.headliner?.roomId).toBe("alpha");
   expect(view.result.current.listRooms.map((room) => room.roomId)).toEqual(["beta"]);
-  expect(view.result.current.readout).toBe("2 live · 10 open seats");
+  expect(view.result.current.readout).toBe("2 live · 6 open seats");
 
-  await push(lobby, ADDED, ["alpha", listing("alpha", { clients: 6 })]);
+  await push(lobby, ADDED, ["alpha", listing("alpha", { clients: 4 })]);
   expect(view.result.current.headliner?.roomId).toBe("beta");
   expect(view.result.current.listRooms.map((room) => room.roomId)).toEqual(["alpha"]);
-  expect(view.result.current.readout).toBe("2 live · 5 open seats");
+  expect(view.result.current.readout).toBe("2 live · 3 open seats");
 
   await push(lobby, REMOVED, "beta");
   expect(view.result.current.headliner).toBeUndefined();
@@ -157,7 +156,7 @@ test("lists only the entries it can describe as a table", async () => {
     listing("alpha"),
     { roomId: "no-metadata" },
     "nonsense",
-    { roomId: "wrong-type", clients: "1", maxClients: 6, metadata: listing("x").metadata },
+    { roomId: "wrong-type", clients: "1", maxClients: 4, metadata: listing("x").metadata },
     listing("beta", { locked: true }),
   ]);
 
@@ -174,8 +173,8 @@ test("adds a table, replaces the one that changed, and drops the one that closed
   expect(view.result.current.rooms.map((room) => room.roomId)).toEqual(["alpha", "beta"]);
 
   // A listing that came back for a row already held is the same table with fresher numbers.
-  await push(lobby, ADDED, ["beta", listing("beta", { clients: 6 })]);
-  expect(view.result.current.rooms.map((room) => room.clients)).toEqual([1, 6]);
+  await push(lobby, ADDED, ["beta", listing("beta", { clients: 4 })]);
+  expect(view.result.current.rooms.map((room) => room.clients)).toEqual([1, 4]);
 
   // And a `+` nobody can describe changes nothing.
   await push(lobby, ADDED, ["gamma", { roomId: "gamma" }]);
