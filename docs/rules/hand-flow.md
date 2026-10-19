@@ -50,8 +50,9 @@ The offline game plays one hand on the client, with no server in the loop:
 - The word builder is on screen the whole hand: a seat drags or taps tiles from its rack and
   the board into the word band, reads §11's reason when the draft cannot stand, and confirms
   inside §19's window. The felt's own row is the whole control surface — fold, check/call,
-  the bet/raise slider, and all-in behind its confirmation — and the check doubles as the
-  window's confirm. The bots build words the same way, searching their tiles against the
+  the bet/raise slider, and all-in behind its confirmation. Once betting ends, that row becomes
+  **Submit Word** with the shared submission deadline and a reminder that submission locks
+  the word. The bots build words the same way, searching their tiles against the
   table's dictionary; a bot whose tiles spell nothing the table counts confirms nothing, and
   that window ends on its clock.
 - Before play the mode names the dictionary it judges against (§11), and the table does not

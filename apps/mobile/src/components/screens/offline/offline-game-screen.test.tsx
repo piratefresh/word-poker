@@ -460,16 +460,15 @@ describe("<OfflineGameScreen />", () => {
     const view = await renderTable();
     await advanceToWordWindow(view);
 
-    // The window is open and the hero has nothing to confirm yet, so the row is the table's
-    // own controls gone quiet: the call button falls back to `CALL $0` and does nothing.
+    // An empty draft keeps Submit Word disabled during the final stage.
     await fireEvent.press(view.getByTestId("action-check-call"));
 
-    expect(view.getByText("RIVER")).toBeOnTheScreen();
+    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
     expect(view.queryByText("PAYOUT")).toBeNull();
 
     await beat();
 
-    expect(view.getByText("RIVER")).toBeOnTheScreen();
+    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
     expect(view.queryByText("PAYOUT")).toBeNull();
   });
 

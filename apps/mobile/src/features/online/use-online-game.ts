@@ -237,7 +237,7 @@ interface RoomView {
   community: readonly Tile[];
   betting: { currentBet: number; minRaise: number; bigBlind: number } | null;
   pots: readonly number[];
-  word: { status: "open" | "settled"; slots: readonly WordSlotView[] } | null;
+  word: { status: "open" | "settled"; slots: readonly WordSlotView[]; endsAtMs?: number; deadline?: number } | null;
   result: ResultView | null;
   /** §40: the table deals powers (Wild). */
   wild: boolean;
@@ -364,7 +364,7 @@ export function useOnlineGame({
   }
 
   useEffect(() => {
-    const handleState = (state: unknown) => setView(decodeRoom(state));
+    const handleState = (state: unknown) => setView((previous) => decodeRoom(state, previous));
     const handlePrivate = (payload: unknown) =>
       setPriv(decodePrivate(payload, Date.now(), drawClock.current));
     const handleRejected = (payload: unknown) => {
@@ -788,6 +788,7 @@ function perspectiveOf(
     available: waiting ? [] : availableFor(priv, view),
     word: {
       open: view.word?.status === "open",
+      endsAtMs: view.word?.endsAtMs,
       hero: heroWord === undefined || heroWord === "none" ? null : heroWord,
       confirmedPlays: priv?.word.confirmed ?? null,
     },
@@ -818,12 +819,20 @@ function feltSeatCount(maxSeats: number): 4 | 5 | 6 {
  * place, so each is copied into a plain snapshot a React render can compare by reference.
  * ------------------------------------------------------------------------------------------- */
 
-function decodeRoom(state: unknown): RoomView | null {
+function decodeRoom(state: unknown, previous?: RoomView | null): RoomView | null {
   if (!isRecord(state) || !isRecord(state.table)) return null;
   const table = state.table;
   const betting = isRecord(state.betting) ? state.betting : null;
   const word = isRecord(state.wordWindow) ? state.wordWindow : null;
   const result = isRecord(state.result) ? state.result : null;
+  // Preserve the first device anchor across patches, including other players submitting.
+  // On reconnect/mount, use the server's remaining time rather than a fresh 60 seconds.
+  let wordEndsAtMs: number | undefined;
+  if (word?.status === "open" && typeof word.deadline === "number" && typeof word.now === "number") {
+    wordEndsAtMs = previous?.handCount === numberOf(state.handCount) && previous.word?.deadline === word.deadline
+      ? previous.word.endsAtMs
+      : Date.now() + Math.max(0, word.deadline - word.now);
+  }
 
   return {
     phase: (state.phase as RoomPhase) ?? WAITING_PHASE,
@@ -845,7 +854,7 @@ function decodeRoom(state: unknown): RoomView | null {
     pots: iterate(state.pots).map((pot) => numberOf((pot as Record<string, unknown>).amount)),
     word:
       word?.status === "open" || word?.status === "settled"
-        ? { status: word.status, slots: iterate(word.slots).map(decodeWordSlot) }
+        ? { status: word.status, slots: iterate(word.slots).map(decodeWordSlot), endsAtMs: wordEndsAtMs, deadline: numberOf(word.deadline) }
         : null,
     result:
       result?.available === true

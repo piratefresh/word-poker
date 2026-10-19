@@ -116,21 +116,20 @@ tags:
     id: "word-builder-tile-E-11"
 - assertVisible: "FE"
 
-# Using the power did not end the turn. Play it out: CHECK answers every turn, and inside §19's
-# window it locks FE in. The window puts no seat on the turn, so on the river the row is tapped
-# whether or not the browser holds it.
+# Using the power did not end the turn. Check/call answers betting, and SUBMIT WORD locks FE
+# in during the final stage. After acceptance, wait for the other seats without tapping again.
 - repeat:
     while:
       notVisible:
         text: "PAYOUT"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER|PAYOUT"
-          timeout: 40000
+          visible: "YOUR TURN|SUBMIT WORD|PAYOUT"
+          timeout: 70000
           optional: true
       - runFlow:
           when:
-            visible: "YOUR TURN|RIVER"
+            visible: "YOUR TURN|SUBMIT WORD"
           commands:
             - tapOn:
                 id: "action-check-call"

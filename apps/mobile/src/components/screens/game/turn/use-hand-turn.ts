@@ -10,7 +10,7 @@ import { holdTurn, openTurn, turnKey } from "./turn-anchor";
  * table's clock. Must sit inside a `TurnClockProvider`.
  */
 export function useHandTurn(
-  game: Pick<GameScreenState, "id" | "secondsRemaining">,
+  game: Pick<GameScreenState, "id" | "secondsRemaining" | "turnEndsAtMs">,
   clockHeld: boolean,
 ) {
   // The shared clock's reading, not a fresh clock read: a deadline derived from a new

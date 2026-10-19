@@ -281,6 +281,8 @@ function GameScreenBody({
           onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
           pot={game.pot}
           state={game.betting}
+          submission={game.wordSubmission}
+          timer={view}
         />
       )}
     </View>
@@ -425,10 +427,10 @@ function GameScreenBody({
         onHelp={onHelp}
         onLeave={goBack}
         phase={game.phase}
-        stamp={waiting?.stamp}
+        stamp={waiting?.stamp ?? (game.wordSubmission ? "FINAL STAGE" : undefined)}
         style={{ top: insets.top }}
         turn={waiting ? null : view}
-        turnPhrase={heroTurnPhrase(game)}
+        turnPhrase={game.wordSubmission ? "Word submission deadline" : heroTurnPhrase(game)}
       />
       {modal ? (
         <View pointerEvents="box-none" style={styles.modalLayer}>

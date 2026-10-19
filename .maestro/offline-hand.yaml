@@ -143,11 +143,17 @@ tags:
     containsDescendants:
       - text: "\\$20"
 - assertVisible:
-    text: "RIVER"
+    text: "FINAL STAGE · SUBMIT YOUR WORD"
+- assertVisible:
+    text: "Shared submission deadline.*"
+- assertNotVisible:
+    id: "action-fold"
+- assertNotVisible:
+    id: "all-in-button"
 
 # The river's close opened §19's window: the band under the felt — the draft line and the
-# strip of tiles the seat sorts — is what the flow builds its word through. The phase stays
-# the river while the window is open.
+# strip of tiles the seat sorts — is what the flow builds its word through. The HUD names
+# the final stage while the gameplay phase stays river.
 #
 # Build the word out of three tiles the strip holds for this seed. The strip's tiles carry test
 # ids and the felt's copies of them carry none — those draw the state alone — so by its id a tap
@@ -179,19 +185,11 @@ tags:
 - assertVisible:
     text: "14 pts"
 
-# §19's window turns the check into the confirm: the word as it stands is locked in, and no
-# second control row carries a confirm of its own. The row's control is tapped until the hand pays
-# out rather than once — the hero's opening bet can be raised at, so the round is answered street
-# by street, and the tap that confirms is the one §19's window arms. The taps are by id, because
-# the felt's nameplates print CHECK and CALL as seat status too.
-- repeat:
-    while:
-      notVisible:
-        text: "PAYOUT"
-    commands:
-      - tapOn:
-          id: "action-check-call"
-      - waitForAnimationToEnd
+# Submit once, then let the remaining seats answer on the shared clock.
+- assertVisible:
+    text: "SUBMIT WORD"
+- tapOn:
+    id: "action-check-call"
 
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
 # immediately when the bots found words, or on the window's clock when they did not.

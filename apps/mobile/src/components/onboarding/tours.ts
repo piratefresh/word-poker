@@ -77,7 +77,7 @@ export const HELPER_TOUR: readonly CoachStep[] = [
     title: "Your action",
     body:
       "CHECK passes when nothing is owed, CALL matches the bet, FOLD gives up the hand. Once " +
-      "the river's betting is done the Word Window opens, and CHECK locks your word in.",
+      "the river's betting is done the final stage opens, and SUBMIT WORD locks your word in.",
     target: "actions",
     side: "top",
     advance: "next",
@@ -225,7 +225,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "J",
     title: "Lock in your word",
     body:
-      "Your rack spells CLOTH. Tap CHECK to lock it in. A locked word is final — even if it " +
+      "Betting is complete. Your rack spells CLOTH. Tap SUBMIT WORD to lock it in. A locked word is final — even if it " +
       "isn't in the dictionary.",
     target: "check",
     side: "top",
