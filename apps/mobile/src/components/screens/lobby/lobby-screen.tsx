@@ -1,127 +1,83 @@
-/**
- * lobby-screen.tsx — The Parlor: the tables open right now, and the way to deal one.
- *
- * The list is the subscription's own (`useLobby`), so a table that fills up or closes is a card
- * that updates or leaves rather than a screen that goes stale. §3's browser is drawn as the design
- * has it: the liveliest table takes the hero card with the felt and the one gold way in, the rest
- * follow as rows, and the rail above them counts the room. Which table is the hero, what its
- * button says and what the rail reads are `parlor-view.ts`'s three folds over the listing — this
- * screen is the drawing, and it holds no rules of its own.
- *
- * A tap takes a seat and then shows it. The seat already held is the one exception: a room counts
- * connections, not identities, so asking to join the table you are sitting at would take a second
- * seat rather than return to the first — that card routes to the seat instead of joining it.
- *
- * A refusal never leaves the card hanging on "taking your seat": the sentence goes up over the
- * buttons, the list is asked for again (a seat taken under us is what usually says no), and the
- * cards come back.
- *
- * Tables nobody can sit at — full under §5's cap, locked for §3's "temporarily unavailable" — stay
- * listed and visibly inert: a player watching a table fill is watching the room they were about to
- * take.
- */
+/** The 2a night lobby: headliner, filters, live room list, details, and create. */
 
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Image } from "expo-image";
+import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import Animated, { Easing, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { RoomSummary } from "@wordpoker/contracts";
 
 import { GoldButton } from "@/components/ui/gold-button";
-import {
-  border,
-  colors,
-  fonts,
-  fontSize,
-  radius,
-  spacing,
-} from "@/constants/theme";
+import { HomeNavRack, type HomeNavDestination } from "@/components/screens/home/home-nav-rack";
+import { artPoint, STREETS } from "@/components/screens/home/street-art";
+import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
-import { joinTable, useActiveRoomId } from "@/features/online/room-session";
+import { filterLobbyRooms, LOBBY_FILTERS, type LobbyFilter } from "@/features/online/lobby-view";
+import { joinTable, useActiveRoomId, useHostedRoomIds } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
 import { ParlorBackground } from "./parlor-background";
 import { ParlorNav } from "./parlor-nav";
-import { ParlorStats } from "./parlor-stats";
-import { parlorView } from "./parlor-view";
+import { RoomDetailsSheet } from "./room-details-sheet";
 import { RoomRow } from "./room-row";
 
-/** How much room the floating "deal" button and its shadow need under the last row. */
-const CTA_CLEARANCE = 96;
+const NAV_ROUTES: Record<HomeNavDestination, Href> = {
+  home: "/",
+  friends: "/friends",
+  history: "/history",
+  store: "/store",
+};
+const TABLE_ENTRY_MS = 900;
+const TABLE_ENTRY_ZOOM = 3.4;
 
 export function LobbyScreen() {
   const insets = useSafeAreaInsets();
-  const { status, rooms, refreshing, error, refresh } = useLobby();
+  const { width, height } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
+  const { status, rooms, headliner, listRooms, readout, refreshing, error, refresh } = useLobby();
   const activeRoomId = useActiveRoomId();
+  const hostedRoomIds = useHostedRoomIds();
   const { data: session } = authClient.useSession();
-  const { coins } = useQuests();
+  const { coins, state: questState } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
-  // Home's "Play a Friend" arrives with `create=1`: open the sheet once, then drop the param so a
-  // back-and-forth doesn't reopen it.
+  const [filter, setFilter] = useState<LobbyFilter>("All");
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const { create } = useLocalSearchParams<{ create?: string }>();
   const [creating, setCreating] = useState(create === "1");
+  const travel = useSharedValue(0);
+  const travelStarted = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      travelStarted.current = false;
+      travel.set(0);
+    }, [travel]),
+  );
+
+  const street = width > height ? STREETS.landscape : STREETS.portrait;
+  const door = artPoint(street, { width, height }, street.door);
+  const streetReveal = useAnimatedStyle(() => ({
+    opacity: interpolate(travel.get(), [0, 0.72, 1], [0, 1, 1], "clamp"),
+  }));
+  const sceneZoom = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(travel.get(), [0, 1], [1, TABLE_ENTRY_ZOOM]) }],
+  }));
+
   useEffect(() => {
     if (create === "1") router.setParams({ create: undefined });
   }, [create]);
 
-  const { featured, others, stats } = parlorView(rooms, activeRoomId, coins);
-  const joiningRoom =
-    joining === null
-      ? undefined
-      : rooms.find((room) => room.roomId === joining);
+  const selectedRoom = rooms.find((room) => room.roomId === selectedRoomId) ?? null;
+  const filteredRooms = filterLobbyRooms(listRooms, filter);
+  const joiningRoom = joining === null ? undefined : rooms.find((room) => room.roomId === joining);
+  const banner = refusal ?? (joiningRoom === undefined ? null : `Taking a seat at ${joiningRoom.metadata.name}…`);
+  const currentReadout = status === "loading" && rooms.length === 0 ? "Looking for tables…" : readout;
 
-  // One line over the buttons: the refusal if the last tap was refused, otherwise the seat it is
-  // still taking. A refusal is never shown beside "taking your seat", because it *is* the outcome.
-  const banner =
-    refusal ??
-    (joiningRoom === undefined
-      ? null
-      : `Taking a seat at ${joiningRoom.metadata.name}…`);
-
-  const openTable = (room: RoomSummary) => {
-    const { roomId } = room;
-
-    if (roomId === activeRoomId) {
-      // The seat is already this device's: a second `joinById` would take a second seat (§3), so
-      // the card is the way back to the table rather than a way into it.
-      router.push({ pathname: "/online/[roomId]", params: { roomId } });
-      return;
-    }
-
-    setRefusal(null);
-    setJoining(roomId);
-    void joinTable(roomId)
-      .then(() => {
-        router.push({ pathname: "/online/[roomId]", params: { roomId } });
-      })
-      .catch((failure: unknown) => {
-        // The sentence is the session's own read of the refusal: a table that filled or closed
-        // between the listing and the tap says so in the player's words, not a matchmaking code.
-        setRefusal(
-          failure instanceof Error
-            ? failure.message
-            : "That table could not be joined.",
-        );
-        // The list is the table's own account of itself: a seat taken under us is what says no,
-        // so what the screen holds is asked for again before the player tries the next card.
-        refresh();
-      })
-      .finally(() => setJoining(null));
-  };
-
-  // The route draws no header, so the room reaches under the status bar and past the home
-  // indicator on its own. A tap on the chevron leaves the way it arrived — and a link that opened
-  // the lobby cold has nowhere to leave to, so that one goes to the menu it would have come from.
   const back = () => {
     if (router.canGoBack()) {
       router.back();
@@ -130,174 +86,186 @@ export function LobbyScreen() {
     router.replace("/");
   };
 
+  const travelToTable = (roomId: string) => {
+    if (travelStarted.current) return;
+    travelStarted.current = true;
+    const enter = () => router.push({ pathname: "/online/[roomId]", params: { roomId } });
+    if (reduceMotion) {
+      enter();
+      return;
+    }
+    travel.set(withTiming(1, { duration: TABLE_ENTRY_MS, easing: Easing.in(Easing.cubic) }));
+    setTimeout(enter, TABLE_ENTRY_MS);
+  };
+
+  const openTable = (room: RoomSummary) => {
+    if (room.roomId === activeRoomId) {
+      setSelectedRoomId(null);
+      travelToTable(room.roomId);
+      return;
+    }
+
+    setRefusal(null);
+    setJoining(room.roomId);
+    void joinTable(room.roomId)
+      .then(() => {
+        setSelectedRoomId(null);
+        travelToTable(room.roomId);
+      })
+      .catch((failure: unknown) => {
+        setRefusal(failure instanceof Error ? failure.message : "That table could not be joined.");
+        refresh();
+      })
+      .finally(() => setJoining(null));
+  };
+
   return (
     <View style={styles.screen} testID="lobby-screen">
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, streetReveal]}>
+        <Image contentFit="cover" source={street.source} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+      <Animated.View style={[styles.scene, { transformOrigin: [door.x, door.y, 0] }, sceneZoom]}>
       <ParlorBackground />
-
       <ScrollView
-        contentContainerStyle={{
-          paddingBottom: insets.bottom + CTA_CLEARANCE,
-          paddingTop: insets.top + spacing.md,
-        }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: insets.top + spacing.md }}
         refreshControl={
-          <RefreshControl
-            colors={[colors.gold]}
-            onRefresh={refresh}
-            refreshing={refreshing}
-            tintColor={colors.gold}
-          />
+          <RefreshControl colors={[colors.gold]} onRefresh={refresh} refreshing={refreshing} tintColor={nightLobby.gold.light} />
         }
         testID="lobby-scroll"
       >
         <ParlorNav
-          me={
-            session?.user.isAnonymous
-              ? "Guest"
-              : session?.user.name?.trim() || session?.user.email
-          }
+          coins={coins}
+          level={questState?.level}
+          me={session?.user.isAnonymous ? "Guest" : session?.user.name?.trim() || session?.user.email}
           onBack={back}
+          readout={currentReadout}
         />
 
-        <ParlorStats stats={stats} />
+        <GoldButton
+          icon="plus"
+          label="DEAL A NEW TABLE"
+          onPress={() => setCreating(true)}
+          style={styles.createButton}
+          testID="lobby-create"
+        />
 
-        {featured === null ? null : (
+        {headliner ? (
           <FeaturedTableCard
-            featured={featured}
-            joining={joining === featured.room.roomId}
-            onJoin={() => openTable(featured.room)}
+            joining={joining === headliner.roomId}
+            onDetails={() => setSelectedRoomId(headliner.roomId)}
+            onJoin={() => openTable(headliner)}
+            room={headliner}
+            yours={headliner.roomId === activeRoomId}
           />
-        )}
+        ) : null}
+
+        {status === "ready" && rooms.length === 0 ? (
+          <View style={styles.empty} testID="lobby-empty">
+            <Text style={styles.emptyTitle}>THE SKY IS QUIET</Text>
+            <Text style={styles.emptyCopy}>Deal the first table and light it up.</Text>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Other tables</Text>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>ROOMS</Text>
+            <Text style={styles.count}>{filteredRooms.length}</Text>
+          </View>
 
-          {others.map((room) => (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+            {LOBBY_FILTERS.map((item) => {
+              const selected = filter === item;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={item}
+                  onPress={() => setFilter(item)}
+                  style={({ pressed }) => [styles.filter, selected && styles.filterSelected, pressed && styles.filterPressed]}
+                  testID={`lobby-filter-${item.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <Text style={[styles.filterText, selected && styles.filterTextSelected]}>{item}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {filteredRooms.map((room) => (
             <RoomRow
               disabled={joining !== null}
+              hosted={hostedRoomIds.has(room.roomId)}
               key={room.roomId}
-              onPress={() => openTable(room)}
+              onPress={() => setSelectedRoomId(room.roomId)}
               room={room}
               yours={room.roomId === activeRoomId}
             />
           ))}
 
           {status === "loading" && rooms.length === 0 ? (
-            <Text style={styles.note} testID="lobby-loading">
-              Looking for tables…
-            </Text>
+            <Text style={styles.note} testID="lobby-loading">Looking for tables…</Text>
           ) : null}
 
-          {status === "ready" && rooms.length === 0 ? (
-            <Text style={styles.note} testID="lobby-empty">
-              The room is empty — deal the first table.
-            </Text>
-          ) : null}
-
-          {status === "ready" && rooms.length > 0 && others.length === 0 ? (
-            <Text style={styles.note} testID="lobby-only-table">
-              This is the only table in the room.
+          {status === "ready" && rooms.length > 0 && filteredRooms.length === 0 ? (
+            <Text style={styles.note} testID="lobby-no-filter-matches">
+              {filter === "All" && headliner ? "No other tables yet." : "No rooms match this filter."}
             </Text>
           ) : null}
 
           {status === "error" ? (
             <View style={styles.dropped}>
-              <Text style={styles.refusal} testID="lobby-error">
-                {error}
-              </Text>
-              <GoldButton
-                label="TRY THE LIST AGAIN"
-                onPress={refresh}
-                testID="lobby-retry"
-              />
+              <Text style={styles.refusal} testID="lobby-error">{error}</Text>
+              <GoldButton label="TRY THE LIST AGAIN" onPress={refresh} testID="lobby-retry" />
             </View>
           ) : null}
         </View>
       </ScrollView>
 
-      {/* What the last tap is doing, or what it was told — over the felt, never under the fold.
-          A refusal is the outcome of the join above it, so it takes the slot the moment it lands. */}
       {banner === null ? null : (
         <Text
-          style={[
-            styles.banner,
-            joiningRoom === undefined
-              ? styles.bannerRefusal
-              : styles.bannerNotice,
-            { bottom: insets.bottom + CTA_CLEARANCE },
-          ]}
+          style={[styles.banner, joiningRoom === undefined ? styles.bannerRefusal : styles.bannerNotice, { bottom: insets.bottom + 82 }]}
           testID={joiningRoom === undefined ? "lobby-refusal" : "lobby-joining"}
         >
           {banner}
         </Text>
       )}
 
-      <GoldButton
-        icon="plus"
-        label="DEAL A NEW TABLE"
-        onPress={() => setCreating(true)}
-        style={[styles.floating, { bottom: insets.bottom + spacing.md }]}
-        testID="lobby-create"
-      />
+      <HomeNavRack active="home" onNavigate={(destination) => router.push(NAV_ROUTES[destination])} />
 
-      <CreateTableForm visible={creating} onClose={() => setCreating(false)} />
+      <CreateTableForm visible={creating} onClose={() => setCreating(false)} onCreated={travelToTable} />
+      <RoomDetailsSheet
+        hosted={selectedRoom !== null && hostedRoomIds.has(selectedRoom.roomId)}
+        joining={selectedRoom !== null && joining === selectedRoom.roomId}
+        onClose={() => setSelectedRoomId(null)}
+        onJoin={() => selectedRoom && openTable(selectedRoom)}
+        room={selectedRoom}
+        yours={selectedRoom !== null && selectedRoom.roomId === activeRoomId}
+      />
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.bg,
-    flex: 1,
-  },
-  section: {
-    gap: spacing.sm,
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.xl,
-  },
-  sectionTitle: {
-    color: colors.textBright,
-    fontFamily: fonts.serifBoldItalic,
-    fontSize: fontSize.title,
-  },
-  note: {
-    color: colors.textDim,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.body,
-    lineHeight: 22,
-  },
-  dropped: {
-    gap: spacing.md,
-    paddingTop: spacing.xs,
-  },
-  refusal: {
-    color: colors.danger,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.small,
-    lineHeight: 19,
-  },
-  banner: {
-    backgroundColor: colors.scrim,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    borderWidth: border.hairline,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.small,
-    left: spacing.gutter,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    position: "absolute",
-    right: spacing.gutter,
-    textAlign: "center",
-  },
-  bannerNotice: {
-    color: colors.goldHi,
-  },
-  bannerRefusal: {
-    color: colors.danger,
-  },
-  floating: {
-    left: spacing.gutter,
-    position: "absolute",
-    right: spacing.gutter,
-  },
+  screen: { backgroundColor: nightLobby.sky[0], flex: 1 },
+  scene: { flex: 1 },
+  createButton: { marginHorizontal: spacing.gutter, marginBottom: spacing.md },
+  empty: { alignItems: "center", gap: spacing.xs, marginHorizontal: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.xl },
+  emptyTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h3, letterSpacing: 1 },
+  emptyCopy: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.body, textAlign: "center" },
+  section: { gap: spacing.sm, paddingHorizontal: spacing.gutter, paddingTop: spacing.lg },
+  sectionHeading: { alignItems: "baseline", flexDirection: "row", gap: spacing.sm, paddingTop: spacing.xs },
+  sectionTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h3, letterSpacing: 1 },
+  count: { color: nightLobby.text.muted, fontFamily: fonts.rubikMedium, fontSize: fontSize.small },
+  filters: { gap: spacing.xs, paddingBottom: spacing.xs },
+  filter: { backgroundColor: "rgba(14,22,48,0.88)", borderColor: "rgba(243,230,196,0.18)", borderRadius: radius.pill, borderWidth: border.thick, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  filterSelected: { backgroundColor: nightLobby.gold.button[0], borderColor: nightLobby.gold.buttonEdge },
+  filterPressed: { opacity: 0.78 },
+  filterText: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.small },
+  filterTextSelected: { color: nightLobby.gold.buttonText },
+  note: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.body, paddingHorizontal: spacing.sm, paddingVertical: spacing.lg },
+  dropped: { gap: spacing.md, padding: spacing.md },
+  refusal: { color: "#ff9387", fontFamily: fonts.rubikMedium, fontSize: fontSize.body, textAlign: "center" },
+  banner: { borderRadius: radius.md, fontFamily: fonts.rubikMedium, fontSize: fontSize.small, left: spacing.gutter, overflow: "hidden", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: spacing.gutter, textAlign: "center" },
+  bannerNotice: { backgroundColor: "rgba(10,16,40,0.95)", color: nightLobby.text.cream },
+  bannerRefusal: { backgroundColor: "#351a29", color: "#ffb3a7" },
 });

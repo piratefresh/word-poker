@@ -9,8 +9,10 @@ import { LobbyScreen } from "./lobby-screen";
 jest.mock("@/features/online/game-client", () => ({ gameClient: { joinOrCreate: jest.fn() } }));
 jest.mock("@/features/online/room-session", () => ({
   createTable: jest.fn(),
+  forgetHostedRoom: jest.fn(),
   joinTable: jest.fn(),
   useActiveRoomId: jest.fn(() => null),
+  useHostedRoomIds: jest.fn(() => new Set()),
 }));
 
 // expo-router reaches a navigation package Jest cannot parse, and the router is the one thing

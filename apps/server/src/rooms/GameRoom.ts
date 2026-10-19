@@ -9,11 +9,14 @@ import {
   WAITING_PHASE,
   isGameMessagePayload,
   TABLE_STARTED_MESSAGE,
+  LOBBY_PLAYER_COLORS,
   blindsFor,
   validateRoomCreateOptions,
   type GameRejectionEvent,
   type GameRoomMetadata,
   type GameTableConfig,
+  type RoomLastWord,
+  type RoomPlayerSummary,
   type OfflineAction,
   type OnlineBettingAction,
   type OnlinePickPowerAction,
@@ -61,6 +64,7 @@ interface SeatBinding {
   /** Better Auth account identity; kept server-side and stable during reconnect holds. */
   readonly userId: string;
   readonly seat: number;
+  publicName: string;
   client: Client;
   connected: boolean;
   present: boolean;
@@ -112,6 +116,12 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private table!: TableConfig;
   private engine?: AuthoritativeGame;
   private readonly bindings = new Map<string, SeatBinding>();
+  /** Internal host identity; only its public display name reaches room metadata. */
+  private hostPlayerId?: string;
+  private hostName = "A player";
+  private createdAt = 0;
+  private lastWord?: RoomLastWord;
+  private lastWordPlayerId?: string;
   /** Sessions with a befriend request in flight; overlapping ones are dropped. */
   private readonly befriending = new Set<string>();
   private readonly projection = new GameRoomProjection(this.state);
@@ -275,6 +285,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
     const { name, buyIn, maxSeats, powerUps } = validation.options;
     this.table = { name, buyIn, ...blindsFor(buyIn), maxSeats, powerUps };
+    this.createdAt = this.now();
     this.maxClients = maxSeats;
     this.dictionary = await loadDictionary();
 
@@ -328,7 +339,15 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       blinds: { smallBlind: this.table.smallBlind, bigBlind: this.table.bigBlind },
       turnDurationMs: this.turnDuration,
       powerUps: this.table.powerUps,
-      onSettled: (hand) => this.settlements.observe(hand),
+      onSettled: (hand) => {
+        this.settlements.observe(hand);
+        const winner = hand.state.result?.standings[0];
+        const binding = winner === undefined ? undefined : this.bindings.get(winner.playerId);
+        if (winner?.word !== null && winner?.word !== undefined && binding !== undefined) {
+          this.lastWord = { by: binding.publicName, word: winner.word, points: winner.score };
+          this.lastWordPlayerId = binding.playerId;
+        }
+      },
     });
     this.engine = engine;
     this.setTimestep(() => this.onTick(), this.tickMs);
@@ -354,19 +373,26 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     }
 
     // Engine actions keep using the connection id; history uses the verified account id.
-    this.bindings.set(client.sessionId, {
+    const binding: SeatBinding = {
       playerId: client.sessionId,
       userId: auth.userId,
       seat,
+      publicName: "A player",
       client,
       connected: true,
       present: true,
       tableStack: this.table.buyIn,
       ready: false,
       seenResults: false,
-    });
+    };
+    this.bindings.set(client.sessionId, binding);
+    if (this.hostPlayerId === undefined) {
+      this.hostPlayerId = binding.playerId;
+      this.hostName = binding.publicName;
+    }
     this.project();
     this.sendPrivateStateLater(client);
+    this.resolvePublicName(binding);
   }
 
   onDrop(client: Client, _code: CloseCode) {
@@ -834,10 +860,46 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private publishPhase() {
     if (this.table === undefined) return;
     const status: RoomPhase = this.game?.phase ?? WAITING_PHASE;
-    const metadata: GameRoomMetadata = { ...this.table, status };
+    const metadata: GameRoomMetadata = {
+      ...this.table,
+      status,
+      createdAt: this.createdAt,
+      players: this.publicPlayers(),
+      ...(this.hostPlayerId === undefined ? {} : { hostName: this.hostName }),
+      ...(this.lastWord === undefined ? {} : { lastWord: this.lastWord }),
+    };
     this.setMatchmaking({ metadata }).catch(() => {
       // A listing failure must not mutate the hand or reject an action.
     });
+  }
+
+  /** Resolve the public name after the synchronous seat allocation, so a database outage never blocks a join. */
+  private resolvePublicName(binding: SeatBinding) {
+    void (async () => {
+      try {
+        const orm = await serverOrm();
+        if (orm === null) return;
+        const name = (await displayName(binding.userId, { orm })).trim() || "A player";
+        const stillSeated = this.bindings.get(binding.playerId) === binding;
+        if (stillSeated) binding.publicName = name;
+        const isHost = this.hostPlayerId === binding.playerId;
+        if (isHost) this.hostName = name;
+        const lastWord = this.lastWordPlayerId === binding.playerId ? this.lastWord : undefined;
+        if (lastWord !== undefined) this.lastWord = { ...lastWord, by: name };
+        if (stillSeated || isHost || lastWord !== undefined) this.publishPhase();
+      } catch {
+        // Public names enrich the lobby; they never gate an authenticated seat.
+      }
+    })();
+  }
+
+  /** Lobby-safe player markers; session ids, account ids and private tile state stay server-side. */
+  private publicPlayers(): RoomPlayerSummary[] {
+    return this.presentBindings().map((binding) => ({
+      id: `seat-${binding.seat + 1}`,
+      initial: Array.from(binding.publicName.trim())[0] ?? "?",
+      color: LOBBY_PLAYER_COLORS[binding.seat % LOBBY_PLAYER_COLORS.length],
+    }));
   }
 
   private isAtTable(client: Client): boolean {

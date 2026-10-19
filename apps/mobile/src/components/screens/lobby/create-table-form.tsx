@@ -39,7 +39,7 @@ import {
 } from "@wordpoker/contracts";
 
 import { GoldButton } from "@/components/ui/gold-button";
-import { border, colors, fonts, fontSize, palette, radius, spacing } from "@/constants/theme";
+import { border, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
 import { formatAmount } from "@/lib/ui/format";
 import { DEAL_MODE_NAMES } from "@/features/table/power-view";
 import { createTable } from "@/features/online/room-session";
@@ -49,6 +49,7 @@ import { CreateTableLayout } from "./create-table-layout";
 export type CreateTableFormProps = {
   visible: boolean;
   onClose: () => void;
+  onCreated?: (roomId: string) => void;
 };
 
 /**
@@ -73,27 +74,27 @@ const SEAT_COUNTS = Array.from(
 const DEFAULT_SEATS = MAX_SEATS;
 
 const titleText = {
-  color: colors.textBright,
-  fontFamily: fonts.serifBold,
+  color: nightLobby.text.cream,
+  fontFamily: fonts.arcade,
   fontSize: fontSize.h3,
 } satisfies UniversalTextStyle;
 
 const kickerText = {
-  color: colors.gold,
-  fontFamily: fonts.mono,
+  color: nightLobby.gold.light,
+  fontFamily: fonts.rubikSemiBold,
   fontSize: fontSize.micro,
   letterSpacing: 2.2,
 } satisfies UniversalTextStyle;
 
 const fieldLabelText = {
-  color: colors.textDim,
-  fontFamily: fonts.mono,
+  color: nightLobby.text.label,
+  fontFamily: fonts.rubikSemiBold,
   fontSize: fontSize.caption,
   letterSpacing: 1.4,
 } satisfies UniversalTextStyle;
 
 const refusalText = {
-  color: colors.danger,
+  color: "#ff9387",
   fontFamily: fonts.sans,
   fontSize: fontSize.small,
   lineHeight: 19,
@@ -101,11 +102,11 @@ const refusalText = {
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: colors.surfaceStrong,
-    borderColor: colors.border,
+    backgroundColor: "rgba(8,12,28,0.65)",
+    borderColor: "rgba(243,230,196,0.2)",
     borderRadius: radius.sm,
     borderWidth: border.hairline,
-    color: colors.textBright,
+    color: nightLobby.text.cream,
     fontFamily: fonts.sans,
     fontSize: fontSize.body,
     paddingHorizontal: spacing.md,
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   cancelLabel: {
-    color: colors.textDim,
+    color: nightLobby.text.muted,
     fontFamily: fonts.sansBold,
     fontSize: fontSize.small,
     letterSpacing: 1,
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
  * §2's create, as a sheet the lobby opens: the options a table is made of, refused where they are
  * wrong and created where they are not, with the new table's own screen the way in.
  */
-export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
+export function CreateTableForm({ visible, onClose, onCreated }: CreateTableFormProps) {
   const [name, setName] = useState("");
   const [buyIn, setBuyIn] = useState<BuyInPreset>(BUY_IN_PRESETS[0]);
   const [maxSeats, setMaxSeats] = useState(DEFAULT_SEATS);
@@ -162,7 +163,8 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
         setName("");
         setRefusal(null);
         onClose();
-        router.push({ pathname: "/online/[roomId]", params: { roomId } });
+        if (onCreated) onCreated(roomId);
+        else router.push({ pathname: "/online/[roomId]", params: { roomId } });
       })
       .catch((failure: unknown) => {
         const message = failure instanceof Error ? failure.message : "Couldn't create that table.";
@@ -174,7 +176,7 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
 
   return (
     <BottomSheet
-      containerColor={palette.felt800}
+      containerColor={nightLobby.panel.navy[1]}
       isPresented={visible}
       onDismiss={dismiss}
       snapPoints={["full"]}
@@ -215,7 +217,7 @@ export function CreateTableForm({ visible, onClose }: CreateTableFormProps) {
                 autoCorrect={false}
                 onChangeText={setName}
                 placeholder="Sunday felt"
-                placeholderTextColor={colors.textFaint}
+                placeholderTextColor={nightLobby.text.label}
                 style={styles.input}
                 testID="create-table-name"
                 value={name}

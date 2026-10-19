@@ -33,6 +33,32 @@ export const MIN_SEATS = 2;
 /** §5: a table seats four at its largest (the tabletop layout has no room for more). */
 export const MAX_SEATS = 4;
 
+/** Shared accent wheel for public room players; these colors carry no account information. */
+export const LOBBY_PLAYER_COLORS = [
+  "#e6b450",
+  "#7ec4cf",
+  "#9ec27a",
+  "#a78bfa",
+  "#f0a8c0",
+  "#e07a5f",
+  "#81b29a",
+  "#a8d0f0",
+] as const;
+
+/** Public player identity for a lobby seat. `id` is a room-local seat id, not an account id. */
+export interface RoomPlayerSummary {
+  readonly id: string;
+  readonly initial: string;
+  readonly color: (typeof LOBBY_PLAYER_COLORS)[number];
+}
+
+/** Last public showdown word, safe to show on the room's headliner card. */
+export interface RoomLastWord {
+  readonly by: string;
+  readonly word: string;
+  readonly points: number;
+}
+
 /** §2's table name is a short label on a card; anything longer is a paste accident. */
 export const ROOM_NAME_MAX_LENGTH = 32;
 
@@ -148,6 +174,43 @@ export interface GameRoomMetadata {
   /** §40's deal mode, so a card and the pre-join sheet can say Classic or Wild. */
   readonly powerUps: PowerUpSettings;
   readonly status: RoomPhase;
+  /** First seat's public display name. Omitted by older servers. */
+  readonly hostName?: string;
+  /** Public initials and colors in seat order; never includes private racks or drafts. */
+  readonly players?: readonly RoomPlayerSummary[];
+  /** Editorial override; otherwise the lobby chooses the highest-buy-in joinable room. */
+  readonly isHeadliner?: boolean;
+  /** Most recent valid winning word, if a hand has settled. */
+  readonly lastWord?: RoomLastWord;
+  /** Room creation time in epoch milliseconds. Omitted by older servers. */
+  readonly createdAt?: number;
+}
+
+function isRoomPlayerSummary(value: unknown): value is RoomPlayerSummary {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    typeof candidate.initial === "string" &&
+    Array.from(candidate.initial).length === 1 &&
+    candidate.initial.trim().length > 0 &&
+    (LOBBY_PLAYER_COLORS as readonly unknown[]).includes(candidate.color)
+  );
+}
+
+function isRoomLastWord(value: unknown): value is RoomLastWord {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.by === "string" &&
+    candidate.by.trim().length > 0 &&
+    typeof candidate.word === "string" &&
+    candidate.word.trim().length > 0 &&
+    typeof candidate.points === "number" &&
+    Number.isInteger(candidate.points) &&
+    candidate.points >= 0
+  );
 }
 
 /**
@@ -159,14 +222,31 @@ export function isGameRoomMetadata(value: unknown): value is GameRoomMetadata {
   const candidate = value as Record<string, unknown>;
   if (!isBuyInPreset(candidate.buyIn)) return false;
   const blinds = blindsFor(candidate.buyIn);
+  const players = candidate.players;
   return (
     typeof candidate.name === "string" &&
     candidate.name.length > 0 &&
     candidate.smallBlind === blinds.smallBlind &&
     candidate.bigBlind === blinds.bigBlind &&
     typeof candidate.maxSeats === "number" &&
+    Number.isInteger(candidate.maxSeats) &&
+    candidate.maxSeats >= MIN_SEATS &&
+    candidate.maxSeats <= MAX_SEATS &&
     isPowerUpSettings(candidate.powerUps) &&
-    isRoomPhase(candidate.status)
+    isRoomPhase(candidate.status) &&
+    (candidate.hostName === undefined ||
+      (typeof candidate.hostName === "string" && candidate.hostName.trim().length > 0)) &&
+    (players === undefined ||
+      (Array.isArray(players) &&
+        players.length <= (candidate.maxSeats as number) &&
+        players.every(isRoomPlayerSummary) &&
+        new Set(players.map((player) => player.id)).size === players.length)) &&
+    (candidate.isHeadliner === undefined || typeof candidate.isHeadliner === "boolean") &&
+    (candidate.lastWord === undefined || isRoomLastWord(candidate.lastWord)) &&
+    (candidate.createdAt === undefined ||
+      (typeof candidate.createdAt === "number" &&
+        Number.isSafeInteger(candidate.createdAt) &&
+        candidate.createdAt >= 0))
   );
 }
 
@@ -206,6 +286,15 @@ export function roomSummaryFromListing(value: unknown): RoomSummary | undefined 
   if (typeof roomId !== "string" || roomId.length === 0) return undefined;
   if (typeof clients !== "number" || typeof maxClients !== "number") return undefined;
   if (!isGameRoomMetadata(candidate.metadata)) return undefined;
+  if (
+    !Number.isInteger(clients) ||
+    clients < 0 ||
+    !Number.isInteger(maxClients) ||
+    maxClients !== candidate.metadata.maxSeats ||
+    clients > maxClients
+  ) {
+    return undefined;
+  }
 
   return {
     roomId,

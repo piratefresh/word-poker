@@ -10,6 +10,7 @@ export {
 export {
   BUY_IN_PRESETS,
   GAME_ROOM_NAME,
+  LOBBY_PLAYER_COLORS,
   LOBBY_ROOM_NAME,
   MAX_SEATS,
   MIN_SEATS,
@@ -23,6 +24,8 @@ export {
   type BuyInPreset,
   type GameRoomCreateOptions,
   type GameRoomMetadata,
+  type RoomLastWord,
+  type RoomPlayerSummary,
   type RoomCreateField,
   type RoomCreateRefusal,
   type RoomCreateValidation,
