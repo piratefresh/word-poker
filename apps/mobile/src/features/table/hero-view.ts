@@ -119,6 +119,8 @@ export interface HeroPerspective {
   /** The tiles the hero may build from (§10): its rack and the revealed board. */
   available: readonly Tile[];
   word: {
+    /** Submission deadline mapped onto the device timeline by the online adapter. */
+    endsAtMs?: number;
     /** §19's window is open. */
     open: boolean;
     /** The hero's slot in it, or null when the hero has none. */
@@ -236,6 +238,8 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
   const winners = winnerIds(p.result);
   const best = p.result?.standings[0];
   const blinds = blindSeats(p.seats, p.dealerIndex);
+  const hero = p.seats[p.heroIndex];
+  const wordStatus = hero && !hero.folded && !hero.sittingOut ? p.word.hero : null;
 
   const players: (GamePlayer | null)[] = Array.from({ length: p.seatCount }, () => null);
   p.seats.forEach((seat, index) => {
@@ -251,6 +255,7 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
     phase: p.phase,
     phaseNumber: PHASE_NUMBER[p.phase],
     secondsRemaining: clockBudgetMs(p) / 1_000,
+    ...(p.word.open && p.word.endsAtMs !== undefined ? { turnEndsAtMs: p.word.endsAtMs } : {}),
     seatCount: p.seatCount,
     players,
     // Every chip committed this hand, in §25's layers: the main pot first, side pots above it.
@@ -267,6 +272,11 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
     // word to show. A fold-out has no reveal at all and nothing to show (§26).
     bestWord: best?.word ? best.word : undefined,
     betting: bettingRow(p, local),
+    ...(p.word.open ? {
+      wordSubmission: {
+        status: wordStatus === "drafting" && local.pendingConfirm ? "submitting" : wordStatus,
+      },
+    } : {}),
   };
 }
 
@@ -318,9 +328,9 @@ function bettingRow(p: HeroPerspective, local: HeroLocal): BettingState {
     }
   }
 
-  const drafting = p.word.open && p.word.hero === "drafting" && !local.pendingConfirm;
-  if (!drafting || local.draft.length === 0) return INERT_BETS;
-  return { ...INERT_BETS, canCheck: true, primary: "confirm" };
+  if (!p.word.open) return INERT_BETS;
+  const drafting = p.word.hero === "drafting" && hero !== undefined && !hero.folded && !hero.sittingOut && !local.pendingConfirm;
+  return { ...INERT_BETS, canCheck: drafting && local.draft.length > 0, primary: "confirm" };
 }
 
 /** Which seats hold the blinds: engine indexes, or null when the table has no blind to mark. */

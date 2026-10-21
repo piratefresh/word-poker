@@ -438,7 +438,8 @@ export function WordCheckButton(): JSX.Element | null {
   return (
     <GameButton
       disabled={!canCheck}
-      label="CHECK"
+      label="WORD CHECKER"
+      accessibilityLabel={`Word Checker, ${remaining} checks remaining. Checks validity without submitting.`}
       labelAccent={`${remaining}/${WORD_CHECKS_PER_HAND}`}
       compact
       horizontalPadding={4}

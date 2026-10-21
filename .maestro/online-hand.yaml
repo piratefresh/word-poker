@@ -90,16 +90,23 @@ tags:
 - assertVisible:
     text: "ILK"
 
-# CHECK confirms the word once the window opens. The opponent's 60-second payout delay keeps the
+# SUBMIT WORD confirms the word once the window opens. The opponent's 60-second payout delay keeps the
 # results overlay visible long enough to assert it before the next hand.
 - repeat:
     while:
       notVisible:
         text: "PAYOUT"
     commands:
-      - tapOn:
-          id: "action-check-call"
-      - waitForAnimationToEnd
+      - extendedWaitUntil:
+          visible: "YOUR TURN|SUBMIT WORD|PAYOUT"
+          timeout: 70000
+      - runFlow:
+          when:
+            visible: "YOUR TURN|SUBMIT WORD"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 30000

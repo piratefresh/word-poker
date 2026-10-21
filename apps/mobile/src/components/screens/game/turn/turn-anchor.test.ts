@@ -2,6 +2,11 @@ import { holdTurn, openTurn } from "./turn-anchor";
 
 const GAME = { id: "turn-1", secondsRemaining: 60 };
 
+test("uses the authoritative submission deadline after reconnect", () => {
+  const turn = openTurn({ ...GAME, turnEndsAtMs: 61_000 }, 41_000);
+  expect(turn.timing).toMatchObject({ startedAtMs: 1_000, endsAtMs: 61_000 });
+});
+
 describe("holdTurn", () => {
   it("pins a running turn where it stands, and leaves a held one alone", () => {
     const running = openTurn(GAME, 1_000);

@@ -59,7 +59,7 @@ export function WagerButton({
   waitingOn,
 }: {
   amount?: string;
-  label: "BET" | "RAISE" | "RAISE TO" | "CHECK" | "CALL";
+  label: "BET" | "RAISE" | "RAISE TO" | "CHECK" | "CALL" | "SUBMIT WORD";
   size?: number;
   disabled?: boolean;
   soundEnabled?: boolean;
@@ -84,7 +84,7 @@ export function WagerButton({
   const offTurn = waitingOn !== undefined;
   const face = offTurn ? "WAITING" : label;
   const waitingName = offTurn ? waitingOn?.name : undefined;
-  const labelSize = offTurn ? 116 : label === "RAISE TO" ? 90 : amount == null ? 140 : 116;
+  const labelSize = offTurn ? 116 : label === "SUBMIT WORD" ? 72 : label === "RAISE TO" ? 90 : amount == null ? 140 : 116;
   const reduceMotion = useReducedMotion();
   const press = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -166,7 +166,7 @@ export function WagerButton({
     <Pressable
       accessibilityLabel={offTurn
         ? waitingName == null ? "Waiting" : `Waiting for ${waitingName}`
-        : amount == null ? "Check" : `${label === "BET" ? "Bet" : label === "CALL" ? "Call" : "Raise to"} ${amount}`}
+        : amount == null ? label === "SUBMIT WORD" ? "Submit word" : "Check" : `${label === "BET" ? "Bet" : label === "CALL" ? "Call" : "Raise to"} ${amount}`}
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || offTurn }}
       disabled={disabled && !offTurn ? true : undefined}

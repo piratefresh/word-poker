@@ -106,6 +106,8 @@ export interface GameScreenState {
   phase: RoundPhase;
   phaseNumber: number;
   secondsRemaining: number;
+  /** Server submission deadline mapped onto this device's clock, including after reconnect. */
+  turnEndsAtMs?: number;
   seatCount: SeatCount;
   players: readonly (GamePlayer | null)[];
   /** Every chip in the middle: the seats' committed-this-hand, pots layered or not. */
@@ -135,4 +137,6 @@ export interface GameScreenState {
    */
   blinds: { smallBlind: number; bigBlind: number };
   betting: BettingState;
+  /** Present only during the shared final word window; null hero means spectating. */
+  wordSubmission?: { status: "drafting" | "submitting" | "confirmed" | "timed-out" | null };
 }

@@ -235,15 +235,55 @@ test("returns to call at the slider floor and resets a selected raise on a new t
   expect(view.queryByTestId("action-wager")).toBeNull();
 });
 
-test("keeps check available without a legal bet, including the word confirm window", async () => {
+test("labels word confirmation Submit word", async () => {
   const onCheckOrCall = jest.fn();
   const view = await renderScreen({
     game: { ...FOUR_PLAYER_FLOP_FIXTURE, betting: { ...FOUR_PLAYER_FLOP_FIXTURE.betting, primary: "confirm", canCheck: true, callAmount: undefined, canBet: false, canRaise: false } },
     onCheckOrCall,
   });
-  await fireEvent.press(view.getByRole("button", { name: "Check" }));
+  await fireEvent.press(view.getByRole("button", { name: "Submit word" }));
   expect(onCheckOrCall).toHaveBeenCalledTimes(1);
   expect(view.queryByTestId("action-wager")).toBeNull();
+});
+
+test.each([[375, 667], [800, 390], [1440, 900]])("shows the final submission stage at %s × %s", async (width, height) => {
+  const original = Dimensions.get("window");
+  Dimensions.set({ window: { ...original, width, height }, screen: { ...original, width, height } });
+  jest.useFakeTimers();
+  try {
+    const game = {
+      ...FOUR_PLAYER_FLOP_FIXTURE,
+      id: "word-window",
+      phase: "river" as const,
+      secondsRemaining: 60,
+      wordSubmission: { status: "drafting" as const },
+      betting: { ...FOUR_PLAYER_FLOP_FIXTURE.betting, primary: "confirm" as const, canCheck: true, callAmount: undefined, canBet: false, canRaise: false },
+    };
+    const onSubmit = jest.fn();
+    const view = await renderScreen({ game, onCheckOrCall: onSubmit });
+    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
+    expect(view.getByText(/Betting is complete/)).toBeOnTheScreen();
+    expect(view.getByText(/Submitting locks your word/)).toBeOnTheScreen();
+    for (const id of ["action-fold", "all-in-button"]) expect(view.queryByTestId(id)).toBeNull();
+    expect(view.queryByLabelText("Wager amount")).toBeNull();
+    await fireEvent.press(view.getByRole("button", { name: "Submit word" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await act(async () => jest.advanceTimersByTime(1000));
+    expect(view.getByText("Shared submission deadline · 00:59")).toBeOnTheScreen();
+
+    await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...game, wordSubmission: { status: "submitting" } }} />);
+    expect(view.getByRole("button", { name: "Submitting word" })).toBeDisabled();
+    expect(view.queryByText(/WORD SUBMITTED/)).toBeNull();
+    await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...game, wordSubmission: { status: "confirmed" } }} />);
+    expect(view.getByText("WORD SUBMITTED · Waiting for other players")).toBeOnTheScreen();
+    expect(view.queryByTestId("action-check-call")).toBeNull();
+    expect(view.getByText("Shared submission deadline · 00:59")).toBeOnTheScreen();
+    await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...game, wordSubmission: { status: null } }} />);
+    expect(view.queryByText(/SUBMIT YOUR WORD/)).toBeNull();
+    expect(view.queryByTestId("action-check-call")).toBeNull();
+  } finally {
+    await act(() => Dimensions.set({ window: original, screen: original }));
+  }
 });
 
 test("asks before committing the whole stack, and only commits on the confirm", async () => {

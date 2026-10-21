@@ -469,6 +469,7 @@ describe("useOnlineGame", () => {
     });
 
     await act(async () => handle.current.confirmWord());
+    expect(handle.current.game?.wordSubmission?.status).toBe("submitting");
     expect(room.sends).toContainEqual({
       type: GAME_MESSAGES.confirmWord,
       payload: { submission: { plays } },
@@ -484,6 +485,38 @@ describe("useOnlineGame", () => {
       room.emit(GAME_EVENTS.privateState, privateState({ word: { status: "confirmed", draft: null, confirmed: { plays } } })),
     );
     expect(handle.current.words?.confirmed).toBe(true);
+  });
+
+  test("keeps the server deadline and retries a refused submission without claiming acceptance", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(100_000);
+    try {
+      const window = { active: true, status: "open", now: 40_000, deadline: 60_000, slots: [{ playerId: HERO, status: "drafting" }] };
+      const room = makeRoom(HERO, liveState({ phase: "river", toActSeat: -1, betting: { active: false }, wordWindow: window }));
+      const handle = await mount(room);
+      await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ isYourTurn: false, word: { status: "drafting", confirmed: null } })));
+      expect(handle.current.game?.turnEndsAtMs).toBe(120_000);
+      await act(async () => handle.current.setDraft([...RACK].reverse().map((tile) => ({ tileId: tile.id }))));
+      const send = jest.spyOn(room, "send").mockImplementationOnce(() => { throw new Error("Disconnected"); });
+      expect(() => handle.current.confirmWord()).toThrow("Disconnected");
+      expect(handle.current.game?.wordSubmission?.status).toBe("drafting");
+      expect(handle.current.game?.betting.canCheck).toBe(true);
+      send.mockRestore();
+      await act(async () => handle.current.primary());
+      expect(handle.current.game?.wordSubmission?.status).toBe("submitting");
+      await act(async () => room.emit(GAME_EVENTS.rejected, { action: "confirmWord", reason: "too-short" }));
+      expect(handle.current.game?.wordSubmission?.status).toBe("drafting");
+      expect(handle.current.game?.betting.canCheck).toBe(true);
+      now.mockReturnValue(105_000);
+      await act(async () => room.emitState(liveState({ phase: "river", toActSeat: -1, betting: { active: false }, wordWindow: { ...window, now: 45_000 } })));
+      expect(handle.current.game?.turnEndsAtMs).toBe(120_000);
+      await act(async () => handle.current.primary());
+      const plays = [...RACK].reverse().map((tile) => ({ tileId: tile.id }));
+      await act(async () => room.emit(GAME_EVENTS.privateState, privateState({ isYourTurn: false, word: { status: "confirmed", confirmed: { plays } } })));
+      expect(handle.current.game?.wordSubmission?.status).toBe("confirmed");
+      expect(handle.current.words?.open).toBe(false);
+    } finally {
+      now.mockRestore();
+    }
   });
 
   test("shows the hero's move at once and darkens the row before the server echoes", async () => {

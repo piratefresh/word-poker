@@ -5,12 +5,13 @@ import type { TurnTimerView } from "@/components/hud/turn-clock";
 import { CoachTarget } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
 
-import type { BettingState } from "../game-types";
+import type { BettingState, GameScreenState } from "../game-types";
 import { useCompactControls, useScreenScale, useShortControls } from "../screen-scale";
 import { AllInSheet } from "./all-in-sheet";
 import { formatCompactAmount } from "./format-amount";
 import { RaiseSlider } from "./raise-slider";
 import { WagerButton } from "./wager-button";
+import { WordSubmissionControls } from "./word-submission-controls";
 
 export function BettingControls({
   state,
@@ -18,6 +19,8 @@ export function BettingControls({
   pot,
   locked,
   waitingOn,
+  submission,
+  timer,
   onAmountChange,
   onFold,
   onCheckOrCall,
@@ -29,6 +32,8 @@ export function BettingControls({
   pot: number;
   /** The row's own actions and the slider are held disabled (`actionsLocked`). */
   locked: boolean;
+  submission?: GameScreenState["wordSubmission"];
+  timer?: TurnTimerView;
   /**
    * Off-turn: the table waits on another seat, so the wager button waits too — WAITING, that
    * seat's name, its clock draining a ring. Omitted on the hero's turn.
@@ -60,7 +65,7 @@ export function BettingControls({
   const selectedWager = amount > 0 && (state.canRaise || state.canBet);
   const wagerLabel = selectedWager
     ? (state.wager === "bet" ? "BET" : "RAISE TO")
-    : (state.primary === "call" ? "CALL" : "CHECK");
+    : (state.primary === "confirm" ? "SUBMIT WORD" : state.primary === "call" ? "CALL" : "CHECK");
   const canFold = !locked && state.canFold;
   const canCheckOrCall =
     !locked && (state.canCheck || state.callAmount != null);
@@ -132,6 +137,17 @@ export function BettingControls({
       </CoachTarget>
     </View>
   );
+
+  if (submission) {
+    return (
+      <WordSubmissionControls
+        status={submission.status}
+        timer={timer}
+        disabled={!canCheckOrCall}
+        onSubmit={onCheckOrCall}
+      />
+    );
+  }
 
   return (
     <View style={[styles.betting, tight && styles.bettingTight]}>

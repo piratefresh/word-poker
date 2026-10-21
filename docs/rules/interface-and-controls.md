@@ -57,7 +57,13 @@ The primary button combines Check, Call, Bet, and Raise. Each turn starts with t
 its leftmost position: the button shows Check when checking is legal, or Call with the chips
 owed when facing a bet. Moving the slider selects a legal Bet amount or Raise To round total;
 returning it to the left restores Check or Call. The label and tap use the same action.
-During the word-confirm window, Check still confirms the word. Fold and All In remain separate.
+During the word-confirm window, the primary action is **Submit Word**. Betting controls
+(Fold, All In, and the wager slider) are hidden. A persistent **FINAL STAGE · SUBMIT YOUR WORD**
+label explains that betting is complete, and the labeled shared countdown shows the submission
+deadline. Submitting locks the word; the optional **Word Checker** only checks validity.
+While a request is pending, show **Submitting…**; only authoritative acceptance shows
+**WORD SUBMITTED · Waiting for other players**. A refusal leaves the draft actionable while
+time remains. Folded players spectate this stage; all-in players still submit.
 
 ## Fold
 

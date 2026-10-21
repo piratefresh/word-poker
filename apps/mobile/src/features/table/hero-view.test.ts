@@ -194,7 +194,7 @@ describe("heroView — the action row", () => {
   });
 
   test("turns the check into the confirm inside §19's window once there is a draft", () => {
-    expect(heroView(perspective(WINDOW), LOCAL).game.betting).toMatchObject({ canCheck: false, primary: "call" });
+    expect(heroView(perspective(WINDOW), LOCAL).game.betting).toMatchObject({ canCheck: false, primary: "confirm" });
     expect(heroView(perspective(WINDOW), { ...LOCAL, draft: GO }).game.betting).toMatchObject({
       canCheck: true,
       primary: "confirm",
@@ -204,7 +204,16 @@ describe("heroView — the action row", () => {
   test("disarms the confirm while a confirmation is on the wire", () => {
     const { betting } = heroView(perspective(WINDOW), { ...LOCAL, draft: GO, pendingConfirm: true }).game;
 
-    expect(betting).toMatchObject({ canCheck: false, primary: "call" });
+    expect(betting).toMatchObject({ canCheck: false, primary: "confirm" });
+  });
+
+  test("reports acceptance separately from pending submission, and includes all-in players", () => {
+    const p = perspective({ ...WINDOW, seats: [seat("hero", 0, { allIn: true }), seat("opp", 2)] });
+    expect(heroView(p, LOCAL).game.wordSubmission?.status).toBe("drafting");
+    expect(heroView(p, { ...LOCAL, draft: GO, pendingConfirm: true }).game.wordSubmission?.status).toBe("submitting");
+    expect(heroView({ ...p, word: { ...p.word, hero: "confirmed", confirmedPlays: GO } }, LOCAL).game.wordSubmission?.status).toBe("confirmed");
+    expect(heroView({ ...p, word: { ...p.word, hero: "timed-out" } }, LOCAL).game.wordSubmission?.status).toBe("timed-out");
+    expect(heroView(perspective({ phase: "river" }), LOCAL).game.wordSubmission).toBeUndefined();
   });
 });
 
@@ -217,12 +226,13 @@ describe("heroView — the word", () => {
     expect(inside).toMatchObject({ word: "GO", confirmable: true });
   });
 
-  test("calls a one-letter draft a word in progress, and a real miss a miss", () => {
+  test("keeps dictionary validity private until Word Checker and allows submitting a miss", () => {
     const partial = heroView(perspective(), { ...LOCAL, draft: [{ tileId: "t-g" }] }).words;
     const reversed = heroView(perspective(), { ...LOCAL, draft: [{ tileId: "t-o" }, { tileId: "t-g" }] }).words;
 
     expect(partial?.reason).toBeNull();
-    expect(reversed?.reason).toBe("not-in-dictionary");
+    expect(reversed?.reason).toBeNull();
+    expect(heroView(perspective(WINDOW), { ...LOCAL, draft: [{ tileId: "t-o" }, { tileId: "t-g" }] }).game.betting.canCheck).toBe(true);
   });
 
   test("shows the engine's locked word once confirmed, whatever the device still holds", () => {
@@ -238,6 +248,9 @@ describe("heroView — the word", () => {
     const seats = [seat("hero", 0, { folded: true }), seat("opp", 2)];
 
     expect(heroView(perspective({ seats }), LOCAL).words).toBeNull();
+    const window = heroView(perspective({ ...WINDOW, seats }), { ...LOCAL, draft: GO });
+    expect(window.game.wordSubmission?.status).toBeNull();
+    expect(window.game.betting.canCheck).toBe(false);
   });
 });
 

@@ -43,8 +43,8 @@ export interface OpenTurn {
  * Identifies the state a turn was opened from. A new hand and a new budget are both new
  * turns; a re-render of the same one is not.
  */
-export function turnKey(game: Pick<GameScreenState, "id" | "secondsRemaining">): string {
-  return `${game.id}:${game.secondsRemaining}`;
+export function turnKey(game: Pick<GameScreenState, "id" | "secondsRemaining" | "turnEndsAtMs">): string {
+  return `${game.id}:${game.secondsRemaining}:${game.turnEndsAtMs ?? "local"}`;
 }
 
 /**
@@ -57,16 +57,16 @@ export function turnKey(game: Pick<GameScreenState, "id" | "secondsRemaining">):
  * push the deadline forward by a frame each time, and the countdown would stand still.
  */
 export function openTurn(
-  game: Pick<GameScreenState, "id" | "secondsRemaining">,
+  game: Pick<GameScreenState, "id" | "secondsRemaining" | "turnEndsAtMs">,
   nowMs: number,
 ): OpenTurn {
   return {
     key: turnKey(game),
     timing: {
-      startedAtMs: nowMs,
+      startedAtMs: game.turnEndsAtMs === undefined ? nowMs : game.turnEndsAtMs - Math.max(0, game.secondsRemaining) * 1000,
       // A spent or negative budget is not a turn: it expires at once rather than
       // counting up from the wrong end.
-      endsAtMs: nowMs + Math.max(0, game.secondsRemaining) * 1000,
+      endsAtMs: game.turnEndsAtMs ?? nowMs + Math.max(0, game.secondsRemaining) * 1000,
       pausedAtMs: null,
     },
   };

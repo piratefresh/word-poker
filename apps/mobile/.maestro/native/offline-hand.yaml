@@ -182,6 +182,14 @@ tags:
       id: "action-check-call"
       enabled: true
     timeout: 20000
+- assertVisible:
+    text: "FINAL STAGE · SUBMIT YOUR WORD"
+- assertVisible:
+    text: "SUBMIT WORD"
+- assertNotVisible:
+    id: "action-fold"
+- assertNotVisible:
+    id: "all-in-button"
 - tapOn:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
