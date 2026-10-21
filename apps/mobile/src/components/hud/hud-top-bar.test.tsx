@@ -8,6 +8,11 @@ import { CHIP_HEIGHT } from "./top-bar/balance-chip";
 import { MODE_TAG_BLOCK, MODE_TAG_GAP } from "./top-bar/banner";
 import { deriveTurnTimer, type TurnTimerView } from "./turn-clock";
 
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock")
+    .default,
+);
+
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
 // and the bar reads it for its two effects, so the one hook is layered on here.
 jest.mock("react-native-reanimated", () => ({
@@ -44,14 +49,14 @@ async function renderBar(props: Partial<HudTopBarProps> = {}) {
 }
 
 const PHASE_CASES: [RoundPhase, string][] = [
-  ["preflop", "PREFLOP"],
-  ["flop", "FLOP"],
-  ["turn", "TURN"],
-  ["river", "RIVER"],
-  ["payout", "PAYOUT"],
+  ["preflop", "PREFLOP 1/5"],
+  ["flop", "FLOP 2/5"],
+  ["turn", "TURN 3/5"],
+  ["river", "RIVER 4/5"],
+  ["payout", "PAYOUT 5/5"],
 ];
 
-test.each(PHASE_CASES)("names %s in the capsule", async (phase, stamp) => {
+test.each(PHASE_CASES)("numbers %s out of five in the capsule", async (phase, stamp) => {
   await renderBar({ phase });
 
   expect(screen.getByText(stamp)).toBeOnTheScreen();

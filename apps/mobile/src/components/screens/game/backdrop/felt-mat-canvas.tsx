@@ -19,10 +19,11 @@ export interface FeltMatProps {
   width: number;
   height: number;
   box: MatBox;
+  tilt?: number;
 }
 
 /** The felt mat on the wood: a soft shadow, the felt cropped to cover, a darker rim, a stitch. */
-export function FeltMatCanvas({ width, height, box }: FeltMatProps) {
+export function FeltMatCanvas({ width, height, box, tilt = MAT.tilt }: FeltMatProps) {
   const felt = useImage(FELT);
   const { x, y, width: w, height: h } = box;
   const centre = vec(x + w / 2, y + h / 2);
@@ -30,7 +31,7 @@ export function FeltMatCanvas({ width, height, box }: FeltMatProps) {
   return (
     // One style object: the web Canvas hands it to a DOM node, which takes no arrays.
     <Canvas pointerEvents="none" style={{ height, left: 0, position: "absolute", top: 0, width }}>
-      <Group origin={centre} transform={[{ rotate: (MAT.tilt * Math.PI) / 180 }]}>
+      <Group origin={centre} transform={[{ rotate: (tilt * Math.PI) / 180 }]}>
         <RoundedRect color="#14301f" height={h} r={MAT.radius} width={w} x={x} y={y}>
           <Shadow blur={14} color="rgba(20,8,2,0.6)" dx={0} dy={8} />
         </RoundedRect>

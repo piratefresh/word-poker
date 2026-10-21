@@ -24,6 +24,7 @@ import {
   betChipOffset,
   seatDirection,
   seatMetrics,
+  type SeatDirection,
   type SeatMetrics,
 } from "../seat-metrics";
 
@@ -169,16 +170,18 @@ export function PlayerSeat({
   appearanceWidth,
   dealt = false,
   tabletop = false,
+  direction = seatDirection(anchor, seatCount),
   onPress,
 }: SeatSlot<GamePlayer> & {
   /** The hand is dealt: an opponent still in it shows its two tiles face down in a rack. */
   dealt?: boolean;
   /** The tabletop room's larger seat (`seatMetrics`); its bounds are `tabletopSeatBounds`. */
   tabletop?: boolean;
+  /** A compact landscape seat can keep its labels beside the avatar. */
+  direction?: SeatDirection;
   onPress?: (player: GamePlayer) => void;
 }) {
   const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width, tabletop);
-  const direction = seatDirection(anchor, seatCount);
   const beside = direction !== "stacked";
   const frame = beside
     ? [
@@ -322,7 +325,7 @@ export function PlayerSeat({
           style={[
             styles.betChip,
             scaled.betChip,
-            betChipOffset(anchor, metrics, seatCount),
+            betChipOffset(anchor, metrics, seatCount, direction),
           ]}
         >
           <View style={StyleSheet.absoluteFill}>

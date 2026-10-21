@@ -379,20 +379,38 @@ test("draws each side pot under the main pot, and none when the hand has one pot
 
 describe("landscape", () => {
   const original = Dimensions.get("window");
-  afterEach(() => {
-    Dimensions.set({ window: original, screen: original });
+  afterEach(async () => {
+    await act(() => Dimensions.set({ window: original, screen: original }));
   });
 
   // Phone landscape is the tight case: every control the tutorial points at has to still be drawn.
-  test("keeps the table, rack and every betting control on a phone on its side", async () => {
-    const window = { ...original, width: 800, height: 390 };
-    Dimensions.set({ window, screen: window });
-    const view = await renderScreen({ rackActions: <Text>RACK ACTIONS</Text> });
+  test.each([[800, 390], [1440, 930]])(
+    "keeps the table over the rack and slider columns and the panel-wide action row at %s × %s",
+    async (width, height) => {
+      const window = { ...original, width, height };
+      Dimensions.set({ window, screen: window });
+      const view = await renderScreen({ rackActions: <Text>RACK ACTIONS</Text> });
 
-    expect(view.getByTestId("poker-table")).toBeOnTheScreen();
-    expect(view.getByText("RACK ACTIONS")).toBeOnTheScreen();
-    for (const id of ["action-fold", "action-check-call", "all-in-button"]) {
-      expect(view.getByTestId(id)).toBeOnTheScreen();
-    }
-  });
+      expect(view.getByTestId("poker-table")).toBeOnTheScreen();
+      // The rack and the slider each keep their own column under the table…
+      expect(view.getByTestId("landscape-rack")).toBeOnTheScreen();
+      expect(view.getByTestId("landscape-betting")).toContainElement(
+        view.getByTestId("wager-slider"),
+      );
+      // …and the seat actions span the whole panel below both columns, with the mode's own
+      // rack controls leading them there rather than sitting under the rack.
+      expect(view.getByTestId("game-controls")).toContainElement(view.getByText("RACK ACTIONS"));
+      expect(view.getByTestId("landscape-rack")).not.toContainElement(
+        view.getByText("RACK ACTIONS"),
+      );
+      expect(view.getByTestId("landscape-betting")).not.toContainElement(
+        view.getByTestId("action-fold"),
+      );
+      expect(view.getByTestId("game-controls")).toContainElement(view.getByTestId("landscape-rack"));
+      expect(view.getByTestId("game-controls")).not.toContainElement(view.getByTestId("poker-table"));
+      for (const id of ["action-fold", "action-check-call", "all-in-button"]) {
+        expect(view.getByTestId(id)).toBeOnTheScreen();
+      }
+    },
+  );
 });

@@ -250,14 +250,14 @@ describe("<OfflineGameScreen />", () => {
     // §11 wants the word list on screen before play, and the hand is judged against it, so
     // the felt does not draw until it has arrived.
     expect(view.getByText("Setting the table…")).toBeOnTheScreen();
-    expect(view.queryByText("PREFLOP")).toBeNull();
+    expect(view.queryByText("PREFLOP 1/5")).toBeNull();
   });
 
   test("deals a hand and puts the hero on the clock, with the row the engine armed", async () => {
     const view = await renderTable();
 
     expectBoard(view, 0);
-    expect(view.getByText("PREFLOP")).toBeOnTheScreen();
+    expect(view.getByText("PREFLOP 1/5")).toBeOnTheScreen();
     expect(view.getByText("YOUR TURN")).toBeOnTheScreen();
     // The badge only lands on the felt if the mapped state flags the hero's seat.
     expect(view.getByText("YOU")).toBeOnTheScreen();
@@ -325,9 +325,9 @@ describe("<OfflineGameScreen />", () => {
     const view = await renderTable();
 
     const streets: [dealt: number, phase: string][] = [
-      [3, "FLOP"],
-      [4, "TURN"],
-      [5, "RIVER"],
+      [3, "FLOP 2/5"],
+      [4, "TURN 3/5"],
+      [5, "RIVER 4/5"],
     ];
 
     for (const [dealt, phase] of streets) {
@@ -423,7 +423,7 @@ describe("<OfflineGameScreen />", () => {
 
     await fireEvent.press(view.getByTestId("results-deal"));
 
-    expect(view.getByText("PREFLOP")).toBeOnTheScreen();
+    expect(view.getByText("PREFLOP 1/5")).toBeOnTheScreen();
     expectBoard(view, 0);
     // Nothing of the results is left on screen — or reachable to a second tap.
     expect(view.queryByTestId("results-deal")).toBeNull();
@@ -437,7 +437,7 @@ describe("<OfflineGameScreen />", () => {
     // The pinned hand checks around to the hero on the river, which is where the row arms the
     // opening bet rather than a raise: the same slider, and the other engine action.
     for (let street = 0; street < 3; street += 1) await takeTurn(view);
-    expect(view.getByText("RIVER")).toBeOnTheScreen();
+    expect(view.getByText("RIVER 4/5")).toBeOnTheScreen();
     expect(view.getByRole("button", { name: "Check" })).toBeOnTheScreen();
     await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
     expect(view.getByRole("button", { name: "Bet $20" })).toBeOnTheScreen();
@@ -452,7 +452,7 @@ describe("<OfflineGameScreen />", () => {
     // These opponents have no word in the one-word fixture dictionary: all three fold.
     expect(before).toBe(240);
     expect(potAmount(view)).toBe(260);
-    expect(view.getByText("PAYOUT")).toBeOnTheScreen();
+    expect(view.getByText("PAYOUT 5/5")).toBeOnTheScreen();
 
   });
 
@@ -460,15 +460,16 @@ describe("<OfflineGameScreen />", () => {
     const view = await renderTable();
     await advanceToWordWindow(view);
 
-    // An empty draft keeps Submit Word disabled during the final stage.
+    // The window is open and the hero has nothing to confirm yet, so the row is the table's
+    // own controls gone quiet: the call button falls back to `CALL $0` and does nothing.
     await fireEvent.press(view.getByTestId("action-check-call"));
 
-    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
+    expect(view.getByText("RIVER")).toBeOnTheScreen();
     expect(view.queryByText("PAYOUT")).toBeNull();
 
     await beat();
 
-    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
+    expect(view.getByText("RIVER")).toBeOnTheScreen();
     expect(view.queryByText("PAYOUT")).toBeNull();
   });
 

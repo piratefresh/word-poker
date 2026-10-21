@@ -34,7 +34,7 @@ import {
   spacing,
 } from "@/constants/theme";
 
-import type { RoundPhase } from "@wordpoker/contracts";
+import { ROUND_PHASES, type RoundPhase } from "@wordpoker/contracts";
 
 import { useScreenScale } from "@/components/screens/game/screen-scale";
 
@@ -171,7 +171,7 @@ export function HudTopBar({
             </View>
           ) : null}
           <PhaseCapsule
-            label={stamp ?? PHASE_LABEL[phase]}
+            label={stamp ?? `${PHASE_LABEL[phase]} ${ROUND_PHASES.indexOf(phase) + 1}/${ROUND_PHASES.length}`}
             loopsEnabled={loopsOn}
             phrase={turnPhrase}
             reduceMotion={reduce}

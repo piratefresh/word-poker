@@ -215,8 +215,8 @@ export function betChipOffset(
   anchor: Pick<SeatAnchor, "angle">,
   m: SeatMetrics,
   seatCount = 4,
+  direction = seatDirection(anchor, seatCount),
 ): { left: number; top: number } {
-  const direction = seatDirection(anchor, seatCount);
   const top = (m.avatar - m.chip) / 2;
   if (direction === "left") return { left: m.width + m.besideGap + m.avatar + 4 * m.scale, top };
   if (direction === "right") return { left: -m.chip - 4 * m.scale, top };
@@ -266,11 +266,11 @@ export function playerSeatBounds(
   tableWidth: number,
   seatCount = 4,
   tabletop = false,
+  direction = seatDirection(anchor, seatCount),
 ): SeatExtents {
   const m = seatMetrics(tableWidth, tabletop);
   const radius = m.avatar / 2;
-  const direction = seatDirection(anchor, seatCount);
-  const chip = betChipOffset(anchor, m, seatCount);
+  const chip = betChipOffset(anchor, m, seatCount, direction);
   const badges = radius - m.badgeTop;
   if (direction !== "stacked") {
     const chipSide = radius + 4 * m.scale + m.chip;

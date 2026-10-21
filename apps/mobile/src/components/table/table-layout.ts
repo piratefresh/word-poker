@@ -78,6 +78,8 @@ export interface TableLayoutConfig {
   communityY?: number;
   /** Vertical center of the pot region. */
   potY?: number;
+  /** Horizontal center of the pot region; compact landscape puts it beside the board. */
+  potX?: number;
   /**
    * Seats in rows: every seat on one side of the ring takes that side's own rim, so a shallow
    * arc reads as a line of seats across the table rather than a fan (the tabletop room's
@@ -102,6 +104,7 @@ const DEFAULTS: Omit<ResolvedTableLayoutConfig, "seatCount"> = {
   communitySpan: 0.62,
   communityY: 0.44,
   potY: 0.62,
+  potX: 0.5,
   seatRows: false,
 };
 
@@ -137,6 +140,7 @@ function resolveConfig(config: TableLayoutConfig): ResolvedTableLayoutConfig {
     communitySpan: config.communitySpan ?? DEFAULTS.communitySpan,
     communityY: config.communityY ?? DEFAULTS.communityY,
     potY: config.potY ?? DEFAULTS.potY,
+    potX: config.potX ?? DEFAULTS.potX,
     seatRows: config.seatRows ?? DEFAULTS.seatRows,
     seatAngles: config.seatAngles,
   };
@@ -171,7 +175,7 @@ export function computeTableLayout(config: TableLayoutConfig): TableLayout {
   return {
     seats,
     community,
-    pot: { x: cx, y: resolved.potY },
+    pot: { x: resolved.potX, y: resolved.potY },
     dealOrigin: { x: cx, y: cy },
     felt: { x: 0, y: 0, width: 1, height: 1 },
     config: resolved,
