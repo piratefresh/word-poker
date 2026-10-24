@@ -22,7 +22,7 @@ export const MIN_AVATAR = 38;
 
 /** The seat at `MIN_AVATAR`, in points. Every one of them scales with the avatar. */
 const BASE = {
-  /** The seat's column: the name truncates inside it. */
+  /** The seat's column, also used to place labels beside the avatar. */
   width: 86,
   gap: BASE_GAP,
   /** Between an avatar and the labels beside it: clear of the role badges that overhang it. */
@@ -39,13 +39,13 @@ const BASE = {
   nameSize: 8,
   nameLine: 11,
   nameTracking: 0.8,
-  /** The nameplate tucks up over the avatar's lower rim. */
-  nameGap: -8,
+  /** The compact name-and-stack plate sits just below the avatar. */
+  nameGap: 2,
   platePadX: 7,
   platePadY: 2,
   plateRadius: 5,
   stackSize: 10,
-  stackLine: 13,
+  stackLine: 0,
   coin: 8,
   /** The opponent rack's wood box (`opponent-rack-3-tight`): the plate tucks over its top by
    *  `rackTuck`, the standing tiles' feet sit `rackFeet` above its bottom, and the lip re-draws
@@ -118,7 +118,7 @@ export function avatarDiameter(tableWidth: number): number {
 const TABLETOP = {
   avatar: 68,
   width: 92,
-  nameGap: -22,
+  nameGap: 2,
   badge: 18,
   badgeText: 7,
   nameSize: 11,
@@ -127,7 +127,7 @@ const TABLETOP = {
   platePadY: 3,
   plateRadius: 7,
   stackSize: 12,
-  stackLine: 15,
+  stackLine: 0,
   coin: 10,
   rackW: 88,
   // The trimmed opponent-rack-5 artwork is 1280 by 723; its lower rail covers the tile feet.
@@ -145,6 +145,23 @@ const TABLETOP = {
   chip: 22,
 } as const;
 const TABLETOP_ROOM_WIDTH = 400;
+/** The nameplate and status tag: what `labelScale` grows while the avatar and rack keep their size. */
+const LABEL_KEYS = new Set<string>([
+  "width",
+  "badge",
+  "badgeText",
+  "nameSize",
+  "nameLine",
+  "platePadX",
+  "platePadY",
+  "plateRadius",
+  "stackSize",
+  "coin",
+  "pillPadX",
+  "pillPadY",
+  "statusSize",
+  "statusLine",
+]);
 /** How far a wide window grows the tabletop seat. */
 const TABLETOP_MAX_SCALE = 1.8;
 
@@ -182,14 +199,18 @@ export function tabletopFitsTopChrome(
 }
 
 /** Every measure of a seat at a felt `tableWidth` wide — or, `tabletop`, in a room that wide. */
-export function seatMetrics(tableWidth: number, tabletop = false): SeatMetrics {
+export function seatMetrics(tableWidth: number, tabletop = false, labelScale = 1): SeatMetrics {
   if (tabletop) {
     const scale = Math.min(TABLETOP_MAX_SCALE, Math.max(0.6, tableWidth / TABLETOP_ROOM_WIDTH));
     const scaled = {} as BaseMetrics;
     for (const key of Object.keys(BASE) as (keyof typeof BASE)[]) {
-      scaled[key] = (key in TABLETOP ? TABLETOP[key as keyof typeof TABLETOP] : BASE[key]) * scale;
+      scaled[key] =
+        (key in TABLETOP ? TABLETOP[key as keyof typeof TABLETOP] : BASE[key]) *
+        scale *
+        (LABEL_KEYS.has(key) ? labelScale : 1);
     }
-    return { ...scaled, avatar: Math.round(TABLETOP.avatar * scale), scale };
+    // The avatar grows with the labels; it may spill past the seat's bounds.
+    return { ...scaled, avatar: Math.round(TABLETOP.avatar * scale * labelScale), scale };
   }
   const avatar = avatarDiameter(tableWidth);
   const scale = avatar / MIN_AVATAR;

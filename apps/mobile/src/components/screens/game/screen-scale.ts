@@ -68,12 +68,24 @@ export function useCompactControls(): boolean {
   return isCompactWindow(useUsableWindow());
 }
 
-/** Below this a landscape window's rack shrinks, the way portrait's compact controls do. */
-const COMPACT_LANDSCAPE_HEIGHT = 450;
-
-/** Whether a landscape window is too short for the landscape rack's full-size tiles. */
-export function isCompactLandscapeWindow(window: Window): boolean {
-  return window.width > window.height && window.height < COMPACT_LANDSCAPE_HEIGHT;
+/**
+ * A phone on its side (mocks 1a, 3a, 4a–4c): the content box between the side insets, the
+ * action row's top `rowTop` (the line `A`: one tile tall, 6 above the bottom inset), and the
+ * table from 6 under the top to `A − 94` tall — the room left under it is the hero's seat
+ * straddling its edge and the word preview's line. The foot reaches into the home indicator's
+ * band as portrait's does, half of it kept clear, so the height goes to the table. A device with
+ * no inset (an SE, the web) keeps the mock's 20 at the sides and 8 at the foot.
+ */
+export function landscapeFrame(
+  window: Window,
+  insets: { top: number; bottom: number; left: number; right: number },
+  tile: number,
+) {
+  const side = Math.max(insets.left, insets.right) || 20;
+  const bottom = Math.round(insets.bottom / 2) || 8;
+  const rowTop = window.height - bottom - tile - 6;
+  const tableTop = insets.top + 6;
+  return { side, bottom, rowTop, tableTop, tableHeight: rowTop - 94 - insets.top };
 }
 
 /** Below this a portrait window's betting row shrinks, leaving the height to the felt. */

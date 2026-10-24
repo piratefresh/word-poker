@@ -22,7 +22,6 @@ export function MiniTile({ letter, size = "md", tone = "cream", opacity = 1, mul
     <View style={{ opacity, paddingTop: 14 }}>
       <Tile
         tile={{ id: `ledger-${letter}`, letter, points, multiplier }}
-        multiplierBadgePlacement="outside"
         side="front"
         size={SIZES[size]}
         ownership={tone === "gold" ? "private" : "neutral"}

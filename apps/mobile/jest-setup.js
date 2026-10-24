@@ -45,20 +45,6 @@ jest.mock("@/components/screens/game/betting/waiting-shield", () => ({ WaitingSh
 // Its housing is a Rive view, native-only: tests drive the button over no art.
 jest.mock("@/components/screens/game/betting/wager-art", () => ({ WagerArt: () => null }));
 
-// The choice accent's beam is decorative Skia; tests keep the static purple strip.
-jest.mock("@/components/game/tile-choice-beam", () => ({
-  TileChoiceBeam: ({ color, height }) => {
-    const React = require("react");
-    const { View } = require("react-native");
-    return React.createElement(View, { style: { backgroundColor: color, height } });
-  },
-}));
-
-// The multiplier tile's beam is the same Skia decoration; tests keep the static border.
-jest.mock("@/components/game/tile-multiplier-beam", () => ({
-  MultiplierBeam: ({ children }) => children,
-}));
-
 // Shadows under the tray, racks and tiles are Skia canvases, and decoration only.
 jest.mock("@/components/ui/shadow-box", () => ({ ShadowBox: () => null }));
 

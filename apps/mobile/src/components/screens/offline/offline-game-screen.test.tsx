@@ -266,7 +266,7 @@ describe("<OfflineGameScreen />", () => {
     // real pot — the numbers the engine counted, not a placeholder row.
     expect(view.getByRole("button", { name: "Call $60" })).toBeOnTheScreen();
     expect(view.getByTestId("pot")).toHaveTextContent(/\$90/);
-    expect(control(view, "all-in-button").getByText("ALL IN")).toBeOnTheScreen();
+    expect(control(view, "action-raise").getByText("RAISE ▲")).toBeOnTheScreen();
   });
 
   test("queues the hero behind a real CPU card and holds its flip until its own card clears", async () => {
@@ -344,14 +344,14 @@ describe("<OfflineGameScreen />", () => {
     const view = await renderTable();
 
     // The builder brings no buttons of its own, and nothing of its drawing either until the
-    // strip spells something: the row is fold, the call, the wager and the all-in, with the
+    // strip spells something: the row is fold, the call and the raise toggle, with the
     // shuffle at its head. No second row of word or round buttons exists.
     expect(view.queryByTestId("word-preview")).toBeNull();
     expect(view.getByTestId("word-builder-shuffle")).toBeOnTheScreen();
     expect(control(view, "action-fold").getByText("FOLD")).toBeOnTheScreen();
     expect(view.getByRole("button", { name: "Call $60" })).toBeOnTheScreen();
     expect(view.queryByTestId("action-wager")).toBeNull();
-    expect(view.getByTestId("all-in-button")).toBeOnTheScreen();
+    expect(view.getByTestId("action-raise")).toBeOnTheScreen();
     expect(view.queryByText("Advance")).toBeNull();
     expect(view.queryByText("Confirm")).toBeNull();
     expect(view.queryByText("Clear")).toBeNull();
@@ -439,8 +439,9 @@ describe("<OfflineGameScreen />", () => {
     for (let street = 0; street < 3; street += 1) await takeTurn(view);
     expect(view.getByText("RIVER")).toBeOnTheScreen();
     expect(view.getByRole("button", { name: "Check" })).toBeOnTheScreen();
+    await fireEvent.press(view.getByTestId("action-raise"));
     await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
-    expect(view.getByRole("button", { name: "Bet $20" })).toBeOnTheScreen();
+    expect(view.getByRole("button", { name: "CONFIRM $20" })).toBeOnTheScreen();
 
     const before = potAmount(view);
     await fireEvent.press(view.getByTestId("action-wager"));

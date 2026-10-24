@@ -28,15 +28,14 @@ import Animated, {
 import { isSwappedTileId } from "@wordpoker/game-rules";
 
 import {
-  Tile,
-  scaleTileMetrics,
   getTileAccessibilityLabel,
+  scaleTileMetrics,
+  Tile,
   type TileOwnership,
   type TileSide,
   type TileSize,
 } from "@/components/game";
 import {
-  isCompactLandscapeWindow,
   isCompactWindow,
   screenScale,
 } from "@/components/screens/game/screen-scale";
@@ -50,10 +49,10 @@ import { styles } from "./styles";
 const MAX_GAP = 10;
 
 /** The bite taken at either end of the rack, so the hand does not run into the edge of the table. */
-const RACK_INSET = 8;
+export const RACK_INSET = 8;
 
 /** A choice tile's chips, under it: the caption they print and the padding they wear it in. */
-const FACE_HEIGHT = 24;
+const FACE_HEIGHT = 46;
 
 /**
  * A tile in the strip stays where the seat left it: the word is the tiles it has selected, read
@@ -68,6 +67,8 @@ export interface RackGeometry {
   /** The screen scale the tile is grown by; 1 on a phone. */
   readonly scale: number;
   readonly itemWidth: number;
+  /** The tile's own height, without the choice faces under it. */
+  readonly itemHeight: number;
   /** How far apart two places sit on a rack with room to spare: the tile and `MAX_GAP`. */
   readonly maxStep: number;
   /**
@@ -89,11 +90,13 @@ function rackGeometry(size: TileSize, scale = 1): RackGeometry {
     size,
     scale,
     itemWidth: tile.width,
+    itemHeight: tile.height,
     maxStep: tile.width + MAX_GAP,
     minStep: Math.round(tile.width * 0.72),
     height: tile.height + spacing.xs + FACE_HEIGHT * scale,
   };
 }
+
 
 /** The rack for a phone: the medium tile, drawn as it always was. */
 export const RACK = {
@@ -103,24 +106,38 @@ export const RACK = {
   /** A phone on its side: the medium tile, matching the felt's own community tiles; the step
    *  tightens on its own (`stepFor`) if seven of them outrun the tray's width. */
   landscape: rackGeometry("medium"),
-  /** A small phone on its side (an SE-class short side): the rack has no width to spare, so it
-   *  takes the small tile instead of squeezing the medium one into an overlap. */
-  landscapeCompact: rackGeometry("small"),
+  /** An SE on its side: seven tiles, the shuffle, the check and the betting row share 627
+   *  points, so the tile gives up four to fit the row (mock 3a). */
+  landscapeCompact: rackGeometry("medium", 40 / 44),
+  /** An 11 / XR-class width on its side: 48 (mock 4b). */
+  landscapeWide: rackGeometry("medium", 48 / 44),
+  /** A Pro Max-class width on its side: the tile grows to 50. */
+  landscapeLarge: rackGeometry("medium", 50 / 44),
 } as const;
+
+/** A phone on its side picks its tile by width, the row's scarce side: below each, the next. */
+const LANDSCAPE_TILE_WIDTHS = [
+  [700, RACK.landscapeCompact],
+  [860, RACK.landscape],
+  [920, RACK.landscapeWide],
+] as const;
 
 /**
  * The rack for a window: the medium tile grown by the window's screen scale, so the tiles keep
  * pace with the banner, the seats and the action row. Its shorter side decides, so a phone —
  * upright or on its side — gets the phone rack itself.
  */
-export function rackFor(window: {
-  width: number;
-  height: number;
-}): RackGeometry {
+export function rackFor(
+  window: {
+    width: number;
+    height: number;
+  },
+): RackGeometry {
   const scale = screenScale(window);
   if (scale !== 1) return rackGeometry("medium", scale);
   if (window.width > window.height && window.height < layout.wideShortSide) {
-    return isCompactLandscapeWindow(window) ? RACK.landscapeCompact : RACK.landscape;
+    const step = LANDSCAPE_TILE_WIDTHS.find(([below]) => window.width < below);
+    return step?.[1] ?? RACK.landscapeLarge;
   }
   return isCompactWindow(window) ? RACK.compact : RACK.phone;
 }
@@ -443,9 +460,15 @@ export function TileStrip({
         entry,
         held: held.has(entry.tile.id),
         chosenFace: held.get(entry.tile.id),
-        pick: picking ? (entry.ownership === "private" ? "target" : "off") : null,
+        pick: picking
+          ? entry.ownership === "private"
+            ? "target"
+            : "off"
+          : null,
         flip:
-          flip !== null && flip.tileId === entry.tile.id && flipped !== flip.tileId
+          flip !== null &&
+          flip.tileId === entry.tile.id &&
+          flipped !== flip.tileId
             ? {
                 from: flip.from,
                 revealed: flip.revealed,
@@ -457,8 +480,6 @@ export function TileStrip({
   );
 
   const rack = rackFor(useWindowDimensions());
-  const hasChoice = strip.some(({ tile }) => "alternativeLetter" in tile);
-  const stripHeight = hasChoice ? rack.height : rack.height - FACE_HEIGHT * rack.scale;
   // A hand never holds more than the places (§7's seven), but cap the empties at 0 rather than
   // trust it: a negative count would draw nothing and shift every step.
   const laidOut = Math.max(places, data.length);
@@ -467,6 +488,7 @@ export function TileStrip({
   return (
     <View
       accessibilityLabel="Your letter rack"
+      id={webTestID("word-builder-strip")}
       onLayout={measure}
       style={[styles.strip, rack !== RACK.phone && styles.stripTight]}
       testID="word-builder-strip"
@@ -479,7 +501,8 @@ export function TileStrip({
       <View
         style={[
           styles.stripContent,
-          { height: stripHeight, width: rowWidth(laidOut, step, rack) },
+          // The chips' row is always kept, so a choice tile dealt mid-hand moves nothing.
+          { height: rack.height, width: rowWidth(laidOut, step, rack) },
         ]}
       >
         {/* Every place has its card slot, drawn under the tiles, so a lifted tile shows it. */}
@@ -793,6 +816,7 @@ function TileContent({
   // Choosing a tile for a power: the seat's own tiles are the only ones that answer a tap.
   const picking = pick !== null;
   const choice = "alternativeLetter" in tile ? tile : null;
+  const tileWidth = scaleTileMetrics(size, scale).width;
   // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
   // held choice tile says the face the word is playing and not only the pair it prints.
   const playing =
@@ -806,7 +830,9 @@ function TileContent({
     const mark = face === tile && powered ? ", from your power" : "";
     const spoken = `${getTileAccessibilityLabel(face)}${mark}${playing}`;
     if (pick === "target") return `${spoken}, tap to swap it`;
-    return held ? `${spoken}, in your word, tap to take it back` : `${spoken}, tap to play it`;
+    return held
+      ? `${spoken}, in your word, tap to take it back`
+      : `${spoken}, tap to play it`;
   };
   const tileProps = {
     chosenFace,
@@ -855,21 +881,31 @@ function TileContent({
         )}
       </PickPulse>
       {choice === null ? null : (
-        <View style={styles.faces}>
-          {[choice.letter, choice.alternativeLetter].map((face) => (
-            <FaceChip
-              key={face}
-              chosen={chosenFace === face}
-              face={face}
-              onPress={() => {
-                haptic("settle");
-                onToggle(entry, face);
-              }}
-              playable={live && !picking}
-              tile={choice}
-            />
-          ))}
-        </View>
+        <>
+          <View style={styles.faces}>
+            {[choice.letter, choice.alternativeLetter].map((face) => (
+              <FaceChip
+                key={face}
+                chosen={held && chosenFace === face}
+                face={face}
+                onPress={() => {
+                  haptic("settle");
+                  onToggle(entry, face);
+                }}
+                playable={live && !picking}
+                tile={choice}
+              />
+            ))}
+          </View>
+          {held && chosenFace !== undefined ? null : (
+            <Text
+              numberOfLines={2}
+              style={[styles.faceCaption, { width: tileWidth }]}
+            >
+              Select
+            </Text>
+          )}
+        </>
       )}
     </View>
   );
@@ -879,7 +915,13 @@ function TileContent({
  * A private tile the seat may choose for its power (§44): it breathes, with a gold ring, so the
  * rack says which tiles the tap is waiting on. Under reduced motion the ring holds still.
  */
-function PickPulse({ active, children }: { active: boolean; children: ReactNode }): JSX.Element {
+function PickPulse({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: ReactNode;
+}): JSX.Element {
   const reduceMotion = useReducedMotion();
   const pulse = useSharedValue(0);
 
@@ -887,7 +929,10 @@ function PickPulse({ active, children }: { active: boolean; children: ReactNode 
     if (active && !reduceMotion) {
       pulse.set(
         withRepeat(
-          withSequence(withTiming(1, { duration: 520 }), withTiming(0, { duration: 520 })),
+          withSequence(
+            withTiming(1, { duration: 520 }),
+            withTiming(0, { duration: 520 }),
+          ),
           -1,
         ),
       );
@@ -906,7 +951,10 @@ function PickPulse({ active, children }: { active: boolean; children: ReactNode 
     <Animated.View style={active ? breathe : undefined}>
       {children}
       {active ? (
-        <Animated.View pointerEvents="none" style={[styles.pickRing, glow(colors.gold, 8), ring]} />
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.pickRing, glow(colors.gold, 8), ring]}
+        />
       ) : null}
     </Animated.View>
   );
@@ -943,7 +991,10 @@ function SwapReveal({
   // be face up before it can turn over, and a tile mounted face down has no turn to report.
   useEffect(() => {
     if (!revealed || beat !== "from") return;
-    const timer = setTimeout(() => setBeat(reduceMotion ? "showing" : "hiding"), SWAP_TURN_DELAY_MS);
+    const timer = setTimeout(
+      () => setBeat(reduceMotion ? "showing" : "hiding"),
+      SWAP_TURN_DELAY_MS,
+    );
     return () => clearTimeout(timer);
   }, [beat, reduceMotion, revealed]);
 
@@ -959,11 +1010,19 @@ function SwapReveal({
     return (
       <View style={{ height: metrics.height, width: metrics.width }}>
         {beat === "from" ? (
-          <Animated.View exiting={FadeOut.duration(SWAP_FADE_MS)} key="from" style={styles.swapFace}>
+          <Animated.View
+            exiting={FadeOut.duration(SWAP_FADE_MS)}
+            key="from"
+            style={styles.swapFace}
+          >
             {render(flip.from, "front")}
           </Animated.View>
         ) : (
-          <Animated.View entering={FadeIn.duration(SWAP_FADE_MS)} key="to" style={styles.swapFace}>
+          <Animated.View
+            entering={FadeIn.duration(SWAP_FADE_MS)}
+            key="to"
+            style={styles.swapFace}
+          >
             {render(tile, "front")}
           </Animated.View>
         )}
@@ -1015,13 +1074,16 @@ function FaceChip({
       id={webTestID(testID)}
       onPress={onPress}
       style={[
+        { padding: 0, height: "auto" },
         styles.chip,
         chosen && styles.chipChosen,
         !playable && styles.chipSpent,
       ]}
       testID={testID}
     >
-      <Text style={styles.chipFace}>{face}</Text>
+      <Text style={[styles.chipFace, chosen && styles.chipFaceChosen]}>
+        {face}
+      </Text>
     </Pressable>
   );
 }

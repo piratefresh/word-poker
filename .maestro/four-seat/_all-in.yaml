@@ -7,6 +7,10 @@ name: Four-seat - all in
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 150000
+# The ALL IN preset puts the knob at the stack; the raise button then reads ALL IN (its own id).
+- tapOn:
+    id: "action-raise"
+- tapOn: "ALL IN"
 - retry:
     maxRetries: 2
     commands:

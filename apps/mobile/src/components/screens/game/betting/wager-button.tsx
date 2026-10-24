@@ -1,4 +1,4 @@
-import { useAudioPlayer } from "expo-audio";
+import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 import { Pressable, StyleSheet, Text as RNText, View } from "react-native";
 import Animated, {
   Easing,
@@ -27,6 +27,16 @@ const ART_SIZE = 1280;
 /** How far below the old housing's face the Rive button's face sits, in lettering units. */
 const FACE_DROP = 90;
 const EASING = Easing.out(Easing.cubic);
+
+// Shared across mounts and never released: a button unmounting mid-sound (the hand ending) would
+// otherwise abort the pending play, which expo-audio's web player leaves unhandled. Created on the
+// first press, so static web rendering never builds an Audio element.
+const players = new Map<number, AudioPlayer>();
+function sound(source: number): AudioPlayer {
+  let player = players.get(source);
+  if (!player) players.set(source, (player = createAudioPlayer(source)));
+  return player;
+}
 
 /** The lettering's two homes: above an amount (or a waited-on name), or centred on a bare face. */
 const ARC_AMOUNT = "M 340 445 Q 640 335 940 445";
@@ -91,8 +101,6 @@ export function WagerButton({
   const pop = useSharedValue(1);
   const [pressed, setPressed] = useState(false);
   const wasOffTurn = useRef(false);
-  const player = useAudioPlayer(CLICK);
-  const cuePlayer = useAudioPlayer(YOUR_TURN);
   const buttonStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shake.get() }, { scale: pop.get() }],
   }));
@@ -126,7 +134,7 @@ export function WagerButton({
       if (!reduceMotion) shake.set(wiggle(1));
       if (soundEnabled) {
         try {
-          // eslint-disable-next-line react-hooks/immutability
+          const cuePlayer = sound(YOUR_TURN);
           cuePlayer.volume = 0.5;
           void cuePlayer.seekTo(0).catch(() => {});
           cuePlayer.play();
@@ -142,8 +150,8 @@ export function WagerButton({
     if (soundEnabled) {
       // Feedback is optional: a refused audio session must never prevent a wager.
       try {
+        const player = sound(CLICK);
         // Expo's native AudioPlayer exposes volume through an imperative setter.
-        // eslint-disable-next-line react-hooks/immutability
         player.volume = 0.45;
         void player.seekTo(0).catch(() => {});
         player.play();

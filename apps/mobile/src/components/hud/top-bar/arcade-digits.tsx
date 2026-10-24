@@ -33,11 +33,13 @@ export function ArcadeDigits({
   children,
   loud = false,
   style,
+  testID,
 }: {
   children: string;
   loud?: boolean;
   /** The digits' size, scaled with the banner they are lettered on. */
   style?: TextStyle;
+  testID?: string;
 }) {
   // Gradient ids share one document on the web, so each clock needs its own.
   const fillId = `arcade-fill-${useId().replace(/:/g, "")}`;
@@ -61,7 +63,9 @@ export function ArcadeDigits({
 
   return (
     <View style={[styles.box, { paddingHorizontal: pad, transform: [...LEAN] }]}>
-      <Text style={[styles.metric, style]}>{children}</Text>
+      <Text style={[styles.metric, style]} testID={testID}>
+        {children}
+      </Text>
       {/* Hidden from assistive tech: the transparent text is what gets read. */}
       <View
         aria-hidden

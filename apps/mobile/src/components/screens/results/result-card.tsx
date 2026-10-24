@@ -307,7 +307,6 @@ function ResultTile({
     <Animated.View style={[builderStyles.entry, enter]}>
       <Tile
         animation="none"
-        multiplierBadgePlacement="outside"
         // §44: a tile a power handed the seat shows the table its ⚡, and nothing it replaced.
         powered={isSwappedTileId(tile.id)}
         side="front"

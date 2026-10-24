@@ -117,8 +117,8 @@ tags:
     timeout: 20000
 # Select the minimum opening bet; the combined button defaults to Check.
 - tapOn:
-    id: "wager-slider"
-    point: "2%,50%"
+    id: "action-raise"
+- tapOn: "MIN"
 - assertVisible:
     id: "action-wager"
     containsDescendants:

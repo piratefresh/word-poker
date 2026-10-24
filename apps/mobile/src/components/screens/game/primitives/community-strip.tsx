@@ -13,6 +13,7 @@ import Animated, {
 import type { LetterTileData } from "../game-types";
 import { isCompactWindow, useScreenScale } from "../screen-scale";
 import { Tile, TILE_METRICS } from "@/components/game";
+import { webTestID } from "@/lib/ui/web-id";
 import { LabelBand } from "./label-band";
 import { communityDealDelayMs, EmptyTile, LetterTile, tileSizeFor } from "./letter-tile";
 
@@ -61,7 +62,15 @@ const BACK_TILE: LetterTileData = { id: "undealt", letter: "A", points: 1 };
  * Spotlight's beam (§44): a tile that gains its 2x while it sits on the felt drops in from above
  * with a gold glow, once. A tile that is dealt already doubled just appears — nothing was lit.
  */
-function SpotlightBeam({ tile, children }: { tile: LetterTileData; children: ReactNode }) {
+function SpotlightBeam({
+  tile,
+  children,
+  testID,
+}: {
+  tile: LetterTileData;
+  children: ReactNode;
+  testID: string;
+}) {
   const reduceMotion = useReducedMotion();
   const previous = useRef({ id: tile.id, lit: tile.multiplier !== undefined });
   const drop = useSharedValue(0);
@@ -87,7 +96,7 @@ function SpotlightBeam({ tile, children }: { tile: LetterTileData; children: Rea
   const halo = useAnimatedStyle(() => ({ opacity: glow.value }));
 
   return (
-    <Animated.View style={style}>
+    <Animated.View style={style} testID={testID}>
       <Animated.View pointerEvents="none" style={[styles.halo, halo]} />
       {children}
     </Animated.View>
@@ -121,7 +130,9 @@ export function CommunityStrip({
     <View
       aria-label={inTable ? `Community ${five.filter(Boolean).length}/5` : undefined}
       role={inTable ? "group" : undefined}
+      id={webTestID("community-strip")}
       style={inTable ? undefined : styles.community}
+      testID="community-strip"
     >
       {inTable ? null : (
         <LabelBand>
@@ -138,11 +149,16 @@ export function CommunityStrip({
         >
           {five.map((tile, index) => (
             tile ? (
-              <SpotlightBeam key={`community-${index}`} tile={tile}>
+              <SpotlightBeam
+                key={`community-${index}`}
+                testID={`community-slot-${index}`}
+                tile={tile}
+              >
                 {onPick !== undefined && tile.multiplier === undefined ? (
                   <Pressable
                     accessibilityLabel={`Spotlight ${tile.letter}`}
                     accessibilityRole="button"
+                    id={webTestID(`community-tile-${tile.id}`)}
                     onPress={() => onPick(tile)}
                     style={styles.target}
                     testID={`community-tile-${tile.id}`}
@@ -159,6 +175,7 @@ export function CommunityStrip({
                     dealDelayMs={communityDealDelayMs(index)}
                     scale={scale}
                     size={tileWidth}
+                    testID={`community-tile-${tile.id}`}
                     tile={tile}
                   />
                 )}
@@ -170,10 +187,15 @@ export function CommunityStrip({
                 scale={scale}
                 side="back"
                 size={tileSizeFor(tileWidth)}
+                testID={`community-slot-${index}`}
                 tile={BACK_TILE}
               />
             ) : (
-              <EmptyTile key={`community-${index}`} size={tileSize} />
+              <EmptyTile
+                key={`community-${index}`}
+                size={tileSize}
+                testID={`community-slot-${index}`}
+              />
             )
           ))}
         </View>

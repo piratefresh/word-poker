@@ -9,7 +9,7 @@ import { WORD_REJECTION_REASONS } from "@wordpoker/contracts";
 import { useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
-import { colors, opacity } from "@/constants/theme";
+import { opacity } from "@/constants/theme";
 
 import {
   WordBuilder,
@@ -174,12 +174,6 @@ function shuffleArmed(view: RenderResult): boolean {
   );
 }
 
-/** What the draft line paints the score in, which is how it says whether the word will count. */
-function scoreColor(view: RenderResult): string | undefined {
-  return StyleSheet.flatten(view.getByTestId("word-builder-score").props.style)
-    .color;
-}
-
 describe("<WordBuilder />", () => {
   test("draws every tile the seat can play as one strip, and the draft line over it", async () => {
     const { view } = await renderBuilder();
@@ -202,16 +196,14 @@ describe("<WordBuilder />", () => {
     await fireEvent.press(view.getByTestId("word-builder-tile-p-a"));
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "p-a" }]);
 
-    // A/E has no face to play on its own, so its body plays the printed first face (§10) and
-    // the chips are how the other one is named.
+    // A/E has no face to play on its own: its body does nothing until a chip names a letter.
     await fireEvent.press(view.getByTestId("word-builder-tile-p-ae"));
-    expect(onDraft).toHaveBeenCalledWith([{ tileId: "p-ae", chosenFace: "A" }]);
+    expect(onDraft).toHaveBeenCalledTimes(1);
 
     await fireEvent.press(view.getByTestId("word-builder-face-p-ae-E"));
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "p-ae", chosenFace: "E" }]);
 
-    // A choice tile's body plays the face it prints first, and its chips name the other one (§10).
-    await fireEvent.press(view.getByTestId("word-builder-tile-c-ts"));
+    await fireEvent.press(view.getByTestId("word-builder-face-c-ts-T"));
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "c-ts", chosenFace: "T" }]);
   });
 
@@ -258,10 +250,9 @@ describe("<WordBuilder />", () => {
     expect(held.queryByText("A", hidden)).toBeNull();
     expect(held.queryByText("/", hidden)).toBeNull();
 
-    // A choice tile the word does not hold keeps printing the pair it can be played as.
+    // A choice tile the word does not hold prints "?" until a letter is named.
     const open = within(view.getByTestId("word-builder-tile-c-ts"));
-    expect(open.getByText("T", hidden)).toBeOnTheScreen();
-    expect(open.getByText("S", hidden)).toBeOnTheScreen();
+    expect(open.getByText("?", hidden)).toBeOnTheScreen();
 
     // Both faces are still on screen under the tile, the played one chosen.
     expect(
@@ -306,12 +297,8 @@ describe("<WordBuilder />", () => {
     expect(standing.view.getByTestId("word-builder-word")).toHaveTextContent(
       "EL",
     );
-    expect(standing.view.getByTestId("word-builder-score")).toHaveTextContent(
-      /3 pts/,
-    );
+    expect(standing.view.getByTestId("word-builder-score")).toHaveTextContent("3");
     expect(standing.view.queryByTestId("word-builder-full-rack")).toBeNull();
-    expect(scoreColor(standing.view)).toBe(colors.gold);
-
     // §7.3's bonus is the one part of the score a seat cannot read off the tiles, so the line
     // says where it came from.
     const rack = await renderBuilder({
@@ -319,25 +306,20 @@ describe("<WordBuilder />", () => {
       score: FULL_RACK,
       word: "EL",
     });
-    expect(rack.view.getByTestId("word-builder-score")).toHaveTextContent(
-      /13 pts/,
-    );
+    expect(rack.view.getByTestId("word-builder-score")).toHaveTextContent("13");
     expect(rack.view.getByTestId("word-builder-full-rack")).toHaveTextContent(
       /\+10 full rack/,
     );
 
-    // A draft §11 refuses scores nothing, and the number is drawn as what it is rather than
-    // dropped: the seat is still shaping the word it wants to keep.
+    // A draft §11 refuses scores nothing: the coin shows a dash, and the reason stays
+    // readable to assistive tech.
     const refused = await renderBuilder({
       plays: DRAFT,
       reason: "not-in-dictionary",
       score: SCORE,
       word: "EL",
     });
-    expect(refused.view.getByTestId("word-builder-score")).toHaveTextContent(
-      /3 pts/,
-    );
-    expect(scoreColor(refused.view)).toBe(colors.textFaint);
+    expect(refused.view.getByTestId("word-builder-score")).toHaveTextContent("–");
     expect(refused.view.getByRole("alert")).toHaveTextContent(
       "Not in the dictionary",
     );
