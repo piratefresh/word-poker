@@ -1,261 +1,214 @@
-import { useState } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
   type GestureResponderEvent,
-  type LayoutChangeEvent,
 } from "react-native";
+import Animated, { SlideInRight, SlideOutRight } from "react-native-reanimated";
 
 import { CoachTarget } from "@/components/ui/coach";
 import { webTestID } from "@/lib/ui/web-id";
 import { fonts, palette, radius } from "@/constants/theme";
 
 import type { BettingState } from "../game-types";
-import { useCompactControls, useScreenScale } from "../screen-scale";
 import { formatCompactAmount } from "./format-amount";
 
-/** The wager slider. */
+/** The tube's height, and the gap that keeps the knob inside it at either end. */
+const TUBE_HEIGHT = 300;
+const TRACK_INSET = 15;
+/** Presets closer than this would overlap their pills. */
+const PILL_GAP = 32;
+
+/**
+ * The collapsible wager slider: a vertical tube floating over the table's right edge, presets
+ * beside it. `amount` 0 is "untouched" (the knob rests at the floor and the action row still
+ * offers CLOSE); any positive amount is the round total the RAISE button would commit.
+ */
 export function RaiseSlider({
   state,
   amount,
   pot,
-  disabled,
+  open,
   onAmountChange,
+  tubeHeight: height = TUBE_HEIGHT,
 }: {
   state: BettingState;
   amount: number;
   /** The chips currently in the pot, including this round's commitments. */
   pot: number;
-  disabled: boolean;
+  open: boolean;
   onAmountChange: (amount: number) => void;
+  /** The tube's height: shorter where the screen is (a phone on its side). */
+  tubeHeight?: number;
 }) {
-  const scale = useScreenScale();
-  const tight = useCompactControls();
-  const { width, height } = useWindowDimensions();
-  const landscape = width > height;
-  const [trackWidth, setTrackWidth] = useState(1);
+  if (!open) return null;
 
-  const range = Math.max(1, state.maxRaise - state.minRaise + state.raiseStep);
-  const progress = amount === 0 ? 0 : (amount - state.minRaise + state.raiseStep) / range;
+  const { minRaise, maxRaise } = state;
+  const span = Math.max(1, maxRaise - minRaise);
+  const usable = height - 2 * TRACK_INSET;
+  const progress = amount === 0 ? 0 : Math.max(0, Math.min(1, (amount - minRaise) / span));
+  const offset = (fraction: number) => TRACK_INSET + fraction * usable;
   const potAfterCall = pot + (state.callAmount ?? 0);
   const wagerPhrase = state.wager === "bet" ? "bet" : "raise to";
-  const presets = POT_PRESETS.map((preset) => {
-    // Slider amounts are round totals (§22): add a fraction of the pot after calling to the
-    // current round total. In an unopened round, this reduces to a fraction of the pot.
-    const desired = state.currentBet + potAfterCall * preset.multiplier;
-    const available =
-      !disabled && desired >= state.minRaise && desired <= state.maxRaise;
-    const stepped = Math.round(desired / state.raiseStep) * state.raiseStep;
-    const presetAmount = Math.max(
-      state.minRaise,
-      Math.min(state.maxRaise, stepped),
-    );
-    return {
-      ...preset,
-      amount: presetAmount,
-      available,
-      selected: available && amount === presetAmount,
-    };
+
+  const amounts = [
+    { id: "minimum", label: "MIN", name: "Minimum", amount: minRaise },
+    ...POT_PRESETS.map((preset) => ({
+      id: preset.id,
+      label: preset.label,
+      name: preset.name,
+      // Slider amounts are round totals (§22): a fraction of the pot after calling, on top of the
+      // current round total.
+      amount: state.currentBet + potAfterCall * preset.multiplier,
+    })),
+    { id: "all-in", label: "ALL IN", name: "All in", amount: maxRaise },
+  ].map((preset) => {
+    const stepped = Math.round(preset.amount / state.raiseStep) * state.raiseStep;
+    const clamped = Math.max(minRaise, Math.min(maxRaise, stepped));
+    return { ...preset, amount: clamped, selected: amount === clamped };
   });
+
+  // Bottom-up, push each pill clear of the one below; then top-down, pull any that ran off the
+  // top back under it.
+  const ys = amounts.map((preset) => offset((preset.amount - minRaise) / span));
+  for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + PILL_GAP);
+  ys[ys.length - 1] = Math.min(ys[ys.length - 1], height - TRACK_INSET);
+  for (let i = ys.length - 2; i >= 0; i--) ys[i] = Math.min(ys[i], ys[i + 1] - PILL_GAP);
+
   const fromEvent = (event: GestureResponderEvent) => {
-    const position = Math.max(0, Math.min(1, event.nativeEvent.locationX / trackWidth)) * range;
-    onAmountChange(position < state.raiseStep / 2 ? 0 : Math.max(state.minRaise, state.minRaise + position - state.raiseStep));
+    const fraction = 1 - (event.nativeEvent.locationY - TRACK_INSET) / usable;
+    onAmountChange(minRaise + Math.max(0, Math.min(1, fraction)) * span);
   };
+
   return (
-    <CoachTarget id="raise" style={styles.raiseRow}>
-      <View
-        style={[
-          styles.presetRow,
-          { marginHorizontal: 12 * scale },
-          landscape && styles.presetRowLandscape,
-        ]}
-      >
-        {presets.map((preset) => (
-          <Pressable
-            key={preset.label}
-            accessibilityLabel={[
-              preset.accessibilityLabel,
-              wagerPhrase,
-              formatCompactAmount(preset.amount),
-            ].join(" ")}
-            accessibilityRole="button"
-            accessibilityState={{ selected: preset.selected }}
-            disabled={!preset.available}
-            hitSlop={{ top: 7, bottom: 7, left: 5, right: 5 }}
-            onPress={() => onAmountChange(preset.amount)}
-            style={({ pressed }) => [
-              styles.presetButton,
-              preset.available && pressed && styles.presetButtonPressed,
-              !preset.available && styles.presetButtonDisabled,
-            ]}
-          >
-            <View
-              style={[
-                styles.flagBadge,
-                landscape && { paddingHorizontal: 3 * scale },
-                preset.selected && styles.flagBadgeSelected,
-              ]}
-            >
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.flagText,
-                  landscape && { fontSize: 10 * scale },
-                  preset.selected && styles.flagTextSelected,
-                ]}
-              >
-                {preset.label}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-      <View style={styles.trackRow}>
+    <Animated.View
+      entering={SlideInRight.duration(320)}
+      exiting={SlideOutRight.duration(200)}
+      pointerEvents="box-none"
+      style={[styles.panel, { height }]}
+    >
+      <CoachTarget id="raise" style={{ height }}>
+        <View style={[styles.tag, { bottom: height + 6 }]}>
+          <Text style={styles.tagText}>{formatCompactAmount(amount === 0 ? minRaise : amount)}</Text>
+        </View>
         <View
           testID="wager-slider"
           id={webTestID("wager-slider")}
           accessibilityActions={[
             { name: "increment", label: "Increase wager" },
-            { name: "decrement", label: "Decrease wager or return to check or call" },
+            { name: "decrement", label: "Decrease wager" },
           ]}
           accessibilityLabel="Wager amount"
           accessibilityRole="adjustable"
           accessibilityValue={{
             min: 0,
-            max: state.maxRaise,
+            max: maxRaise,
             now: amount,
-            text: amount === 0 ? (state.primary === "call" ? `Call $${state.callAmount ?? 0}` : "Check") : `$${amount}`,
+            text: amount === 0 ? "No wager" : amount >= maxRaise ? `All in, $${amount}` : `$${amount}`,
           }}
           onAccessibilityAction={(event) =>
-            !disabled &&
             onAmountChange(
               event.nativeEvent.actionName === "increment"
-                ? (amount === 0 ? state.minRaise : amount + state.raiseStep)
-                : (amount <= state.minRaise ? 0 : amount - state.raiseStep),
+                ? (amount === 0 ? minRaise : amount + state.raiseStep)
+                : (amount <= minRaise ? 0 : amount - state.raiseStep),
             )
           }
-          onLayout={(event: LayoutChangeEvent) =>
-            setTrackWidth(event.nativeEvent.layout.width)
-          }
-          onMoveShouldSetResponder={() => !disabled}
+          onMoveShouldSetResponder={() => true}
           onResponderGrant={fromEvent}
           onResponderMove={fromEvent}
-          onStartShouldSetResponder={() => !disabled}
-          style={[
-            styles.touchArea,
-            { marginHorizontal: 12 * scale }, // room for the thumb's overhang
-            tight && { height: 28 },
-            scale !== 1 && { height: 36 * scale },
-          ]}
+          onStartShouldSetResponder={() => true}
+          style={[styles.touchArea, { height }]}
         >
-          {/* The touch area is the tall hit target; pointerEvents none keeps locationX measured on
-            it (same width as the track), not on the fill or thumb. */}
+          {/* pointerEvents none keeps locationY measured on the touch area, not on the fill or knob. */}
+          <View pointerEvents="none" style={[styles.track, { height: height - 2 * TRACK_INSET + 8 }]}>
+            <View style={[styles.fill, { height: offset(progress) - TRACK_INSET + 4 }]} />
+          </View>
           <View
             pointerEvents="none"
-            style={[styles.slider, scale !== 1 && { height: 10 * scale }]}
-          >
-            <View
-              style={[
-                styles.sliderFill,
-                scale !== 1 && { height: 10 * scale },
-                { width: `${progress * 100}%` },
-              ]}
-            />
-            <View
-              style={[
-                styles.sliderThumb,
-                scale !== 1 && {
-                  height: 24 * scale,
-                  marginLeft: -12 * scale,
-                  marginTop: -10 * scale,
-                  width: 24 * scale,
-                },
-                { left: `${progress * 100}%` },
-              ]}
-            />
-          </View>
+            style={[styles.knob, { bottom: offset(progress) - KNOB / 2 }]}
+          />
         </View>
-      </View>
-    </CoachTarget>
+        {amounts.map((preset, i) => (
+          <Pressable
+            key={preset.label}
+            accessibilityLabel={`${preset.name} ${wagerPhrase} ${formatCompactAmount(preset.amount)}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: preset.selected }}
+            hitSlop={{ top: 4, bottom: 4, right: 4 }}
+            id={webTestID(`wager-preset-${preset.id}`)}
+            onPress={() => onAmountChange(preset.amount)}
+            style={[styles.pill, { bottom: ys[i] - 14 }, preset.selected && styles.pillSelected]}
+            testID={`wager-preset-${preset.id}`}
+          >
+            <Text style={[styles.pillText, preset.selected && styles.pillTextSelected]}>
+              {preset.label}
+            </Text>
+          </Pressable>
+        ))}
+      </CoachTarget>
+    </Animated.View>
   );
 }
 
+const KNOB = 26;
 const POT_PRESETS = [
-  { label: "½ POT", accessibilityLabel: "Half pot", multiplier: 0.5 },
-  { label: "POT", accessibilityLabel: "Pot", multiplier: 1 },
-  { label: "2× POT", accessibilityLabel: "Two times pot", multiplier: 2 },
+  { id: "half-pot", label: "½ POT", name: "Half pot", multiplier: 0.5 },
+  { id: "pot", label: "POT", name: "Pot", multiplier: 1 },
+  { id: "double-pot", label: "2× POT", name: "Two times pot", multiplier: 2 },
 ] as const;
 
 const styles = StyleSheet.create({
-  // No `flex: 1` here or on the track row: the column around them has no height of its own, and
-  // native Yoga reads a zero flex basis literally there, collapsing the row so the action row
-  // below draws over the track (the web's CSS sizes it by content instead).
-  raiseRow: { minWidth: 0 },
-  presetRow: { flexDirection: "row", height: 30, marginBottom: 2 },
-  presetRowLandscape: { marginHorizontal: 0 },
-  presetButton: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  presetButtonPressed: { transform: [{ translateY: 1 }] },
-  presetButtonDisabled: { opacity: 0.38 },
-  flagBadge: {
-    alignItems: "center",
-    backgroundColor: "rgba(60,36,12,0.88)",
-    borderColor: palette.gold400,
-    borderRadius: 4,
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  flagBadgeSelected: {
-    backgroundColor: palette.gold300,
-    borderColor: palette.gold100,
-  },
-  flagText: {
-    color: palette.cream100,
-    fontFamily: fonts.sansBlack,
-    fontSize: 12,
-    lineHeight: 14,
-  },
-  flagTextSelected: { color: "#3c240c" },
-  trackRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    minHeight: 30,
-  },
-  touchArea: { flex: 1, height: 36, justifyContent: "center" },
-  slider: {
-    backgroundColor: "rgba(60,36,12,0.55)",
-    borderColor: "#5a3a14",
+  /** Sits over the table's right edge, bottom-aligned to the action row it opens from. */
+  panel: { width: 132 },
+  touchArea: { alignItems: "center", justifyContent: "flex-end", width: 36 },
+  track: {
+    backgroundColor: "#1a0d06",
+    borderColor: "rgba(224,178,90,0.35)",
     borderRadius: 6,
     borderWidth: 1.5,
-    boxShadow: "inset 0px 2px 3px rgba(0,0,0,0.7)",
-    height: 10,
-    position: "relative",
+    bottom: 0,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    position: "absolute",
+    top: TRACK_INSET - 4,
+    width: 10,
   },
-  sliderFill: {
-    backgroundColor: "#ffc500",
-    borderRadius: 4,
-    boxShadow:
-      "inset 0px 1px 0px rgba(255,248,220,0.9), inset 0px -2px 0px rgba(138,90,12,0.45)",
-    height: 7,
-  },
-  sliderThumb: {
-    backgroundColor: "#ffc500",
+  fill: { backgroundColor: palette.gold300, width: "100%" },
+  knob: {
+    backgroundColor: palette.gold300,
     borderColor: "#6b430a",
     borderRadius: radius.pill,
     borderWidth: 2.5,
-    boxShadow:
-      "0px 3px 4px rgba(40,20,0,0.65), inset 0px 2px 0px rgba(255,248,220,0.8)",
-    height: 24,
-    marginLeft: -12,
-    marginTop: -10,
+    boxShadow: "0px 3px 4px rgba(40,20,0,0.65), inset 0px 2px 0px rgba(255,248,220,0.8)",
+    height: KNOB,
+    left: 5,
     position: "absolute",
-    width: 24,
+    width: KNOB,
   },
+  tag: {
+    alignSelf: "flex-start",
+    backgroundColor: "#1f4a33",
+    borderColor: "#e0b25a",
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    position: "absolute",
+  },
+  tagText: { color: palette.cream100, fontFamily: fonts.sansBlack, fontSize: 14 },
+  // The pills stand clear of the tube: any overlap steals a drag that starts beside the knob.
+  pill: {
+    backgroundColor: "#2a1408",
+    borderColor: "#e0b25a",
+    borderRadius: 8,
+    borderWidth: 2,
+    left: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    position: "absolute",
+  },
+  pillSelected: { backgroundColor: palette.gold300, borderColor: palette.gold100 },
+  pillText: { color: "#f7e7b5", fontFamily: fonts.sansBlack, fontSize: 12, lineHeight: 16 },
+  pillTextSelected: { color: "#2a1906" },
 });

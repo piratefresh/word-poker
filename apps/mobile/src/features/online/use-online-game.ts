@@ -70,6 +70,7 @@ import { buildSettledSnapshot } from "@/components/screens/results/results-snaps
 import type { ResultsSnapshot } from "@/components/screens/results/results-types";
 import type { WordDraft } from "@/components/word-builder";
 import { colors, palette } from "@/constants/theme";
+import { initialsFromName } from "@/lib/player-initials";
 import {
   feltControls,
   heroView,
@@ -275,10 +276,13 @@ function idOf(view: RoomView): string {
 export function useOnlineGame({
   room,
   dictionary,
+  displayName,
   onReject,
 }: {
   room: GameRoomLike;
   dictionary: Dictionary;
+  /** The signed-in player's name, used for their avatar initials. */
+  displayName?: string | null;
   /** A refused action, for a screen that wants to surface the server's "no" (STO-406). */
   onReject?: (event: GameRejectionEvent) => void;
 }): OnlineGame {
@@ -550,8 +554,11 @@ export function useOnlineGame({
   );
 
   const perspective = useMemo(
-    () => (view === null ? null : perspectiveOf(view, priv, heroId, dictionary, handPowerEvents)),
-    [dictionary, handPowerEvents, heroId, priv, view],
+    () =>
+      view === null
+        ? null
+        : perspectiveOf(view, priv, heroId, dictionary, handPowerEvents, displayName),
+    [dictionary, displayName, handPowerEvents, heroId, priv, view],
   );
 
   const powers = useMemo<PowerView | null>(() => {
@@ -716,6 +723,7 @@ function perspectiveOf(
   heroId: PlayerId,
   dictionary: Dictionary,
   powerEvents: readonly PowerUsedEvent[] = [],
+  displayName?: string | null,
 ): HeroPerspective | null {
   const waiting = view.phase === WAITING_PHASE ||
     (view.phase === "payout" && view.seats.some((seat) => seat.playerId === heroId && seat.seenResults));
@@ -723,6 +731,7 @@ function perspectiveOf(
   if (phase === null) return null;
 
   const heroSeat = view.seats.find((seat) => seat.playerId === heroId)?.seat ?? 0;
+  const heroInitials = initialsFromName(displayName ?? "") || "YOU";
   const seats = engineOrder(view.seats).map((seat) => {
     const isHero = seat.playerId === heroId;
     return {
@@ -735,10 +744,9 @@ function perspectiveOf(
       sittingOut: seat.sittingOut,
       actedThisRound: seat.actedThisRound,
       place: (seat.seat - heroSeat + view.maxSeats) % view.maxSeats,
-      // Anonymous seats until identity lands (Epic B): the hero is unnamed so the felt's "· YOU"
-      // badge is the only word on it, opponents are numbered by their seat.
+      // The nameplates stay role-labeled; the hero's avatar can use its local profile name.
       name: isHero ? "You" : `Seat ${seat.seat + 1}`,
-      initials: isHero ? "YOU" : `S${seat.seat + 1}`,
+      initials: isHero ? heroInitials : `S${seat.seat + 1}`,
       color: colors.players[seat.seat % colors.players.length] ?? palette.amber400,
     };
   });

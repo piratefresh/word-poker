@@ -22,6 +22,7 @@ import {
   easing as motionEasing,
   spacing,
 } from "@/constants/theme";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { formatClockMs, type TurnTimerView } from "../turn-clock";
 import { useTurnAnnouncement } from "../use-turn-clock";
@@ -89,7 +90,9 @@ export function BannerClock({
       <View
         accessibilityLabel="No turn in progress"
         accessible
+        id={webTestID("turn-clock")}
         style={styles.clockRow}
+        testID="turn-clock"
       >
         <ArcadeDigits style={clockStyle}>{IDLE_CLOCK}</ArcadeDigits>
       </View>
@@ -104,7 +107,9 @@ export function BannerClock({
       <View
         accessibilityLabel={clockLabel(turn)}
         accessible
+        id={webTestID("turn-clock")}
         style={styles.clockRow}
+        testID="turn-clock"
       >
         {loud ? (
           <Text

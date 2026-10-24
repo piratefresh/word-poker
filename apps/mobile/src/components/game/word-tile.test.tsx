@@ -36,13 +36,12 @@ describe("<Tile /> — §10's choice tiles", () => {
     // tech — the tile's own label is what a reader gets — so the queries have to say so.
     const hidden = { includeHiddenElements: true } as const;
 
-    // Nothing picked: the pair prints as a pair, both letters, the slash between them, and both
-    // values.
+    // Nothing picked: the tile prints "?" under its MULTI strip, and the pair's one value.
     const open = await render(<Tile side="front" tile={CHOICE} />);
-    expect(open.getByText("A", hidden)).toBeOnTheScreen();
-    expect(open.getByText("E", hidden)).toBeOnTheScreen();
-    expect(open.getAllByText("/", hidden)).toHaveLength(1);
-    expect(open.getByText("1/1", hidden)).toBeOnTheScreen();
+    expect(open.getByText("?", hidden)).toBeOnTheScreen();
+    expect(open.getByText("MULTI", hidden)).toBeOnTheScreen();
+    expect(open.queryByText("A", hidden)).toBeNull();
+    expect(open.getByText("1", hidden)).toBeOnTheScreen();
 
     // Played as E: the tile prints E alone, worth its own value, with no other letter or value.
     const chosen = await render(<Tile chosenFace="E" side="front" tile={CHOICE} />);

@@ -111,6 +111,7 @@ export function Hud({
           onHelp={onHelp}
           onLeave={onLeave}
           phase={phase}
+          testID={testID === undefined ? undefined : `${testID}-bar`}
           // Derived rather than passed: the ordinal is a property of the phase, and two
           // screens each deciding what number a phase is would eventually disagree.
 

@@ -31,6 +31,10 @@ const CLOCK_SIZE = {
 /** The wood rail's thickness as a share of the capsule's height. */
 const RAIL = 0.17;
 const YELLOW = "#FFC72C";
+/** Landscape's plate (mock 1a): 88 by 34, its rail thinner so two lines fit the inlay. */
+const STACKED_HEIGHT = 34;
+const STACKED_MIN_WIDTH = 88;
+const STACKED_RAIL = 0.12;
 
 export function PhaseCapsule({
   label,
@@ -39,7 +43,11 @@ export function PhaseCapsule({
   loopsEnabled,
   reduceMotion,
   showClock = true,
+  stacked = false,
+  testID,
 }: {
+  /** Landscape's small plate (mock 1a): 34 tall, 88 wide at least, the clock under the phase. */
+  stacked?: boolean;
   label: string;
   turn: TurnTimerView | null;
   phrase?: string;
@@ -47,14 +55,22 @@ export function PhaseCapsule({
   reduceMotion: boolean;
   /** The waiting table names itself in the capsule and runs no clock. */
   showClock?: boolean;
+  testID?: string;
 }) {
   const scale = useScreenScale();
   const compact = useCompactControls();
-  const height = CAPSULE_HEIGHT * scale;
+  const height = stacked ? STACKED_HEIGHT : CAPSULE_HEIGHT * scale;
   const cap = height * CAP_RATIO;
+  // The stacked plate's two lines, and the clock glyph that leads the second.
+  const phaseSize = stacked ? 9 : (compact ? 12 : PHASE_SIZE) * scale;
+  const clockSize = stacked ? 11 : (compact ? 14 : CLOCK_SIZE.fontSize) * scale;
+  const glyph = stacked ? 10 : 18 * scale;
   const art = { height, position: "absolute", top: 0 } as const;
   return (
-    <View style={{ height, paddingHorizontal: cap * 0.7 }}>
+    <View
+      style={{ height, minWidth: stacked ? STACKED_MIN_WIDTH : undefined, paddingHorizontal: cap * 0.7 }}
+      testID={testID}
+    >
       <Image
         accessible={false}
         contentFit="cover"
@@ -77,22 +93,23 @@ export function PhaseCapsule({
       />
       {/* The felt-green inlay: the wood's dark interior is hard to read gold on. */}
       <View
-        style={[styles.inlay, { borderRadius: height, inset: height * RAIL }]}
+        style={[styles.inlay, { borderRadius: height, inset: height * (stacked ? STACKED_RAIL : RAIL) }]}
       />
-      <View style={styles.row}>
+      <View style={[styles.row, stacked && styles.stacked]}>
         <Text
           numberOfLines={1}
           style={[
             styles.phase,
-            { fontSize: (compact ? 12 : PHASE_SIZE) * scale, lineHeight: height * 0.6 },
+            { fontSize: phaseSize, lineHeight: stacked ? 11 : height * 0.6 },
           ]}
         >
           {label}
         </Text>
         {showClock ? (
           <>
-            <View style={[styles.divider, { height: height * 0.4 }]} />
-            <Svg height={18 * scale} viewBox="0 0 18 18" width={18 * scale}>
+            {stacked ? null : <View style={[styles.divider, { height: height * 0.4 }]} />}
+            <View style={[styles.clock, { gap: stacked ? 3 : 6 }]}>
+            <Svg height={glyph} viewBox="0 0 18 18" width={glyph}>
               <Line
                 stroke={YELLOW}
                 strokeLinecap="round"
@@ -122,8 +139,8 @@ export function PhaseCapsule({
             </Svg>
             <BannerClock
               clockStyle={{
-                fontSize: (compact ? 14 : CLOCK_SIZE.fontSize) * scale,
-                lineHeight: CLOCK_SIZE.lineHeight * scale,
+                fontSize: clockSize,
+                lineHeight: stacked ? 12 : CLOCK_SIZE.lineHeight * scale,
                 letterSpacing: CLOCK_SIZE.letterSpacing * scale,
               }}
               loopsEnabled={loopsEnabled}
@@ -131,6 +148,7 @@ export function PhaseCapsule({
               reduceMotion={reduceMotion}
               turn={turn}
             />
+            </View>
           </>
         ) : null}
       </View>
@@ -157,5 +175,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.arcade,
     letterSpacing: 0.5,
   },
+  stacked: { flexDirection: "column", gap: 0 },
+  clock: { alignItems: "center", flexDirection: "row" },
   divider: { backgroundColor: "#E0B33A", width: 1.5 },
 });

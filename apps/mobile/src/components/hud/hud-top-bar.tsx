@@ -14,8 +14,9 @@
  * a render, so a pot or a seat moving moves neither.
  */
 
-import type { ReactElement } from "react";
+import { useContext, type ReactElement } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import Animated, {
   interpolate,
   useAnimatedReaction,
@@ -36,7 +37,7 @@ import {
 
 import type { RoundPhase } from "@wordpoker/contracts";
 
-import { useScreenScale } from "@/components/screens/game/screen-scale";
+import { landscapeFrame, useScreenScale } from "@/components/screens/game/screen-scale";
 
 import { PHASE_LABEL, type BalanceView } from "./hud-types";
 import { BalanceChip } from "./top-bar/balance-chip";
@@ -84,6 +85,12 @@ export interface HudTopBarProps {
   testID?: string;
 }
 
+const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
+
+/** Landscape's corner discs, and how far inside the table's edge the corners sit (mock 1a). */
+const LANDSCAPE_DISC = 32;
+const LANDSCAPE_CORNER = 8;
+
 /** The phase header's entrance, in points: the block settles into place rather than sliding. */
 const PHASE_RISE = 8;
 
@@ -106,7 +113,10 @@ export function HudTopBar({
   // own that never ticks: the hook is unconditional, so its order never depends on props.
   const localTick = useSharedValue(0);
   const window = useWindowDimensions();
-  const balanceOnLeft = window.width > window.height && !modeTag;
+  // The context, not the hook: a bar drawn on its own (its tests) has no provider, and reads as
+  // the web does, with no insets.
+  const insets = useContext(SafeAreaInsetsContext) ?? NO_INSETS;
+  const landscape = window.width > window.height;
   const scale = useScreenScale();
   const clockTick = tick ?? localTick;
   const loopsOn = loopsEnabled ?? true;
@@ -148,16 +158,73 @@ export function HudTopBar({
     ],
   }));
 
+  const capsule = (stacked: boolean) => (
+    <PhaseCapsule
+      label={stamp ?? PHASE_LABEL[phase]}
+      loopsEnabled={loopsOn}
+      phrase={turnPhrase}
+      reduceMotion={reduce}
+      showClock={stamp === undefined}
+      stacked={stacked}
+      testID="phase-capsule"
+      turn={turn}
+    />
+  );
+
+  if (landscape) {
+    // Mock 1a: the corners sit inside the table's top corners, 8 in from its edge — back and the
+    // small plate on the left (the mode's tag hanging under the plate, as it hangs under the
+    // portrait capsule), help on the right. The table's top seat has the middle to itself.
+    const inset = landscapeFrame(window, insets, 0).side + LANDSCAPE_CORNER - spacing.md;
+    return (
+      <View style={{ height: hudBarHeight(window) }} testID={testID}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.bar, styles.barLandscape, { paddingHorizontal: inset }]}
+        >
+          <View style={[styles.corner, styles.leading]}>
+            <WoodButton
+              diameter={LANDSCAPE_DISC}
+              label="Leave the table"
+              onPress={onLeave}
+              testID="hud-leave-button"
+            >
+              <BackChevron />
+            </WoodButton>
+            <Animated.View pointerEvents="none" style={[styles.capsuleSlot, entrance]}>
+              {balance.state === "free-play" ? (
+                <View testID="hud-mode-tag" style={[styles.modeTag, { top: 34 + MODE_TAG_GAP }]}>
+                  <BalanceChip balance={balance} testID="hud-balance" />
+                </View>
+              ) : null}
+              {capsule(true)}
+            </Animated.View>
+            {balance.state === "free-play" ? null : (
+              <BalanceChip balance={balance} onPress={onBalancePress} testID="hud-balance" />
+            )}
+          </View>
+          <View style={[styles.corner, styles.trailing]}>
+            <WoodButton
+              diameter={LANDSCAPE_DISC}
+              label="How to play"
+              onPress={onHelp}
+              testID="hud-help-button"
+            >
+              <Text style={[styles.helpGlyph, styles.helpGlyphSmall]}>?</Text>
+            </WoodButton>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ height: hudBarHeight(window) }} testID={testID}>
       <View pointerEvents="box-none" style={[styles.bar, { top: BAR_TOP_PAD, height: CAPSULE_HEIGHT * scale }]}>
         <View style={[styles.corner, styles.leading]}>
-          <WoodButton label="Leave the table" onPress={onLeave}>
+          <WoodButton label="Leave the table" onPress={onLeave} testID="hud-leave-button">
             <BackChevron />
           </WoodButton>
-          {balanceOnLeft ? (
-            <BalanceChip balance={balance} onPress={onBalancePress} />
-          ) : null}
         </View>
         {/* The capsule rises on a phase change; the corner buttons stay put. The two corner
             groups share the row's spare width equally, so the capsule sits at the window's
@@ -167,25 +234,18 @@ export function HudTopBar({
           {/* Drawn before the capsule so the capsule's foot overlaps the tag's top. */}
           {modeTag ? (
             <View testID="hud-mode-tag" style={[styles.modeTag, { top: CAPSULE_HEIGHT * scale + MODE_TAG_GAP }]}>
-              <BalanceChip balance={balance} />
+              <BalanceChip balance={balance} testID="hud-balance" />
             </View>
           ) : null}
-          <PhaseCapsule
-            label={stamp ?? PHASE_LABEL[phase]}
-            loopsEnabled={loopsOn}
-            phrase={turnPhrase}
-            reduceMotion={reduce}
-            showClock={stamp === undefined}
-            turn={turn}
-          />
+          {capsule(false)}
         </Animated.View>
         {/* A tag sits under the capsule, so that one balance is not in this group — the
             numbers that are readouts, and the one chip that is a control, are. */}
         <View style={[styles.corner, styles.trailing]}>
-          {modeTag || balanceOnLeft ? null : (
-            <BalanceChip balance={balance} onPress={onBalancePress} />
+          {modeTag ? null : (
+            <BalanceChip balance={balance} onPress={onBalancePress} testID="hud-balance" />
           )}
-          <WoodButton label="How to play" onPress={onHelp}>
+          <WoodButton label="How to play" onPress={onHelp} testID="hud-help-button">
             <Text style={styles.helpGlyph}>?</Text>
           </WoodButton>
         </View>
@@ -216,4 +276,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   trailing: { justifyContent: "flex-end" },
+  // The table starts 6 down; the corners 8 inside it.
+  barLandscape: { alignItems: "flex-start", top: 6 + LANDSCAPE_CORNER },
+  helpGlyphSmall: { fontSize: 17 },
 });

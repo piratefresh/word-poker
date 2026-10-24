@@ -17,6 +17,7 @@ import {
   palette,
 } from "@/constants/theme";
 import { formatAmount } from "@/lib/ui/format";
+import { webTestID } from "@/lib/ui/web-id";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
 import { SeatBeam } from "./seat-beam";
@@ -24,6 +25,7 @@ import {
   betChipOffset,
   seatDirection,
   seatMetrics,
+  type SeatDirection,
   type SeatMetrics,
 } from "../seat-metrics";
 
@@ -87,7 +89,16 @@ function seatStyles(m: SeatMetrics) {
       width: m.avatar,
     },
     avatarLit: { borderWidth: m.avatarBorderLit },
-    initials: { fontSize: m.initials, lineHeight: m.initials * 1.2 },
+    initials: { fontSize: m.avatar * 0.27, lineHeight: m.avatar * 0.34 },
+    levelBadge: {
+      borderRadius: m.avatar * 0.18,
+      borderWidth: 2 * m.scale,
+      height: m.avatar * 0.36,
+      width: m.avatar * 0.36,
+      left: -m.scale,
+      top: -2 * m.scale,
+    },
+    levelText: { fontSize: m.avatar * 0.14, lineHeight: m.avatar * 0.18 },
     roleRow: { gap: m.badgeGap, right: m.badgeRight, top: m.badgeTop },
     roleBadge: {
       borderRadius: m.badge / 2,
@@ -100,13 +111,12 @@ function seatStyles(m: SeatMetrics) {
       borderRadius: m.plateRadius,
       borderWidth: m.scale,
       marginTop: m.nameGap,
-      maxWidth: m.width,
       paddingHorizontal: m.platePadX,
       paddingVertical: m.platePadY,
     },
     playerName: {
       fontSize: m.nameSize,
-      letterSpacing: m.nameTracking,
+      letterSpacing: 0,
       lineHeight: m.nameLine,
     },
     stackRow: { gap: m.coin * 0.4 },
@@ -145,11 +155,11 @@ function seatStyles(m: SeatMetrics) {
 }
 
 /** One set of seat styles per felt width: the table re-renders often, and resizes rarely. */
-function useSeatStyles(tableWidth: number, tabletop: boolean) {
+function useSeatStyles(tableWidth: number, tabletop: boolean, labelScale: number) {
   return useMemo(() => {
-    const metrics = seatMetrics(tableWidth, tabletop);
+    const metrics = seatMetrics(tableWidth, tabletop, labelScale);
     return { metrics, scaled: seatStyles(metrics) };
-  }, [tableWidth, tabletop]);
+  }, [tableWidth, tabletop, labelScale]);
 }
 
 /**
@@ -169,16 +179,34 @@ export function PlayerSeat({
   appearanceWidth,
   dealt = false,
   tabletop = false,
+  level,
+  turnProgress,
   onPress,
+  direction: directionOverride,
+  pill = false,
+  labelScale = 1,
 }: SeatSlot<GamePlayer> & {
   /** The hand is dealt: an opponent still in it shows its two tiles face down in a rack. */
   dealt?: boolean;
   /** The tabletop room's larger seat (`seatMetrics`); its bounds are `tabletopSeatBounds`. */
   tabletop?: boolean;
+  /** Present when the player's level is available; omitted rather than guessed. */
+  level?: number;
+  /** Elapsed share of the same turn timer displayed by the HUD. */
+  turnProgress?: number;
   onPress?: (player: GamePlayer) => void;
+  /** Where the labels sit, over the one the seat's place at the table picks. */
+  direction?: SeatDirection;
+  /**
+   * Landscape's own seat (mock 1a): a pill round the avatar and its labels, outlined, which takes
+   * the turn's glow while the hero acts. A backing, so the avatar stays on its anchor.
+   */
+  pill?: boolean;
+  /** Grows the nameplate and status tag alone (`seatMetrics`): landscape's short felt shrinks them past reading. */
+  labelScale?: number;
 }) {
-  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width, tabletop);
-  const direction = seatDirection(anchor, seatCount);
+  const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width, tabletop, labelScale);
+  const direction = directionOverride ?? seatDirection(anchor, seatCount);
   const beside = direction !== "stacked";
   const frame = beside
     ? [
@@ -212,6 +240,7 @@ export function PlayerSeat({
         {labelColumn(
           <Text
             style={[styles.emptySeatLabel, scaled.emptySeatLabel, firstLabel]}
+            testID={`seat-open-label-${anchor.index}`}
           >
             OPEN
           </Text>,
@@ -222,7 +251,7 @@ export function PlayerSeat({
   const active = seat.status === "your-turn";
   const winner = seat.status === "winner";
   const lit = active || winner;
-  // The seat whose move it is — the hero's or any other — wears the beam while its turn runs.
+  // The hero and opponents share the HUD's turn fill while they are acting.
   const turn = active || seat.status === "thinking";
   const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
@@ -235,11 +264,18 @@ export function PlayerSeat({
       : STATUS_LABEL[seat.status];
   const content = (
     <>
+      {pill ? (
+        <View
+          pointerEvents="none"
+          style={[styles.pill, active && [styles.pillLit, glow(colors.goldHi, metrics.glow)]]}
+          testID="hero-seat-pill"
+        />
+      ) : null}
       <View style={styles.avatarWrap}>
         <SeatBeam
           active={turn}
+          progress={turnProgress}
           borderWidth={metrics.avatarBorderLit}
-          glow={metrics.beamGlow}
           size={metrics.avatar}
         >
           <View
@@ -247,7 +283,7 @@ export function PlayerSeat({
               styles.avatar,
               scaled.avatar,
               { backgroundColor: seat.color },
-              lit && [scaled.avatarLit, { borderColor: statusColor }],
+              scaled.avatarLit,
               winner && glow(colors.goldHi, metrics.glow),
             ]}
             testID={`seat-avatar-${seat.id}`}
@@ -255,8 +291,21 @@ export function PlayerSeat({
             <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
           </View>
         </SeatBeam>
+        {level !== undefined ? (
+          <View
+            accessibilityLabel={`Level ${level}`}
+            id={webTestID(`seat-level-${seat.id}`)}
+            style={[styles.levelBadge, scaled.levelBadge]}
+            testID={`seat-level-${seat.id}`}
+          >
+            <Text style={[styles.levelText, scaled.levelText]}>{level}</Text>
+          </View>
+        ) : null}
         {seat.roles?.length ? (
-          <View style={[styles.roleRow, scaled.roleRow]}>
+          <View
+            style={[styles.roleRow, scaled.roleRow]}
+            testID={`seat-roles-${seat.id}`}
+          >
             {seat.roles.map((role) => (
               <View key={role} style={[styles.roleBadge, scaled.roleBadge]}>
                 <Text style={[styles.roleText, scaled.roleText]}>
@@ -269,16 +318,14 @@ export function PlayerSeat({
       </View>
       {labelColumn(
         <>
-          <View style={[styles.plate, scaled.plate, tabletop && { width: metrics.width - 10 * metrics.scale }, firstLabel]}>
-            <Text numberOfLines={1} style={[styles.playerName, scaled.playerName]}>
-              {seat.isHero ? "YOU" : seat.name.toUpperCase()}
+          <View style={[styles.plate, scaled.plate, firstLabel]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.playerName, scaled.playerName]}
+              testID={`seat-label-${seat.id}`}
+            >
+              {seat.isHero ? "YOU" : seat.name.toUpperCase()} · {seat.stack.toLocaleString()}
             </Text>
-            <View style={[styles.stackRow, scaled.stackRow]}>
-              <View style={[styles.coin, scaled.coin]} />
-              <Text numberOfLines={1} style={[styles.stack, scaled.stack]}>
-                {seat.stack.toLocaleString()}
-              </Text>
-            </View>
           </View>
           {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View style={[styles.statusRow, scaled.statusRow]}>
@@ -289,6 +336,8 @@ export function PlayerSeat({
                 styles.actionPill,
                 lit && { backgroundColor: statusColor, borderColor: statusColor },
               ]}
+              id={webTestID(`seat-status-${seat.id}`)}
+              testID={`seat-status-${seat.id}`}
             >
               <Text
                 accessibilityLabel={statusLabel}
@@ -324,6 +373,7 @@ export function PlayerSeat({
             scaled.betChip,
             betChipOffset(anchor, metrics, seatCount),
           ]}
+          testID={`seat-bet-${seat.id}`}
         >
           <View style={StyleSheet.absoluteFill}>
             <ChipSprite tone={chipToneForAmount(seat.bet)} size={metrics.chip} />
@@ -339,7 +389,7 @@ export function PlayerSeat({
   const testID = `seat-${seat.id}`;
   if (!onPress) {
     return (
-      <View style={seatStyle} testID={testID}>
+      <View id={webTestID(testID)} style={seatStyle} testID={testID}>
         {content}
       </View>
     );
@@ -349,6 +399,7 @@ export function PlayerSeat({
       accessibilityLabel={`${seat.name}'s seat`}
       accessibilityRole="button"
       hitSlop={layout.hitSlop}
+      id={webTestID(testID)}
       onPress={() => onPress(seat)}
       style={seatStyle}
       testID={testID}
@@ -414,7 +465,7 @@ const styles = StyleSheet.create({
   avatarWrap: { position: "relative" },
   avatar: {
     alignItems: "center",
-    borderColor: palette.felt600,
+    borderColor: "#a96226",
     justifyContent: "center",
     ...elevation.card,
   },
@@ -423,7 +474,16 @@ const styles = StyleSheet.create({
     borderColor: colors.borderFaint,
     borderStyle: "dashed",
   },
-  initials: { color: "#0c1410", fontFamily: fonts.sansBlack },
+  initials: { color: "#14251b", fontFamily: fonts.sansBlack },
+  levelBadge: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "absolute",
+    backgroundColor: "#285ba6",
+    borderColor: "#fff8e9",
+    zIndex: 3,
+  },
+  levelText: { color: "#ffffff", fontFamily: fonts.sansBlack },
   /** The seat's markers, pinned to the avatar's corner and growing away from it: D, SB, BB. */
   roleRow: { flexDirection: "row", position: "absolute", zIndex: 2 },
   roleBadge: {
@@ -431,17 +491,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.textBright,
     borderColor: "#3a2815",
     justifyContent: "center",
+    transform: [{ rotate: "-8deg" }],
   },
   roleText: { color: colors.onGold, fontFamily: fonts.monoBold },
-  // The name, stack and status sit on dark wood, so they read on the desk, the felt and the rail.
+  // A compact cream label keeps the name and stack together below the avatar.
   plate: {
     alignItems: "center",
-    backgroundColor: "#603014",
-    borderColor: "#d59750",
-    boxShadow: "inset 0 2px 2px #f1b667, inset 0 -3px 6px #351807, 0 3px 4px #30150780",
+    backgroundColor: "#f7ecd6",
+    borderColor: "#ead6b5",
     zIndex: 1,
   },
-  playerName: { color: "#fff8e9", fontFamily: fonts.arcade },
+  playerName: { color: "#35251b", fontFamily: fonts.sansBlack },
   stackRow: { alignItems: "center", flexDirection: "row" },
   coin: { backgroundColor: "#FFC72C", borderColor: "#8A5A00", boxShadow: "inset 0 0 0 2px #ffe787" },
   stack: { color: "#fff8e9", fontFamily: fonts.arcade },
@@ -459,6 +519,18 @@ const styles = StyleSheet.create({
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
   powerTagText: { color: colors.goldHi },
   folded: { opacity: 0.45 },
+  pill: {
+    backgroundColor: "rgba(20,12,6,0.82)",
+    borderColor: "#fff0d8",
+    borderRadius: 999,
+    borderWidth: 2,
+    bottom: -4,
+    left: -4,
+    position: "absolute",
+    right: -10,
+    top: -4,
+  },
+  pillLit: { borderColor: colors.goldHi },
   emptySeatLabel: {
     color: colors.textFaint,
     fontFamily: fonts.mono,

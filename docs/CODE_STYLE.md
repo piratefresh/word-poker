@@ -12,6 +12,30 @@ This guide applies to the whole pnpm monorepo. Follow AGENTS.md, CONTEXT.md, the
 - Put shared game behavior in packages/game-rules and wire types in packages/contracts. Do not copy rules into mobile or server. The server owns authoritative state; the client may use shared rules for previews.
 - Use domain names from CONTEXT.md, docs/FINAL_RULES.md, and the contracts. Comments should explain a non-obvious invariant or trade-off and point to the canonical rule when useful. Avoid repeating long documentation in source comments.
 
+## Folder organization
+
+- Group files by domain or feature first. Prefer nested folders over a large, flat directory containing screens, hooks, components, and helpers together.
+- Within each domain, organize files by responsibility. Common examples include `components/` for child components, `hooks/` for hooks, `utils/` for utility functions, `services/` for external integrations and data access, `types/` for shared domain types, `constants/` for constants, and `schemas/` for validation schemas. These names are examples, not an exhaustive list; choose meaningful folders for the domain's actual responsibilities.
+- Add deeper subfolders for distinct workflows or subdomains as a feature grows. Create folders when they help navigation; do not scaffold empty categories or split tightly related code just to match the examples.
+- Keep feature-specific code inside its feature. Move code into shared folders only when multiple domains use it.
+- Keep screen entry points and public `index.ts` files at the feature root. Colocate tests with the files they cover, including inside nested folders.
+
+For example:
+
+```text
+features/receipts/
+  components/
+    reading-view.tsx
+    scan-summary-sheet.tsx
+  hooks/
+    use-receipt-scan.ts
+  utils/
+    parse-receipt.ts
+    parse-receipt.test.ts
+  index.ts
+  scan-screen.tsx
+```
+
 ## TypeScript and files
 
 - Use two spaces, double quotes, semicolons, and trailing commas in multiline structures, matching existing code. Avoid formatting-only churn outside files you change.

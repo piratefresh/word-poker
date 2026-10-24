@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import { authClient } from "@/auth/client/auth-client";
 import {
   PowerDrawReveal,
   PowerHeldChip,
@@ -110,6 +111,7 @@ function OfflineTable({
   dictionary: Dictionary;
   turnDurationMs?: number;
 }) {
+  const { data: authSession } = authClient.useSession();
   const history = useHistory();
   const params = useLocalSearchParams<{ seed?: string; powers?: string; turn?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
@@ -139,7 +141,12 @@ function OfflineTable({
     newGame,
     historyError,
     retryHistory,
-  } = useOfflineGame({ seed, dictionary, turnDurationMs: turnDurationMs ?? pinnedTurnMs(params.turn), powerUps,
+  } = useOfflineGame({
+    seed,
+    dictionary,
+    displayName: authSession?.user.name,
+    turnDurationMs: turnDurationMs ?? pinnedTurnMs(params.turn),
+    powerUps,
     history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
   });
   const payout = game.phase === "payout";

@@ -5,14 +5,15 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import type { Tile as TileData } from "@wordpoker/contracts";
 
 import { Tile, type TileSize } from "@/components/game";
-import { FREE_PLAY } from "@/components/hud";
+import { FREE_PLAY, TurnClockProvider, formatClockMs } from "@/components/hud";
+import { DEVICE_CLOCK_SAMPLE, useHandTurn } from "@/components/screens/game/turn";
 import { BalanceChip } from "@/components/hud/top-bar/balance-chip";
 import { TableBackdrop } from "@/components/screens/game/backdrop";
 import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
 import { PlayerSeat } from "@/components/screens/game/primitives";
 import { Pot } from "@/components/screens/game/primitives/pot";
 import { WagerButton } from "@/components/screens/game/betting/wager-button";
-import { BettingControls, useRaiseAmount } from "@/components/screens/game/betting";
+import { BettingControls, RaiseSlider, useRaiseAmount } from "@/components/screens/game/betting";
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, spacing } from "@/constants/theme";
 import { useDictionary } from "@/features/table/use-dictionary";
@@ -47,6 +48,15 @@ const SIZES: readonly TileSize[] = ["small", "medium", "large"];
 const SCALES = [1, 1.5] as const;
 
 export default function DevTabletopKit() {
+  return (
+    <TurnClockProvider sample={DEVICE_CLOCK_SAMPLE}>
+      <DevTabletopKitContent />
+    </TurnClockProvider>
+  );
+}
+
+function DevTabletopKitContent() {
+  const timer = useHandTurn(FOUR_PLAYER_FLOP_FIXTURE, false);
   const dictionary = useDictionary();
   const [flipped, setFlipped] = useState(false);
   const [lifted, setLifted] = useState(false);
@@ -63,11 +73,11 @@ export default function DevTabletopKit() {
       <TableBackdrop />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.artwork}>
-          <View accessibilityLabel="Flop, 28 seconds remaining" style={styles.phase}>
+          <View accessibilityLabel={`Flop, ${Math.ceil(timer.remainingMs / 1000)} seconds remaining`} style={styles.phase}>
             <Image source={require("../../assets/images/ui/v2/phase-frame-left-2-tight.png")} style={styles.phaseCapLeft} />
             <Image contentFit="fill" source={require("../../assets/images/ui/v2/phase-frame-middle-2-tight.png")} style={styles.phaseMiddle} />
             <Image source={require("../../assets/images/ui/v2/phase-frame-right-2-tight.png")} style={styles.phaseCapRight} />
-            <Text style={styles.phaseLabel}>FLOP | 0:28</Text>
+            <Text style={styles.phaseLabel}>FLOP | {formatClockMs(timer.remainingMs)}</Text>
           </View>
         </View>
         <View style={styles.toggles}>
@@ -97,6 +107,8 @@ export default function DevTabletopKit() {
                     anchor={{ x: 0, y: 0, angle: Math.PI / 2, key: id, index }}
                     appearanceWidth={400}
                     dealt
+                    level={10}
+                    turnProgress={timer.elapsedFraction}
                     isDealer={index === 0}
                     scale={1}
                     seat={FOUR_PLAYER_FLOP_FIXTURE.players.find((p) => p?.id === id) ?? null}
@@ -113,7 +125,7 @@ export default function DevTabletopKit() {
         <Section title="dynamic pot chips">
           <View style={styles.tiles}>
             {[0, 20, 120, 137, 1000, 12000].map((amount) => (
-              <Pot key={amount} amount={amount} tabletop />
+              <Pot key={amount} amount={amount} blinds={{ smallBlind: 10, bigBlind: 20 }} tabletop />
             ))}
           </View>
         </Section>
@@ -208,9 +220,13 @@ function BettingPreview() {
     minRaise: facingBet ? 40 : 20,
   };
   const [amount, changeAmount] = useRaiseAmount(state);
+  const [open, setOpen] = useState(false);
   return <View style={{ width: "100%", maxWidth: 400 }}>
     <Toggle label="Facing a bet" on={facingBet} onPress={() => setFacingBet((value) => !value)} />
-    <BettingControls state={state} amount={amount} pot={120} locked={false} onAmountChange={changeAmount} />
+    <View style={{ alignItems: "flex-end" }}>
+      <RaiseSlider amount={amount} onAmountChange={changeAmount} open={open} pot={120} state={state} />
+    </View>
+    <BettingControls state={state} amount={amount} locked={false} raiseOpen={open} onRaiseOpenChange={setOpen} />
   </View>;
 }
 

@@ -1,3 +1,3 @@
-/** On a device Skia is ready from the start, so the beam is the canvas itself. */
+/** Devices draw the shared turn progress as an SVG sector. */
 export { SeatBeamCanvas as SeatBeam } from "./seat-beam-canvas";
 export type { SeatBeamProps } from "./seat-beam-canvas";

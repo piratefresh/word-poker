@@ -1,6 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { duration } from "@/constants/theme";
+import { webTestID } from "@/lib/ui/web-id";
 
 import type { LetterTileData } from "../game-types";
 import { communityDealDelayMs, EmptyTile, LetterTile } from "./letter-tile";
@@ -13,12 +14,18 @@ export function PlayerRack({
   community: readonly (LetterTileData | null)[];
 }) {
   return (
-    <View accessibilityLabel="Your letter rack" style={styles.rack}>
+    <View
+      accessibilityLabel="Your letter rack"
+      id={webTestID("player-rack")}
+      style={styles.rack}
+      testID="player-rack"
+    >
       {privateTiles.map((tile, index) => (
         <LetterTile
           dealDelayMs={index * duration.holeStagger}
           key={tile.id}
           size={36}
+          testID={`player-rack-tile-${tile.id}`}
           tile={tile}
         />
       ))}
@@ -30,10 +37,15 @@ export function PlayerRack({
               dimmed
               key={`rack-${index}`}
               size={36}
+              testID={`player-rack-community-${tile.id}`}
               tile={tile}
             />
           ) : (
-            <EmptyTile key={`rack-empty-${index}`} size={36} />
+            <EmptyTile
+              key={`rack-empty-${index}`}
+              size={36}
+              testID={`player-rack-community-slot-${index}`}
+            />
           ),
       )}
     </View>

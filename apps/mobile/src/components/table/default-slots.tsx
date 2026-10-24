@@ -8,6 +8,7 @@ import {
 } from "@expo/ui";
 
 import { border, colors, fonts, fontSize, palette, radius } from "@/constants/theme";
+import { initialsFromName } from "@/lib/player-initials";
 import type {
   CommunitySlot,
   PokerTableProps,
@@ -144,7 +145,7 @@ export function DefaultSeat({ seat, anchor, scale }: SeatSlot<SeatData>) {
       <Column alignment="center" spacing={4} style={{ width: containerWidth }}>
         <Row alignment="center" style={puckStyle}>
           <Text textStyle={{ ...avatarInk, fontSize: px(30, scale, 21) }}>
-            {seat.glyph ?? initials(seat.name)}
+            {seat.glyph ?? initialsFromName(seat.name)}
           </Text>
         </Row>
         <Column alignment="center" spacing={2} style={plate}>
@@ -169,15 +170,6 @@ export function DefaultSeat({ seat, anchor, scale }: SeatSlot<SeatData>) {
       </Column>
     </Host>
   );
-}
-
-/** Two-letter initials from a display name ("Mira Quill" → "MQ", "Ben" → "BE"). */
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length > 1) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
 }
 
 /* ── community card ───────────────────────────────────────────────── */

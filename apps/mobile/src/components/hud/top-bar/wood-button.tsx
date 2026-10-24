@@ -8,6 +8,7 @@ import Svg, { Polyline } from "react-native-svg";
 
 import { useScreenScale } from "@/components/screens/game/screen-scale";
 import { border, layout, opacity, radius } from "@/constants/theme";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { CAPSULE_HEIGHT } from "./banner";
 
@@ -19,22 +20,33 @@ interface WoodButtonProps {
   label: string;
   onPress?: () => void;
   children: ReactNode;
+  testID?: string;
+  /** Over the bar's own size: landscape's corner discs are 32 (mock 1a). */
+  diameter?: number;
 }
 
-export function WoodButton({ label, onPress, children }: WoodButtonProps) {
+export function WoodButton({
+  label,
+  onPress,
+  children,
+  testID,
+  diameter: diameterOverride,
+}: WoodButtonProps) {
   const scale = useScreenScale();
-  const diameter = DIAMETER * scale;
+  const diameter = diameterOverride ?? DIAMETER * scale;
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
       hitSlop={layout.hitSlop}
+      id={webTestID(testID)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.woodButton,
         { height: diameter, width: diameter },
         pressed && styles.pressed,
       ]}
+      testID={testID}
     >
       {/* The glyph is drawn at the phone's size; a larger window grows it with the disc. */}
       {scale === 1 ? children : <View style={{ transform: [{ scale }] }}>{children}</View>}

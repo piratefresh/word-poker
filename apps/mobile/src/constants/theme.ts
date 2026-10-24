@@ -211,7 +211,7 @@ export const gradients = {
   },
   // Smooth ivory, lit from the upper left (STO-538); sampled off the tabletop reference.
   tile: {
-    colors: ["#fcefd2", "#f0dab2"] as const,
+    colors: ["#fff6e2", "#f0dbb2"] as const,
     start: { x: 0, y: 0 },
     end: { x: 1, y: 1 },
   },
@@ -233,10 +233,19 @@ export const gradients = {
  * views — no image, no canvas — so a row of seven costs seven views, not seven GL contexts.
  */
 export const tileMaterial = {
-  slab: "#c38143",
+  slab: "#c4743a",
   /** The dark rim round the slab's foot and the face's edge on a tile with no owner colour. */
   edge: "#6b3a12",
-  ink: "#15110d",
+  ink: "#2b1c10",
+  /** A seat's own two letters: a dark face, ringed in gold, on a black slab. */
+  private: {
+    gradient: ["#4a4540", "#1c1917"] as const,
+    ring: "#f2c75a",
+    slab: "#000000",
+    ink: "#fff6e2",
+  },
+  /** The 2x / 3x pill on a tile's corner, printed in `ink`. */
+  multiplier: { double: "#f2c75a", triple: "#ff8a5c", ink: "#2a1906" },
   back: {
     gradient: ["#b81f29", "#8b161e"] as const,
     slab: "#5a0b10",

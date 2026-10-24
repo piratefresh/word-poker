@@ -67,7 +67,7 @@ export function BestWord({
   if (!payout && word === undefined) return null;
 
   return (
-    <Animated.View style={[styles.bestWord, entrance]}>
+    <Animated.View style={[styles.bestWord, entrance]} testID="best-word">
       <Text style={styles.bestWordLabel}>
         {payout ? "WINNING WORD" : "BEST WORD SO FAR"}
       </Text>

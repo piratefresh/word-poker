@@ -182,6 +182,7 @@ test("calls the wager action the button is labelled with", async () => {
   const view = await renderScreen({ onBet, onRaise });
 
   // Facing a bet, the slider raises: the amount is the round total it would raise to.
+  await fireEvent.press(view.getByTestId("action-raise"));
   await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
   await fireEvent.press(view.getByTestId("action-wager"));
   expect(onRaise).toHaveBeenCalledWith(40);
@@ -211,27 +212,40 @@ test("calls the wager action the button is labelled with", async () => {
     />,
   );
 
+  await fireEvent.press(view.getByTestId("action-raise"));
   await fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
   await fireEvent.press(view.getByTestId("action-wager"));
   expect(onBet).toHaveBeenCalledWith(20);
   expect(onRaise).toHaveBeenCalledTimes(1);
 });
 
-test("returns to call at the slider floor and resets a selected raise on a new turn", async () => {
+test("opens collapsed, backs out untouched, and collapses again on a new turn", async () => {
   const onCheckOrCall = jest.fn();
   const onRaise = jest.fn();
   const view = await renderScreen({ onCheckOrCall, onRaise });
-  expect(view.getByRole("button", { name: "Call $20" })).toBeOnTheScreen();
   const adjust = async (actionName: string) => fireEvent(view.getByLabelText("Wager amount"), "accessibilityAction", { nativeEvent: { actionName } });
+  expect(view.getByRole("button", { name: "Call $20" })).toBeOnTheScreen();
+  expect(view.queryByLabelText("Wager amount")).toBeNull();
+
+  await fireEvent.press(view.getByText("RAISE ▲"));
+  expect(view.getByText("CLOSE ▼")).toBeOnTheScreen();
   await adjust("increment");
-  expect(view.getByRole("button", { name: "Raise to $40" })).toBeOnTheScreen();
+  expect(view.getByRole("button", { name: "CONFIRM $40" })).toBeOnTheScreen();
   await adjust("decrement");
+  await fireEvent.press(view.getByText("CLOSE ▼"));
+  expect(view.queryByLabelText("Wager amount")).toBeNull();
+  expect(onRaise).not.toHaveBeenCalled();
+
+  await fireEvent.press(view.getByText("RAISE ▲"));
   await fireEvent.press(view.getByRole("button", { name: "Call $20" }));
   expect(onCheckOrCall).toHaveBeenCalledTimes(1);
-  expect(onRaise).not.toHaveBeenCalled();
+  expect(view.queryByLabelText("Wager amount")).toBeNull();
+
+  await fireEvent.press(view.getByText("RAISE ▲"));
   await adjust("increment");
   await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...FOUR_PLAYER_FLOP_FIXTURE, id: "next-turn" }} onCheckOrCall={onCheckOrCall} onRaise={onRaise} />);
-  expect(view.getByRole("button", { name: "Call $20" })).toBeOnTheScreen();
+  expect(view.queryByLabelText("Wager amount")).toBeNull();
+  expect(view.getByText("RAISE ▲")).toBeOnTheScreen();
   expect(view.queryByTestId("action-wager")).toBeNull();
 });
 
@@ -262,9 +276,8 @@ test.each([[375, 667], [800, 390], [1440, 900]])("shows the final submission sta
     const onSubmit = jest.fn();
     const view = await renderScreen({ game, onCheckOrCall: onSubmit });
     expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
-    expect(view.getByText(/Betting is complete/)).toBeOnTheScreen();
-    expect(view.getByText(/Submitting locks your word/)).toBeOnTheScreen();
-    for (const id of ["action-fold", "all-in-button"]) expect(view.queryByTestId(id)).toBeNull();
+    expect(view.getByTestId("action-fold")).toBeOnTheScreen();
+    expect(view.queryByTestId("all-in-button")).toBeNull();
     expect(view.queryByLabelText("Wager amount")).toBeNull();
     await fireEvent.press(view.getByRole("button", { name: "Submit word" }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -291,8 +304,13 @@ test("asks before committing the whole stack, and only commits on the confirm", 
   const view = await renderScreen({ onAllIn });
 
   // The button is a bare action; the sheet it opens states the exact amount §22 commits.
-  expect(view.getByText("ALL IN")).toBeOnTheScreen();
-  await fireEvent.press(view.getByTestId("all-in-button"));
+  // The ALL IN preset puts the knob at the stack, so the raise button reads ALL IN.
+  const shove = async () => {
+    await fireEvent.press(view.getByTestId("action-raise"));
+    await fireEvent.press(view.getByRole("button", { name: /^All in raise to/ }));
+    await fireEvent.press(view.getByTestId("all-in-button"));
+  };
+  await shove();
   expect(view.getByTestId("all-in-sheet")).toBeOnTheScreen();
   expect(view.getByText("Commits your entire Table Stack.")).toBeOnTheScreen();
 
@@ -300,6 +318,7 @@ test("asks before committing the whole stack, and only commits on the confirm", 
   expect(view.queryByTestId("all-in-sheet")).toBeNull();
   expect(onAllIn).not.toHaveBeenCalled();
 
+  // Cancelling leaves the slider open at the stack, so the button is still ALL IN.
   await fireEvent.press(view.getByTestId("all-in-button"));
   await fireEvent.press(view.getByTestId("all-in-confirm"));
 
@@ -313,14 +332,14 @@ test("leaves a disabled control inert", async () => {
   const view = await renderScreen({
     game: {
       ...FOUR_PLAYER_FLOP_FIXTURE,
-      betting: { ...FOUR_PLAYER_FLOP_FIXTURE.betting, canFold: false, canAllIn: false },
+      betting: { ...FOUR_PLAYER_FLOP_FIXTURE.betting, canFold: false, canRaise: false, canAllIn: false },
     },
     onAllIn,
     onFold,
   });
 
   await fireEvent.press(view.getByText("FOLD"));
-  await fireEvent.press(view.getByTestId("all-in-button"));
+  await fireEvent.press(view.getByTestId("action-raise"));
 
   expect(onFold).not.toHaveBeenCalled();
   expect(onAllIn).not.toHaveBeenCalled();
@@ -347,7 +366,7 @@ test("holds every action in the row while a lesson locks it, and keeps the mode'
     onRaise,
   });
 
-  for (const id of ["action-fold", "action-check-call", "all-in-button"]) {
+  for (const id of ["action-fold", "action-check-call", "action-raise"]) {
     await fireEvent.press(view.getByTestId(id));
   }
   await fireEvent.press(view.getByTestId("mode-control"));
@@ -391,8 +410,21 @@ describe("landscape", () => {
 
     expect(view.getByTestId("poker-table")).toBeOnTheScreen();
     expect(view.getByText("RACK ACTIONS")).toBeOnTheScreen();
-    for (const id of ["action-fold", "action-check-call", "all-in-button"]) {
+    for (const id of ["action-fold", "action-check-call", "action-raise"]) {
       expect(view.getByTestId(id)).toBeOnTheScreen();
     }
+  });
+
+  test("opens the wager slider from RAISE on a phone on its side", async () => {
+    const window = { ...original, width: 852, height: 393 };
+    Dimensions.set({ window, screen: window });
+    const onRaise = jest.fn();
+    const view = await renderScreen({ onRaise });
+    expect(view.queryByTestId("wager-slider")).toBeNull();
+
+    await fireEvent.press(view.getByTestId("action-raise"));
+    await fireEvent.press(view.getByTestId("wager-preset-minimum"));
+    await fireEvent.press(view.getByTestId("action-wager"));
+    expect(onRaise).toHaveBeenCalledWith(FOUR_PLAYER_FLOP_FIXTURE.betting.minRaise);
   });
 });

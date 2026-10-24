@@ -9,15 +9,22 @@ import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "@wordpoker/game-rules";
 import type { JSX, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { AccessibilityInfo, Platform, Pressable, Text, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
-import { GameButton } from "@/components/ui/game-button";
-import { colors } from "@/constants/theme";
 
 import { useScreenScale } from "@/components/screens/game/screen-scale";
-import { DraftLine } from "./draft-line";
+import { DraftPlate } from "./draft-line";
 import {
   inStripOrder,
+  RACK_INSET,
+  rackFor,
   sameDraft,
   shuffleUnheld,
   TileStrip,
@@ -25,6 +32,7 @@ import {
   type StripEntry,
   type SwapFlip,
 } from "./strip";
+import { RackPill } from "./rack-pill";
 import { styles } from "./styles";
 
 /**
@@ -146,11 +154,6 @@ export function useWordBuilderScope(): WordBuilderScope {
   return scope;
 }
 
-/** The first face a tile prints: what a choice tile plays when its body is tapped (§10). */
-function firstFace(tile: TileData): string | undefined {
-  return "alternativeLetter" in tile ? tile.letter : undefined;
-}
-
 export function WordBuilder({
   plays,
   word,
@@ -209,11 +212,12 @@ export function WordBuilder({
   const toggle = useCallback(
     (entry: StripEntry, face?: string) => {
       const inWord = playedIds.has(entry.tile.id);
-      const playing = face ?? firstFace(entry.tile);
+      // A choice tile has no face of its own to play: it enters the word only by a letter named.
+      if (!inWord && face === undefined && "alternativeLetter" in entry.tile) return;
       const play: TilePlay =
-        playing === undefined
+        face === undefined
           ? { tileId: entry.tile.id }
-          : { tileId: entry.tile.id, chosenFace: playing };
+          : { tileId: entry.tile.id, chosenFace: face };
 
       if (inWord && face === undefined) {
         onDraft(
@@ -297,19 +301,40 @@ export function WordHand({
   const { strip, held, live, sortable, toggle, reorder, pickTile, swapFlip, draft } =
     useWordBuilderScope();
   const bonus = draft.word.length === 0 ? 0 : (draft.score?.fullRackBonus ?? 0);
+  // On its side the tray is one row with the controls beside the tiles, so the strip is handed
+  // the room for seven tiles 5 apart rather than the row's width; its end insets hang outside.
+  const window = useWindowDimensions();
+  const landscape = window.width > window.height;
+  const { itemWidth: tile, itemHeight } = rackFor(window);
+  const rowWidth = WORD_PLACES * tile + (WORD_PLACES - 1) * LANDSCAPE_TILE_GAP;
+  const landscapeStrip = landscape && {
+    marginLeft: -RACK_INSET,
+    width: rowWidth + 2 * RACK_INSET,
+  };
 
   // The hand lies straight on the felt mat: seven dashed card slots, one for each tile a seat can
   // play (§7), with the tiles dealt so far sitting in theirs, so a hand a street short of the
   // river reads as one still filling. The strip sizes itself; this only wraps it.
   return (
-    <View>
+    <View testID="word-builder-hand">
       {/* The draft reads above the tray, on the wood: the tray is the tiles alone. The slot is
           kept while the line is empty, so the first letter played does not move the felt. */}
-      <View style={styles.previewSlot}>
+      <View
+        style={[
+          styles.previewSlot,
+          // Centred over the tiles alone, and only a line tall: the plate rises into the table's
+          // corner rather than taking the table's height.
+          landscape && [styles.previewSlotLandscape, { width: rowWidth }],
+        ]}
+        testID="word-builder-preview-slot"
+      >
         <DraftPreview />
       </View>
       <BlankPicker />
-      <View style={styles.tray} testID="word-builder-tray">
+      <View
+        style={[styles.tray, landscape && styles.trayLandscape]}
+        testID="word-builder-tray"
+      >
         {bonus === 0 ? null : (
           <View style={styles.rackBonusPill}>
             <Text style={styles.rackBonus} testID="word-builder-full-rack">
@@ -317,18 +342,31 @@ export function WordHand({
             </Text>
           </View>
         )}
-        <TileStrip
-          flip={swapFlip}
-          held={held}
-          live={live}
-          onPick={pickTile}
-          onReorder={reorder}
-          onToggle={toggle}
-          places={WORD_PLACES}
-          sortable={sortable}
-          strip={strip}
-        />
-        {actions == null ? null : <View style={styles.trayActions}>{actions}</View>}
+        <View style={landscapeStrip}>
+          <TileStrip
+            flip={swapFlip}
+            held={held}
+            live={live}
+            onPick={pickTile}
+            onReorder={reorder}
+            onToggle={toggle}
+            places={WORD_PLACES}
+            sortable={sortable}
+            strip={strip}
+          />
+        </View>
+        {actions == null ? null : (
+          // On its side the controls centre on the tiles, not the strip's foot: the strip keeps
+          // a choice tile's chip row under them, and its tiles sit `stripTight` lower.
+          <View
+            style={[
+              styles.trayActions,
+              landscape && [styles.trayActionsLandscape, styles.stripTight, { height: itemHeight }],
+            ]}
+          >
+            {actions}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -368,6 +406,8 @@ const LETTERS = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 
 
 /** The tiles a seat can play: its private tiles and the whole board (§7). */
 const WORD_PLACES = PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;
+/** The gap between tiles on a phone on its side. */
+const LANDSCAPE_TILE_GAP = 5;
 
 /**
  * The draft as the seat reads it, beside the tray's label: the letters the strip spells, what §7
@@ -386,17 +426,12 @@ function DraftPreview(): JSX.Element | null {
   if (draft.word.length === 0 && draft.reason === null) return null;
 
   return (
-    <View style={styles.previewRow} testID="word-preview">
-      <Text style={styles.word} testID="word-builder-word">
-        {draft.word}
-      </Text>
-      <DraftLine
-        checkedResult={checkedResult}
-        reason={draft.reason}
-        score={draft.score}
-        word={draft.word}
-      />
-    </View>
+    <DraftPlate
+      checkedResult={checkedResult}
+      reason={draft.reason}
+      score={draft.score}
+      word={draft.word}
+    />
   );
 }
 
@@ -436,21 +471,14 @@ export function WordCheckButton(): JSX.Element | null {
   if (onCheckWord === undefined) return null;
 
   return (
-    <GameButton
+    <RackPill
       disabled={!canCheck}
-      label="WORD CHECKER"
-      accessibilityLabel={`Word Checker, ${remaining} checks remaining. Checks validity without submitting.`}
-      labelAccent={`${remaining}/${WORD_CHECKS_PER_HAND}`}
-      compact
-      horizontalPadding={4}
+      label={`CHECK ${remaining}/${WORD_CHECKS_PER_HAND}`}
+      accessibilityLabel={`Word Checker, ${remaining} of ${WORD_CHECKS_PER_HAND} checks remaining. Checks validity without submitting.`}
       scale={scale}
       onPress={handleCheck}
-      style={{ height: 30 * scale, minWidth: 0 }}
       testID="word-check-button"
-      variant="gold"
-    >
-      <Text style={{ color: colors.onGold, fontSize: 14 * scale }}>✓</Text>
-    </GameButton>
+    />
   );
 }
 

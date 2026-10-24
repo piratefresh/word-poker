@@ -3,22 +3,21 @@ import type {
   WordRejectionReason,
   WordScore,
 } from "@wordpoker/contracts";
-import type { JSX } from "react";
-import { Text, View } from "react-native";
+import { useState, type JSX } from "react";
+import { Pressable, Text, View } from "react-native";
 
 import { WORD_REJECTION_COPY } from "@/features/table/word-rejection-copy";
 
 import { styles } from "./styles";
 
 /**
- * The score and full rack bonus, below the word and dictionary check button.
+ * The draft as a plate: the word's letters as small tiles, an "=", and the coin it is worth.
  *
- * Nothing is scored below two letters (§12), and a draft of one tile is a letter rather than a
- * word, so the number appears only when there is a word behind the letters. A refused draft
- * still shows what it would have scored, drawn faded: the reason line under it is what says it
- * will not count.
+ * A word §11 refuses, or a dictionary check that says "not a word", counts for nothing: the
+ * tiles go muted under a strike line, the "=" dims and the coin shows a dash — no text. The
+ * reason still reaches assistive tech as an alert, drawn out of sight.
  */
-export function DraftLine({
+export function DraftPlate({
   word,
   score,
   reason,
@@ -33,84 +32,100 @@ export function DraftLine({
   /** The latest private dictionary check, shown only while it matches this exact draft. */
   checkedResult?: WordCheckResult | null;
 }): JSX.Element {
-  const refused = reason !== null;
+  const [open, setOpen] = useState(false);
+  const checked = checkedResult ?? null;
+  const refused = reason !== null || checked?.valid === false;
+  const points = checked?.valid ? (checked.points ?? 0) : score?.total ?? null;
+  const multiplier = refused ? undefined : bestMultiplier(score);
 
   return (
     <>
-      {word.length === 0 ? null : (
-        <View style={styles.preview}>
-          {checkedResult === null || checkedResult === undefined ? (
-            <>
-              {score === null ? null : (
-                <Text
-                  accessibilityLabel={`${score.total} points`}
-                  style={[
-                    styles.score,
-                    refused && styles.scoreRefused,
-                  ]}
-                  testID="word-builder-score"
-                >
-                  {score.total}
-                  {" pts"}
-                </Text>
-              )}
-            </>
-          ) : (
-            <View
-              accessible
-              accessibilityLabel={
-                checkedResult.valid
-                  ? `Valid Word, ${checkedResult.points ?? 0} points`
-                  : "Not a word"
-              }
-              style={[
-                styles.checkedResult,
-                checkedResult.valid
-                  ? styles.checkedResultValid
-                  : styles.checkedResultInvalid,
-              ]}
-              testID="word-builder-check-result"
-            >
-              <Text
-                accessible={false}
-                style={[
-                  styles.checkedIcon,
-                  checkedResult.valid
-                    ? styles.checkedValid
-                    : styles.checkedInvalid,
-                ]}
-              >
-                {checkedResult.valid ? "✓" : "×"}
-              </Text>
-
-              <Text
-                accessible={false}
-                style={[
-                  styles.checkedLabel,
-                  checkedResult.valid
-                    ? styles.checkedValid
-                    : styles.checkedInvalid,
-                ]}
-              >
-                {checkedResult.valid ? "Valid word" : "Not a word"}
-              </Text>
-
-              {checkedResult.valid ? (
-                <Text accessible={false} style={styles.checkedPoints}>
-                  {"· "}
-                  {checkedResult.points ?? 0}
-                  {" pts"}
-                </Text>
-              ) : null}
-            </View>
-          )}
+      <View
+        accessible
+        accessibilityLabel={
+          refused
+            ? `${word}, not a word`
+            : points === null
+              ? word
+              : `${word}, ${points} points`
+        }
+        style={styles.plate}
+        testID="word-preview"
+      >
+        <View style={styles.plateTiles}>
+          <Text style={[styles.plateWord, refused && styles.plateDim]}>{word}</Text>
+          {refused ? <View style={styles.plateStrike} /> : null}
         </View>
-      )}
+        {checked?.valid === false ? (
+          <Text style={styles.notAWord} testID="word-builder-not-a-word">Not a word</Text>
+        ) : (
+        <>
+        <Text style={[styles.plateEquals, refused && styles.plateDim]}>=</Text>
+        <Pressable
+          accessibilityLabel={refused || points === null ? undefined : `${points} points, tap for the breakdown`}
+          onHoverIn={() => setOpen(true)}
+          onHoverOut={() => setOpen(false)}
+          onPress={() => setOpen((was) => !was)}
+          style={[styles.coin, refused && styles.coinDim]}
+        >
+          <Text
+            style={[styles.coinText, refused && styles.plateDim]}
+            testID="word-builder-score"
+          >
+            {refused || points === null ? "–" : points}
+          </Text>
+          {multiplier === undefined ? null : (
+            <Text style={styles.coinTag}>{multiplier}</Text>
+          )}
+          {open && !refused && score !== null ? (
+            <View style={styles.breakdown} testID="word-builder-breakdown">
+              {score.letters.map((letter, at) => (
+                <View key={at} style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>{letter.letter}</Text>
+                  <Text
+                    style={[
+                      styles.breakdownValue,
+                      letter.multiplier !== undefined && styles.breakdownGold,
+                    ]}
+                  >
+                    {letter.multiplier === undefined ? "" : `${letter.multiplier === "triple-letter" ? "3×" : "2×"}  `}
+                    +{letter.value}
+                  </Text>
+                </View>
+              ))}
+              {score.fullRackBonus === 0 ? null : (
+                <View style={styles.breakdownRow}>
+                  <Text style={[styles.breakdownLabel, styles.breakdownGold]}>
+                    Full rack
+                  </Text>
+                  <Text style={[styles.breakdownValue, styles.breakdownGold]}>
+                    +{score.fullRackBonus}
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.breakdownRow, styles.breakdownTotal]}>
+                <Text style={[styles.breakdownLabel, styles.breakdownGold]}>
+                  Total
+                </Text>
+                <Text style={[styles.breakdownValue, styles.breakdownGold]}>
+                  {score.total}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </Pressable>
+        </>
+        )}
+        {/* Out of sight, for the label and the tests: the tiles above read as one word. */}
+        <Text style={styles.checkLiveRegion} testID="word-builder-word">
+          {word}
+        </Text>
+      </View>
 
       {reason === null ? null : (
         <Text
           accessibilityRole="alert"
-          style={styles.reason}
+          style={styles.checkLiveRegion}
           testID="word-builder-reason"
         >
           {WORD_REJECTION_COPY[reason]}
@@ -118,4 +133,11 @@ export function DraftLine({
       )}
     </>
   );
+}
+
+/** The biggest tile multiplier the word plays, as the coin's tag; none when no tile has one. */
+function bestMultiplier(score: WordScore | null): string | undefined {
+  const kinds = score?.letters.map((letter) => letter.multiplier) ?? [];
+  if (kinds.includes("triple-letter")) return "3×";
+  return kinds.includes("double-letter") ? "2×" : undefined;
 }

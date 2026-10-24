@@ -86,6 +86,7 @@ export function OnlineFelt({
   /** Release the seat and leave the table — the felt's own way out (§3). */
   onLeave: () => void;
 }) {
+  const { data: session } = authClient.useSession();
   const {
     game,
     results,
@@ -104,7 +105,7 @@ export function OnlineFelt({
     pickPower,
     usePower,
     endPowerUsed,
-  } = useOnlineGame({ room, dictionary });
+  } = useOnlineGame({ room, dictionary, displayName: session?.user.name });
   // The header's chip is the signed-in player's Wallet (STO-562) — the one economy a real
   // online table touches. The read follows the hand: dealt, and again when it reaches payout
   // and the pot posts. STO-444's payouts replace the re-read with the real grant event.
@@ -122,7 +123,6 @@ export function OnlineFelt({
   const connection = useRoomConnection(room);
   const [inviting, setInviting] = useState(false);
   // A guest is asked once, at the first results screen, whether to keep what they played.
-  const { data: session } = authClient.useSession();
   const [saveDismissed, setSaveDismissed] = useState(false);
   const [friendSeat, setFriendSeat] = useState<GamePlayer | null>(null);
 

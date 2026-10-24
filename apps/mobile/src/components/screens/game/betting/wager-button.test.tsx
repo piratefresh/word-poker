@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { useAudioPlayer } from "expo-audio";
+import { createAudioPlayer } from "expo-audio";
 
 import { haptic } from "@/components/word-builder/haptics";
 
@@ -9,7 +9,7 @@ jest.mock("react-native-reanimated", () => ({
   ...jest.requireActual<Record<string, unknown>>("react-native-reanimated/mock"),
   useReducedMotion: () => false,
 }));
-jest.mock("expo-audio", () => ({ useAudioPlayer: jest.fn() }));
+jest.mock("expo-audio", () => ({ createAudioPlayer: jest.fn() }));
 jest.mock("@/components/word-builder/haptics", () => ({ haptic: jest.fn() }));
 // Jest's asset stub gives every file the same value; the two sounds must be told apart.
 jest.mock("../../../../../assets/images/ui/v2/button/raise-press.mp3", () => "raise-press");
@@ -42,13 +42,13 @@ function playerFor(source: unknown): Player {
   return player;
 }
 
-const click = () => players.get(CLICK)!;
-const cue = () => players.get(YOUR_TURN)!;
+const click = () => playerFor(CLICK);
+const cue = () => playerFor(YOUR_TURN);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(useAudioPlayer).mockImplementation(((source: unknown) =>
-    playerFor(source)) as unknown as typeof useAudioPlayer);
+  jest.mocked(createAudioPlayer).mockImplementation(((source: unknown) =>
+    playerFor(source)) as unknown as typeof createAudioPlayer);
 });
 
 test("replays feedback and commits one wager for each activation", async () => {

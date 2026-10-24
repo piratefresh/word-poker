@@ -19,6 +19,7 @@ import {
   spacing,
 } from "@/constants/theme";
 import { formatAmount, formatAmountCompact } from "@/lib/ui/format";
+import { webTestID } from "@/lib/ui/web-id";
 
 import type { BalanceView } from "../hud-types";
 import { GLASS_EDGE, GLASS_FILL } from "./glass";
@@ -36,10 +37,12 @@ export function BalanceChip({
   balance,
   onPress,
   style,
+  testID,
 }: {
   balance: BalanceView;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 }) {
   if (balance.state === "signed-out") {
     // No handler means no destination, and a chip that looks tappable but does nothing
@@ -50,8 +53,10 @@ export function BalanceChip({
         accessibilityLabel="Sign in to see your balance"
         accessibilityRole="button"
         hitSlop={layout.hitSlop}
+        id={webTestID(testID)}
         onPress={onPress}
         style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+        testID={testID}
       >
         <Text style={styles.chipTag}>SIGN IN</Text>
       </Pressable>
@@ -64,7 +69,9 @@ export function BalanceChip({
       accessibilityLabel={balanceLabel(balance)}
       accessibilityRole="text"
       accessible
+      id={webTestID(testID)}
       style={[styles.chip, style]}
+      testID={testID}
     >
       <Text
         numberOfLines={1}

@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
-import { Tile, type TileSize } from "@/components/game";
+import { Tile, TILE_METRICS, type TileSize } from "@/components/game";
 import { duration } from "@/constants/theme";
 
 import type { LetterTileData } from "../game-types";
@@ -16,6 +16,7 @@ export function LetterTile({
   dimmed = false,
   dealDelayMs = 0,
   scale = 1,
+  testID,
 }: {
   tile: LetterTileData;
   size: number;
@@ -24,6 +25,7 @@ export function LetterTile({
   dealDelayMs?: number;
   /** Grows the tile past its size's metrics, for a window larger than a phone. */
   scale?: number;
+  testID?: string;
 }) {
   return (
     <Tile
@@ -34,14 +36,25 @@ export function LetterTile({
       scale={scale}
       side="front"
       size={tileSizeFor(size)}
+      testID={testID}
       tile={tile}
     />
   );
 }
 
-export function EmptyTile({ size }: { size: number }) {
+export function EmptyTile({ size, testID }: { size: number; testID?: string }) {
+  const metrics = TILE_METRICS[tileSizeFor(size)];
   return (
-    <View style={[styles.emptyTile, { width: size, height: size * 1.18 }]} />
+    <View
+      style={[
+        styles.emptyTile,
+        {
+          width: size,
+          height: (size * metrics.height) / metrics.width,
+        },
+      ]}
+      testID={testID}
+    />
   );
 }
 

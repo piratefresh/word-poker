@@ -67,6 +67,7 @@ import { colors, duration, palette } from "@/constants/theme";
 import { feltControls, heroView, isUnbuildable, type HeroPerspective } from "@/features/table/hero-view";
 import { randomSeed } from "./offline-seed";
 import { OfflineHandRecorder } from "@/lib/history/hand-recorder";
+import { initialsFromName } from "@/lib/player-initials";
 import type { PowerView } from "@/features/table/power-view";
 
 /** The hero always sits in this seat; the bots fill the rest. */
@@ -79,11 +80,11 @@ const HERO_ID: PlayerId = "hero";
  * beside the name of whoever holds `isHero` — naming the seat that same word would put
  * it on the felt twice.
  */
-const ROSTER: readonly { id: PlayerId; name: string; initials: string }[] = [
-  { id: HERO_ID, name: "Guest", initials: "GU" },
-  { id: "ellis", name: "Ellis", initials: "EL" },
-  { id: "jay", name: "Jay", initials: "JA" },
-  { id: "mira", name: "Mira", initials: "MI" },
+const ROSTER: readonly { id: PlayerId; name: string }[] = [
+  { id: HERO_ID, name: "Guest" },
+  { id: "ellis", name: "Ellis" },
+  { id: "jay", name: "Jay" },
+  { id: "mira", name: "Mira" },
 ];
 
 /**
@@ -208,6 +209,7 @@ function untilDeadline(endsAtMs: number, nowMs: number): number {
 export function useOfflineGame({
   seed,
   dictionary,
+  displayName,
   turnDurationMs,
   powerUps,
   session,
@@ -222,6 +224,8 @@ export function useOfflineGame({
    */
   seed: number;
   dictionary: Dictionary;
+  /** The signed-in player's name, used for their avatar initials. */
+  displayName?: string | null;
   /**
    * How long a seat has to act, overriding the engine's own budget. Only a caller tuning the
    * table passes one: the felt's countdown and the table's clock both read it, so a screen that
@@ -661,13 +665,13 @@ export function useOfflineGame({
 
   const view = useMemo(
     () =>
-      heroView(perspectiveOf(state, flights, seatActions), {
+      heroView(perspectiveOf(state, flights, seatActions, displayName), {
         draft: heroDraft,
         refusal,
         pendingPill: null,
         pendingConfirm: false,
       }),
-    [flights, heroDraft, refusal, seatActions, state],
+    [displayName, flights, heroDraft, refusal, seatActions, state],
   );
   const { game } = view;
 
@@ -1008,9 +1012,11 @@ function perspectiveOf(
   state: OfflineState,
   flights: readonly ChipFlight[],
   seatActions: readonly SeatAction[],
+  displayName?: string | null,
 ): HeroPerspective {
   const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
   const hero = state.seats[heroIndex];
+  const heroInitials = initialsFromName(displayName ?? "");
   const slot = state.wordWindow?.slots.find((candidate) => candidate.seat === heroIndex);
   // Who acted on this street, as the pills read it: every entry the table has moved past — the
   // street before this one, the hand before this one — is dropped here rather than unwound.
@@ -1035,13 +1041,18 @@ function perspectiveOf(
     ),
     phase: state.phase,
     seatCount: toSeatCount(state.seats.length),
-    seats: state.seats.map((seat, index) => ({
-      ...seat,
-      place: index,
-      name: ROSTER[index]?.name ?? seat.id,
-      initials: ROSTER[index]?.initials ?? seat.id.slice(0, 2).toUpperCase(),
-      color: colors.players[index % colors.players.length] ?? palette.amber400,
-    })),
+    seats: state.seats.map((seat, index) => {
+      const name = ROSTER[index]?.name ?? seat.id;
+      return {
+        ...seat,
+        place: index,
+        name,
+        initials:
+          (index === heroIndex ? heroInitials : initialsFromName(name)) ||
+          seat.id.slice(0, 2).toUpperCase(),
+        color: colors.players[index % colors.players.length] ?? palette.amber400,
+      };
+    }),
     heroIndex,
     actingIndex: state.toActIndex,
     // The button rides on the seat index, which is why a busted seat can still be the dealer.

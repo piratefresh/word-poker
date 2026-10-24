@@ -44,9 +44,6 @@ import {
 import { ShadowBox } from "@/components/ui/shadow-box";
 import { webTestID } from "@/lib/ui/web-id";
 
-import { TileChoiceBeam } from "./tile-choice-beam";
-import { MultiplierBeam } from "./tile-multiplier-beam";
-
 /**
  * The tile this component draws: the wire shape (contracts' `Tile`, aliased here because
  * this module's own `Tile` is the renderer). A tile is one of two shapes — a single letter, or
@@ -91,8 +88,6 @@ export interface TileProps {
    * showdown, which says a power made the tile and nothing about what it replaced.
    */
   powered?: boolean;
-  /** Results float the multiplier clear of the smaller tile's letter. */
-  multiplierBadgePlacement?: "inset" | "outside";
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -110,43 +105,48 @@ interface TileMetrics {
   alternateSize: number;
   pointSize: number;
   badgeSize: number;
+  /** The 2x / 3x pill's type. */
+  multiplierSize: number;
   inset: number;
 }
 export const TILE_METRICS: Record<TileSize, TileMetrics> = {
   small: {
     width: 34,
-    height: 40,
-    slab: 4,
+    height: 46,
+    slab: 5,
     radius: 5,
-    borderWidth: 1,
-    letterSize: 22,
+    borderWidth: 2,
+    letterSize: 21,
     alternateSize: 15,
-    pointSize: 9,
+    pointSize: 8,
     badgeSize: 7,
+    multiplierSize: 10,
     inset: 3,
   },
   medium: {
     width: 44,
-    height: 52,
-    slab: 6,
+    height: 60,
+    slab: 7,
     radius: 7,
-    borderWidth: 1.25,
-    letterSize: 29,
+    borderWidth: 2.5,
+    letterSize: 27,
     alternateSize: 19,
-    pointSize: 11,
+    pointSize: 9,
     badgeSize: 8,
+    multiplierSize: 11,
     inset: 4,
   },
   large: {
     width: 58,
-    height: 69,
-    slab: 8,
+    height: 79,
+    slab: 9,
     radius: 9,
-    borderWidth: 1.5,
-    letterSize: 38,
-    alternateSize: 25,
-    pointSize: 13,
+    borderWidth: 3,
+    letterSize: 34,
+    alternateSize: 24,
+    pointSize: 10,
     badgeSize: 10,
+    multiplierSize: 13,
     inset: 5,
   },
 };
@@ -168,24 +168,18 @@ const TILE_FONT = fonts.arcade;
 const FLIP_EASING = Easing.bezier(...motionEasing.flip);
 const DEAL_EASING = Easing.bezier(...motionEasing.deal);
 const FLIP_PERSPECTIVE = 900;
-// The reference rims every tile in dark brown; an owner's colour is kept, but a shade darker so
-// it reads as an edge and not a highlight.
-const OWNERSHIP_BORDER: Record<TileOwnership, string> = {
-  private: "#b07a1c",
-  community: "#5d7a45",
-  neutral: "#7a4b27",
-};
 const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
   "double-letter": "2×",
   "triple-letter": "3×",
 };
+const MULTIPLIER_FILL: Record<LetterMultiplier, string> = {
+  "double-letter": tileMaterial.multiplier.double,
+  "triple-letter": tileMaterial.multiplier.triple,
+};
 
 /** §10's choice tiles wear an accent no single letter does: the pair is one tile, not two. */
-const CHOICE_ACCENT = palette.violet400;
-
-/** A 2x tile wears this border all the way round, a light running along it; a 3x tile the rainbow below. */
-const DOUBLE_BORDER = palette.violet400;
-const TRIPLE_BORDER = ["#ff4d4d", "#ffb020", "#ffe94d", "#3ddc84", "#3da9ff", "#a455ff"] as const;
+const CHOICE_STRIP = ["#9a72e0", "#7a4fc0"] as const;
+const CHOICE_UNCHOSEN = "#a89a78";
 
 /**
  * The second face a choice tile prints — `E` for A/E — or null on a single-letter tile, which
@@ -267,7 +261,6 @@ export function Tile({
   animation = "flip",
   dealDelayMs = 0,
   powered = false,
-  multiplierBadgePlacement = "inset",
   onPress,
   onFlipComplete,
   accessibilityLabel,
@@ -277,6 +270,11 @@ export function Tile({
   const metrics = scaleTileMetrics(size, scale);
   const second = secondFace(tile);
   const played = playedFace(tile, chosenFace);
+  // A choice tile prints "?" until a face is picked (§10); a blank keeps its own "?".
+  const unchosen = second !== null && played === null;
+  /** A seat's own letters: the dark, gold-ringed face. The ledger's gold fill keeps its own paint. */
+  const mine = ownership === "private" && fill === "ivory";
+  const ink = mine ? tileMaterial.private.ink : tileMaterial.ink;
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -490,10 +488,11 @@ export function Tile({
   });
   // The slab is the tile's body, so it turns with the face: ivory under the front, crimson under
   // the back. It flips colour as the tile goes edge-on, which is when neither face can be seen.
+  const frontSlab = mine ? tileMaterial.private.slab : tileMaterial.slab;
   const slabMotion = useAnimatedStyle(() => {
     const front = rotation.get() > 0.5;
     return {
-      backgroundColor: front ? tileMaterial.slab : tileMaterial.back.slab,
+      backgroundColor: front ? frontSlab : tileMaterial.back.slab,
       borderColor: front ? tileMaterial.edge : tileMaterial.back.edge,
     };
   });
@@ -523,31 +522,27 @@ export function Tile({
     side === "front" && publishedSide === side && !revealing
       ? (accessibilityLabel ?? getTileAccessibilityLabel(tile))
       : "Hidden letter tile";
-  const multiplierLabel = tile.multiplier
-    ? MULTIPLIER_LABEL[tile.multiplier]
-    : null;
-  const multiplierBadge = multiplierLabel ? (
+  // A pill tilted over the tile's top-left corner, hanging past its edge.
+  const multiplierBadge = tile.multiplier ? (
     <View
       pointerEvents="none"
       style={[
         styles.multiplierBadge,
-        tile.multiplier === "triple-letter" && styles.tripleBadge,
-        multiplierBadgePlacement === "outside"
-          ? { left: -metrics.inset * 2, top: -Math.max(14, metrics.inset * 2) }
-          : { left: metrics.inset, top: metrics.inset },
+        {
+          backgroundColor: MULTIPLIER_FILL[tile.multiplier],
+          left: -metrics.inset - 2,
+          top: -metrics.inset - 2,
+        },
       ]}
     >
       <Text
+        maxFontSizeMultiplier={1.2}
         style={[
           styles.multiplier,
-          {
-            fontSize: multiplierBadgePlacement === "outside"
-              ? Math.max(9, metrics.badgeSize)
-              : metrics.badgeSize,
-          },
+          { fontSize: metrics.multiplierSize, lineHeight: Math.round(metrics.multiplierSize * 1.15) },
         ]}
       >
-        {multiplierLabel}
+        {MULTIPLIER_LABEL[tile.multiplier]}
       </Text>
     </View>
   ) : null;
@@ -615,51 +610,19 @@ export function Tile({
             slabMotion,
           ]}
         />
-        <MultiplierBeam
-          active={side === "front" && !reduceMotion}
-          borderWidth={metrics.borderWidth}
-          multiplier={tile.multiplier}
-          radius={metrics.radius}
-        >
+        {/* Only a seat's own letters wear the gold ring; a lifted tile lights it on any tile. */}
         <View
           style={[
             styles.frame,
             {
-              borderColor: selected
-                ? colors.goldHi
-                : tile.multiplier === "double-letter"
-                  ? DOUBLE_BORDER
-                  : tile.multiplier === "triple-letter"
-                    ? "transparent"
-                    : OWNERSHIP_BORDER[ownership],
+              borderColor: selected ? colors.goldHi : tileMaterial.private.ring,
               borderRadius: metrics.radius,
-              borderWidth: selected || tile.multiplier !== undefined
-                ? metrics.borderWidth + 1
-                : metrics.borderWidth,
+              borderWidth: selected || mine ? metrics.borderWidth : 0,
               height: metrics.height - metrics.slab,
             },
             selected && styles.selectedShell,
           ]}
         >
-        {tile.multiplier === "triple-letter" && !selected ? (
-          // A border cannot take a gradient, so the rainbow sits under the face and shows
-          // round it, in the border's own width.
-          <LinearGradient
-            colors={TRIPLE_BORDER}
-            end={{ x: 1, y: 1 }}
-            pointerEvents="none"
-            start={{ x: 0, y: 0 }}
-            style={{
-              borderRadius: metrics.radius,
-              bottom: -(metrics.borderWidth + 1),
-              left: -(metrics.borderWidth + 1),
-              position: "absolute",
-              right: -(metrics.borderWidth + 1),
-              top: -(metrics.borderWidth + 1),
-            }}
-            testID="tile-triple-border"
-          />
-        ) : null}
         <Animated.View
           importantForAccessibility="no-hide-descendants"
           style={[
@@ -668,21 +631,33 @@ export function Tile({
             frontMotion,
           ]}
         >
-          <LinearGradient {...gradients.tile} colors={fill === "gold" ? ledger.goldButton : gradients.tile.colors} style={styles.faceFill}>
+          <LinearGradient
+            {...gradients.tile}
+            colors={
+              fill === "gold"
+                ? ledger.goldButton
+                : mine
+                  ? tileMaterial.private.gradient
+                  : gradients.tile.colors
+            }
+            style={styles.faceFill}
+          >
             {second === null ? null : (
-              // §10: a choice tile has to look special. The pair wears an accent strip no
-              // single letter does, over the tile's own ownership border.
-              <View
-                style={[styles.choiceAccent, { height: Math.max(2, metrics.badgeSize / 2) }]}
-                testID="tile-choice-accent"
+              // §10: a choice tile is a MULTI tile. It wears a purple strip no single letter
+              // does, over the tile's own ownership border.
+              <LinearGradient
+                colors={CHOICE_STRIP}
                 pointerEvents="none"
+                style={[styles.choiceAccent, { height: Math.round(metrics.height * 0.26) }]}
+                testID="tile-choice-accent"
               >
-                <TileChoiceBeam
-                  active={side === "front"}
-                  color={CHOICE_ACCENT}
-                  height={Math.max(2, metrics.badgeSize / 2)}
-                />
-              </View>
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  style={[styles.choiceLabel, { fontSize: metrics.badgeSize + 1 }]}
+                >
+                  MULTI
+                </Text>
+              </LinearGradient>
             )}
             {powered ? (
               // A swapped tile is always plain (§44), so the ⚡ takes the corner a multiplier
@@ -695,12 +670,11 @@ export function Tile({
                 <Bolt size={metrics.badgeSize + 3} />
               </View>
             ) : null}
-            {multiplierBadgePlacement === "inset" ? multiplierBadge : null}
-            {/* A badge in the corner would sit on a wide letter's arm, so the letter steps down. */}
+            {/* A bolt in the corner would sit on a wide letter's arm, so the letter steps down. */}
             <View
               style={[
                 styles.letters,
-                ((multiplierLabel && multiplierBadgePlacement === "inset") || powered) && {
+                powered && {
                   marginTop: Math.round(metrics.badgeSize * 0.5),
                 },
               ]}
@@ -709,32 +683,17 @@ export function Tile({
                 maxFontSizeMultiplier={1.2}
                 style={[
                   styles.letter,
-                  {
-                    fontSize:
-                      played !== null || second === null
-                        ? metrics.letterSize
-                        : metrics.alternateSize,
-                  },
+                  { color: unchosen ? CHOICE_UNCHOSEN : ink, fontSize: metrics.letterSize },
                 ]}
               >
-                {played ?? tile.letter}
+                {unchosen ? "?" : (played ?? tile.letter)}
               </Text>
-              {played !== null || second === null ? null : (
-                <>
-                  <Text style={[styles.slash, { fontSize: metrics.badgeSize }]}>/</Text>
-                  <Text
-                    maxFontSizeMultiplier={1.2}
-                    style={[styles.letter, { fontSize: metrics.alternateSize }]}
-                  >
-                    {second}
-                  </Text>
-                </>
-              )}
             </View>
             <Text
               maxFontSizeMultiplier={1.2}
               style={[
                 styles.points,
+                { color: ink },
                 {
                   bottom: metrics.inset - 1,
                   fontSize: metrics.pointSize,
@@ -744,36 +703,10 @@ export function Tile({
             >
               {played !== null ? (
                 // The played face prints its own value alone: the other face is not scored (§10).
-                <Text
-                  style={{
-                    color: selected ? colors.goldHi : styles.points.color,
-                  }}
-                >
+                <Text style={{ color: ink }}>
                   {faceValue(tile, played)}
                 </Text>
-              ) : "alternativeLetter" in tile ? (
-                <>
-                  <Text
-                    style={{
-                      color: selected && chosenFace === tile.letter
-                        ? colors.goldHi
-                        : styles.points.color,
-                    }}
-                  >
-                    {tile.points}
-                  </Text>
-                  /
-                  <Text
-                    style={{
-                      color: selected && chosenFace === tile.alternativeLetter
-                        ? colors.goldHi
-                        : styles.points.color,
-                    }}
-                  >
-                    {tile.alternativePoints}
-                  </Text>
-                </>
-              ) : tile.points}
+              ) : facePoints(tile).join("/")}
             </Text>
           </LinearGradient>
         </Animated.View>
@@ -814,8 +747,7 @@ export function Tile({
           />
         ) : null}
         </View>
-        </MultiplierBeam>
-        {multiplierBadgePlacement === "outside" && multiplierBadge !== null ? (
+        {multiplierBadge !== null ? (
           <Animated.View
             aria-hidden
             pointerEvents="none"
@@ -847,7 +779,15 @@ const styles = StyleSheet.create({
     top: 0,
   },
   faceFill: { alignItems: "center", flex: 1, justifyContent: "center" },
+  choiceLabel: {
+    color: "#ffffff",
+    // ponytail: SemiBold stands in for Rubik 700, which the app does not load.
+    fontFamily: fonts.rubikSemiBold,
+    letterSpacing: 1.4,
+  },
   choiceAccent: {
+    alignItems: "center",
+    justifyContent: "center",
     left: 0,
     overflow: "hidden",
     position: "absolute",
@@ -864,30 +804,29 @@ const styles = StyleSheet.create({
     fontFamily: fonts.arcade,
   },
   slash: {
-    color: "rgba(21,17,13,0.5)",
     fontFamily: TILE_FONT,
     marginHorizontal: 1,
+    opacity: 0.5,
   },
   points: {
     color: tileMaterial.ink,
-    fontFamily: fonts.arcade,
+    fontFamily: fonts.rubikSemiBold,
     position: "absolute",
   },
   poweredBadge: { position: "absolute" },
   multiplierBadge: {
     alignItems: "center",
-    backgroundColor: colors.gold,
-    borderRadius: 3,
-    minWidth: 16,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    borderColor: tileMaterial.multiplier.ink,
+    borderRadius: 999,
+    borderWidth: 2,
+    boxShadow: [{ offsetX: 0, offsetY: 2, blurRadius: 2, color: "rgba(0,0,0,0.35)" }],
+    paddingHorizontal: 5,
     position: "absolute",
+    transform: [{ rotate: "-8deg" }],
   },
-  tripleBadge: { backgroundColor: colors.danger },
   multiplier: {
-    color: colors.onGold,
-    fontFamily: fonts.monoBold,
-    lineHeight: 11,
+    color: tileMaterial.multiplier.ink,
+    fontFamily: fonts.arcade,
   },
   backFill: { flex: 1, padding: 3 },
   backInset: {

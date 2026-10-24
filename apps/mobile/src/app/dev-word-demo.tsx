@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
-import type { PrivateWordCheckState, TilePlay } from "@wordpoker/contracts";
+import type { PrivateWordCheckState, Tile as TileData, TilePlay } from "@wordpoker/contracts";
 import {
   availableTiles,
   resolveSubmission,
@@ -30,7 +30,7 @@ export default function DevWordDemo() {
   if (!__DEV__) return null;
   return (
     <View style={styles.screen} testID="word-demo">
-      {dictionary === null ? null : <Stage dictionary={dictionary} />}
+      {dictionary === null ? null : <Stage dictionary={dictionary} showMultiTiles />}
       <Finger />
     </View>
   );
@@ -80,31 +80,75 @@ const FINGER = 34;
 /** A hand with every check left, for a stage that shows the word's controls. */
 const FULL_CHECKS: PrivateWordCheckState = { checksRemaining: 5, result: null };
 
+const PRIVATE_MULTI_TILE: TileData = {
+  id: "SL-1",
+  letter: "S",
+  points: 1,
+  alternativeLetter: "L",
+  alternativePoints: 2,
+};
+const PRIVATE_HIGH_MULTI_TILE: TileData = {
+  id: "JH-1",
+  letter: "J",
+  points: 8,
+  alternativeLetter: "H",
+  alternativePoints: 5,
+};
+
 /**
- * The tutorial's deal on the real word builder. `revealed` is how much of the board is out —
- * 3 is the flop, 5 the river, which is the whole deal and what the recording uses — and
- * `actions` draws Shuffle and Check Word under the rack, as the felt does. `dev-tabletop-kit`
- * reuses this rather than wire a second builder.
+ * The tutorial's deal on the real word builder. `showMultiTiles` places two choice tiles next to
+ * each other and a Triple Letter tile beside them for this route's preview; the tabletop kit
+ * keeps the lesson's own deal. `revealed` is how much of the board is out — 3 is the flop, 5 the
+ * river — and `actions` draws Shuffle and Check Word under the rack, as the felt does.
  */
 export function Stage({
   dictionary,
   revealed = 5,
   actions = false,
   flush = false,
+  showMultiTiles = false,
 }: {
   dictionary: Dictionary;
   revealed?: number;
   actions?: boolean;
+  /** Places two adjacent choice tiles and a Triple Letter tile in the demo route. */
+  showMultiTiles?: boolean;
   /** Drops the stage's side padding, so the rack has the room the felt's rack slot gives it. */
   flush?: boolean;
 }) {
   const deal = useMemo(() => startTutorial({ dictionary, nowMs: 0 }).state, [dictionary]);
-  const hero = deal.seats[0];
-  const available = availableTiles(deal, 0);
+  const demoDeal = useMemo(() => {
+    if (!showMultiTiles) return deal;
+    return {
+      ...deal,
+      seats: deal.seats.map((seat, seatIndex) =>
+        seatIndex === 0
+          ? {
+              ...seat,
+              privateTiles: seat.privateTiles.map((tile, tileIndex) =>
+                tileIndex === 0
+                  ? {
+                      ...PRIVATE_HIGH_MULTI_TILE,
+                      ...(tile.multiplier === undefined ? {} : { multiplier: tile.multiplier }),
+                    }
+                  : tileIndex === 1
+                    ? PRIVATE_MULTI_TILE
+                    : tile,
+              ),
+            }
+          : seat,
+      ),
+      community: deal.community.map((tile, tileIndex) =>
+        tileIndex === 0 ? { ...tile, multiplier: "triple-letter" } : tile,
+      ),
+    };
+  }, [deal, showMultiTiles]);
+  const hero = demoDeal.seats[0];
+  const available = availableTiles(demoDeal, 0);
   const [plays, setPlays] = useState<readonly TilePlay[]>([]);
   const community = useMemo(
-    () => deal.community.map((tile, index) => (index < revealed ? tile : null)),
-    [deal, revealed],
+    () => demoDeal.community.map((tile, index) => (index < revealed ? tile : null)),
+    [demoDeal, revealed],
   );
 
   const submission = { plays: [...plays] };

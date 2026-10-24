@@ -124,12 +124,13 @@ tags:
     visible: "YOUR TURN"
     timeout: 20000
 - tapOn:
-    id: "wager-slider"
-    point: "2%,50%"
+    id: "action-raise"
     waitToSettleTimeoutMs: 500
+- tapOn: "MIN"
 - assertVisible:
     id: "action-wager"
-    text: "Bet \\$20"
+    containsDescendants:
+      - text: "\\$20"
 - assertVisible:
     text: "\\$460"
 - tapOn:
