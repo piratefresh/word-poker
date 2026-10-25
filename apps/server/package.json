@@ -43,7 +43,6 @@
     "@wordpoker/db": "workspace:*",
     "@wordpoker/game-rules": "workspace:*",
     "colyseus": "^0.18.2",
-    "expo-server": "^57.0.3",
     "express": "^5.2.1"
   }
 }

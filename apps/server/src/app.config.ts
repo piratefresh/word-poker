@@ -1,17 +1,11 @@
-import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-import express from "express";
 import {
   defineServer,
   defineRoom,
   monitor,
   playground,
   createRouter,
+  createEndpoint,
   LobbyRoom,
-  matchMaker,
 } from "colyseus";
 import { admin } from "@colyseus/admin";
 import type { MonitorOptions } from "@colyseus/monitor";
@@ -94,6 +88,9 @@ const server = defineServer({
    *
    */
   routes: createRouter({
+    api_hello: createEndpoint("/api/hello", { method: "GET" }, async (ctx) => {
+      return { message: "Hello World" };
+    }),
     /**
      * Ops tools: the admin panel at /admin/ (dashboard, live rooms), with the monitor at /monitor
      * and the playground at /playground behind its login. The first visit to /admin/ asks for an
@@ -109,42 +106,16 @@ const server = defineServer({
   }),
 
   /**
-   * The mobile app's web export (`expo export --platform web`): its pages and its API routes
-   * (auth, wallet, friends, history, store, RevenueCat webhook) — what Railway served from
-   * apps/mobile/server.cjs. Colyseus answers its own routes (matchmaking, healthcheck, admin)
-   * before Express sees a request, so Expo's handler takes everything else; `/` is registered by
-   * name because Colyseus only looks for an explicit root route before claiming `/` itself.
-   * Skipped when the export has not been built.
+   * Bind your custom express routes here:
+   * Read more: https://expressjs.com/en/starter/basic-routing.html
    */
   express: (app) => {
-    const dist = process.env.MOBILE_DIST_DIR ?? fileURLToPath(new URL("../../mobile/dist", import.meta.url));
-    if (!existsSync(path.join(dist, "server"))) {
-      console.warn(`web: no export at ${dist}; the app's pages and /api are not served`);
-      return;
-    }
-    // The CommonJS build: expo-server's ESM build uses extensionless imports Node rejects.
-    const { createRequestHandler } = createRequire(import.meta.url)("expo-server/adapter/express");
-    const web = createRequestHandler({ build: path.join(dist, "server"), environment: process.env.NODE_ENV });
-    app.use(express.static(path.join(dist, "client")));
-    app.get("/", web);
-    app.use(web);
+
+    app.get("/hi", (req, res) => {
+      res.send("It's time to kick ass and chew bubblegum!");
+    });
   }
 });
-
-/**
- * Colyseus sets CORS on every HTTP response, the app's /api included, and by default reflects
- * any Origin with credentials allowed — which would let any site read a signed-in web player's
- * wallet. Only the web app's own origins (`WEB_ORIGINS`, comma-separated) are reflected; native
- * clients send no Origin. Development also allows the local and LAN hosts it is served on.
- */
-const webOrigins = new Set(process.env.WEB_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean));
-const devOrigin = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/;
-matchMaker.controller.getCorsHeaders = (headers) => {
-  const origin = headers.get("origin");
-  const allowed = origin !== null &&
-    (webOrigins.has(origin) || (process.env.NODE_ENV !== "production" && devOrigin.test(origin)));
-  return { "Access-Control-Allow-Origin": allowed ? origin : "" };
-};
 
 export default server;
 
