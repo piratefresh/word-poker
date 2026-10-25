@@ -435,6 +435,9 @@ importers:
       colyseus:
         specifier: ^0.18.2
         version: 0.18.6(b055dc4692c4d775e0afe22605aa22f5)
+      expo-server:
+        specifier: ^57.0.3
+        version: 57.0.3
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@8.1.1)

@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+# One deploy at a time; a newer push supersedes one still building.
+concurrency:
+  group: colyseus-cloud-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: write # pushes the `deploy` branch
 
 jobs:
   deploy:
@@ -13,12 +22,40 @@ jobs:
       token: ${{ secrets.TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version from package.json's packageManager
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24.x"
-          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The game host runs out of memory building this (Metro), so it is built here and shipped
+      # as files; the server serves apps/mobile/dist (apps/server/src/app.config.ts). EXPO_PUBLIC_*
+      # are inlined now, from the repository's Actions variables.
+      - name: Export the web app and API routes
+        run: pnpm --filter @wordpoker/mobile exec expo export --platform web
+        env:
+          EXPO_PUBLIC_AUTH_URL: ${{ vars.EXPO_PUBLIC_AUTH_URL }}
+          EXPO_PUBLIC_GAME_URL: ${{ vars.EXPO_PUBLIC_GAME_URL }}
+          EXPO_PUBLIC_REVENUECAT_WEB_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY }}
+          EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY }}
+          EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY }}
+          EXPO_PUBLIC_COIN_STORE: ${{ vars.EXPO_PUBLIC_COIN_STORE }}
+
+      # Colyseus Cloud deploys a git branch, so the export travels as a commit on top of main.
+      # Force-pushed each time; never merge it back.
+      - name: Publish main plus the export to the deploy branch
+        run: |
+          find apps/mobile/dist -name "*.map" -delete
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git switch --create deploy
+          git add --force apps/mobile/dist
+          git commit --quiet --message "Deploy ${GITHUB_SHA::7} with the web export"
+          git push --force origin deploy
+
       - name: Trigger deployment
         run: |
           npm install -g @colyseus/cloud
-          npx @colyseus/cloud deploy --applicationId $applicationId --token $token
+          npx @colyseus/cloud deploy --applicationId $applicationId --token $token --branch deploy
