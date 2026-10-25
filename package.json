@@ -12,6 +12,7 @@
     "ios:build:dev": "pnpm --filter @wordpoker/mobile exec eas build --profile development --platform ios",
     "android:device": "pnpm --filter @wordpoker/mobile exec expo run:android --device",
     "android:device:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm android:device\"",
+    "android:distribute": "node --env-file=apps/mobile/.env scripts/distribute-android.mjs",
     "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
     "dev:history": "node --env-file=apps/mobile/.env scripts/dev-history.mjs",
     "deploy:colyseus": "npx @colyseus/cloud deploy",

@@ -19,6 +19,13 @@
         "EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY": "appl_TWXWFUQLqVvUoYfzgNJdzaRvGJk"
       }
     },
+    "firebase": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "e2e-test": {
       "withoutCredentials": true,
       "env": {
