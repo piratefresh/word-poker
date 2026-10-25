@@ -21,7 +21,7 @@
     "start": "pnpm kill:ports && pnpm --filter @wordpoker/mobile start",
     "kill:ports": "node scripts/kill-ports.mjs",
     "dev:server": "pnpm --filter @wordpoker/server start",
-    "build": "pnpm --filter @wordpoker/mobile exec expo export --platform web && pnpm --filter @wordpoker/server build",
+    "build": "pnpm --filter @wordpoker/server build",
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",
     "smoke:online:wild": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Wild",
     "smoke:online:guest": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1 -Guest",
