@@ -32,6 +32,7 @@ import {
   type StripEntry,
   type SwapFlip,
 } from "./strip";
+import { HOLDER } from "./rack-holder-box";
 import { RackPill } from "./rack-pill";
 import { styles } from "./styles";
 
@@ -307,29 +308,51 @@ export function WordHand({
   const landscape = window.width > window.height;
   const { itemWidth: tile, itemHeight } = rackFor(window);
   const rowWidth = WORD_PLACES * tile + (WORD_PLACES - 1) * LANDSCAPE_TILE_GAP;
+  // On its side the strip is the one thing centred in the row: the controls hang at the left edge.
+  // The draft's plate runs the rail's length, with the word and its value centred in it.
+  const railWidth = rowWidth + 2 * HOLDER.side;
   const landscapeStrip = landscape && {
-    marginLeft: -RACK_INSET,
+    alignSelf: "center" as const,
     width: rowWidth + 2 * RACK_INSET,
   };
+
+  const preview = (
+    // The draft reads above the tray, on the wood: the tray is the tiles alone. The slot is
+    // kept while the line is empty, so the first letter played does not move the felt.
+    <View
+      style={[
+        styles.previewSlot,
+        // Centred over the tiles alone, and only a line tall: the plate rises into the table's
+        // corner rather than taking the table's height.
+        landscape && [styles.previewSlotLandscape, { width: railWidth }],
+      ]}
+      testID="word-builder-preview-slot"
+    >
+      <DraftPreview />
+    </View>
+  );
+  const strip_ = (
+    <View style={landscapeStrip}>
+      <TileStrip
+        flip={swapFlip}
+        held={held}
+        live={live}
+        onPick={pickTile}
+        onReorder={reorder}
+        onToggle={toggle}
+        places={WORD_PLACES}
+        sortable={sortable}
+        strip={strip}
+      />
+    </View>
+  );
 
   // The hand lies straight on the felt mat: seven dashed card slots, one for each tile a seat can
   // play (§7), with the tiles dealt so far sitting in theirs, so a hand a street short of the
   // river reads as one still filling. The strip sizes itself; this only wraps it.
   return (
     <View testID="word-builder-hand">
-      {/* The draft reads above the tray, on the wood: the tray is the tiles alone. The slot is
-          kept while the line is empty, so the first letter played does not move the felt. */}
-      <View
-        style={[
-          styles.previewSlot,
-          // Centred over the tiles alone, and only a line tall: the plate rises into the table's
-          // corner rather than taking the table's height.
-          landscape && [styles.previewSlotLandscape, { width: rowWidth }],
-        ]}
-        testID="word-builder-preview-slot"
-      >
-        <DraftPreview />
-      </View>
+      {landscape ? null : preview}
       <BlankPicker />
       <View
         style={[styles.tray, landscape && styles.trayLandscape]}
@@ -342,30 +365,33 @@ export function WordHand({
             </Text>
           </View>
         )}
-        <View style={landscapeStrip}>
-          <TileStrip
-            flip={swapFlip}
-            held={held}
-            live={live}
-            onPick={pickTile}
-            onReorder={reorder}
-            onToggle={toggle}
-            places={WORD_PLACES}
-            sortable={sortable}
-            strip={strip}
-          />
-        </View>
-        {actions == null ? null : (
-          // On its side the controls centre on the tiles, not the strip's foot: the strip keeps
-          // a choice tile's chip row under them, and its tiles sit `stripTight` lower.
-          <View
-            style={[
-              styles.trayActions,
-              landscape && [styles.trayActionsLandscape, styles.stripTight, { height: itemHeight }],
-            ]}
-          >
-            {actions}
-          </View>
+        {landscape ? (
+          <>
+            {actions == null ? null : (
+              // The controls centre on the tiles, not the strip's foot: the draft's line sits
+              // above the tiles and the strip keeps a choice tile's chip row under them.
+              <View
+                style={[
+                  styles.trayActions,
+                  styles.trayActionsLandscape,
+                  { height: itemHeight },
+                ]}
+              >
+                {actions}
+              </View>
+            )}
+            <View style={{ width: railWidth }}>
+              {preview}
+              {strip_}
+            </View>
+          </>
+        ) : (
+          <>
+            {strip_}
+            {actions == null ? null : (
+              <View style={styles.trayActions}>{actions}</View>
+            )}
+          </>
         )}
       </View>
     </View>

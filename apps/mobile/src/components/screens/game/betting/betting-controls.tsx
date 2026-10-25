@@ -105,7 +105,7 @@ export function BettingControls({
         : { id: "action-raise", label: `${state.wager === "bet" ? "BET" : "RAISE"} ▲`, amount: undefined, variant: "gold" as const, disabled: !canWager, onPress: () => { measureRaise(); onRaiseOpenChange(true); } };
 
   // Landscape's right thumb (mocks 3a, 4a–4c): Fold and Raise one width, the round wager button
-  // between them a tile across, so the row stands one tile tall.
+  // between them the largest control, so the row stands one tile tall.
   const tile = Math.round(rackFor(window).itemWidth);
   // A phone on its side shares one row with the rack, so its buttons run small: 0.8 of a tile.
   const buttonScale = landscape ? 0.8 : scale;
@@ -117,7 +117,7 @@ export function BettingControls({
     // Landscape's disc takes a tile of the row and lets its artwork's clear room overhang it.
     <CoachTarget
       id="wager"
-      style={[{ flexShrink: 0 }, landscape && { alignItems: "center", width: Math.round(tile * 0.85) }]}
+      style={[{ flexShrink: 0 }, landscape && { alignItems: "center", width: Math.round(tile * 1.05) }]}
     >
       <CoachTarget id="check">
         {/* The tutorial's hold keeps the disabled look: a lesson that wants the rack
@@ -128,8 +128,9 @@ export function BettingControls({
           amount={state.primary === "call" ? formatCompactAmount(state.callAmount ?? 0) : undefined}
           label={wagerLabel}
           onPress={closing(onCheckOrCall)}
-          // The artwork has clear room round its disc: 1.7 tiles draws the disc about 1.2 tiles across.
-          size={landscape ? tile * 1.4 : (short ? 104 : 124) * scale}
+          // The artwork has clear room round its disc: 2.1 tiles draws the disc about 1.5 tiles
+          // across — the biggest control on the row.
+          size={landscape ? tile * 2.1 : (short ? 104 : 124) * scale}
           testID="action-check-call"
         />
       </CoachTarget>
@@ -160,7 +161,9 @@ export function BettingControls({
       <View
         ref={raiseRef}
         onLayout={measureRaise}
-        style={landscapeButton || styles.action}
+        // Landscape's width is a floor: CONFIRM $1.2K or ALL IN run longer than RAISE, and the
+        // button grows to its label rather than eliding it.
+        style={landscapeButton ? { height: landscapeButton.height, minWidth: landscapeButton.width } : styles.action}
       >
       <GameButton
         amount={raise.amount}

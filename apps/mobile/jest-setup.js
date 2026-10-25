@@ -45,6 +45,9 @@ jest.mock("@/components/screens/game/betting/waiting-shield", () => ({ WaitingSh
 // Its housing is a Rive view, native-only: tests drive the button over no art.
 jest.mock("@/components/screens/game/betting/wager-art", () => ({ WagerArt: () => null }));
 
+// The wooden rail behind the rack is Skia decoration: tests see the tiles without it.
+jest.mock("@/components/word-builder/rack-holder", () => ({ RackHolder: () => null }));
+
 // Shadows under the tray, racks and tiles are Skia canvases, and decoration only.
 jest.mock("@/components/ui/shadow-box", () => ({ ShadowBox: () => null }));
 

@@ -43,6 +43,7 @@ import { colors, glow, layout, spacing } from "@/constants/theme";
 import { webTestID } from "@/lib/ui/web-id";
 
 import { haptic } from "./haptics";
+import { RackHolder } from "./rack-holder";
 import { styles } from "./styles";
 
 /** The widest gap the places take between them: a short hand sits at this and stays tight. */
@@ -505,6 +506,12 @@ export function TileStrip({
           { height: rack.height, width: rowWidth(laidOut, step, rack) },
         ]}
       >
+        {laidOut > 0 ? (
+          <RackHolder
+            tileHeight={rack.itemHeight}
+            width={rowWidth(laidOut, step, rack)}
+          />
+        ) : null}
         {/* Every place has its card slot, drawn under the tiles, so a lifted tile shows it. */}
         {Array.from({ length: laidOut }, (_, index) => (
           <EmptyPlace

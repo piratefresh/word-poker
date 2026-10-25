@@ -43,6 +43,7 @@ export function AnimatedSplashOverlay() {
           scheduleOnRN(setVisible, false);
         }
       })}
+      pointerEvents="none"
       style={styles.splashOverlay}>
       {image}
     </Animated.View>
@@ -53,6 +54,7 @@ export function AnimatedSplashOverlay() {
           setAnimate(true);
         });
       }}
+      pointerEvents="none"
       style={styles.splashOverlay}>
       {image}
     </View>

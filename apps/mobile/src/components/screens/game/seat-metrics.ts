@@ -162,6 +162,8 @@ const LABEL_KEYS = new Set<string>([
   "statusSize",
   "statusLine",
 ]);
+/** The share of `labelScale`'s growth the avatar takes: 1 grows it with the labels, 0 not at all. */
+const AVATAR_LABEL_SHARE = 0.5;
 /** How far a wide window grows the tabletop seat. */
 const TABLETOP_MAX_SCALE = 1.8;
 
@@ -209,8 +211,10 @@ export function seatMetrics(tableWidth: number, tabletop = false, labelScale = 1
         scale *
         (LABEL_KEYS.has(key) ? labelScale : 1);
     }
-    // The avatar grows with the labels; it may spill past the seat's bounds.
-    return { ...scaled, avatar: Math.round(TABLETOP.avatar * scale * labelScale), scale };
+    // The avatar follows the labels only half as far, so the room the seats give up goes to the
+    // community tiles; it may still spill past the seat's bounds.
+    const avatarGrowth = 1 + (labelScale - 1) * AVATAR_LABEL_SHARE;
+    return { ...scaled, avatar: Math.round(TABLETOP.avatar * scale * avatarGrowth), scale };
   }
   const avatar = avatarDiameter(tableWidth);
   const scale = avatar / MIN_AVATAR;
@@ -221,16 +225,10 @@ export function seatMetrics(tableWidth: number, tabletop = false, labelScale = 1
   return { ...scaled, avatar, scale };
 }
 
-/** A side seat, as opposed to the top and bottom ones: it faces the pot sideways. */
-function isSideSeat(anchor: Pick<SeatAnchor, "angle">): boolean {
-  return Math.abs(Math.cos(anchor.angle)) > Math.abs(Math.sin(anchor.angle));
-}
-
 /**
  * Where a seat's bet chip sits, in the seat's own box (its top is the avatar's top edge; its
  * left is the column's left, or the avatar's for a seat whose labels are on its right). The chip
- * is level with the avatar, beside it — for a side seat, on the side that faces the pot, so the
- * eye reads the money going in.
+ * stands centred above the avatar, clear of the labels and the felt's pot.
  */
 export function betChipOffset(
   anchor: Pick<SeatAnchor, "angle">,
@@ -238,16 +236,11 @@ export function betChipOffset(
   seatCount = 4,
 ): { left: number; top: number } {
   const direction = seatDirection(anchor, seatCount);
-  const top = (m.avatar - m.chip) / 2;
-  if (direction === "left") return { left: m.width + m.besideGap + m.avatar + 4 * m.scale, top };
-  if (direction === "right") return { left: -m.chip - 4 * m.scale, top };
-  const avatarLeft = (m.width - m.avatar) / 2;
-  // A left-hand seat's chip faces the pot on its right; every other seat's goes on the avatar's
-  // left — the pot's side for a right-hand seat, and clear of the role badges pinned top-right.
-  if (isSideSeat(anchor) && Math.cos(anchor.angle) < 0) {
-    return { left: avatarLeft + m.avatar + 4 * m.scale, top };
-  }
-  return { left: avatarLeft - m.chip - 4 * m.scale, top };
+  const top = -m.chip - 2 * m.scale;
+  const centred = (m.avatar - m.chip) / 2;
+  if (direction === "left") return { left: m.width + m.besideGap + centred, top };
+  if (direction === "right") return { left: centred, top };
+  return { left: (m.width - m.chip) / 2, top };
 }
 
 /**
@@ -291,26 +284,23 @@ export function playerSeatBounds(
   const m = seatMetrics(tableWidth, tabletop);
   const radius = m.avatar / 2;
   const direction = seatDirection(anchor, seatCount);
-  const chip = betChipOffset(anchor, m, seatCount);
+  // The bet chip stands above the avatar but is left free to spill, so the seat keeps its room.
   const badges = radius - m.badgeTop;
   if (direction !== "stacked") {
-    const chipSide = radius + 4 * m.scale + m.chip;
     const labelSide = radius + m.besideGap + m.width;
     // The labels are centred on the avatar, and may stand taller than it.
     const half = labelBlock(m) / 2;
     return {
-      left: direction === "left" ? labelSide : chipSide,
-      right: direction === "right" ? labelSide : chipSide,
+      left: direction === "left" ? labelSide : radius,
+      right: direction === "right" ? labelSide : radius,
       top: Math.max(badges, half),
       bottom: Math.max(radius, half),
       core: radius,
     };
   }
-  const rootLeft = -m.width / 2;
-  const chipLeft = rootLeft + chip.left;
   return {
-    left: Math.max(m.width / 2, -chipLeft),
-    right: Math.max(m.width / 2, chipLeft + m.chip),
+    left: m.width / 2,
+    right: m.width / 2,
     top: badges,
     // Reserve the full name/status/stack even for empty seats and changing states.
     bottom: radius + labelDrop(m) - (tabletop && anchor.index === 0 ? m.rackH - m.rackTuck : 0),

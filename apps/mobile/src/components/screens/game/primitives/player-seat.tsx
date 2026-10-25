@@ -89,7 +89,7 @@ function seatStyles(m: SeatMetrics) {
       width: m.avatar,
     },
     avatarLit: { borderWidth: m.avatarBorderLit },
-    initials: { fontSize: m.avatar * 0.27, lineHeight: m.avatar * 0.34 },
+    initials: { fontSize: m.avatar * 0.36, lineHeight: m.avatar * 0.44 },
     levelBadge: {
       borderRadius: m.avatar * 0.18,
       borderWidth: 2 * m.scale,
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderFaint,
     borderStyle: "dashed",
   },
-  initials: { color: "#14251b", fontFamily: fonts.sansBlack },
+  initials: { color: "#14251b", fontFamily: fonts.sansBlack, fontWeight: "900" },
   levelBadge: {
     alignItems: "center",
     justifyContent: "center",

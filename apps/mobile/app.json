@@ -35,6 +35,12 @@
       "expo-router",
       "./plugins/launch-mode",
       [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "DEFAULT"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

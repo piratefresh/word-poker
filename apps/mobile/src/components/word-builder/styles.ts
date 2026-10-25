@@ -74,6 +74,7 @@ export const styles = StyleSheet.create({
     borderRadius: radius.md,
     columnGap: spacing.md,
     flexDirection: "row",
+    justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.4)",
 
     paddingHorizontal: spacing.xs,
@@ -198,33 +199,36 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: spacing.xxs,
   },
+  // The plate stretches the slot, which is the rail's length; a gap keeps it off the rail's top.
   previewSlotLandscape: {
-    alignItems: "flex-start",
+    alignItems: "stretch",
+    alignSelf: "center",
     height: 24,
+    marginBottom: 8,
     minHeight: 0,
     overflow: "visible",
   },
-  // A phone on its side: the tiles from the content's edge, then shuffle and check beside them.
+  // The controls at the left edge, then the strip centred in the rest.
   trayLandscape: {
-    alignItems: "center",
-    alignSelf: "flex-start",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    alignSelf: "stretch",
     flexDirection: "row",
     marginHorizontal: 0,
   },
-  // Beside the last tile, one row with it: the shuffle and check pills, as portrait draws them.
-  // The strip's end inset is the 8 before the disc; 6 between the two (mock 3a: ends at 432).
+  // Shuffle and check, one row with the tiles: level with them, under the draft's line, and
+  // pinned to the row's left edge so the rail stays centred on the screen.
   trayActionsLandscape: {
     alignItems: "center",
-    alignSelf: "flex-start",
     gap: 6,
-    marginLeft: 0,
-    marginTop: 0,
+    left: 0,
+    marginTop: 46,
+    position: "absolute",
   },
-  // A card slot stitched into the felt, the size of a tile; a dealt tile sits over its slot.
+  // A pocket cut into the rail, the size of a tile; a dealt tile sits over its pocket.
   emptyPlace: {
-    backgroundColor: "rgba(0,24,10,0.22)",
-    borderColor: "rgba(214,236,214,0.4)",
-    borderStyle: "dashed",
+    backgroundColor: "rgba(40,16,2,0.35)",
+    borderColor: "rgba(30,12,0,0.45)",
     borderWidth: 1.25,
     position: "absolute",
     top: 0,
