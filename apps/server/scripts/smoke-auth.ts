@@ -39,7 +39,7 @@ try {
   await assert.rejects(async () => {
     const duplicate = await client.joinById(created.roomId, { userId: "another-forged-account-id" });
     rooms.push(duplicate);
-  }, (error: { code?: number }) => error.code === 409);
+  }, (error: { code?: number }) => error.code === 4400);
   console.log("PASS: one account cannot take a second seat");
 
   const signOut = await fetch(new URL("/api/auth/sign-out", apiOrigin), {
