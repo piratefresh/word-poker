@@ -92,6 +92,7 @@ export function RaiseSlider({
         <View style={[styles.tag, { bottom: height + 6 }]}>
           <Text style={styles.tagText}>{formatCompactAmount(amount === 0 ? minRaise : amount)}</Text>
         </View>
+        <View pointerEvents="none" style={styles.backdrop} />
         <View
           testID="wager-slider"
           id={webTestID("wager-slider")}
@@ -160,7 +161,20 @@ const POT_PRESETS = [
 
 const styles = StyleSheet.create({
   /** Sits over the table's right edge, bottom-aligned to the action row it opens from. */
-  panel: { width: 132 },
+  panel: { width: 109 },
+  /** A felt-green card behind tube and pills, so the slider stays legible over the table's buttons. */
+  backdrop: {
+    backgroundColor: "rgba(14,38,28,0.94)",
+    borderColor: "rgba(224,178,90,0.55)",
+    borderRadius: 18,
+    borderWidth: 2,
+    bottom: -10,
+    boxShadow: "0px 4px 10px rgba(0,0,0,0.5)",
+    left: -6,
+    position: "absolute",
+    right: 0,
+    top: -10,
+  },
   touchArea: { alignItems: "center", justifyContent: "flex-end", width: 36 },
   track: {
     backgroundColor: "#1a0d06",
@@ -203,8 +217,8 @@ const styles = StyleSheet.create({
     borderColor: "#e0b25a",
     borderRadius: 8,
     borderWidth: 2,
-    left: 40,
-    paddingHorizontal: 8,
+    left: 38,
+    paddingHorizontal: 6,
     paddingVertical: 3,
     position: "absolute",
   },

@@ -2,6 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
+  Pressable,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -57,6 +58,7 @@ import {
   PlayerSeat,
   Pot,
 } from "./primitives";
+import { HOLDER } from "@/components/word-builder/rack-holder-box";
 import { rackFor } from "@/components/word-builder/strip";
 
 import {
@@ -290,22 +292,27 @@ function GameScreenBody({
   }, [game.seatCount, landscape, seating]);
   // In landscape the hero's seat sits on the table's bottom edge, its labels beside the avatar and
   // the pair centred; at two and four seats the top opponent sits just under the HUD and the side
-  // ones halfway down the table's edges.
+  // ones close beside it, a little lower, so the three read as one row.
   const heroSeat = seatMetrics(chromeWidth, true, labelScale);
   const contentWidth = window.width - 2 * side;
   const seatPositionOverrides = useMemo((): Record<number, Partial<NormPoint>> | undefined => {
     if (!landscape) return undefined;
     const hero = {
-      x: 0.5 - (heroSeat.besideGap + heroSeat.width) / 2 / Math.max(1, contentWidth),
+      // The hero stands in the right corner over fold, call and raise: its labels run to the
+      // avatar's right, so the avatar sits one label's width plus its own radius from the edge.
+      x:
+        1 -
+        (heroSeat.avatar / 2 + heroSeat.besideGap + heroSeat.width + 8) /
+          Math.max(1, contentWidth),
       y: 1,
     };
     if (game.seatCount === 2) return { 0: hero, 1: { y: 0.14 } };
     if (game.seatCount === 4) {
       return {
         0: hero,
-        1: { x: 0.06, y: 0.45 },
+        1: { x: 0.28, y: 0.22 },
         2: { y: 0.14 },
-        3: { x: 0.94, y: 0.45 },
+        3: { x: 0.72, y: 0.2 },
       };
     }
     return { 0: hero };
@@ -313,6 +320,11 @@ function GameScreenBody({
 
   // Keep the mode under the capsule in portrait; the table reserves its clearance below.
   const modeTag = hangsModeTag(balance, window);
+
+  // The rail's foot: the controls' bottom, up past the choice chips' row that the strip keeps under
+  // its tiles, down by the strip's own drop (`stripTight`) and the ledge below the tiles.
+  const landscapeMatBottom =
+    height - frame.bottom - 6 - (hand.height - hand.itemHeight) + 6 + HOLDER.ledge;
 
   const rackBlock = (
     <>
@@ -402,11 +414,16 @@ function GameScreenBody({
       <CoinBowlGameContext.Provider value={game}>
         <TableBackdrop />
         {/* The mat starts under the HUD and its hanging mode tag, so the opponents sit on it. On
-          its side it is the table's zone alone: the hero's seat straddles its bottom edge and the
-          controls lie on the wood under it. */}
+          its side it runs down to the foot of the word builder's rail, so the tiles and the table
+          share the one mat; the hero's seat still straddles the table's own bottom edge. */}
         {landscape ? (
           <FeltMat
-            box={{ x: side, y: tableTop, width: window.width - 2 * side, height: tableHeight }}
+            box={{
+              x: side,
+              y: tableTop,
+              width: window.width - 2 * side,
+              height: landscapeMatBottom - tableTop,
+            }}
             height={height}
             width={window.width}
           />
@@ -428,6 +445,9 @@ function GameScreenBody({
         {!landscape && rackHeight != null && heroActing ? (
           <TurnGlow height={Math.min(340, controlsHeight - rackHeight)} />
         ) : null}
+        {/* On its side the row is one band at the foot: the glow rises from the screen's bottom
+          edge behind it, the rail and the betting buttons both. */}
+        {landscape && heroActing ? <TurnGlow height={hand.itemHeight + 40} /> : null}
         {/* Above the HUD, so the community label reads over the timer banner's hanging tip; the
           layer takes no touches of its own, so the HUD's buttons stay pressable. */}
         <View
@@ -446,8 +466,9 @@ function GameScreenBody({
           <CoachTarget
             id="table"
             style={[
-              styles.tableRegion,
-              landscape && { flexBasis: tableHeight, flexGrow: 0, flexShrink: 0, minHeight: 0 },
+              // Landscape's region is its own style, not an override of the portrait one: a `flex: 1`
+              // underneath beats a longhand `flexBasis` on iOS, and `flex: 0` is a 0% basis on web.
+              landscape ? { height: tableHeight } : styles.tableRegion,
               !landscape && compact && styles.tableRegionCompact,
             ]}
           >
@@ -463,8 +484,8 @@ function GameScreenBody({
                 <>
                   <CommunityInTable
                     onPick={onPickCommunityTile}
-                    // Landscape's board is 34–38 wide a card (mock 1a), under the portrait felt's 46.
-                    scale={landscape ? scale * 0.8 : scale}
+                    // Landscape's board gives back the room the smaller avatars free: 1.1 of the tile.
+                    scale={landscape ? scale * 1.1 : scale}
                     tiles={game.community}
                     beside={
                       landscape && !hidePot ? (
@@ -535,6 +556,15 @@ function GameScreenBody({
             />
             {winOverlay}
           </CoachTarget>
+          {/* A tap anywhere off the slider closes it; it sits under the controls, so those still act. */}
+          {raiseOpen && !waiting ? (
+            <Pressable
+              accessible={false}
+              onPress={() => setRaiseOpen(false)}
+              style={StyleSheet.absoluteFill}
+              testID="wager-slider-dismiss"
+            />
+          ) : null}
           {landscape ? (
             <View
               pointerEvents="box-none"
@@ -544,7 +574,11 @@ function GameScreenBody({
               ]}
               testID="game-controls"
             >
-              <View>{rackBlock}</View>
+              {/* The word builder spans the whole row, so its rail is centred on the screen and the
+                betting buttons, drawn after it, lie over its empty right-hand side. */}
+              <View pointerEvents="box-none" style={styles.landscapeRack}>
+                {rackBlock}
+              </View>
               {bettingBlock}
             </View>
           ) : (
@@ -571,7 +605,7 @@ function GameScreenBody({
               style={{
                 // The tube stands on the raise button, centred over it; the pills hang to its right.
                 bottom: raiseAnchor
-                  ? window.height - raiseAnchor.y + 4
+                  ? window.height - raiseAnchor.y + 16
                   : bottomInset + controlsHeight,
                 left: raiseAnchor
                   ? Math.min(
@@ -592,7 +626,7 @@ function GameScreenBody({
                 // disc in the table's corner (8 in, 32 across), its amount tag included.
                 tubeHeight={
                   landscape && raiseAnchor
-                    ? Math.min(300, raiseAnchor.y - 4 - tableTop - 8 - 32 - 4 - 30)
+                    ? Math.min(300, raiseAnchor.y - 16 - tableTop - 8 - 32 - 4 - 30)
                     : undefined
                 }
               />
@@ -707,7 +741,7 @@ function CommunityInTable({
   tiles: GameScreenState["community"];
   scale: number;
   onPick?: (tile: LetterTileData) => void;
-  /** Landscape's pot, hung off the board's right edge. */
+  /** Landscape's pot, hung under the board. */
   beside?: ReactNode;
 }) {
   const { layout, resolveContainer } = useTableLayout();
@@ -780,7 +814,7 @@ function HeroSeatAccessory({
 }
 
 /** How far the preset pills reach right of the tube's left edge. */
-const RAISE_PILL_REACH = 126;
+const RAISE_PILL_REACH = 109;
 
 // Outside StyleSheet.create: the web build validates its keys and rejects Reanimated's CSS animation.
 const TURN_GLOW_PULSE = {
@@ -795,7 +829,7 @@ const TURN_GLOW_PULSE = {
 } as const;
 
 const styles = StyleSheet.create({
-  besideBoard: { bottom: 0, justifyContent: "center", left: "100%", marginLeft: 8, position: "absolute", top: 0 },
+  besideBoard: { alignItems: "center", left: 0, marginTop: 4, position: "absolute", right: 0, top: "100%" },
   communityInTable: {
     alignItems: "center",
     justifyContent: "center",
@@ -813,9 +847,10 @@ const styles = StyleSheet.create({
   landscapeControls: {
     alignItems: "flex-end",
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     position: "absolute",
   },
+  landscapeRack: { bottom: 0, left: 0, position: "absolute", right: 0 },
   tableRegionCompact: { minHeight: 234 },
   // A small phone: the felt is narrower than the screen, so the height it keeps goes to the word.
   table: { backgroundColor: "transparent", flex: 1 },

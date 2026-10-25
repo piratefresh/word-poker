@@ -20,19 +20,22 @@ import { RobotoSlab_800ExtraBold } from "@expo-google-fonts/roboto-slab";
 import * as Sentry from "@sentry/react-native";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
+import * as Notifications from "expo-notifications";
 import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
-import * as Notifications from "expo-notifications";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, restoreWithGameCenter } from "@/auth/client/game-center";
 import { changeSessionIfSignedOut } from "@/auth/client/session-coordinator";
+import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { TableInviteBanner } from "@/components/ui/table-invite-banner";
 import { colors } from "@/constants/theme";
-import { E2E_AUTH_BYPASS } from "@/lib/testing/e2e";
+import { leaveTable } from "@/features/online/room-session";
+import { usePresence } from "@/lib/friends/use-presence";
+import { usePushRegistration } from "@/lib/friends/use-push-registration";
 import {
   destinationFromURL,
   rememberDestination,
@@ -40,12 +43,9 @@ import {
   takeDestination,
   type Destination,
 } from "@/lib/navigation/pending-destination";
-import { leaveTable } from "@/features/online/room-session";
 import { QuestsProvider } from "@/lib/quests/quests-provider";
+import { E2E_AUTH_BYPASS } from "@/lib/testing/e2e";
 import { useRevenueCatIdentity } from "@/lib/wallet/use-revenuecat";
-import { usePresence } from "@/lib/friends/use-presence";
-import { usePushRegistration } from "@/lib/friends/use-push-registration";
-import { TableInviteBanner } from "@/components/ui/table-invite-banner";
 
 Sentry.init({
   dsn: "https://275e0d7eaac4989bad2cdca3b110a5c0@o4512200430125056.ingest.us.sentry.io/4512200442904576",
@@ -155,7 +155,7 @@ export function RootLayout() {
                   <Stack.Screen name="forgot-password" />
                 </Stack.Protected>
                 <Stack.Protected guard={authed}>
-                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="(tabs)" options={{ orientation: 'portrait' }} />
                   <Stack.Screen name="tutorial" />
                   <Stack.Screen name="offline" />
                   <Stack.Screen name="online" />

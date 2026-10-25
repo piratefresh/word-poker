@@ -40,7 +40,7 @@ export function PowerHeldChip({
   if (held === null) return null;
 
   // As tall as the buttons beside it, and a card's shape at that height.
-  const height = compact ? 44 : 48 * scale;
+  const height = compact ? 60 : 66 * scale;
   const width = Math.round(height / POWER_CARD_ASPECT);
   const state = held.used ? "used" : held.usable ? "ready" : "waiting";
   const hint = "Use Spotlight on your betting turn during the flop or turn.";
@@ -93,7 +93,7 @@ export function PowerHeldChip({
 }
 
 /**
- * The felt's side of using a power: while the hero chooses, the felt dims and says what to do;
+ * The felt's side of using a power: while the hero chooses, the felt stays clear and a hint says what to do;
  * once a tile is chosen, the felt asks to confirm the swap in the catalog's words — "Discard A
  * for a random letter?". Tapping the dimmed felt, or CANCEL, backs out.
  *
@@ -146,7 +146,7 @@ export function PowerUsePrompt({
         onPress={onCancel}
         // Picking, the felt must still take the tap that names the tile; CANCEL backs out.
         pointerEvents={stage === "picking" ? "none" : "auto"}
-        style={styles.scrim}
+        style={[styles.scrim, stage === "picking" && styles.scrimClear]}
         testID="power-scrim"
       />
       {question === null ? (
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   chip: { alignItems: "center", borderRadius: 6, justifyContent: "center" },
   chipReady: glow(colors.gold, 8),
   chipIdle: { opacity: 0.45 },
-  chipActive: { transform: [{ translateY: -4 }, { scale: 1.06 }] },
+  chipActive: { transform: [{ translateY: -4 }, { scale: 1.12 }] },
   usedBand: {
     backgroundColor: "rgba(20,8,4,0.82)",
     borderColor: palette.gold400,
@@ -227,6 +227,8 @@ const styles = StyleSheet.create({
   },
   layer: { ...FILL, zIndex: 20 },
   scrim: { ...FILL, backgroundColor: "rgba(2,12,9,0.58)" },
+  // Choosing, the felt stays lit so the tiles are easy to read.
+  scrimClear: { backgroundColor: "transparent" },
   hintRow: {
     alignItems: "center",
     bottom: spacing.sm,

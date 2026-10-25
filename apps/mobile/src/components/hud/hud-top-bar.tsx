@@ -35,7 +35,7 @@ import {
   spacing,
 } from "@/constants/theme";
 
-import type { RoundPhase } from "@wordpoker/contracts";
+import { ROUND_PHASES, type RoundPhase } from "@wordpoker/contracts";
 
 import { landscapeFrame, useScreenScale } from "@/components/screens/game/screen-scale";
 
@@ -160,7 +160,13 @@ export function HudTopBar({
 
   const capsule = (stacked: boolean) => (
     <PhaseCapsule
-      label={stamp ?? PHASE_LABEL[phase]}
+      label={
+        stamp ??
+        // The small landscape plate has no room for a progress bar: the step is in its words.
+        (stacked
+          ? `${PHASE_LABEL[phase]} ${ROUND_PHASES.indexOf(phase) + 1}/${ROUND_PHASES.length}`
+          : PHASE_LABEL[phase])
+      }
       loopsEnabled={loopsOn}
       phrase={turnPhrase}
       reduceMotion={reduce}
