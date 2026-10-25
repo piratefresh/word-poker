@@ -114,7 +114,8 @@ const server = defineServer({
    * apps/mobile/server.cjs. Colyseus answers its own routes (matchmaking, healthcheck, admin)
    * before Express sees a request, so Expo's handler takes everything else; `/` is registered by
    * name because Colyseus only looks for an explicit root route before claiming `/` itself.
-   * Skipped when the export has not been built.
+   * The export is too heavy to build on the game host, so the deploy workflow builds it and ships
+   * it on the `deploy` branch; without it (local dev, a plain `main` checkout) this is skipped.
    */
   express: (app) => {
     const dist = process.env.MOBILE_DIST_DIR ?? fileURLToPath(new URL("../../mobile/dist", import.meta.url));
