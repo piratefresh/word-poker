@@ -19,7 +19,7 @@
     "deploy:all": "pnpm deploy:colyseus && pnpm deploy:railway",
     "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm kill:ports && pnpm --filter @wordpoker/mobile start",
-    "kill:ports": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8081,8082 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; exit 0\"",
+    "kill:ports": "node scripts/kill-ports.mjs",
     "dev:server": "pnpm --filter @wordpoker/server start",
     "build": "pnpm --filter @wordpoker/mobile exec expo export --platform web && pnpm --filter @wordpoker/server build",
     "smoke:online": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-online.ps1",
