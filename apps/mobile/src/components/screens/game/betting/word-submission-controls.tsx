@@ -25,9 +25,9 @@ export function WordSubmissionControls({
   const drafting = status === "drafting" || status === "submitting";
 
   return (
-    <View style={styles.panel} testID="word-submission-controls">
+    <View pointerEvents="box-none" style={styles.panel} testID="word-submission-controls">
       {drafting ? (
-        <View style={styles.actions}>
+        <View pointerEvents="box-none" style={styles.actions}>
           {/* <GameButton
             label="FOLD"
             variant="danger"
@@ -65,7 +65,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   actions: { flexDirection: "row", gap: 8 },
-  action: { flex: 1 },
+  // Grows into portrait's full-width row, but keeps its label's width in landscape's row, which
+  // sizes to its content: `flex: 1` there is a zero basis and the button collapses out of sight.
+  action: { flexGrow: 1 },
   countdown: {
     color: colors.text,
     fontFamily: fonts.sansBold,

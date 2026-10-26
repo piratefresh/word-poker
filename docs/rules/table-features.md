@@ -80,9 +80,9 @@ without motion.
 
 ---
 
-# 43. Word Checker
+# 43. Validate Word
 
-- A player may privately check a draft against the showdown dictionary by tapping **Check**.
+- A player may privately check a draft against the showdown dictionary by tapping **Validate Word**.
   Arranging, selecting, or sorting tiles never runs a check.
 - Each player gets five checks per hand. The server enforces the limit, and a new hand resets
   the count.

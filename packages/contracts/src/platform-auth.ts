@@ -85,6 +85,8 @@ export interface GameCenterAuthRequest {
   readonly proof: GameCenterProof;
   /** The guest confirmed, before the flow began, that its progress moves into the account. */
   readonly adoptGuestProgress?: boolean;
+  /** The device's Game Center alias. Unsigned: only names a newly created account, never picks one. */
+  readonly displayName?: string;
 }
 
 export interface PlayGamesAuthRequest {
@@ -127,11 +129,19 @@ function parseGameCenterProof(value: unknown): GameCenterProof | null {
 }
 
 export function parseGameCenterRequest(body: unknown): GameCenterAuthRequest | null {
-  const fields = record(body, ["attemptToken", "proof"], ["adoptGuestProgress"]);
+  const fields = record(body, ["attemptToken", "proof"], ["adoptGuestProgress", "displayName"]);
   if (!fields || !text(fields.attemptToken, TOKEN_MAX)) return null;
   if (fields.adoptGuestProgress !== undefined && typeof fields.adoptGuestProgress !== "boolean") return null;
+  if (fields.displayName !== undefined && !text(fields.displayName, 128)) return null;
   const proof = parseGameCenterProof(fields.proof);
-  return proof ? { attemptToken: fields.attemptToken, proof, adoptGuestProgress: fields.adoptGuestProgress === true } : null;
+  return proof
+    ? {
+        attemptToken: fields.attemptToken,
+        proof,
+        adoptGuestProgress: fields.adoptGuestProgress === true,
+        ...(fields.displayName === undefined ? {} : { displayName: fields.displayName }),
+      }
+    : null;
 }
 
 export function parsePlayGamesRequest(body: unknown): PlayGamesAuthRequest | null {

@@ -220,7 +220,10 @@ function DeepLinks({
   const playAsGuest = useCallback(() => {
     if (guestTried.current) return;
     guestTried.current = true;
-    void changeSessionIfSignedOut(() => authClient.signIn.anonymous()).catch(() => {});
+    // On iOS the launch's Game Center restore goes first: a guest queued ahead of it would win the
+    // session, so a returning player would land as a guest with sign-in flashing underneath.
+    const restored = GAME_CENTER_AVAILABLE ? restoreWithGameCenter().catch(() => false) : Promise.resolve(false);
+    void restored.then(() => changeSessionIfSignedOut(() => authClient.signIn.anonymous())).catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -142,10 +142,11 @@ tags:
     id: "action-wager"
     containsDescendants:
       - text: "\\$20"
+# The HUD's stamp names the stage; the row is the one Submit, with no Fold beside it.
 - assertVisible:
-    text: "FINAL STAGE · SUBMIT YOUR WORD"
+    text: "FINAL STAGE"
 - assertVisible:
-    text: "Shared submission deadline.*"
+    text: "SUBMIT WORD"
 - assertNotVisible:
     id: "action-fold"
 - assertNotVisible:
@@ -185,11 +186,24 @@ tags:
 - assertVisible:
     text: "14 pts"
 
-# Submit once, then let the remaining seats answer on the shared clock.
+# Validate Word spends one of the hand's five lookups without submitting: the count drops on
+# every tap, which is what proves the tap reached the button (the betting row used to sit over
+# part of it and swallow the press).
 - assertVisible:
-    text: "SUBMIT WORD"
+    text: "VALIDATE WORD 5/5"
+- tapOn:
+    id: "word-check-button"
+- assertVisible:
+    text: "VALIDATE WORD 4/5"
+- assertVisible:
+    text: "ZIG"
+
+# Submit twice in a row: the second tap must neither break the table nor skip the results.
 - tapOn:
     id: "action-check-call"
+- tapOn:
+    id: "action-check-call"
+    optional: true
 
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
 # immediately when the bots found words, or on the window's clock when they did not.

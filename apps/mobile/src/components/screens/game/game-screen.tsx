@@ -349,7 +349,10 @@ function GameScreenBody({
     </>
   );
   const bettingBlock = (
+    // Pulled up over the rack's action row (`bettingCloser`), so its empty room must pass taps
+    // through to Validate Word and Shuffle beneath it; only its own controls take them.
     <View
+      pointerEvents="box-none"
       onLayout={
         landscape
           ? undefined

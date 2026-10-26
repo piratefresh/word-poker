@@ -1,7 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
@@ -17,9 +16,9 @@ import {
 import { FREE_PLAY } from "@/components/hud";
 import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
-import type { GameScreenState } from "@/components/screens/game/game-types";
 import { reviewOf } from "@/components/screens/results/river-review";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
+import { useCoinStore } from "@/components/screens/store/use-coin-store";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { useXpResultOverlay } from "@/components/screens/results/use-xp-result-overlay";
@@ -45,6 +44,7 @@ import { pinnedPowerUps, pinnedSeed, pinnedTurnMs, randomSeed } from "@/features
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
+import { formatCoins } from "@/lib/ui/format";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -150,6 +150,7 @@ function OfflineTable({
     history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
   });
   const payout = game.phase === "payout";
+  const heroBusted = sessionOver && (game.players.find((player) => player?.isHero)?.stack ?? 0) <= 0;
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
   // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
@@ -275,18 +276,19 @@ function OfflineTable({
       {/*
         The hand's payoff, presented over the felt: every hand that pays out ends here, and
         from here the results' own primary is the only deal on the table (STO-379 decision 4).
-        The session's last hand keeps its end-of-session sheet instead — a New game is the only
-        useful thing left to say once the hero has busted (ADR 0002).
+        The session's last hand ends the same way; its deal just starts a new session, fresh
+        stacks and a fresh seed (ADR 0002).
       */}
-      {payout && !sessionOver && results !== null && !celebratingWin && xp.hero === null ? (
+      {heroBusted && xp.hero === null ? (
+        <OutOfCoins onRefill={restart} userId={authSession?.user.id} />
+      ) : payout && results !== null && !celebratingWin && xp.hero === null ? (
         <ResultsScreen
-          onDeal={deal}
+          onDeal={sessionOver ? restart : deal}
           onExit={leaveTable}
           review={reviewOf(powers?.review, game)}
           snapshot={results}
         />
       ) : null}
-      {sessionOver && xp.hero === null ? <SessionOver game={game} onNewGame={restart} /> : null}
       {historyError ? (
         <Modal transparent visible>
           <View style={styles.overlayBackdrop}>
@@ -302,41 +304,43 @@ function OfflineTable({
 }
 
 /**
- * The session's end-state, over the felt it ended on: every seat's final Table Stack and the
- * one way out — a new session, with fresh stacks and a fresh seed (ADR 0002).
+ * The busted hero's way back: the store's coin packs, bought in place, and the beta's free
+ * refill — a new session with fresh stacks and a fresh seed (ADR 0002).
  */
-function SessionOver({
-  game,
-  onNewGame,
-}: {
-  game: GameScreenState;
-  onNewGame: () => void;
-}) {
-  const insets = useSafeAreaInsets();
+function OutOfCoins({ onRefill, userId }: { onRefill: () => void; userId: string | undefined }) {
+  const store = useCoinStore(userId);
 
   return (
     <Modal animationType="fade" transparent visible>
       <View style={styles.overlayBackdrop}>
-        <View
-          style={[styles.overlay, { marginBottom: insets.bottom }]}
-          testID="session-over"
-        >
-          <Text style={styles.overlayTitle}>SESSION OVER</Text>
-          <View style={styles.overlaySeats}>
-            {game.players.map((player) =>
-              player ? (
-                <Text key={player.id} style={styles.overlaySeat}>
-                  {`${player.name} · $${player.stack.toLocaleString()}`}
-                </Text>
-              ) : null,
-            )}
-          </View>
-          <GameButton
-            label="NEW GAME"
-            onPress={onNewGame}
-            testID="new-game-button"
-            variant="gold"
-          />
+        <View style={styles.overlay} testID="out-of-coins">
+          <Text style={styles.overlayTitle}>OUT OF COINS</Text>
+          <Text style={styles.overlaySeat}>
+            You have lost all your coins. Visit the store to refill — refills are free during the beta.
+          </Text>
+          {store.packs.status === "ready"
+            ? store.packs.rows.map((row) => (
+                <GameButton
+                  amount={`+${formatCoins(row.coins)}`}
+                  disabled={!store.canBuy || store.buying !== null}
+                  key={row.productId}
+                  label={store.buying === row.productId ? "BUYING…" : row.priceString}
+                  onPress={() => void store.buy(row)}
+                  testID={`out-of-coins-pack-${row.productId}`}
+                  variant="dark"
+                />
+              ))
+            : null}
+          {store.notice ? (
+            <Text style={styles.overlaySeat}>
+              {store.notice.kind === "added"
+                ? `+${formatCoins(store.notice.coins)} COINS ADDED`
+                : store.notice.kind === "on-the-way"
+                  ? "Coins are on their way."
+                  : store.notice.message}
+            </Text>
+          ) : null}
+          <GameButton label="FREE REFILL" onPress={onRefill} testID="free-refill-button" variant="gold" />
         </View>
       </View>
     </Modal>
@@ -377,7 +381,6 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textAlign: "center",
   },
-  overlaySeats: { gap: 2 },
   overlaySeat: {
     color: colors.textBright,
     fontFamily: fonts.mono,

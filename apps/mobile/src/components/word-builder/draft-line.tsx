@@ -114,6 +114,9 @@ export function DraftPlate({
             </View>
           ) : null}
         </Pressable>
+        {checked?.valid ? (
+          <Text style={styles.validWord} testID="word-builder-valid">✓ Valid</Text>
+        ) : null}
         </>
         )}
         {/* Out of sight, for the label and the tests: the tiles above read as one word. */}

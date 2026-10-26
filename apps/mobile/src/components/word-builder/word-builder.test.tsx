@@ -558,4 +558,17 @@ describe("<WordBuilder /> and a held power (§44)", () => {
     expect(inWord.onDraft).toHaveBeenCalledWith([{ tileId: "power-0", chosenFace: "Q" }]);
     expect(onDraft).not.toHaveBeenCalled();
   });
+
+  test("tapping a blank not yet in the word opens the picker, and only the pick plays it", async () => {
+    // A faceless blank is a draft the adapters refuse, so the tap must not report one.
+    const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
+    const { view, onDraft } = await renderBuilder({ privateTiles: [blank, PRIVATE_TILES[1]!] });
+
+    await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
+    expect(onDraft).not.toHaveBeenCalled();
+    expect(view.getByTestId("word-builder-blank-picker")).toBeTruthy();
+
+    await fireEvent.press(view.getByTestId("word-builder-blank-Q"));
+    expect(onDraft).toHaveBeenCalledWith([{ tileId: "power-0", chosenFace: "Q" }]);
+  });
 });
