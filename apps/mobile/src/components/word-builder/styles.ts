@@ -217,10 +217,10 @@ export const styles = StyleSheet.create({
   },
   // The controls at the left edge, then the strip centred in the rest.
   trayLandscape: {
-    alignItems: "flex-start",
+    alignItems: "center",
+    flexDirection: "column",
     justifyContent: "center",
     alignSelf: "stretch",
-    flexDirection: "row",
     marginHorizontal: 0,
   },
   // Shuffle and check, one row with the tiles: level with them, under the draft's line, and
