@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { levelForXp } from "@wordpoker/game-rules";
 
+import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { fonts, palette } from "@/constants/theme";
 import { useQuests, type HandReport } from "@/lib/quests/quests-provider";
 import { webTestID } from "@/lib/ui/web-id";
@@ -108,7 +109,7 @@ export function XpResultOverlay({ hero, report, onComplete }: {
   }, []);
 
   return (
-    <Modal transparent visible statusBarTranslucent navigationBarTranslucent>
+    <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible statusBarTranslucent navigationBarTranslucent>
       <View accessibilityViewIsModal style={styles.backdrop} testID="xp-result-overlay">
         <ScrollView
           ref={scrollRef}

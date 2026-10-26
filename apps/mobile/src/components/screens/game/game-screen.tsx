@@ -647,7 +647,7 @@ function GameScreenBody({
           stamp={
             waiting?.stamp ?? (game.wordSubmission ? "FINAL STAGE" : undefined)
           }
-          style={{ top: insets.top }}
+          style={{ top: insets.top, elevation: 2, zIndex: 2 }}
           turn={waiting ? null : view}
           turnPhrase={
             game.wordSubmission

@@ -42,7 +42,16 @@ export function ResultsHeader({
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.bar, { paddingTop: insets.top + spacing.sm }]}>
+    <View
+      style={[
+        styles.bar,
+        {
+          paddingLeft: Math.max(spacing.gutter, insets.left),
+          paddingRight: Math.max(spacing.gutter, insets.right),
+          paddingTop: insets.top + spacing.sm,
+        },
+      ]}
+    >
       <Pressable
         accessibilityLabel="Back to the main menu"
         accessibilityRole="button"

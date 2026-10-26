@@ -200,8 +200,9 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   trayActions: {
-    flexDirection: "row",
-    gap: spacing.sm,
+    alignItems: "center",
+    flexDirection: "column",
+    gap: spacing.xs,
     justifyContent: "center",
     marginTop: spacing.xxs,
   },
