@@ -818,7 +818,7 @@ function openTable({
  * A bot whose tiles spell nothing the table counts is passed over rather than stopping the pass:
  * §19 leaves its slot to the clock, and the seats behind it in seat order still get to answer.
  */
-function nextCpuMove(state: OfflineState, nowMs: number): OfflineAction | null {
+export function nextCpuMove(state: OfflineState, nowMs: number): OfflineAction | null {
   // A settled hand is dealt by the seat, not by a bot: `deal` is the felt's own control.
   if (state.phase === "payout" || cpuDeadlinePassed(state, nowMs)) return null;
 

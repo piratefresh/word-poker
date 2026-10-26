@@ -60,7 +60,7 @@ const VOWELS: ReadonlySet<string> = new Set(["A", "E", "I", "O", "U"]);
  * but every seven tiles from the top hold three vowels, so a hand rarely shows a board of all
  * vowels or all consonants. A pile that runs dry hands its turns to the other.
  */
-function marbleOrder(bag: readonly Tile[], rng: () => number): Tile[] {
+export function marbleOrder(bag: readonly Tile[], rng: () => number): Tile[] {
   const vowels = shuffle(bag.filter((tile) => VOWELS.has(tile.letter)), rng);
   const consonants = shuffle(bag.filter((tile) => !VOWELS.has(tile.letter)), rng);
   const order: Tile[] = [];

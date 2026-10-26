@@ -269,6 +269,11 @@ export interface StartHandOptions {
    * including CPU and all-in seats.
    */
   powerUps?: { deal: PowerUpDealMode };
+  /**
+   * An authored hand (`fixedDeal`, STO-860) to play instead of the seed's deal. Story-mode
+   * lessons only; online tables never pass one.
+   */
+  deal?: ReturnType<typeof dealHand>;
 }
 
 function freshWordChecks(
@@ -306,12 +311,13 @@ export function startHand({
   dealerSeat,
   turnDurationMs: requestedTurnDurationMs,
   powerUps,
+  deal,
 }: StartHandOptions): OfflineState {
   const turnDurationMs = requestedTurnDurationMs ?? OFFLINE_TURN_MS;
   if (!Number.isFinite(turnDurationMs) || turnDurationMs <= 0) {
     throw new OfflineActionError("the betting turn duration must be positive");
   }
-  const dealt = dealHand({ seed, playerCount: players.length });
+  const dealt = deal ?? dealHand({ seed, playerCount: players.length });
   const startingStack = stakes?.startingStack ?? DEFAULT_STAKES.startingStack;
   const carried = new Map((stacks ?? []).map((entry) => [entry.playerId, entry.stack]));
 

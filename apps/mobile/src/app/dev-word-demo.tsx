@@ -139,7 +139,7 @@ export function Stage({
           : seat,
       ),
       community: deal.community.map((tile, tileIndex) =>
-        tileIndex === 0 ? { ...tile, multiplier: "triple-letter" } : tile,
+        tileIndex === 0 ? { ...tile, multiplier: "triple-letter" as const } : tile,
       ),
     };
   }, [deal, showMultiTiles]);

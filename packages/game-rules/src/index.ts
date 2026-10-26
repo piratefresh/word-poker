@@ -6,6 +6,8 @@ export { createRng, mixSeed } from "./core/rng";
 export type { PowerSeedSalt } from "./core/rng";
 export { weightedSampleWithoutReplacement } from "./core/sample";
 export { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER, dealHand, shuffle } from "./tiles/deal";
+export { fixedDeal } from "./tiles/fixed-deal";
+export type { FixedDealSpec } from "./tiles/fixed-deal";
 export { NotEnoughTilesError, TILE_BAG_SIZE, createTileBag, draw } from "./tiles/tiles";
 export {
   CHOICE_TILE_PAIRS,
@@ -40,7 +42,7 @@ export {
 export type { RankShowdownOptions, ShowdownEntry } from "./money/showdown";
 export { decideOfflineMove, chooseOfflineWord } from "./bot/bot";
 export type { ChooseWordOptions } from "./bot/bot";
-export { topWords } from "./bot/bot-word";
+export { evaluateBestWord, topWords } from "./bot/bot-word";
 export { RIVER_REVIEW_WORDS, riverReview } from "./words/river-review";
 export type { BotWord } from "./bot/bot-word";
 export {
