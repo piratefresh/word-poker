@@ -233,7 +233,7 @@ export function platformAuth({ pool, verifiers, onAccountReady }: PlatformAuthOp
             : await createProviderUser(sql, {
                 providerId: "game-center",
                 accountId: identity.teamPlayerId,
-                name: identity.displayName?.trim().slice(0, 32) || "Player",
+                name: (body.displayName ?? identity.displayName)?.trim().slice(0, 32) || "Player",
               });
           if (guestId && !(await adoptGuestHistory(sql, guestId, resolved.userId))) throw fail("ADOPTION_CONFLICT");
           return resolved;

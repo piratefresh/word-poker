@@ -111,6 +111,12 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.body,
     marginLeft: spacing.sm,
   },
+  validWord: {
+    ...type.label,
+    color: colors.successHi,
+    fontSize: fontSize.body,
+    marginLeft: spacing.sm,
+  },
   plateDim: { opacity: 0.4 },
   coin: {
     alignItems: "center",

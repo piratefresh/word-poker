@@ -183,17 +183,35 @@ tags:
       id: "action-check-call"
       enabled: true
     timeout: 20000
+# The HUD's stamp names the stage; the row is the one Submit, with no Fold beside it.
 - assertVisible:
-    text: "FINAL STAGE · SUBMIT YOUR WORD"
+    text: "FINAL STAGE"
 - assertVisible:
     text: "SUBMIT WORD"
 - assertNotVisible:
     id: "action-fold"
 - assertNotVisible:
     id: "all-in-button"
+
+# Validate Word spends one lookup without submitting; the count dropping proves the tap landed
+# (the betting row used to sit over part of the button and swallow the press).
+- assertVisible:
+    text: "VALIDATE WORD 5/5"
+- tapOn:
+    id: "word-check-button"
+    waitToSettleTimeoutMs: 500
+- assertVisible:
+    text: "VALIDATE WORD 4/5"
+- assertVisible:
+    text: "ZIG"
+
+# Submit twice in a row: the second tap must neither break the table nor skip the results.
 - tapOn:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
+- tapOn:
+    id: "action-check-call"
+    optional: true
 
 # Signed-in builds show XP before the results; bypass builds may show the win celebration.
 - extendedWaitUntil:

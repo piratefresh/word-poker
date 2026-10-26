@@ -226,7 +226,7 @@ describe("heroView — the word", () => {
     expect(inside).toMatchObject({ word: "GO", confirmable: true });
   });
 
-  test("keeps dictionary validity private until Word Checker and allows submitting a miss", () => {
+  test("keeps dictionary validity private until Validate Word and allows submitting a miss", () => {
     const partial = heroView(perspective(), { ...LOCAL, draft: [{ tileId: "t-g" }] }).words;
     const reversed = heroView(perspective(), { ...LOCAL, draft: [{ tileId: "t-o" }, { tileId: "t-g" }] }).words;
 

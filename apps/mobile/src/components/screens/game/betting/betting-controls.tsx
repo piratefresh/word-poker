@@ -217,11 +217,13 @@ export function BettingControls({
 
   return (
     <View
+      pointerEvents="box-none"
       style={[styles.betting, tight && styles.bettingTight]}
       testID="betting-controls-panel"
     >
-      <View style={[styles.controls, tight && styles.controlsTight]}>
+      <View pointerEvents="box-none" style={[styles.controls, tight && styles.controlsTight]}>
         <View
+          pointerEvents="box-none"
           style={[styles.raiseActionRow, tight && styles.raiseActionRowTight]}
         >
           {actions}

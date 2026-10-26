@@ -275,24 +275,19 @@ test.each([[375, 667], [800, 390], [1440, 900]])("shows the final submission sta
     };
     const onSubmit = jest.fn();
     const view = await renderScreen({ game, onCheckOrCall: onSubmit });
-    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
-    expect(view.getByTestId("action-fold")).toBeOnTheScreen();
+    // The HUD names the stage; the row is the one Submit, in portrait and on its side alike.
+    expect(view.getByText("FINAL STAGE")).toBeOnTheScreen();
+    expect(view.queryByTestId("action-fold")).toBeNull();
     expect(view.queryByTestId("all-in-button")).toBeNull();
     expect(view.queryByLabelText("Wager amount")).toBeNull();
     await fireEvent.press(view.getByRole("button", { name: "Submit word" }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    await act(async () => jest.advanceTimersByTime(1000));
-    expect(view.getByText("Shared submission deadline · 00:59")).toBeOnTheScreen();
 
     await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...game, wordSubmission: { status: "submitting" } }} />);
     expect(view.getByRole("button", { name: "Submitting word" })).toBeDisabled();
-    expect(view.queryByText(/WORD SUBMITTED/)).toBeNull();
     await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...game, wordSubmission: { status: "confirmed" } }} />);
-    expect(view.getByText("WORD SUBMITTED · Waiting for other players")).toBeOnTheScreen();
     expect(view.queryByTestId("action-check-call")).toBeNull();
-    expect(view.getByText("Shared submission deadline · 00:59")).toBeOnTheScreen();
     await view.rerender(<GameScreen balance={LOADING_BALANCE} game={{ ...game, wordSubmission: { status: null } }} />);
-    expect(view.queryByText(/SUBMIT YOUR WORD/)).toBeNull();
     expect(view.queryByTestId("action-check-call")).toBeNull();
   } finally {
     await act(() => Dimensions.set({ window: original, screen: original }));

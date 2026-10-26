@@ -8,7 +8,7 @@ import type {
 import { WORD_CHECKS_PER_HAND } from "@wordpoker/contracts";
 import { COMMUNITY_TILE_COUNT, PRIVATE_TILES_PER_PLAYER } from "@wordpoker/game-rules";
 import type { JSX, ReactNode } from "react";
-import { createContext, useCallback, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
   AccessibilityInfo,
   Platform,
@@ -137,6 +137,8 @@ export interface WordBuilderScope {
   readonly shuffle: () => void;
   readonly pickTile?: (tile: TileData) => void;
   readonly swapFlip: SwapFlip | null;
+  /** The blank tapped for its letter picker while not yet in the word. */
+  readonly pickingBlank: string | null;
 }
 
 const Scope = createContext<WordBuilderScope | null>(null);
@@ -192,6 +194,8 @@ export function WordBuilder({
   );
 
   const { strip, arrange } = useStripOrder(dealt);
+  // The blank whose letter picker is open before the blank is in the word.
+  const [pickingBlank, setPickingBlank] = useState<string | null>(null);
   const held = useMemo(
     () => new Map(plays.map((play) => [play.tileId, play.chosenFace])),
     [plays],
@@ -215,6 +219,13 @@ export function WordBuilder({
       const inWord = playedIds.has(entry.tile.id);
       // A choice tile has no face of its own to play: it enters the word only by a letter named.
       if (!inWord && face === undefined && "alternativeLetter" in entry.tile) return;
+      // Neither has a blank: a tap opens its A–Z picker, and the letter picked plays it (§44).
+      if (!inWord && face === undefined && "blank" in entry.tile) {
+        const id = entry.tile.id;
+        setPickingBlank((open) => (open === id ? null : id));
+        return;
+      }
+      setPickingBlank(null);
       const play: TilePlay =
         face === undefined
           ? { tileId: entry.tile.id }
@@ -284,6 +295,7 @@ export function WordBuilder({
     shuffle,
     pickTile: onPickTile,
     swapFlip,
+    pickingBlank,
   };
 
   return <Scope.Provider value={scope}>{children}</Scope.Provider>;
@@ -399,13 +411,16 @@ export function WordHand({
 }
 
 /**
- * A blank in the word (§44) names the letter it plays: an A–Z row above the tray while the word
- * holds one, changeable until the word is confirmed. The pick lives in the draft's `chosenFace`,
- * the same place a choice tile's face does.
+ * A blank (§44) names the letter it plays: tapping it opens an A–Z row above the tray, and the
+ * letter picked plays it. The row stays while the word holds the blank, so the letter can change
+ * until the word is confirmed. The pick lives in the draft's `chosenFace`, the same place a choice
+ * tile's face does.
  */
 function BlankPicker(): JSX.Element | null {
-  const { strip, held, live, toggle } = useWordBuilderScope();
-  const entry = strip.find(({ tile }) => "blank" in tile && held.has(tile.id));
+  const { strip, held, live, toggle, pickingBlank } = useWordBuilderScope();
+  const entry = strip.find(
+    ({ tile }) => "blank" in tile && (held.has(tile.id) || tile.id === pickingBlank),
+  );
   if (entry === undefined || !live) return null;
 
   const chosen = held.get(entry.tile.id);
@@ -499,8 +514,8 @@ export function WordCheckButton(): JSX.Element | null {
   return (
     <RackPill
       disabled={!canCheck}
-      label={`CHECK ${remaining}/${WORD_CHECKS_PER_HAND}`}
-      accessibilityLabel={`Word Checker, ${remaining} of ${WORD_CHECKS_PER_HAND} checks remaining. Checks validity without submitting.`}
+      label={`VALIDATE WORD ${remaining}/${WORD_CHECKS_PER_HAND}`}
+      accessibilityLabel={`Validate Word, ${remaining} of ${WORD_CHECKS_PER_HAND} checks remaining. Checks validity without submitting.`}
       scale={scale}
       onPress={handleCheck}
       testID="word-check-button"

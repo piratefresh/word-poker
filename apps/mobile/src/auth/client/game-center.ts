@@ -40,7 +40,11 @@ function serverFailure(error: { code?: string; message?: string }): GameCenterRe
 }
 
 /** Attempt → fresh proof → exchange. Runs inside a session change for sign-in, directly for link. */
-async function exchange(intent: Extract<PlatformAuthIntent, "sign-in" | "link">, adoptGuestProgress: boolean): Promise<GameCenterResult> {
+async function exchange(
+  intent: Extract<PlatformAuthIntent, "sign-in" | "link">,
+  adoptGuestProgress: boolean,
+  displayName?: string,
+): Promise<GameCenterResult> {
   const begun = await authClient.platformAuth.begin({ provider: "game-center", intent });
   if (begun.error) return serverFailure(begun.error);
   let proof;
@@ -52,16 +56,16 @@ async function exchange(intent: Extract<PlatformAuthIntent, "sign-in" | "link">,
   // The inviter whose link brought this device here; only an account the server creates uses it.
   const ref = intent === "sign-in" ? pendingReferral() : null;
   const result = await authClient.platformAuth.gameCenter(
-    { attemptToken: begun.data.attemptToken, proof, adoptGuestProgress },
+    { attemptToken: begun.data.attemptToken, proof, adoptGuestProgress, ...(displayName ? { displayName } : {}) },
     ref ? { "x-wordpoker-ref": ref } : undefined,
   );
   return result.error ? serverFailure(result.error) : { ok: true };
 }
 
-async function signedInToGameCenter(): Promise<GameCenterResult> {
+async function signedInToGameCenter(): Promise<GameCenterResult & { displayName?: string | undefined }> {
   try {
-    await platformAuth.authenticate();
-    return { ok: true };
+    const { displayName } = await platformAuth.authenticate();
+    return { ok: true, displayName };
   } catch (error) {
     return nativeFailure(error);
   }
@@ -74,7 +78,7 @@ async function signedInToGameCenter(): Promise<GameCenterResult> {
 export async function signInWithGameCenter({ adoptGuestProgress }: { adoptGuestProgress: boolean }): Promise<GameCenterResult> {
   const native = await signedInToGameCenter();
   if (!native.ok) return native;
-  const result = await changeSession(() => exchange("sign-in", adoptGuestProgress));
+  const result = await changeSession(() => exchange("sign-in", adoptGuestProgress, native.displayName));
   if (result.ok) await setAutoRestore(true);
   return result;
 }
@@ -104,7 +108,7 @@ export function restoreWithGameCenter(): Promise<boolean> {
     if (!(await autoRestoreAllowed())) return skipped("guest play or sign-out chosen earlier");
     const native = await signedInToGameCenter();
     if (!native.ok) return skipped(`Game Center ${native.code}`);
-    const result = await changeSessionIfSignedOut(() => exchange("sign-in", false)).catch(() => null);
+    const result = await changeSessionIfSignedOut(() => exchange("sign-in", false, native.displayName)).catch(() => null);
     if (result === null) return skipped("a session appeared first, or the request failed");
     if (!result.ok) return skipped(`server ${result.code}`);
     return true;

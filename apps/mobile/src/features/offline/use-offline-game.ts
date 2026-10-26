@@ -524,9 +524,13 @@ export function useOfflineGame({
   );
 
   const confirmWord = useCallback(() => {
-    if (heroDraft.length === 0 || state.wordWindow?.status !== "open") return;
+    // Read the table as it stands, not as this render saw it: a second tap that lands before the
+    // re-render would confirm a slot already confirmed, which the engine throws on.
+    const window = stateRef.current.wordWindow;
+    const slot = window?.status === "open" ? window.slots.find((candidate) => candidate.playerId === HERO_ID) : undefined;
+    if (heroDraft.length === 0 || slot?.status !== "drafting") return;
     act({ type: "confirmWord", playerId: HERO_ID, submission: { plays: [...heroDraft] } });
-  }, [act, heroDraft, state]);
+  }, [act, heroDraft]);
 
   const checkWord = useCallback(() => {
     if (heroDraft.length < 2 || heroDraft.length > 7) return;

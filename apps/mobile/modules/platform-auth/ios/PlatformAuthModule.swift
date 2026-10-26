@@ -71,7 +71,7 @@ public class PlatformAuthModule: Module {
   private func state() -> [String: Any] {
     let player = GKLocalPlayer.local
     if player.isAuthenticated {
-      return ["provider": "game-center", "status": "authenticated", "displayName": player.displayName]
+      return ["provider": "game-center", "status": "authenticated", "displayName": player.alias]
     }
     return ["provider": "game-center", "status": unavailable ? "unavailable" : "signed-out"]
   }

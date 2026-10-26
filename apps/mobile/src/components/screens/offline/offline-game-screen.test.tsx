@@ -9,6 +9,7 @@ import { testDictionary } from "@/test-support/dictionary-fixtures";
 import { useOfflineGame, type OfflineGame } from "@/features/offline/use-offline-game";
 import { WordBuilder } from "@/components/word-builder";
 import { POWER_USED_BEATS } from "@/components/powers/power-used";
+import { snapshotFixture } from "@/components/screens/results/results-fixtures";
 
 
 import { OfflineGameScreen } from "./offline-game-screen";
@@ -67,6 +68,10 @@ jest.mock("react-native-reanimated", () => ({
 // `reportHand` once per settled hand, and the real module pulls in Better Auth's client, which
 // Jest cannot parse.
 const mockReportHand = jest.fn();
+// The store's reads go to the network and RevenueCat; the popup only has to place its packs.
+jest.mock("@/components/screens/store/use-coin-store", () => ({
+  useCoinStore: () => ({ balance: { status: "loading" }, packs: { status: "loading" }, buying: null, canBuy: false, notice: null, buy: jest.fn() }),
+}));
 jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ reportHand: mockReportHand, lastCompletions: [] }),
 }));
@@ -473,9 +478,9 @@ describe("<OfflineGameScreen />", () => {
     expect(view.queryByText("PAYOUT")).toBeNull();
   });
 
-  test("shows the session's end-state over the felt, and New game restarts it", async () => {
-    const newGame = jest.fn();
-    const over: OfflineGame = {
+  /** A session that has played its last hand; `heroStack` 0 is a busted hero. */
+  function sessionOverGame(heroStack: number, newGame: () => void, deal: () => void): OfflineGame {
+    return {
       historyError: null,
       retryHistory: jest.fn(),
       game: {
@@ -484,12 +489,14 @@ describe("<OfflineGameScreen />", () => {
         phase: "payout",
         phaseNumber: 6,
         sessionOver: true,
+        players: FOUR_PLAYER_FLOP_FIXTURE.players.map((player) =>
+          player?.isHero ? { ...player, stack: heroStack } : player,
+        ),
       },
       words: null,
-      // The session's last hand keeps its end-of-session sheet rather than the results: a New
-      // game is the only useful thing left to offer once the hero has busted (ADR 0002).
-      results: null,
-      deal: jest.fn(),
+      // Unrevealed, so no XP overlay or win celebration stands in front of the results.
+      results: snapshotFixture({ revealed: false }),
+      deal,
       fold: jest.fn(),
       check: jest.fn(),
       bet: jest.fn(),
@@ -510,19 +517,40 @@ describe("<OfflineGameScreen />", () => {
       sessionOver: true,
       newGame,
     };
-    jest.mocked(useOfflineGame).mockReturnValue(over);
+  }
+
+  test("offers a busted hero the coin packs and a free refill", async () => {
+    const newGame = jest.fn();
+    jest.mocked(useOfflineGame).mockReturnValue(sessionOverGame(0, newGame, jest.fn()));
 
     const view = await renderTable();
 
-    expect(view.getByTestId("session-over")).toBeOnTheScreen();
-    expect(view.getByText("SESSION OVER")).toBeOnTheScreen();
-    // Every seat's final Table Stack, not just the winner's.
-    expect(view.getByText("Magnus · $980")).toBeOnTheScreen();
-    expect(view.getByText("Mira · $980")).toBeOnTheScreen();
+    expect(view.getByText("OUT OF COINS")).toBeOnTheScreen();
+    expect(view.queryByTestId("results-deal")).toBeNull();
 
-    await fireEvent.press(view.getByTestId("new-game-button"));
+    await fireEvent.press(view.getByTestId("free-refill-button"));
 
     expect(newGame).toHaveBeenCalledTimes(1);
+    // The restart redraws the table, so the injected state must stay until the test is done.
+    jest.mocked(useOfflineGame).mockImplementation(
+      jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/features/offline/use-offline-game").useOfflineGame,
+    );
+  });
+
+  test("ends a won session on the results, and their deal starts a new one", async () => {
+    const newGame = jest.fn();
+    const deal = jest.fn();
+    jest.mocked(useOfflineGame).mockReturnValue(sessionOverGame(3_920, newGame, deal));
+
+    const view = await renderTable();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+    });
+    await fireEvent.press(view.getByTestId("results-deal"));
+
+    expect(newGame).toHaveBeenCalledTimes(1);
+    expect(deal).not.toHaveBeenCalled();
     // The restart redraws the table, so the injected state must stay until the test is done.
     jest.mocked(useOfflineGame).mockImplementation(
       jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/features/offline/use-offline-game").useOfflineGame,

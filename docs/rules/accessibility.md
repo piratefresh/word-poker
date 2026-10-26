@@ -14,7 +14,7 @@ Word Poker must be playable with assistive technology and adjustable to the play
 - Letter tiles are read aloud, including both faces of a choice tile and any multiplier.
 - Submitted words are announced at the showdown.
 - Every control and every piece of table state works with the platform's screen reader.
-- The Word Checker announces the remaining-check message after each lookup (§43).
+- Validate Word announces the remaining-check message after each lookup (§43).
 
 ## Visual Settings
 

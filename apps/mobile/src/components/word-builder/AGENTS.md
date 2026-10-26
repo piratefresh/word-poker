@@ -23,7 +23,7 @@ strip spells something. The builder carries no buttons of its own: the shuffle i
 `WordShuffleButton`, placed with `WordCheckButton` in a row under the rack (`GameScreen`'s
 `rackActions` prop), so the word's controls sit with its tiles and the betting rows keep their
 width; §19's window replaces betting controls with **SUBMIT WORD**, a labeled shared deadline,
-and a reminder that submission locks the word. **Word Checker** checks validity without
+and a reminder that submission locks the word. **Validate Word** checks validity without
 submitting. Pending submission is distinct from authoritative acceptance. `WordBuilder` owns the draft the
 two share; a mode's adapter hands it a `WordDraft` — plays, word, score, reason, confirmed,
 `open`, `confirmable` — and gets the seat's edits back as one `onDraft(plays)` call

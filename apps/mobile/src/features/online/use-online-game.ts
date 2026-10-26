@@ -320,6 +320,8 @@ export function useOnlineGame({
   // it is tagged with the table id it was made against and dropped the moment that id moves, and a
   // rejection drops it too, so the row can never sit disabled behind an action the server refused.
   const [pending, setPending] = useState<Pending | null>(null);
+  // The hand a confirm went out on; a refusal clears it for another try, and a new hand outdates it.
+  const confirmSent = useRef<number | null>(null);
   const pendingRef = useRef(pending);
   useEffect(() => {
     pendingRef.current = pending;
@@ -388,6 +390,7 @@ export function useOnlineGame({
       // The server refused the move: drop the prediction so the row comes back for another try,
       // and — for a word — say why while the seat still has time to fix it.
       setPending(null);
+      if (payload.action === "confirmWord") confirmSent.current = null;
       if (payload.action === "draftWord" || payload.action === "confirmWord") setRefusal(payload.reason);
       onRejectRef.current?.(payload);
     };
@@ -501,14 +504,17 @@ export function useOnlineGame({
   );
 
   const confirmWord = useCallback(() => {
-    if (heroDraft.length === 0 || view?.word?.status !== "open") return;
+    // A ref, not `pending`: a second tap before the re-render would send the confirm twice, and
+    // the server answers the second with a "hand-over" refusal the seat would see.
+    if (heroDraft.length === 0 || view?.word?.status !== "open" || confirmSent.current === handCount) return;
     room.send(GAME_MESSAGES.confirmWord, { submission: { plays: [...heroDraft] } });
+    confirmSent.current = handCount;
     // Lock the builder the instant the word is confirmed, so the check cannot fire twice while the
     // server's own confirmation is on the wire; it clears when that confirmation lands.
     if (viewIdRef.current !== null) {
       setPending({ kind: "confirm", viewId: viewIdRef.current, plays: [...heroDraft] });
     }
-  }, [heroDraft, room, view]);
+  }, [handCount, heroDraft, room, view]);
 
   const checkWord = useCallback(() => {
     if (

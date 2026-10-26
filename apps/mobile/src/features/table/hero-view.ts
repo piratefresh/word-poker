@@ -330,7 +330,8 @@ function bettingRow(p: HeroPerspective, local: HeroLocal): BettingState {
 
   if (!p.word.open) return INERT_BETS;
   const drafting = p.word.hero === "drafting" && hero !== undefined && !hero.folded && !hero.sittingOut && !local.pendingConfirm;
-  return { ...INERT_BETS, canCheck: drafting && local.draft.length > 0, primary: "confirm" };
+  // §12's two-letter floor: a one-tile draft is refused as too short, so the confirm waits for two.
+  return { ...INERT_BETS, canCheck: drafting && local.draft.length >= 2, primary: "confirm" };
 }
 
 /** Which seats hold the blinds: engine indexes, or null when the table has no blind to mark. */
