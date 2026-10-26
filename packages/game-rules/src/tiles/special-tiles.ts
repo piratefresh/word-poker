@@ -342,7 +342,7 @@ function placeChoices(slots: readonly Slot[], rng: () => number, config: Special
 }
 
 /** §10's choice tile: one physical tile printing both faces, each worth its §6 value. */
-function choiceTile([first, second]: readonly [string, string]): ChoiceTile {
+export function choiceTile([first, second]: readonly [string, string]): ChoiceTile {
   return {
     // The pair itself names the tile: the pool places each pair once and the bag holds single
     // letters only, so `AE-1` is a tile of its own on any table (ADR 0005).
