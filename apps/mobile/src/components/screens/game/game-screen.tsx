@@ -163,6 +163,9 @@ export function GameScreen(props: GameScreenProps) {
 }
 
 /** The body reads the clock, so it has to sit inside the provider rather than beside it. */
+/** How far the landscape betting buttons keep from the screen's edge. */
+const LANDSCAPE_BETTING_EDGE = 12;
+
 function GameScreenBody({
   game,
   balance,
@@ -377,6 +380,8 @@ function GameScreenBody({
             height: hand.itemHeight,
             justifyContent: "center",
             marginBottom: hand.height - hand.itemHeight - 6,
+            // Out past the felt's side inset, so the centred rack keeps clear of the buttons.
+            marginRight: -Math.max(0, side - LANDSCAPE_BETTING_EDGE),
           },
       ]}
       testID={waiting ? "waiting-controls" : "betting-controls"}
@@ -647,7 +652,7 @@ function GameScreenBody({
           stamp={
             waiting?.stamp ?? (game.wordSubmission ? "FINAL STAGE" : undefined)
           }
-          style={{ top: insets.top }}
+          style={{ top: insets.top, elevation: 2, zIndex: 2 }}
           turn={waiting ? null : view}
           turnPhrase={
             game.wordSubmission

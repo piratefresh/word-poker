@@ -33,6 +33,7 @@ import {
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
+import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { useResultsEntrance } from "./use-results-entrance";
 
@@ -72,6 +73,7 @@ export function ResultsScreen({ snapshot, replay, review, onDeal, onExit }: Resu
     // `onRequestClose` is Android's hardware back: it does exactly what `Main menu` does, and
     // never backs into a hand that has already paid out (STO-383).
     <Modal
+      supportedOrientations={MODAL_ORIENTATIONS}
       animationType="fade"
       onRequestClose={onExit}
       testID="results-modal"

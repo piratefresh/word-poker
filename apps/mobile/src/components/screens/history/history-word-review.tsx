@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import type { HistoryHand } from "@wordpoker/contracts";
 import { loadDictionary, topWords } from "@wordpoker/game-rules";
 
+import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, ledger } from "@/constants/theme";
 
@@ -37,7 +38,7 @@ export function HistoryWordReview({ hand }: { hand: HistoryHand }) {
       <Pressable accessibilityRole="button" onPress={show} style={styles.trigger}>
         <Text style={styles.link}>See 3 possible words</Text>
       </Pressable>
-      <Modal animationType="fade" transparent visible={open} onRequestClose={() => setOpen(false)}>
+      <Modal supportedOrientations={MODAL_ORIENTATIONS} animationType="fade" transparent visible={open} onRequestClose={() => setOpen(false)}>
         <View style={styles.backdrop}>
           <View accessibilityViewIsModal style={styles.dialog}>
             <ScrollView contentContainerStyle={styles.content}>

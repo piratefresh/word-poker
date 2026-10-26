@@ -3,6 +3,7 @@ import { useCallback, useState, type ReactElement } from "react";
 import { Modal, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 
+import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { GameButton } from "@/components/ui/game-button";
 import { gradients } from "@/constants/theme";
 
@@ -24,7 +25,7 @@ export function SimpleWinResultOverlay({ snapshot, onComplete }: {
 
   if (!snapshot.seats.some((seat) => seat.takesPot)) return null;
   return (
-    <Modal transparent visible statusBarTranslucent navigationBarTranslucent>
+    <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible statusBarTranslucent navigationBarTranslucent>
       <View accessibilityViewIsModal
         onLayout={onLayout} style={styles.overlay} testID="simple-win-overlay">
         <LinearGradient {...gradients.felt} pointerEvents="none" style={styles.backdrop} />

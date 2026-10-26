@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { Dictionary } from "@wordpoker/game-rules";
 
+import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { authClient } from "@/auth/client/auth-client";
 import {
   PowerDrawReveal,
@@ -288,13 +289,13 @@ function OfflineTable({
         />
       ) : null}
       {historyError ? (
-        <Modal transparent visible>
-          <View style={styles.overlayBackdrop}>
+        <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible>
+          <ScrollView contentContainerStyle={styles.overlayBackdrop}>
             <View style={styles.overlay}>
               <Text style={styles.overlaySeat}>{historyError}</Text>
               <GameButton label="RETRY SAVE" onPress={retryHistory} testID="retry-history-save" />
             </View>
-          </View>
+          </ScrollView>
         </Modal>
       ) : null}
     </WordBuilder>
@@ -308,8 +309,8 @@ function OfflineTable({
  */
 function OutOfCoins({ onRefill, onLeave }: { onRefill: () => void; onLeave: () => void }) {
   return (
-    <Modal animationType="fade" onRequestClose={onLeave} transparent visible>
-      <View style={styles.overlayBackdrop}>
+    <Modal supportedOrientations={MODAL_ORIENTATIONS} animationType="fade" onRequestClose={onLeave} transparent visible>
+      <ScrollView contentContainerStyle={styles.overlayBackdrop}>
         <View style={styles.overlay} testID="out-of-coins">
           <Text style={styles.overlayTitle}>OUT OF COINS</Text>
           <Text style={styles.overlaySeat}>
@@ -318,7 +319,7 @@ function OutOfCoins({ onRefill, onLeave }: { onRefill: () => void; onLeave: () =
           <GameButton label="FREE REFILL" onPress={onRefill} testID="free-refill-button" variant="gold" />
           <GameButton label="LEAVE TABLE" onPress={onLeave} testID="out-of-coins-leave" variant="dark" />
         </View>
-      </View>
+      </ScrollView>
     </Modal>
   );
 }
@@ -335,7 +336,7 @@ const styles = StyleSheet.create({
   overlayBackdrop: {
     alignItems: "center",
     backgroundColor: "rgba(2,12,9,0.78)",
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     padding: spacing.lg,
   },

@@ -1,5 +1,6 @@
 import { Modal, StyleSheet, Text, View } from "react-native";
 
+import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { GameButton } from "@/components/ui/game-button";
 import { border, colors, fonts, palette, radius } from "@/constants/theme";
 
@@ -20,6 +21,7 @@ export function AllInSheet({
 }) {
   return (
     <Modal
+      supportedOrientations={MODAL_ORIENTATIONS}
       animationType="fade"
       onRequestClose={onCancel}
       transparent
