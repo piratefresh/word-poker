@@ -18,7 +18,6 @@ import { HELPER_TOUR } from "@/components/onboarding/tours";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { reviewOf } from "@/components/screens/results/river-review";
 import { ResultsScreen } from "@/components/screens/results/results-screen";
-import { useCoinStore } from "@/components/screens/store/use-coin-store";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { useXpResultOverlay } from "@/components/screens/results/use-xp-result-overlay";
@@ -44,7 +43,6 @@ import { pinnedPowerUps, pinnedSeed, pinnedTurnMs, randomSeed } from "@/features
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
-import { formatCoins } from "@/lib/ui/format";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -280,7 +278,7 @@ function OfflineTable({
         stacks and a fresh seed (ADR 0002).
       */}
       {heroBusted && xp.hero === null ? (
-        <OutOfCoins onRefill={restart} userId={authSession?.user.id} />
+        <OutOfCoins onLeave={leaveTable} onRefill={restart} />
       ) : payout && results !== null && !celebratingWin && xp.hero === null ? (
         <ResultsScreen
           onDeal={sessionOver ? restart : deal}
@@ -304,43 +302,21 @@ function OfflineTable({
 }
 
 /**
- * The busted hero's way back: the store's coin packs, bought in place, and the beta's free
- * refill — a new session with fresh stacks and a fresh seed (ADR 0002).
+ * The busted hero's way back: the beta's free refill — a new session with fresh stacks and a
+ * fresh seed (ADR 0002) — or out of the table. Paid packs credit the Wallet, not this session's
+ * stack, so they are not offered here.
  */
-function OutOfCoins({ onRefill, userId }: { onRefill: () => void; userId: string | undefined }) {
-  const store = useCoinStore(userId);
-
+function OutOfCoins({ onRefill, onLeave }: { onRefill: () => void; onLeave: () => void }) {
   return (
-    <Modal animationType="fade" transparent visible>
+    <Modal animationType="fade" onRequestClose={onLeave} transparent visible>
       <View style={styles.overlayBackdrop}>
         <View style={styles.overlay} testID="out-of-coins">
           <Text style={styles.overlayTitle}>OUT OF COINS</Text>
           <Text style={styles.overlaySeat}>
-            You have lost all your coins. Visit the store to refill — refills are free during the beta.
+            You have lost all your coins. Refills are free during the beta.
           </Text>
-          {store.packs.status === "ready"
-            ? store.packs.rows.map((row) => (
-                <GameButton
-                  amount={`+${formatCoins(row.coins)}`}
-                  disabled={!store.canBuy || store.buying !== null}
-                  key={row.productId}
-                  label={store.buying === row.productId ? "BUYING…" : row.priceString}
-                  onPress={() => void store.buy(row)}
-                  testID={`out-of-coins-pack-${row.productId}`}
-                  variant="dark"
-                />
-              ))
-            : null}
-          {store.notice ? (
-            <Text style={styles.overlaySeat}>
-              {store.notice.kind === "added"
-                ? `+${formatCoins(store.notice.coins)} COINS ADDED`
-                : store.notice.kind === "on-the-way"
-                  ? "Coins are on their way."
-                  : store.notice.message}
-            </Text>
-          ) : null}
           <GameButton label="FREE REFILL" onPress={onRefill} testID="free-refill-button" variant="gold" />
+          <GameButton label="LEAVE TABLE" onPress={onLeave} testID="out-of-coins-leave" variant="dark" />
         </View>
       </View>
     </Modal>

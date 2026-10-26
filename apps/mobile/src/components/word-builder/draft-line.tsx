@@ -47,7 +47,7 @@ export function DraftPlate({
             ? `${word}, not a word`
             : points === null
               ? word
-              : `${word}, ${points} points`
+              : `${word}, ${points} points${checked?.valid ? ", valid" : ""}`
         }
         style={styles.plate}
         testID="word-preview"

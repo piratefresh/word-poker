@@ -262,7 +262,7 @@ interface PrivateView {
 /** The hero's own move, held until the authoritative broadcast reconciles it away (server wins). */
 type Pending =
   | { kind: "betting"; pill: OptimisticPill; viewId: string; wagerAmount?: number }
-  | { kind: "confirm"; viewId: string };
+  | { kind: "confirm"; viewId: string; plays: readonly TilePlay[] };
 
 /** One turn, one identity: the HUD re-anchors its countdown when this changes. */
 function idOf(view: RoomView): string {
@@ -322,6 +322,10 @@ export function useOnlineGame({
   const [pending, setPending] = useState<Pending | null>(null);
   // The hand a confirm went out on; a refusal clears it for another try, and a new hand outdates it.
   const confirmSent = useRef<number | null>(null);
+  const pendingRef = useRef(pending);
+  useEffect(() => {
+    pendingRef.current = pending;
+  }, [pending]);
   const onRejectRef = useRef(onReject);
   useEffect(() => {
     onRejectRef.current = onReject;
@@ -408,6 +412,12 @@ export function useOnlineGame({
     // The line came back with a gesture still unanswered: send it again under the same id. The
     // room answers a repeat with its first result, so a gesture that did land is not acted twice.
     const resend = () => {
+      // A word confirmation the drop left unacknowledged goes again while the pending lock still
+      // stands: it clears the moment the server shows the word confirmed or the window closed.
+      const confirming = pendingRef.current;
+      if (confirming?.kind === "confirm") {
+        room.send(GAME_MESSAGES.confirmWord, { submission: { plays: [...confirming.plays] } });
+      }
       const command = inFlightRef.current;
       if (command === null) return;
       room.send(command.kind === "pick" ? GAME_MESSAGES.pickPower : GAME_MESSAGES.usePowerUp, command.payload);
@@ -501,7 +511,9 @@ export function useOnlineGame({
     confirmSent.current = handCount;
     // Lock the builder the instant the word is confirmed, so the check cannot fire twice while the
     // server's own confirmation is on the wire; it clears when that confirmation lands.
-    if (viewIdRef.current !== null) setPending({ kind: "confirm", viewId: viewIdRef.current });
+    if (viewIdRef.current !== null) {
+      setPending({ kind: "confirm", viewId: viewIdRef.current, plays: [...heroDraft] });
+    }
   }, [handCount, heroDraft, room, view]);
 
   const checkWord = useCallback(() => {
