@@ -312,9 +312,9 @@ function OutOfCoins({ onRefill, onLeave }: { onRefill: () => void; onLeave: () =
     <Modal supportedOrientations={MODAL_ORIENTATIONS} animationType="fade" onRequestClose={onLeave} transparent visible>
       <ScrollView contentContainerStyle={styles.overlayBackdrop}>
         <View style={styles.overlay} testID="out-of-coins">
-          <Text style={styles.overlayTitle}>OUT OF COINS</Text>
+          <Text style={styles.overlayTitle}>OUT OF CHIPS</Text>
           <Text style={styles.overlaySeat}>
-            You have lost all your coins. Refills are free during the beta.
+            You&apos;re out of practice chips. Your coins weren&apos;t touched: games against bots never use them.
           </Text>
           <GameButton label="FREE REFILL" onPress={onRefill} testID="free-refill-button" variant="gold" />
           <GameButton label="LEAVE TABLE" onPress={onLeave} testID="out-of-coins-leave" variant="dark" />

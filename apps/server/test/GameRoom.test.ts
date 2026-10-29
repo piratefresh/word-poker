@@ -36,6 +36,8 @@ import {
 import { closeOrm, friendList, getOrm, pgConnectionString } from "@wordpoker/db";
 import { Client as PgClient } from "pg";
 import appConfig from "../src/app.config.js";
+import { GameRoom } from "../src/rooms/GameRoom.js";
+import type { BuyInResult, TableWallet } from "../src/wallet/table-wallet.js";
 import { createRunTarget, openRunOrm, serverUrl } from "../../../packages/db/test/run-target.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
@@ -1474,6 +1476,73 @@ describe("GameRoom", () => {
       assert.ok(
         [...rows.values()].every((listing) => listing.name === "game"),
         "only tables are listed, not the subscription room every client sits in",
+      );
+    });
+  });
+
+  describe("buy-in and cash-out (balances §4, §5)", () => {
+    const originalWallet = GameRoom.walletFromEnv;
+    let answer: BuyInResult;
+    let calls: Array<{ kind: "buy_in" | "cash_out"; userId: string; amount: number; ref: string }>;
+    const wallet: TableWallet = {
+      buyIn: async (userId, amount, ref) => {
+        calls.push({ kind: "buy_in", userId, amount, ref });
+        return answer;
+      },
+      cashOut: async (userId, amount, ref) => {
+        calls.push({ kind: "cash_out", userId, amount, ref });
+      },
+    };
+
+    beforeEach(() => {
+      answer = "paid";
+      calls = [];
+      GameRoom.walletFromEnv = async () => wallet;
+    });
+    afterEach(() => {
+      GameRoom.walletFromEnv = originalWallet;
+    });
+
+    it("takes the buy-in before the seat, and gives the stack back once on leave", async () => {
+      const room = await colyseus.createRoom("game", { name: "Paid", buyIn: 500, maxSeats: 2 });
+      colyseus.sdk.auth.token = "same-session";
+      const client = await colyseus.connectTo(room);
+      const ref = `${room.roomId}:${client.sessionId}`;
+      assert.deepEqual(calls, [{ kind: "buy_in", userId: "same-account", amount: 500, ref }]);
+
+      await client.leave();
+      for (let tick = 0; tick < 50 && calls.length < 2; tick += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+      await room.disconnect();
+      assert.deepEqual(calls.slice(1), [{ kind: "cash_out", userId: "same-account", amount: 500, ref }]);
+    });
+
+    it("refuses a seat the Wallet cannot pay for", async () => {
+      answer = "insufficient";
+      const room = await colyseus.createRoom("game", { name: "Too rich", buyIn: 5000, maxSeats: 2 });
+      await assert.rejects(
+        colyseus.connectTo(room),
+        (error: Error) => error.message === "You need 5,000 coins to sit at this table.",
+      );
+      assert.equal(room.state.seats.size, 0);
+      assert.deepEqual(calls.map((call) => call.kind), ["buy_in"]);
+    });
+
+    it("refuses a seat while the Wallet cannot be reached", async () => {
+      answer = "unavailable";
+      const room = await colyseus.createRoom("game", { name: "Offline wallet", buyIn: 500, maxSeats: 2 });
+      await assert.rejects(colyseus.connectTo(room), (error: Error) => error.message === "Your coins couldn't be reached. Try again.");
+      assert.equal(room.state.seats.size, 0);
+    });
+
+    it("cashes out every seat still held when the table closes", async () => {
+      const room = await colyseus.createRoom("game", { name: "Closing", buyIn: 500, maxSeats: 2 });
+      const first = await colyseus.connectTo(room);
+      const second = await colyseus.connectTo(room);
+      calls = [];
+      await room.disconnect();
+      assert.deepEqual(
+        calls.map((call) => [call.kind, call.amount, call.ref]).sort(),
+        [first, second].map((client) => ["cash_out", 500, `${room.roomId}:${client.sessionId}`]).sort(),
       );
     });
   });

@@ -136,15 +136,24 @@ export function grantWelcome(
 /**
  * Re-sends a player's `pending` rows, oldest first, each under its own id. Stops at the first row
  * that is still unreachable, so changes keep their order. Resolves with how many applied.
+ *
+ * A table writes a `cash_out` under a `pending` buy-in's ref to pay it back; if that buy-in then
+ * fails, there is nothing to pay back, so the cash-out fails with it rather than minting coins.
  */
 export async function retryPending(userId: string, deps: WalletDeps = {}): Promise<number> {
   const store = deps.store ?? databaseStore;
+  const failedBuyIns = new Set<string>();
   let applied = 0;
 
   for (const row of await store.pendingWalletEvents(userId)) {
+    if (row.kind === "cash_out" && row.ref !== null && failedBuyIns.has(row.ref)) {
+      await store.settleWalletEvent(row.id, { status: "failed", lastError: "buy_in_failed" });
+      continue;
+    }
     const result = await send(row, deps);
     if (result.applied) applied += 1;
     else if (result.reason === "pending") break;
+    else if (row.kind === "buy_in" && row.ref !== null) failedBuyIns.add(row.ref);
   }
 
   return applied;

@@ -160,6 +160,16 @@ describe("retryPending", () => {
     assert.equal(d.requests.length, 3, "the second row was not sent ahead of the first");
   });
 
+  it("never pays back a buy-in that failed on retry", async () => {
+    const d = deps(["network", "network", rcError(422, "unprocessable_entity_error")]);
+    await applyWalletChange("u1", "buy_in", -500, { ref: "room:seat" }, d);
+    await applyWalletChange("u1", "cash_out", 500, { ref: "room:seat" }, d);
+
+    assert.equal(await retryPending("u1", d), 0);
+    assert.equal(d.requests.length, 3, "the cash-out was not sent");
+    assert.deepEqual(d.store.rows.map((row) => row.status), ["failed", "failed"]);
+  });
+
   it("sends nothing when nothing is pending", async () => {
     const d = deps([]);
 

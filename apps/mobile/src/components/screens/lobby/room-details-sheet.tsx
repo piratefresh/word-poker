@@ -10,12 +10,15 @@ import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/
 import { formatAmount } from "@/lib/ui/format";
 import { isJoinable, openSeats } from "@/features/online/lobby-view";
 import { powersLabel } from "@/features/table/power-view";
+import { buyInNote, cannotAfford, needCoinsLabel } from "./parlor-view";
 
 export interface RoomDetailsSheetProps {
   room: RoomSummary | null;
   hosted?: boolean;
   yours?: boolean;
   joining?: boolean;
+  /** The Wallet's coins; `null` while unread. */
+  coins?: number | null;
   onClose: () => void;
   onJoin: () => void;
 }
@@ -25,12 +28,14 @@ export function RoomDetailsSheet({
   hosted = false,
   yours = false,
   joining = false,
+  coins = null,
   onClose,
   onJoin,
 }: RoomDetailsSheetProps) {
   const players = room?.metadata.players ?? [];
   const seats = Math.min(room?.maxClients ?? 0, MAX_SEATS);
-  const available = room !== null && (isJoinable(room) || yours);
+  const short = room !== null && !yours && cannotAfford(room, coins);
+  const available = room !== null && ((isJoinable(room) && !short) || yours);
 
   return (
     <BottomSheet
@@ -98,11 +103,12 @@ export function RoomDetailsSheet({
             <View style={styles.actions}>
               <GoldButton
                 disabled={!available || joining}
-                label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : available ? `JOIN · ${formatAmount(room.metadata.buyIn)}` : room.locked ? "UNAVAILABLE" : "TABLE FULL"}
+                label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : available ? `JOIN · ${formatAmount(room.metadata.buyIn)}` : room.locked ? "UNAVAILABLE" : !isJoinable(room) ? "TABLE FULL" : needCoinsLabel(room)}
                 onPress={onJoin}
                 testID="room-details-join"
               />
-              {joining ? <Text style={styles.joining}>Taking your seat at {room.metadata.name}…</Text> : null}
+              {joining ? <Text style={styles.joining}>Taking your seat at {room.metadata.name}…</Text>
+                : yours ? null : <Text style={styles.joining}>{buyInNote(room)}</Text>}
             </View>
           </ScrollView>
         </RNHostView>
