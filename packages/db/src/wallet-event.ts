@@ -140,6 +140,21 @@ export async function pendingWalletEvents(
   return rows.map(toRecord);
 }
 
+/** A table seat's buy-in row, in any status; one per ref (`wallet_event_table_once`). */
+export async function buyInFor(
+  userId: string,
+  ref: string,
+  options: DbOptions = {},
+): Promise<WalletEventRecord | null> {
+  const db = await connection(options);
+  const [row] = await db.execute<WalletEventSqlRow[]>(
+    `select * from "wallet_event" where "user_id" = ? and "kind" = 'buy_in' and "ref" = ? limit 1`,
+    [userId, ref],
+  );
+
+  return row ? toRecord(row) : null;
+}
+
 /** Whether a player's welcome grant has been opened, in any status: a pending one is retried. */
 export async function hasWelcomeEvent(userId: string, options: DbOptions = {}): Promise<boolean> {
   const db = await connection(options);

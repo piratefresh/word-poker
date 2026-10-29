@@ -25,7 +25,10 @@ jest.mock("@expo/ui", () => {
   return { BottomSheet: View, RNHostView: View };
 });
 let mockCoins: number | null = 5450;
-jest.mock("@/lib/quests/quests-provider", () => ({ useQuests: () => ({ coins: mockCoins, state: { level: 2 } }) }));
+const mockRefreshCoins = jest.fn();
+jest.mock("@/lib/quests/quests-provider", () => ({
+  useQuests: () => ({ coins: mockCoins, refreshCoins: mockRefreshCoins, state: { level: 2 } }),
+}));
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: () => ({ data: { user: { name: "Dylan" } } }) } }));
 jest.mock("@/components/word-builder/haptics", () => ({ haptic: jest.fn() }));
 jest.mock("react-native-safe-area-context", () =>
@@ -124,6 +127,11 @@ test("points a player with no coins to quests, the store, and free bot games", a
   expect(view.getByTestId("lobby-out-of-coins")).toBeOnTheScreen();
   await fireEvent.press(view.getByTestId("lobby-out-of-coins-store"));
   expect(router.push).toHaveBeenCalledWith("/store");
+});
+
+test("re-reads the Wallet whenever the lobby comes into focus", async () => {
+  await show([room("hero")]);
+  expect(mockRefreshCoins).toHaveBeenCalled();
 });
 
 test("shows no out-of-coins notice to a player who can afford a table", async () => {

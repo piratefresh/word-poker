@@ -43,7 +43,7 @@ export function LobbyScreen() {
   const activeRoomId = useActiveRoomId();
   const hostedRoomIds = useHostedRoomIds();
   const { data: session } = authClient.useSession();
-  const { coins, state: questState } = useQuests();
+  const { coins, refreshCoins, state: questState } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [filter, setFilter] = useState<LobbyFilter>("All");
@@ -57,7 +57,9 @@ export function LobbyScreen() {
     useCallback(() => {
       travelStarted.current = false;
       travel.set(0);
-    }, [travel]),
+      // Back from the store or a table: the coins that gate Join may have moved.
+      refreshCoins();
+    }, [refreshCoins, travel]),
   );
 
   const street = width > height ? STREETS.landscape : STREETS.portrait;
@@ -130,7 +132,10 @@ export function LobbyScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 180, paddingTop: insets.top + spacing.md }}
         refreshControl={
-          <RefreshControl colors={[colors.gold]} onRefresh={refresh} refreshing={refreshing} tintColor={nightLobby.gold.light} />
+          <RefreshControl colors={[colors.gold]} onRefresh={() => {
+            refresh();
+            refreshCoins();
+          }} refreshing={refreshing} tintColor={nightLobby.gold.light} />
         }
         testID="lobby-scroll"
       >

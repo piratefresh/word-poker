@@ -127,6 +127,11 @@ test("names a table that has already started as such", async () => {
   await expect(joinTable("table-1")).rejects.toThrow("That table has already started.");
 });
 
+test("shows the Wallet's own reason for refusing a seat", async () => {
+  joinById.mockRejectedValue(Object.assign(new Error("You need 5,000 coins to sit at this table."), { code: 4402 }));
+  await expect(joinTable("table-1")).rejects.toThrow("You need 5,000 coins to sit at this table.");
+});
+
 test("explains the unique-session refusal when the account already holds a seat", async () => {
   joinById.mockRejectedValue(Object.assign(new Error("max sessions reached"), { code: 4400 }));
   await expect(joinTable("table-1")).rejects.toThrow(

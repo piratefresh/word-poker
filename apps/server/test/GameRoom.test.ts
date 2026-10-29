@@ -1484,6 +1484,8 @@ describe("GameRoom", () => {
     const originalWallet = GameRoom.walletFromEnv;
     let answer: BuyInResult;
     let calls: Array<{ kind: "buy_in" | "cash_out"; userId: string; amount: number; ref: string }>;
+    /** Holds every cash-out until it resolves, for a test that closes the table mid-record. */
+    let cashOutGate: Promise<void>;
     const wallet: TableWallet = {
       buyIn: async (userId, amount, ref) => {
         calls.push({ kind: "buy_in", userId, amount, ref });
@@ -1491,12 +1493,14 @@ describe("GameRoom", () => {
       },
       cashOut: async (userId, amount, ref) => {
         calls.push({ kind: "cash_out", userId, amount, ref });
+        await cashOutGate;
       },
     };
 
     beforeEach(() => {
       answer = "paid";
       calls = [];
+      cashOutGate = Promise.resolve();
       GameRoom.walletFromEnv = async () => wallet;
     });
     afterEach(() => {
@@ -1532,6 +1536,38 @@ describe("GameRoom", () => {
       const room = await colyseus.createRoom("game", { name: "Offline wallet", buyIn: 500, maxSeats: 2 });
       await assert.rejects(colyseus.connectTo(room), (error: Error) => error.message === "Your coins couldn't be reached. Try again.");
       assert.equal(room.state.seats.size, 0);
+    });
+
+    it("waits on a cash-out already under way when the table closes", async () => {
+      let release!: () => void;
+      cashOutGate = new Promise((resolve) => { release = resolve; });
+      const room = await colyseus.createRoom("game", { name: "Slow wallet", buyIn: 500, maxSeats: 3 });
+      const leaver = await colyseus.connectTo(room);
+      await colyseus.connectTo(room);
+      await leaver.leave();
+      for (let tick = 0; tick < 50 && !calls.some((call) => call.kind === "cash_out"); tick += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      let closed = false;
+      const closing = room.disconnect().then(() => { closed = true; });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.equal(closed, false, "the room is still recording the leaver's cash-out");
+      release();
+      await closing;
+    });
+
+    it("cashes out what a heads-up fold paid, when the table closes before the results", async () => {
+      const room = await colyseus.createRoom("game", { name: "Heads-up", buyIn: 500, maxSeats: 2 });
+      const leaver = await colyseus.connectTo(room);
+      const winner = await colyseus.connectTo(room);
+      await readyUp(room, [leaver, winner]);
+      await leaver.leave();
+      for (let tick = 0; tick < 50 && room.state.phase !== "payout"; tick += 1) await room.waitForNextPatch();
+      calls = [];
+      await room.disconnect();
+      const cashed = calls.filter((call) => call.kind === "cash_out");
+      assert.equal(cashed.reduce((sum, call) => sum + call.amount, 0), 1000, "every chip at the table goes back");
     });
 
     it("cashes out every seat still held when the table closes", async () => {

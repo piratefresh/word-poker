@@ -24,6 +24,7 @@ import {
   PowerUpSettings,
   RoomPhase,
   TABLE_STARTED_MESSAGE,
+  WALLET_REFUSED_CODE,
 } from "@wordpoker/contracts";
 import { useSyncExternalStore } from "react";
 
@@ -170,6 +171,7 @@ function joinFailure(error: unknown): string {
     return "Your account already has a seat. Leave your other table or browser tab before joining. If it disconnected, wait for that seat to expire.";
   }
   if (error instanceof Error && error.message === TABLE_STARTED_MESSAGE) return TABLE_STARTED_MESSAGE;
+  if (code === WALLET_REFUSED_CODE && error instanceof Error && error.message) return error.message;
   if (code === MATCHMAKE_INVALID_ROOM_ID) return "That table is full or has just closed.";
   if (code === MATCHMAKE_NO_HANDLER || code === MATCHMAKE_INVALID_CRITERIA) {
     return "That table isn't available. Try the list again.";

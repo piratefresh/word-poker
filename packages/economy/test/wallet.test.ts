@@ -55,6 +55,9 @@ function memoryStore(): MemoryStore {
     async pendingWalletEvents(userId: string) {
       return rows.filter((row) => row.userId === userId && row.status === "pending");
     },
+    async buyInFor(userId: string, ref: string) {
+      return rows.find((row) => row.userId === userId && row.kind === "buy_in" && row.ref === ref) ?? null;
+    },
   };
 }
 
@@ -160,14 +163,35 @@ describe("retryPending", () => {
     assert.equal(d.requests.length, 3, "the second row was not sent ahead of the first");
   });
 
-  it("never pays back a buy-in that failed on retry", async () => {
-    const d = deps(["network", "network", rcError(422, "unprocessable_entity_error")]);
+  it("holds a table's cash-out until its buy-in has applied", async () => {
+    const d = deps(["network", balances(4500), balances(5000)]);
+    await applyWalletChange("u1", "buy_in", -500, { ref: "room:seat" }, d);
+
+    assert.deepEqual(await applyWalletChange("u1", "cash_out", 500, { ref: "room:seat" }, d), { applied: false, reason: "pending" });
+    assert.equal(d.requests.length, 1, "the cash-out was not sent ahead of its buy-in");
+
+    assert.equal(await retryPending("u1", d), 2);
+    assert.deepEqual(d.store.rows.map((row) => row.status), ["applied", "applied"]);
+  });
+
+  it("never pays back a buy-in that failed, in this pass or a later one", async () => {
+    const d = deps(["network", rcError(422, "unprocessable_entity_error")]);
     await applyWalletChange("u1", "buy_in", -500, { ref: "room:seat" }, d);
     await applyWalletChange("u1", "cash_out", 500, { ref: "room:seat" }, d);
 
     assert.equal(await retryPending("u1", d), 0);
-    assert.equal(d.requests.length, 3, "the cash-out was not sent");
-    assert.deepEqual(d.store.rows.map((row) => row.status), ["failed", "failed"]);
+    assert.equal(d.requests.length, 2, "the cash-out was never sent");
+    assert.deepEqual(d.store.rows.map((row) => [row.status, row.lastError]), [
+      ["failed", "http_422_unprocessable_entity_error"],
+      ["failed", "no_buy_in"],
+    ]);
+  });
+
+  it("pays nothing for a table's cash-out with no buy-in behind it", async () => {
+    const d = deps([]);
+
+    assert.deepEqual(await applyWalletChange("u1", "cash_out", 500, { ref: "room:seat" }, d), { applied: false, reason: "rejected" });
+    assert.equal(d.requests.length, 0);
   });
 
   it("sends nothing when nothing is pending", async () => {

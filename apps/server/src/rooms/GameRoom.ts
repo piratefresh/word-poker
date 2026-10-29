@@ -9,6 +9,7 @@ import {
   WAITING_PHASE,
   isGameMessagePayload,
   TABLE_STARTED_MESSAGE,
+  WALLET_REFUSED_CODE,
   LOBBY_PLAYER_COLORS,
   blindsFor,
   validateRoomCreateOptions,
@@ -125,6 +126,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private table!: TableConfig;
   private engine?: AuthoritativeGame;
   private readonly bindings = new Map<string, SeatBinding>();
+  /** Cash-outs still being recorded, so shutdown waits on seats already removed too. */
+  private readonly cashOuts = new Set<Promise<void>>();
   /** Internal host identity; only its public display name reaches room metadata. */
   private hostPlayerId?: string;
   private hostName = "A player";
@@ -430,7 +433,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private async payBuyIn(userId: string, playerId: string): Promise<void> {
     if (this.wallet === null) {
       if (process.env.NODE_ENV === "production") {
-        throw new ServerError(ErrorCode.APPLICATION_ERROR, WALLET_UNAVAILABLE_MESSAGE);
+        throw new ServerError(WALLET_REFUSED_CODE, WALLET_UNAVAILABLE_MESSAGE);
       }
       return;
     }
@@ -443,11 +446,11 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     }
     if (result === "insufficient") {
       throw new ServerError(
-        ErrorCode.APPLICATION_ERROR,
+        WALLET_REFUSED_CODE,
         `You need ${this.table.buyIn.toLocaleString("en-US")} coins to sit at this table.`,
       );
     }
-    if (result !== "paid") throw new ServerError(ErrorCode.APPLICATION_ERROR, WALLET_UNAVAILABLE_MESSAGE);
+    if (result !== "paid") throw new ServerError(WALLET_REFUSED_CODE, WALLET_UNAVAILABLE_MESSAGE);
   }
 
   /** One seat's buy-in and cash-out ref: a rejoin is a new session, so a new pair of rows. */
@@ -459,7 +462,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private cashOut(binding: SeatBinding): Promise<void> {
     if (binding.cashedOut || this.wallet === null) return Promise.resolve();
     binding.cashedOut = true;
-    return this.wallet.cashOut(binding.userId, binding.tableStack, this.walletRef(binding.playerId));
+    const cashOut = this.wallet.cashOut(binding.userId, binding.tableStack, this.walletRef(binding.playerId));
+    this.cashOuts.add(cashOut);
+    void cashOut.finally(() => this.cashOuts.delete(cashOut));
+    return cashOut;
   }
 
   onDrop(client: Client, _code: CloseCode) {
@@ -514,6 +520,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     // has merely dropped keeps its place and runs its turn clock like a connected one, and the
     // deadline folds it if it is still to act when its clock runs out (§29, ADR 0006).
     this.authoritative.foldDepartedSeat(client.sessionId, this.now());
+    // The fold may have settled the hand, and a closing room cashes out these stacks.
+    this.syncStacks();
     this.project();
     this.closeIfEmpty();
   }
@@ -541,9 +549,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       const timer = setTimeout(resolve, 5_000);
       timer.unref?.();
     });
-    const cashOuts = [...this.bindings.values()].map((binding) => this.cashOut(binding));
+    this.syncStacks();
+    for (const binding of this.bindings.values()) void this.cashOut(binding);
     return Promise.race([
-      Promise.all([this.settlements?.idle() ?? Promise.resolve(), ...cashOuts]).then(() => {}),
+      Promise.all([this.settlements?.idle() ?? Promise.resolve(), ...this.cashOuts]).then(() => {}),
       giveUp,
     ]);
   }

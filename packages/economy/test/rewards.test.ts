@@ -68,6 +68,9 @@ function memoryWalletStore(): MemoryWalletStore {
     async pendingWalletEvents(userId: string) {
       return rows.filter((row) => row.userId === userId && row.status === "pending");
     },
+    async buyInFor() {
+      return null;
+    },
   };
 }
 

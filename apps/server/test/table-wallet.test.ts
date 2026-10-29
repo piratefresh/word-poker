@@ -34,6 +34,9 @@ function memoryStore() {
     async pendingWalletEvents(userId) {
       return rows.filter((row) => row.userId === userId && row.status === "pending");
     },
+    async buyInFor(userId, ref) {
+      return rows.find((row) => row.userId === userId && row.kind === "buy_in" && row.ref === ref) ?? null;
+    },
   };
   return { rows, store };
 }
@@ -69,13 +72,56 @@ describe("table wallet (balances §4, §5)", () => {
     );
   });
 
+  it("pays back a buy-in whose outcome is unknown, once it is known to have applied", async () => {
+    const { rows, store } = memoryStore();
+    let settles = 0;
+    const flaky: WalletStore = {
+      ...store,
+      async settleWalletEvent(id, input) {
+        settles += 1;
+        if (settles === 1) throw new Error("database blinked");
+        return store.settleWalletEvent(id, input);
+      },
+    };
+    const wallet = createTableWallet({ store: flaky, client: client(async () => 4500) });
+
+    assert.equal(await wallet.buyIn("ada", 500, "room:seat"), "unavailable");
+    assert.deepEqual(
+      rows.map((row) => [row.kind, row.ref, row.status]),
+      [["buy_in", "room:seat", "pending"], ["cash_out", "room:seat", "pending"]],
+    );
+  });
+
   it("cashes a seat out once, and nothing for an empty stack", async () => {
     const { rows, store } = memoryStore();
     const wallet = createTableWallet({ store, client: client(async () => 5000) });
 
+    await wallet.buyIn("ada", 500, "room:seat");
     await wallet.cashOut("ada", 0, "room:empty");
     await wallet.cashOut("ada", 750, "room:seat");
     await wallet.cashOut("ada", 750, "room:seat");
-    assert.deepEqual(rows.map((row) => [row.kind, row.amount, row.ref]), [["cash_out", 750, "room:seat"]]);
+    assert.deepEqual(rows.slice(1).map((row) => [row.kind, row.amount, row.ref]), [["cash_out", 750, "room:seat"]]);
+  });
+
+  it("keeps trying to record a cash-out the database could not take", async () => {
+    const { rows, store } = memoryStore();
+    let opens = 0;
+    const flaky: WalletStore = {
+      ...store,
+      async openWalletEvent(input) {
+        opens += 1;
+        if (input.kind === "cash_out" && opens < 4) throw new Error("database down");
+        return store.openWalletEvent(input);
+      },
+    };
+    const waits: number[] = [];
+    const wallet = createTableWallet({ store: flaky, client: client(async () => 5000) }, async (ms) => {
+      waits.push(ms);
+    });
+
+    await wallet.buyIn("ada", 500, "room:seat");
+    await wallet.cashOut("ada", 750, "room:seat");
+    assert.deepEqual(waits, [1000, 2000]);
+    assert.deepEqual(rows.map((row) => [row.kind, row.status]), [["buy_in", "applied"], ["cash_out", "applied"]]);
   });
 });
