@@ -100,6 +100,8 @@ export interface QuestsValue {
   readonly reportHand: (facts: QuestHandFacts | null) => HandReport | null;
   /** Re-reads the streak and quest state — the quests screen's own pull on mount. */
   readonly refresh: () => void;
+  /** Re-reads only the Wallet's coins — the lobby's pull, after a purchase or a cash-out. */
+  readonly refreshCoins: () => void;
 }
 
 const DEFAULT_VALUE: QuestsValue = {
@@ -113,6 +115,7 @@ const DEFAULT_VALUE: QuestsValue = {
   claimOutcomes: {},
   reportHand: () => null,
   refresh: () => {},
+  refreshCoins: () => {},
 };
 
 const QuestsContext = createContext<QuestsValue>(DEFAULT_VALUE);
@@ -297,8 +300,9 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
       claimOutcomes,
       reportHand,
       refresh,
+      refreshCoins: readWallet,
     }),
-    [claimOutcomes, coins, dismissLevelUp, dismissStreakBanner, lastCompletions, levelUp, reportHand, refresh, state, streakBanner],
+    [claimOutcomes, coins, dismissLevelUp, dismissStreakBanner, lastCompletions, levelUp, readWallet, reportHand, refresh, state, streakBanner],
   );
 
   return <QuestsContext.Provider value={value}>{children}</QuestsContext.Provider>;

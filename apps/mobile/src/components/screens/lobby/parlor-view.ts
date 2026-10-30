@@ -7,8 +7,7 @@
  * state it is in (§3's waiting / in hand), and how many seats are taken of how many it has —
  * because that is what a browser needs to offer a seat. It deliberately does not carry a pot, the
  * players in it, or the word last played: those belong to the hand, and the lobby is not in it.
- * The rail is therefore the lobby's own numbers rather than a wallet's — no balance is wired into
- * the app yet, and a rail that invented one would be the only figure on screen that lies.
+ * The rail is the lobby's own numbers, plus the Wallet's coins when the app has read them.
  *
  * Every function here is pure: the screen's lists and figures are a fold over the last listing
  * the server pushed, so a seat taken by someone else redraws the hero, the rail and the rows in
@@ -50,18 +49,35 @@ export interface ParlorView {
   readonly stats: ParlorStat[];
 }
 
+/** §3: the Wallet is below the table's buy-in. Unknown coins (`null`) are left to the server to judge. */
+export function cannotAfford(room: RoomSummary, coins: number | null): boolean {
+  return coins !== null && coins < room.metadata.buyIn;
+}
+
+/** The disabled Join button's label when the Wallet is short. */
+export function needCoinsLabel(room: RoomSummary): string {
+  return `NEED ${formatCoins(room.metadata.buyIn)} COINS`;
+}
+
+/** The line under a Join button: what sitting down takes, and when it comes back (§4, §5). */
+export function buyInNote(room: RoomSummary): string {
+  return `Takes ${formatCoins(room.metadata.buyIn)} coins from your wallet. Your chips come back as coins when you leave.`;
+}
+
 /**
  * What the featured table's button says and whether it does anything. §3's Join rules decide the
- * disabled cases: full, or temporarily unavailable. Your own seat is never disabled — a full table
- * you are sitting at is the table you are sitting at.
+ * disabled cases: full, temporarily unavailable, or a Wallet below the buy-in. Your own seat is
+ * never disabled — a full table you are sitting at is the table you are sitting at.
  */
 export function featuredAction(
   room: RoomSummary,
   yours: boolean,
+  coins: number | null = null,
 ): { label: string; enabled: boolean } {
   if (yours) return { label: "BACK TO YOUR SEAT", enabled: true };
   if (room.locked) return { label: "UNAVAILABLE", enabled: false };
   if (room.clients >= room.maxClients) return { label: "TABLE FULL", enabled: false };
+  if (cannotAfford(room, coins)) return { label: needCoinsLabel(room), enabled: false };
   if (openSeats(room) === 1) return { label: "TAKE THE LAST SEAT", enabled: true };
   return { label: "TAKE A SEAT", enabled: true };
 }

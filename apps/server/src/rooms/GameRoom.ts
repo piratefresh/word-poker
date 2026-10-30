@@ -9,6 +9,7 @@ import {
   WAITING_PHASE,
   isGameMessagePayload,
   TABLE_STARTED_MESSAGE,
+  WALLET_REFUSED_CODE,
   LOBBY_PLAYER_COLORS,
   blindsFor,
   validateRoomCreateOptions,
@@ -51,11 +52,13 @@ import { SettlementRecorder } from "../history/settlement-recorder.js";
 import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
 import { displayName, notifyUsers, requestFriend } from "@wordpoker/db";
 import { serverOrm } from "../database.js";
+import { tableWalletFromEnv, type TableWallet } from "../wallet/table-wallet.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
 /** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
 const MIN_PLAYERS = 2;
 const SEAT_GONE_MESSAGE = "That player has left the table.";
+const WALLET_UNAVAILABLE_MESSAGE = "Your coins couldn't be reached. Try again.";
 
 type TableConfig = GameTableConfig;
 
@@ -73,6 +76,8 @@ interface SeatBinding {
   ready: boolean;
   /** Put away the paid-out hand's results. Cleared whenever the table is off its payout. */
   seenResults: boolean;
+  /** The Table Stack has gone back to the Wallet (§5); set once, so it never goes twice. */
+  cashedOut: boolean;
 }
 
 /**
@@ -112,10 +117,17 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     return { ...account, id: account.userId, token };
   }
 
+  /** Where the Wallet comes from; a test swaps in a fake. */
+  static walletFromEnv: () => Promise<TableWallet | null> = tableWalletFromEnv;
+
   private dictionary!: Dictionary;
+  /** Null when no Wallet is configured: free tables outside production, no seats in it. */
+  private wallet: TableWallet | null = null;
   private table!: TableConfig;
   private engine?: AuthoritativeGame;
   private readonly bindings = new Map<string, SeatBinding>();
+  /** Cash-outs still being recorded, so shutdown waits on seats already removed too. */
+  private readonly cashOuts = new Set<Promise<void>>();
   /** Internal host identity; only its public display name reaches room metadata. */
   private hostPlayerId?: string;
   private hostName = "A player";
@@ -317,6 +329,13 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       this.tickMs = knobs.tickMs;
     }
 
+    this.wallet = await GameRoom.walletFromEnv();
+    if (this.wallet === null) {
+      console.log(process.env.NODE_ENV === "production"
+        ? "wallet: RevenueCat or WORDPOKER_DATABASE_URL is not set; every join at this table is refused"
+        : "wallet: RevenueCat or WORDPOKER_DATABASE_URL is not set; seats at this table cost nothing");
+    }
+
     const history = await HistoryService.fromEnv();
     if (history === null) {
       console.log("history: WORDPOKER_DATABASE_URL is not set; hands at this table are not recorded");
@@ -355,14 +374,16 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.publishPhase();
   }
 
-  onJoin(client: Client, _options: unknown, auth: OnlineAccount) {
-    if (this.game !== null) {
-      throw new ServerError(ErrorCode.APPLICATION_ERROR, TABLE_STARTED_MESSAGE);
-    }
-
-    const seat = firstFreeSeat(this.bindings, this.maxClients);
-    if (seat === null) {
-      throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table has no free seat");
+  async onJoin(client: Client, _options: unknown, auth: OnlineAccount) {
+    this.assertSeatOpen();
+    await this.payBuyIn(auth.userId, client.sessionId);
+    let seat: number;
+    try {
+      seat = this.assertSeatOpen();
+    } catch (error) {
+      // The table filled or dealt while the Wallet answered: the buy-in goes straight back.
+      await this.wallet?.cashOut(auth.userId, this.table.buyIn, this.walletRef(client.sessionId));
+      throw error;
     }
 
     // A changed lineup starts from the held stacks, rather than the previous hand's seats. The
@@ -384,6 +405,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       tableStack: this.table.buyIn,
       ready: false,
       seenResults: false,
+      cashedOut: false,
     };
     this.bindings.set(client.sessionId, binding);
     if (this.hostPlayerId === undefined) {
@@ -393,6 +415,57 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.project();
     this.sendPrivateStateLater(client);
     this.resolvePublicName(binding);
+  }
+
+  /** §3's Join rules the room enforces itself: a table not yet dealt, with a seat free. */
+  private assertSeatOpen(): number {
+    if (this.game !== null) {
+      throw new ServerError(ErrorCode.APPLICATION_ERROR, TABLE_STARTED_MESSAGE);
+    }
+    const seat = firstFreeSeat(this.bindings, this.maxClients);
+    if (seat === null) {
+      throw new ServerError(ErrorCode.APPLICATION_ERROR, "the table has no free seat");
+    }
+    return seat;
+  }
+
+  /** §4: no seat unless the buy-in has left the Wallet. */
+  private async payBuyIn(userId: string, playerId: string): Promise<void> {
+    if (this.wallet === null) {
+      if (process.env.NODE_ENV === "production") {
+        throw new ServerError(WALLET_REFUSED_CODE, WALLET_UNAVAILABLE_MESSAGE);
+      }
+      return;
+    }
+    let result;
+    try {
+      result = await this.wallet.buyIn(userId, this.table.buyIn, this.walletRef(playerId));
+    } catch (error) {
+      console.error("wallet: buy-in was not recorded", error);
+      result = "unavailable";
+    }
+    if (result === "insufficient") {
+      throw new ServerError(
+        WALLET_REFUSED_CODE,
+        `You need ${this.table.buyIn.toLocaleString("en-US")} coins to sit at this table.`,
+      );
+    }
+    if (result !== "paid") throw new ServerError(WALLET_REFUSED_CODE, WALLET_UNAVAILABLE_MESSAGE);
+  }
+
+  /** One seat's buy-in and cash-out ref: a rejoin is a new session, so a new pair of rows. */
+  private walletRef(playerId: string): string {
+    return `${this.roomId}:${playerId}`;
+  }
+
+  /** §5: the seat is gone for good, so what is left of its Table Stack goes back to the Wallet. */
+  private cashOut(binding: SeatBinding): Promise<void> {
+    if (binding.cashedOut || this.wallet === null) return Promise.resolve();
+    binding.cashedOut = true;
+    const cashOut = this.wallet.cashOut(binding.userId, binding.tableStack, this.walletRef(binding.playerId));
+    this.cashOuts.add(cashOut);
+    void cashOut.finally(() => this.cashOuts.delete(cashOut));
+    return cashOut;
   }
 
   onDrop(client: Client, _code: CloseCode) {
@@ -433,6 +506,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       this.authoritative.clear();
       this.awaitingReady = false;
       this.bindings.delete(client.sessionId);
+      void this.cashOut(binding);
       this.project();
       this.publishPhase();
       // The seat that left may have been the last one the rest were waiting on.
@@ -446,6 +520,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     // has merely dropped keeps its place and runs its turn clock like a connected one, and the
     // deadline folds it if it is still to act when its clock runs out (§29, ADR 0006).
     this.authoritative.foldDepartedSeat(client.sessionId, this.now());
+    // The fold may have settled the hand, and a closing room cashes out these stacks.
+    this.syncStacks();
     this.project();
     this.closeIfEmpty();
   }
@@ -464,13 +540,21 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     if (this.presentBindings().length === 0) await this.disconnect();
   }
 
-  /** Shutdown bounds the DB drain; the next process recovers journaled records. */
+  /**
+   * Shutdown bounds the DB drain; the next process recovers journaled records. Every seat still
+   * held is cashed out; a cash-out still pending is retried by `GET /api/wallet`.
+   */
   override onDispose(): Promise<void> {
     const giveUp = new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, 5_000);
       timer.unref?.();
     });
-    return Promise.race([this.settlements?.idle() ?? Promise.resolve(), giveUp]);
+    this.syncStacks();
+    for (const binding of this.bindings.values()) void this.cashOut(binding);
+    return Promise.race([
+      Promise.all([this.settlements?.idle() ?? Promise.resolve(), ...this.cashOuts]).then(() => {}),
+      giveUp,
+    ]);
   }
 
   /**
@@ -493,7 +577,10 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.awaitingReady = preserveHand;
     this.powerLedger.clear();
     for (const [playerId, binding] of this.bindings) {
-      if (!binding.present) this.bindings.delete(playerId);
+      if (!binding.present) {
+        this.bindings.delete(playerId);
+        void this.cashOut(binding);
+      }
       else {
         if (!preserveHand) binding.ready = false;
         binding.seenResults = false;

@@ -7,7 +7,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimen
 import Animated, { Easing, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { RoomSummary } from "@wordpoker/contracts";
+import { BUY_IN_PRESETS, type RoomSummary } from "@wordpoker/contracts";
 
 import { GoldButton } from "@/components/ui/gold-button";
 import { HomeNavRack, type HomeNavDestination } from "@/components/screens/home/home-nav-rack";
@@ -43,7 +43,7 @@ export function LobbyScreen() {
   const activeRoomId = useActiveRoomId();
   const hostedRoomIds = useHostedRoomIds();
   const { data: session } = authClient.useSession();
-  const { coins, state: questState } = useQuests();
+  const { coins, refreshCoins, state: questState } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [filter, setFilter] = useState<LobbyFilter>("All");
@@ -57,7 +57,9 @@ export function LobbyScreen() {
     useCallback(() => {
       travelStarted.current = false;
       travel.set(0);
-    }, [travel]),
+      // Back from the store or a table: the coins that gate Join may have moved.
+      refreshCoins();
+    }, [refreshCoins, travel]),
   );
 
   const street = width > height ? STREETS.landscape : STREETS.portrait;
@@ -130,7 +132,10 @@ export function LobbyScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 180, paddingTop: insets.top + spacing.md }}
         refreshControl={
-          <RefreshControl colors={[colors.gold]} onRefresh={refresh} refreshing={refreshing} tintColor={nightLobby.gold.light} />
+          <RefreshControl colors={[colors.gold]} onRefresh={() => {
+            refresh();
+            refreshCoins();
+          }} refreshing={refreshing} tintColor={nightLobby.gold.light} />
         }
         testID="lobby-scroll"
       >
@@ -142,8 +147,19 @@ export function LobbyScreen() {
           readout={currentReadout}
         />
 
+        {coins !== null && coins < BUY_IN_PRESETS[0] ? (
+          <View style={styles.broke} testID="lobby-out-of-coins">
+            <Text style={styles.emptyTitle}>OUT OF COINS</Text>
+            <Text style={styles.emptyCopy}>
+              Finish quests or visit the store to get back to a table. Games against bots are always free.
+            </Text>
+            <GoldButton label="VISIT THE STORE" onPress={() => router.push(NAV_ROUTES.store)} testID="lobby-out-of-coins-store" />
+          </View>
+        ) : null}
+
         {headliner ? (
           <FeaturedTableCard
+            coins={coins}
             joining={joining === headliner.roomId}
             onDetails={() => setSelectedRoomId(headliner.roomId)}
             onJoin={() => openTable(headliner)}
@@ -230,6 +246,7 @@ export function LobbyScreen() {
 
       <CreateTableForm visible={creating} onClose={() => setCreating(false)} onCreated={travelToTable} />
       <RoomDetailsSheet
+        coins={coins}
         hosted={selectedRoom !== null && hostedRoomIds.has(selectedRoom.roomId)}
         joining={selectedRoom !== null && joining === selectedRoom.roomId}
         onClose={() => setSelectedRoomId(null)}
@@ -247,6 +264,7 @@ const styles = StyleSheet.create({
   scene: { flex: 1 },
   createDock: { position: "absolute", left: spacing.gutter, right: spacing.gutter },
   empty: { alignItems: "center", gap: spacing.xs, marginHorizontal: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.xl },
+  broke: { alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
   emptyTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h3, letterSpacing: 1 },
   emptyCopy: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.body, textAlign: "center" },
   section: { gap: spacing.sm, paddingHorizontal: spacing.gutter, paddingTop: spacing.lg },

@@ -81,6 +81,17 @@ describe("featuredAction", () => {
   ])("cannot be pressed at %s", (_case, room, label) => {
     expect(featuredAction(room, false)).toEqual({ label, enabled: false });
   });
+
+  test("cannot be pressed when the Wallet is below the buy-in (§3)", () => {
+    const room = table("a", { clients: 2 });
+    expect(featuredAction(room, false, room.metadata.buyIn - 1)).toEqual({
+      label: `NEED ${room.metadata.buyIn.toLocaleString("en-US")} COINS`,
+      enabled: false,
+    });
+    expect(featuredAction(room, false, room.metadata.buyIn).enabled).toBe(true);
+    expect(featuredAction(room, false, null).enabled).toBe(true);
+    expect(featuredAction(room, true, 0).enabled).toBe(true);
+  });
 });
 
 describe("featuredTable", () => {

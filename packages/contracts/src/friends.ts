@@ -77,6 +77,9 @@ export interface PresenceResponse { readonly invites: TableInvite[]; readonly em
 
 export const TABLE_STARTED_MESSAGE = "That table has already started.";
 
+/** A join the Wallet turned down (short of the buy-in, or unreachable); its message is the sentence to show. */
+export const WALLET_REFUSED_CODE = 4402;
+
 /** What a room id may look like on the wire: a Colyseus id, nothing a URL could bend. */
 export const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 

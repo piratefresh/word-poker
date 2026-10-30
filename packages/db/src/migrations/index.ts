@@ -19,6 +19,8 @@ import { Migration20261014120000_referral } from "./Migration20261014120000_refe
 import { Migration20261015120000_presence } from "./Migration20261015120000_presence";
 import { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
 import { Migration20261017120000_platform_auth } from "./Migration20261017120000_platform_auth";
+import { Migration20261029120000_table_wallet } from "./Migration20261029120000_table_wallet";
+export { Migration20261029120000_table_wallet } from "./Migration20261029120000_table_wallet";
 export { Migration20261017120000_platform_auth } from "./Migration20261017120000_platform_auth";
 export { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
 export { Migration20261015120000_presence } from "./Migration20261015120000_presence";
@@ -55,4 +57,5 @@ export const migrations: Constructor<Migration>[] = [
   Migration20261015120000_presence,
   Migration20261016120000_notifications,
   Migration20261017120000_platform_auth,
+  Migration20261029120000_table_wallet,
 ];

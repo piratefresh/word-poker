@@ -525,7 +525,7 @@ describe("<OfflineGameScreen />", () => {
 
     const view = await renderTable();
 
-    expect(view.getByText("OUT OF COINS")).toBeOnTheScreen();
+    expect(view.getByText("OUT OF CHIPS")).toBeOnTheScreen();
     expect(view.queryByTestId("results-deal")).toBeNull();
 
     await fireEvent.press(view.getByTestId("free-refill-button"));

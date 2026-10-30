@@ -14,6 +14,7 @@ import type { MikroORM } from "@mikro-orm/postgresql";
 import { Client } from "pg";
 
 import {
+  buyInFor,
   hasWelcomeEvent,
   openWalletEvent,
   pendingWalletEvents,
@@ -78,6 +79,8 @@ describe(
       assert.ok(a && b);
       assert.notEqual(a.id, b.id);
       assert.equal(a.ref, "room-a");
+      assert.equal((await buyInFor(userId, "room-b", { orm }))?.id, b.id);
+      assert.equal(await buyInFor(userId, "room-c", { orm }), null);
     });
 
     it("records a webhook event once", async () => {

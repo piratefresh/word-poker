@@ -47,6 +47,7 @@ export {
 } from "./quests";
 export { adoptGuestHistory, countPlayedHands } from "./guest";
 export {
+  buyInFor,
   hasWelcomeEvent,
   openWalletEvent,
   pendingWalletEvents,

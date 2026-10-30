@@ -12,7 +12,7 @@ import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/
 import { formatAmount } from "@/lib/ui/format";
 import { isJoinable, openSeats } from "@/features/online/lobby-view";
 import { powersLabel } from "@/features/table/power-view";
-import { spokenTable } from "./parlor-view";
+import { buyInNote, cannotAfford, needCoinsLabel, spokenTable } from "./parlor-view";
 
 export interface FeaturedTableCardProps {
   readonly room: RoomSummary;
@@ -20,6 +20,8 @@ export interface FeaturedTableCardProps {
   readonly onDetails: () => void;
   readonly joining?: boolean;
   readonly yours?: boolean;
+  /** The Wallet's coins; `null` while unread. */
+  readonly coins?: number | null;
 }
 
 export function FeaturedTableCard({
@@ -28,12 +30,14 @@ export function FeaturedTableCard({
   onDetails,
   joining = false,
   yours = false,
+  coins = null,
 }: FeaturedTableCardProps): ReactElement {
   const lastWord = room.metadata.lastWord;
   const players = room.metadata.players ?? [];
   const seats = Math.min(room.maxClients, MAX_SEATS);
   const mode = powersLabel(room.metadata.powerUps) ?? "Classic";
-  const canJoin = isJoinable(room) || yours;
+  const short = !yours && cannotAfford(room, coins);
+  const canJoin = (isJoinable(room) && !short) || yours;
 
   return (
     <View style={styles.card} testID="parlor-featured">
@@ -101,10 +105,11 @@ export function FeaturedTableCard({
       <GoldButton
         accessibilityLabel={spokenTable(room, yours)}
         disabled={!canJoin || joining}
-        label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : `JOIN · ${formatAmount(room.metadata.buyIn)}`}
+        label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : short && isJoinable(room) ? needCoinsLabel(room) : `JOIN · ${formatAmount(room.metadata.buyIn)}`}
         onPress={onJoin}
         testID="parlor-featured-join"
       />
+      {yours ? null : <Text style={styles.note}>{buyInNote(room)}</Text>}
     </View>
   );
 }
@@ -146,4 +151,5 @@ const styles = StyleSheet.create({
   seatInitialOpen: { color: nightLobby.text.muted },
   openCount: { color: nightLobby.status.open, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.caption, letterSpacing: 0.8, marginLeft: spacing.xs },
   buyIn: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.h3 },
+  note: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.small, marginTop: spacing.sm, textAlign: "center" },
 });

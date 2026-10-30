@@ -12,6 +12,7 @@
 
 import { WELCOME_GRANT, type WalletEventKind } from "@wordpoker/contracts";
 import {
+  buyInFor,
   openWalletEvent,
   pendingWalletEvents,
   settleWalletEvent,
@@ -33,6 +34,7 @@ export interface WalletStore {
   openWalletEvent(input: OpenWalletEventInput): Promise<WalletEventRecord | null>;
   settleWalletEvent(id: string, input: SettleWalletEventInput): Promise<void>;
   pendingWalletEvents(userId: string): Promise<WalletEventRecord[]>;
+  buyInFor(userId: string, ref: string): Promise<WalletEventRecord | null>;
 }
 
 export interface WalletDeps {
@@ -44,6 +46,7 @@ const databaseStore: WalletStore = {
   openWalletEvent: (input) => openWalletEvent(input),
   settleWalletEvent: (id, input) => settleWalletEvent(id, input),
   pendingWalletEvents: (userId) => pendingWalletEvents(userId),
+  buyInFor: (userId, ref) => buyInFor(userId, ref),
 };
 
 export type WalletChangeResult =
@@ -51,8 +54,9 @@ export type WalletChangeResult =
   /**
    * `already_recorded`: a unique index held the row (a second welcome). `insufficient_coins`:
    * RevenueCat refused the spend and the row is `failed`. `rejected`: RevenueCat refused the row's
-   * idempotency key (never retryable), and the row is `failed`. `pending`: RevenueCat could not be
-   * reached or is not configured, and the row waits for a retry.
+   * idempotency key (never retryable), or a table's cash-out has no applied buy-in, and the row is
+   * `failed`. `pending`: RevenueCat could not be reached or is not configured, or a table's cash-out
+   * waits on its buy-in, and the row waits for a retry.
    */
   | {
       readonly applied: false;
@@ -75,9 +79,23 @@ function errorCode(error: unknown): string {
   return "unexpected";
 }
 
-/** Sends one row to RevenueCat and settles it on the answer. */
+/**
+ * Sends one row to RevenueCat and settles it on the answer. A table's `cash_out` pays back coins its
+ * `buy_in` took, so it waits while that buy-in is `pending` and fails if it never applied: a credit
+ * sent ahead of an unresolved debit could mint coins.
+ */
 async function send(row: WalletEventRecord, deps: WalletDeps): Promise<WalletChangeResult> {
   const store = deps.store ?? databaseStore;
+
+  if (row.kind === "cash_out" && row.ref !== null) {
+    const buyIn = await store.buyInFor(row.userId, row.ref);
+    if (buyIn?.status === "pending") return { applied: false, reason: "pending" };
+    if (buyIn?.status !== "applied") {
+      await store.settleWalletEvent(row.id, { status: "failed", lastError: "no_buy_in" });
+
+      return { applied: false, reason: "rejected" };
+    }
+  }
 
   try {
     const client = deps.client ?? revenueCat();

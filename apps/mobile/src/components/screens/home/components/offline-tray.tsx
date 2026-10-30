@@ -23,7 +23,7 @@ export function OfflineTray<V extends ModeVariant>({ variants, onDeal, onClose, 
   );
 
   return (
-    <TrayFrame id="offline" title="OFFLINE" subline="Practice vs bots · pick a mode" closeLabel="Close offline modes" onClose={onClose} maxHeight={maxHeight}>
+    <TrayFrame id="offline" title="OFFLINE" subline="Free practice chips · your coins are never at stake" closeLabel="Close offline modes" onClose={onClose} maxHeight={maxHeight}>
       <ModeVariants variants={variants} selectedKey={selected.key} onSelect={(variant) => {
         setSelected(variant);
         writeItem(MODE_KEY, variant.key);

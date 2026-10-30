@@ -24,7 +24,11 @@ jest.mock("@expo/ui", () => {
   const { View } = jest.requireActual("react-native");
   return { BottomSheet: View, RNHostView: View };
 });
-jest.mock("@/lib/quests/quests-provider", () => ({ useQuests: () => ({ coins: 5450, state: { level: 2 } }) }));
+let mockCoins: number | null = 5450;
+const mockRefreshCoins = jest.fn();
+jest.mock("@/lib/quests/quests-provider", () => ({
+  useQuests: () => ({ coins: mockCoins, refreshCoins: mockRefreshCoins, state: { level: 2 } }),
+}));
 jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: () => ({ data: { user: { name: "Dylan" } } }) } }));
 jest.mock("@/components/word-builder/haptics", () => ({ haptic: jest.fn() }));
 jest.mock("react-native-safe-area-context", () =>
@@ -48,6 +52,7 @@ function show(rooms: RoomSummary[] = [], extra: Partial<LobbyView> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCoins = 5450;
   jest.mocked(useActiveRoomId).mockReturnValue(null);
   jest.mocked(useLocalSearchParams).mockReturnValue({});
   jest.mocked(joinTable).mockResolvedValue(undefined);
@@ -103,6 +108,35 @@ test("keeps full rooms visible with a disabled join action", async () => {
   await fireEvent.press(view.getByTestId("lobby-room-full"));
   expect(view.getByTestId("room-details-join")).toBeDisabled();
   expect(joinTable).not.toHaveBeenCalled();
+});
+
+test("disables Join when the Wallet is below the buy-in, and says what it costs", async () => {
+  mockCoins = 400;
+  const view = await show([room("hero"), room("row")]);
+  expect(view.getByTestId("parlor-featured-join")).toBeDisabled();
+  expect(view.getByText("NEED 500 COINS")).toBeOnTheScreen();
+  await fireEvent.press(view.getByTestId("lobby-room-row"));
+  expect(view.getByTestId("room-details-join")).toBeDisabled();
+  expect(view.getAllByText("Takes 500 coins from your wallet. Your chips come back as coins when you leave.").length).toBeGreaterThan(0);
+  expect(joinTable).not.toHaveBeenCalled();
+});
+
+test("points a player with no coins to quests, the store, and free bot games", async () => {
+  mockCoins = 0;
+  const view = await show([room("hero")]);
+  expect(view.getByTestId("lobby-out-of-coins")).toBeOnTheScreen();
+  await fireEvent.press(view.getByTestId("lobby-out-of-coins-store"));
+  expect(router.push).toHaveBeenCalledWith("/store");
+});
+
+test("re-reads the Wallet whenever the lobby comes into focus", async () => {
+  await show([room("hero")]);
+  expect(mockRefreshCoins).toHaveBeenCalled();
+});
+
+test("shows no out-of-coins notice to a player who can afford a table", async () => {
+  const view = await show([room("hero")]);
+  expect(view.queryByTestId("lobby-out-of-coins")).toBeNull();
 });
 
 test("returns to an existing seat without joining it again", async () => {
