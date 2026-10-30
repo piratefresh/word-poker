@@ -182,12 +182,11 @@ test("opens Offline's choices, and Wild Power starts a wild table", async () => 
   await fireEvent.press(view.getByTestId("offline-wild"));
   expect(view.getByTestId("offline-normal").props.accessibilityState.checked).toBe(false);
   expect(view.getByTestId("offline-wild").props.accessibilityState.checked).toBe(true);
-  expect(view.getByText("DEAL · WILD POWER")).toBeTruthy();
   expect(router.push).not.toHaveBeenCalled();
   await fireEvent.press(view.getByTestId("offline-deal"));
   await act(async () => jest.runAllTimers());
 
-  expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { powers: "wild" } });
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { powers: "wild", chips: 1_000 } });
   jest.useRealTimers();
 });
 
@@ -275,19 +274,48 @@ test("restores the selected mode when the picker opens again", async () => {
   await fireEvent.press(view.getByTestId("offline-wild"));
   await fireEvent.press(view.getByTestId("offline-close"));
   await fireEvent.press(view.getByTestId("home-slab-offline"));
-  expect(view.getByText("DEAL · WILD POWER")).toBeTruthy();
+  expect(view.getByTestId("offline-wild").props.accessibilityState.checked).toBe(true);
   expect(mockDisk.get("offline-mode")).toBe("wild");
 });
 
-test("DEAL defaults to the normal offline route", async () => {
+test("DEAL defaults to the normal offline route on 1,000 practice chips, and says it is free", async () => {
   jest.useFakeTimers();
   const view = await render(<HomeScreen />);
   await fireEvent.press(view.getByTestId("home-slab-offline"));
-  expect(view.getByText("DEAL · NORMAL")).toBeTruthy();
+  expect(view.getByTestId("offline-chips-1000").props.accessibilityState.checked).toBe(true);
+  expect(view.getByLabelText("1,000 practice chips, default")).toBeTruthy();
+  expect(view.getByLabelText("Deal. Free practice game, your coins are not used.")).toBeTruthy();
+  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 1,000 practice chips. Your coins stay in your wallet.");
   await fireEvent.press(view.getByTestId("offline-deal"));
   await act(async () => jest.runAllTimers());
-  expect(router.push).toHaveBeenCalledWith("/offline");
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { chips: 1_000 } });
   jest.useRealTimers();
+});
+
+test("STARTING CHIPS deals the picked stack and remembers it", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  await fireEvent.press(view.getByLabelText("2,500 practice chips"));
+  expect(view.getByTestId("offline-chips-2500").props.accessibilityState.checked).toBe(true);
+  expect(view.getByTestId("offline-chips-1000").props.accessibilityState.checked).toBe(false);
+  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 2,500 practice chips. Your coins stay in your wallet.");
+  expect(mockDisk.get("offline-starting-chips")).toBe("2500");
+
+  await fireEvent.press(view.getByTestId("offline-close"));
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByTestId("offline-chips-2500").props.accessibilityState.checked).toBe(true);
+  await fireEvent.press(view.getByTestId("offline-deal"));
+  await act(async () => jest.runAllTimers());
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { chips: 2_500 } });
+  jest.useRealTimers();
+});
+
+test("a stored pick the picker no longer offers falls back to 1,000", async () => {
+  mockDisk.set("offline-starting-chips", "777");
+  const view = await render(<HomeScreen />);
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByTestId("offline-chips-1000").props.accessibilityState.checked).toBe(true);
 });
 
 test("device back dismisses the tray and removes its listener", async () => {

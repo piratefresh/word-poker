@@ -209,8 +209,10 @@ Every hand opens with two forced bets, posted before any tile is dealt:
 - **Small Blind**: 1% of the table's Buy-In Cap
 - **Big Blind**: 2% of the table's Buy-In Cap
 
-The offline table, which has no tiers, plays 10 / 20 on its 1,000-chip stacks (the stack is
-ADR 0002's; the blinds are ADR 0004's).
+The offline table, which has no tiers, plays 10 / 20 whatever its starting stack. Every seat
+starts on the stack the player picks in the offline tray — 500, 1,000, 2,500 or 5,000 practice
+chips, 1,000 by default — and New game deals the same stack again (ADR 0002's session; the
+blinds are ADR 0004's).
 
 - The small blind is posted by the first seat clockwise from the dealer button, the big blind
   by the next.

@@ -1,4 +1,4 @@
-import { pinnedPowerUps, pinnedSeed, pinnedTurnMs } from "./offline-seed";
+import { pinnedPowerUps, pinnedSeed, pinnedStartingChips, pinnedTurnMs } from "./offline-seed";
 
 describe("pinnedSeed", () => {
   test("reads the seed a URL names", () => {
@@ -27,6 +27,14 @@ describe("pinnedTurnMs", () => {
     expect(pinnedTurnMs("300000")).toBe(300_000);
     expect(pinnedTurnMs(["5000", "9"])).toBe(5_000);
     for (const bad of [undefined, "", "0", "-1", "soon"]) expect(pinnedTurnMs(bad)).toBeUndefined();
+  });
+});
+
+describe("pinnedStartingChips", () => {
+  test("reads the stack a URL names, and ignores anything that is not a positive whole number", () => {
+    expect(pinnedStartingChips("2500")).toBe(2_500);
+    expect(pinnedStartingChips(["500", "5000"])).toBe(500);
+    for (const bad of [undefined, "", "0", "-500", "2.5", "lots"]) expect(pinnedStartingChips(bad)).toBeUndefined();
   });
 });
 

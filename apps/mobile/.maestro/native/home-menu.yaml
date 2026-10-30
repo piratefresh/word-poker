@@ -42,19 +42,26 @@ tags:
 # Choosing a card updates the deal; dismissing preserves the choice.
 - tapOn:
     id: "offline-wild"
-- assertVisible: "DEAL · WILD POWER"
+- assertVisible:
+    id: "offline-wild"
+    checked: true
 - tapOn:
     id: "offline-close"
 - assertNotVisible:
     id: "offline-tray"
 - tapOn:
     id: "home-slab-offline"
-- assertVisible: "DEAL · WILD POWER"
+- assertVisible:
+    id: "offline-wild"
+    checked: true
 
 # Normal walks through the door only after DEAL.
 - tapOn:
     id: "offline-normal"
-- assertVisible: "DEAL · NORMAL"
+- assertVisible:
+    id: "offline-normal"
+    checked: true
+- assertVisible: "Everyone gets 1,000 practice chips. Your coins stay in your wallet."
 - tapOn:
     id: "offline-deal"
 - extendedWaitUntil:
