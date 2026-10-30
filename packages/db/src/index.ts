@@ -46,6 +46,7 @@ export {
   type QuestProgressRecord,
 } from "./quests";
 export { adoptGuestHistory, countPlayedHands } from "./guest";
+export { eraseAccountData } from "./account-erasure";
 export {
   buyInFor,
   hasWelcomeEvent,

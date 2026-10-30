@@ -198,3 +198,25 @@ describe("revenueCat()", () => {
     assert.throws(() => revenueCat(), EconomyNotConfiguredError);
   });
 });
+
+describe("deleteCustomer", () => {
+  it("deletes the customer", async () => {
+    const { rc, requests } = client([{ status: 200, body: { object: "customer", id: "user_1", deleted_at: 1 } }]);
+
+    await rc.deleteCustomer("user_1");
+    assert.equal(requests[0]?.url, `${BASE}/customers/user_1`);
+    assert.equal(requests[0]?.method, "DELETE");
+  });
+
+  it("treats a customer RevenueCat never saw as deleted", async () => {
+    const { rc } = client([rcError(404, "resource_missing")]);
+
+    await rc.deleteCustomer("user_1");
+  });
+
+  it("throws anything else, so the account is not deleted without its Wallet", async () => {
+    const { rc } = client([rcError(500, "server_error")]);
+
+    await assert.rejects(rc.deleteCustomer("user_1"), RevenueCatError);
+  });
+});

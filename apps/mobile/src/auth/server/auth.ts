@@ -1,7 +1,8 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { anonymous, bearer, lastLoginMethod, username } from "better-auth/plugins";
-import { adoptGuestHistory, inTransaction } from "@wordpoker/db";
+import { adoptGuestHistory, eraseAccountData, inTransaction } from "@wordpoker/db";
+import { deleteWallet } from "@wordpoker/economy";
 import { config } from "dotenv";
 import { Pool } from "pg";
 
@@ -132,10 +133,20 @@ export const auth = betterAuth({
     }),
   ],
   // Rate limits live in Postgres (`rateLimit`), so every API replica counts the same attempts.
-  rateLimit: { storage: "database" },
+  rateLimit: { storage: "database", customRules: { "/delete-user": { window: 60, max: 5 } } },
   // The per-kind notification switches (STO-585) live on the account, so they follow the player
   // across devices; the client reads them from the session and writes them with `updateUser`.
   user: {
+    // STO-821. The password, or a session under a day old (a Game Center reauth mints one), confirms
+    // the player. The Wallet goes last, so a RevenueCat failure rolls back and the player can retry.
+    deleteUser: {
+      enabled: true,
+      beforeDelete: (user) =>
+        inTransaction(authPool, async (sql) => {
+          await eraseAccountData(sql, user.id);
+          await deleteWallet(user.id);
+        }),
+    },
     additionalFields: {
       notifyTableInvite: { type: "boolean", defaultValue: true, required: false },
       notifyFriendRequest: { type: "boolean", defaultValue: true, required: false },

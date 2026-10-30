@@ -23,6 +23,7 @@ describe("platform-auth plugin", { skip: !serverUrl && "no TEST_DATABASE_URL" },
   let auth;
   let PlatformAuthError;
   const ready = [];
+  let deleteWallet = async () => {};
 
   const makeAuth = async (verifiers, extra = {}) => {
     const { platformAuth } = await import("./platform-auth.ts");
@@ -32,7 +33,11 @@ describe("platform-auth plugin", { skip: !serverUrl && "no TEST_DATABASE_URL" },
       database: pool,
       emailAndPassword: { enabled: true },
       rateLimit: { storage: "database", enabled: false },
-      user: { additionalFields: { primaryIdentityVerified: { type: "boolean", defaultValue: false, required: false, input: false } } },
+      user: {
+        // As auth.ts: the erasure and the Wallet in one transaction, before Better Auth drops the user.
+        deleteUser: { enabled: true, beforeDelete: (user) => db.inTransaction(pool, async (sql) => { await db.eraseAccountData(sql, user.id); await deleteWallet(user.id); }) },
+        additionalFields: { primaryIdentityVerified: { type: "boolean", defaultValue: false, required: false, input: false } },
+      },
       plugins: [
         bearer(),
         anonymous({
@@ -163,6 +168,51 @@ describe("platform-auth plugin", { skip: !serverUrl && "no TEST_DATABASE_URL" },
     const taken = await gameCenter("T:ada", headers, { intent: "link" });
     assert.equal(await codeOf(taken), "IDENTITY_IN_USE");
     assert.notEqual(await db.providerOwner(pool, "game-center", "T:ada"), (await sessionOf(headers)).user.id);
+  });
+
+  it("reauth freshens a session only for the account that owns the Game Center identity", async () => {
+    assert.equal(await codeOf(await post("/platform-auth/begin", { provider: "game-center", intent: "reauth" })), "SESSION_REQUIRED");
+    const guest = { cookie: cookieOf(await post("/sign-in/anonymous", {})) };
+    assert.equal(await codeOf(await post("/platform-auth/begin", { provider: "game-center", intent: "reauth" }, guest)), "SESSION_REQUIRED");
+
+    const owner = { cookie: cookieOf(await gameCenter("T:reauth")) };
+    const { id } = (await sessionOf(owner)).user;
+    assert.equal(await codeOf(await gameCenter("T:reauth-other", owner, { intent: "reauth" })), "IDENTITY_IN_USE");
+
+    const fresh = await gameCenter("T:reauth", owner, { intent: "reauth" });
+    assert.deepEqual(await fresh.json(), { outcome: "signed-in" });
+    assert.equal((await sessionOf({ cookie: cookieOf(fresh) })).user.id, id);
+  });
+
+  it("deleting takes a fresh session, rolls back without the Wallet, and leaves the identity free", async () => {
+    const stale = { cookie: cookieOf(await gameCenter("T:delete")) };
+    const { id } = (await sessionOf(stale)).user;
+    await pool.query(`insert into presence (user_id, seen_at) values ($1, now())`, [id]);
+    await pool.query(`update "session" set "createdAt" = now() - interval '2 days' where "userId" = $1`, [id]);
+    assert.equal(await codeOf(await post("/delete-user", {}, stale)), "SESSION_EXPIRED");
+
+    const fresh = { cookie: cookieOf(await gameCenter("T:delete", stale, { intent: "reauth" })) };
+    deleteWallet = async () => { throw new Error("RevenueCat is down"); };
+    assert.notEqual((await post("/delete-user", {}, fresh)).status, 200);
+    deleteWallet = async () => {};
+    assert.equal((await pool.query(`select count(*)::int as n from presence where user_id = $1`, [id])).rows[0].n, 1, "a failed delete keeps everything");
+    assert.equal((await sessionOf(fresh)).user.id, id);
+
+    assert.equal((await post("/delete-user", {}, fresh)).status, 200);
+    assert.equal((await pool.query(`select count(*)::int as n from presence where user_id = $1`, [id])).rows[0].n, 0);
+    assert.equal(await sessionOf(stale), null, "every session goes with the account");
+    assert.equal(await db.providerOwner(pool, "game-center", "T:delete"), null);
+    const again = { cookie: cookieOf(await gameCenter("T:delete")) };
+    assert.notEqual((await sessionOf(again)).user.id, id);
+  });
+
+  it("deleting with a password refuses a wrong one, and the email can register again", async () => {
+    const credentials = { email: "gone@example.com", password: "correct-horse", name: "Gone" };
+    const headers = { cookie: cookieOf(await post("/sign-up/email", credentials)) };
+    assert.equal(await codeOf(await post("/delete-user", { password: "wrong-horse" }, headers)), "INVALID_PASSWORD");
+    assert.equal((await post("/delete-user", { password: credentials.password }, headers)).status, 200);
+    assert.equal((await post("/sign-in/email", credentials)).status, 401);
+    assert.equal((await post("/sign-up/email", credentials)).status, 200);
   });
 
   it("a guest moves into a Game Center account only with consent, and only under its own session", async () => {

@@ -186,10 +186,10 @@ export function platformAuth({ pool, verifiers, onAccountReady }: PlatformAuthOp
         const session = await getSessionFromCtx(ctx, { disableRefresh: true });
         const user = session?.user;
         // Which session each intent starts from: sign-in replaces none or a guest; restore only
-        // ever runs signed out; linking and associating need the permanent account they change.
+        // ever runs signed out; linking, reauth and associating need the permanent account they touch.
         if (body.intent === "sign-in" && user && !user.isAnonymous) throw fail("SESSION_CHANGED");
         if (body.intent === "restore" && session) throw fail("SESSION_CHANGED");
-        if (body.intent === "link" && (!user || user.isAnonymous)) throw fail("SESSION_REQUIRED");
+        if ((body.intent === "link" || body.intent === "reauth") && (!user || user.isAnonymous)) throw fail("SESSION_REQUIRED");
         if (body.intent === "associate" && !isAccountEligible(user)) throw fail("SESSION_REQUIRED");
 
         const attemptToken = randomBytes(32).toString("base64url");
@@ -225,6 +225,11 @@ export function platformAuth({ pool, verifiers, onAccountReady }: PlatformAuthOp
           if (!bound) throw fail("SESSION_CHANGED");
           if (bound.intent === "link") {
             if ((await linkProvider(sql, bound.userId!, "game-center", identity.teamPlayerId)) === "in-use") throw fail("IDENTITY_IN_USE");
+            return { userId: bound.userId!, created: false };
+          }
+          // A step that needs a fresh session (account deletion): only this account's own identity earns one.
+          if (bound.intent === "reauth") {
+            if ((await providerOwner(sql, "game-center", identity.teamPlayerId)) !== bound.userId) throw fail("IDENTITY_IN_USE");
             return { userId: bound.userId!, created: false };
           }
           const owner = await providerOwner(sql, "game-center", identity.teamPlayerId);

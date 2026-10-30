@@ -11,6 +11,7 @@ function grantsClient(grants: CoinGrant[] | Error) {
   const client: RevenueCatClient = {
     getCoinBalance: async () => 0,
     adjustCoins: async () => 0,
+    deleteCustomer: async () => {},
     listCoinGrants: async () => {
       calls += 1;
       if (grants instanceof Error) throw grants;

@@ -7,6 +7,7 @@ import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, linkGameCenter } from "@/auth/client/game-center";
 import { colors, fonts, fontSize, spacing } from "@/constants/theme";
 
+import { DeleteAccount } from "./delete-account";
 import { NotificationSettings } from "./notification-settings";
 
 /** Better Auth's provider ids, as the player knows them. */
@@ -31,6 +32,7 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
   // Offered once the methods are known, so an account that already has Game Center never sees it.
   const canLinkGameCenter = GAME_CENTER_AVAILABLE && !!providers && !providers.includes("game-center");
   const [linking, setLinking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const name = useNativeState(session?.user.name ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,24 +80,32 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
       <View style={{ paddingBottom: spacing.lg }}>
         <Host colorScheme="dark" seedColor={colors.gold} matchContents>
           <Column spacing={spacing.md} style={{ width: width - spacing.lg * 2 }}>
-            <Text textStyle={{ color: colors.textBright, fontFamily: fonts.ui, fontSize: fontSize.h3 }}>Account settings</Text>
-            <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>
-              {session?.user.isAnonymous
-                ? "Guest account"
-                : isPlaceholderEmail(session?.user.email) ? "" : session?.user.email}
-            </Text>
-            {methods ? (
-              <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>{`Sign-in: ${methods}`}</Text>
-            ) : null}
-            <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Display name</Text>
-            <TextInput placeholder="Display name" editable={!saving} testID="account-display-name" value={name} />
-            {canLinkGameCenter ? (
-              <Button disabled={linking} label={linking ? "Linking…" : "Link Game Center"} onPress={link} variant="text" testID="account-link-game-center" />
-            ) : null}
-            {session?.user.isAnonymous ? null : <NotificationSettings />}
-            {error ? <Text textStyle={{ color: colors.danger }}>{error}</Text> : null}
-            <Button disabled={saving} label={saving ? "Saving…" : "Save changes"} onPress={save} testID="account-save" />
-            <Button disabled={saving} label="Cancel" onPress={onDismiss} variant="text" />
+            {deleting && providers ? (
+              <DeleteAccount onBack={() => setDeleting(false)} onDeleted={onDismiss} providers={providers} />
+            ) : (
+              <>
+                <Text textStyle={{ color: colors.textBright, fontFamily: fonts.ui, fontSize: fontSize.h3 }}>Account settings</Text>
+                <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>
+                  {session?.user.isAnonymous
+                    ? "Guest account"
+                    : isPlaceholderEmail(session?.user.email) ? "" : session?.user.email}
+                </Text>
+                {methods ? (
+                  <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>{`Sign-in: ${methods}`}</Text>
+                ) : null}
+                <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Display name</Text>
+                <TextInput placeholder="Display name" editable={!saving} testID="account-display-name" value={name} />
+                {canLinkGameCenter ? (
+                  <Button disabled={linking} label={linking ? "Linking…" : "Link Game Center"} onPress={link} variant="text" testID="account-link-game-center" />
+                ) : null}
+                {session?.user.isAnonymous ? null : <NotificationSettings />}
+                {error ? <Text textStyle={{ color: colors.danger }}>{error}</Text> : null}
+                <Button disabled={saving} label={saving ? "Saving…" : "Save changes"} onPress={save} testID="account-save" />
+                <Button disabled={saving} label="Cancel" onPress={onDismiss} variant="text" />
+                {/* Waits on the sign-in methods, which guests never load: they have no account to delete. */}
+                {providers ? <Button disabled={saving} label="Delete account" onPress={() => setDeleting(true)} variant="text" testID="account-delete" /> : null}
+              </>
+            )}
           </Column>
         </Host>
       </View>

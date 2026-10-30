@@ -41,7 +41,7 @@ function serverFailure(error: { code?: string; message?: string }): GameCenterRe
 
 /** Attempt → fresh proof → exchange. Runs inside a session change for sign-in, directly for link. */
 async function exchange(
-  intent: Extract<PlatformAuthIntent, "sign-in" | "link">,
+  intent: Extract<PlatformAuthIntent, "sign-in" | "link" | "reauth">,
   adoptGuestProgress: boolean,
   displayName?: string,
 ): Promise<GameCenterResult> {
@@ -87,6 +87,12 @@ export async function signInWithGameCenter({ adoptGuestProgress }: { adoptGuestP
 export async function linkGameCenter(): Promise<GameCenterResult> {
   const native = await signedInToGameCenter();
   return native.ok ? exchange("link", false) : native;
+}
+
+/** Proves this device's Game Center player owns the account, which freshens its session. */
+export async function reauthenticateWithGameCenter(): Promise<GameCenterResult> {
+  const native = await signedInToGameCenter();
+  return native.ok ? changeSession(() => exchange("reauth", false)) : native;
 }
 
 let restore: Promise<boolean> | null = null;

@@ -141,6 +141,11 @@ export function getCoinBalance(userId: string, deps: Pick<WalletDeps, "client"> 
   return (deps.client ?? revenueCat()).getCoinBalance(userId);
 }
 
+/** Removes a deleted account's Wallet from RevenueCat. Throws when that could not be done. */
+export function deleteWallet(userId: string, deps: Pick<WalletDeps, "client"> = {}): Promise<void> {
+  return (deps.client ?? revenueCat()).deleteCustomer(userId);
+}
+
 /** The once-per-player welcome grant, paid when the player verifies their email. */
 export function grantWelcome(
   userId: string,
