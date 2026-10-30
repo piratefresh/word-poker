@@ -46,7 +46,7 @@ export interface GameButtonProps {
   /** The printed label. Omit it for an icon button and pass the icon as `children`. */
   label?: string;
   /**
-   * Printed after the label in the material's accent colour — the count in "VALIDATE WORD 5/5".
+   * Printed after the label in the material's accent colour — the count in "CHECK WORD 5/5".
    * A material without an accent prints it in the label's own ink.
    */
   labelAccent?: string;

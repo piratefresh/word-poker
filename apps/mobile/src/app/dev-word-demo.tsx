@@ -99,7 +99,7 @@ const PRIVATE_HIGH_MULTI_TILE: TileData = {
  * The tutorial's deal on the real word builder. `showMultiTiles` places two choice tiles next to
  * each other and a Triple Letter tile beside them for this route's preview; the tabletop kit
  * keeps the lesson's own deal. `revealed` is how much of the board is out — 3 is the flop, 5 the
- * river — and `actions` draws Shuffle and Validate Word under the rack, as the felt does.
+ * river — and `actions` draws Shuffle and Check Word under the rack, as the felt does.
  */
 export function Stage({
   dictionary,
