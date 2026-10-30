@@ -4,15 +4,15 @@ url: http://localhost:8081/online
 name: Four-seat - create Four Table
 ---
 - tapOn:
-    text: "Deal a new table"
+    text: ".*DEAL A NEW TABLE"
 - tapOn:
     id: "Table name"
 - inputText: "Four Table"
 - tapOn:
-    text: "Create"
+    text: "CREATE · 500"
 - extendedWaitUntil:
     visible:
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU"
+    text: "YOU · .*"

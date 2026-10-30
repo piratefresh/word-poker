@@ -8,19 +8,19 @@ tags: [web, online, cross-platform]
 ---
 - openLink: ${WEB_URL}/online
 - extendedWaitUntil:
-    visible: "TAKE YOUR SEAT|Deal a new table"
+    visible: "TAKE YOUR SEAT|.*DEAL A NEW TABLE"
     timeout: 180000
 # Always: a session left in this profile may be the native seat's account (one seat per account).
 - runFlow: sign-in.yaml
 - openLink: ${WEB_URL}/online
 - extendedWaitUntil:
-    visible: "Deal a new table"
+    visible: ".*DEAL A NEW TABLE"
     timeout: 180000
-- tapOn: "Deal a new table"
+- tapOn: ".*DEAL A NEW TABLE"
 - tapOn:
     id: "Table name"
 - inputText: "Cross Platform Table"
-- tapOn: "Create"
+- tapOn: "CREATE · 500"
 - extendedWaitUntil:
     visible:
       id: "poker-table"

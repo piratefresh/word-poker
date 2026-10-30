@@ -20,7 +20,7 @@ tags:
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU"
+    text: "YOU · .*"
 
 # The waiting room carries the invite; its link names this same table.
 - tapOn:

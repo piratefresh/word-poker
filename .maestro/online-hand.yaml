@@ -46,7 +46,7 @@ tags:
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU"
+    text: "YOU · .*"
 
 # The opponent is ready; the browser is the second seat, and readies itself through the same
 # control a device flow taps.

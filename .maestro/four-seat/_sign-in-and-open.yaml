@@ -14,5 +14,5 @@ name: Four-seat - sign in and open the lobby
     file: ../sign-in.yaml
 - openLink: http://localhost:8081/online
 - extendedWaitUntil:
-    visible: "Deal a new table"
+    visible: ".*DEAL A NEW TABLE"
     timeout: 30000
