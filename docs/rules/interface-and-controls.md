@@ -60,7 +60,7 @@ returning it to the left restores Check or Call. The label and tap use the same 
 During the word-confirm window, the primary action is **Submit Word**. Betting controls
 (Fold, All In, and the wager slider) are hidden. A persistent **FINAL STAGE · SUBMIT YOUR WORD**
 label explains that betting is complete, and the labeled shared countdown shows the submission
-deadline. Submitting locks the word; the optional **Validate Word** only checks validity.
+deadline. Submitting locks the word; the optional **Check Word** only checks validity.
 While a request is pending, show **Submitting…**; only authoritative acceptance shows
 **WORD SUBMITTED · Waiting for other players**. A refusal leaves the draft actionable while
 time remains. Folded players spectate this stage; all-in players still submit.

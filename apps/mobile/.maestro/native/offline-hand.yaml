@@ -193,15 +193,15 @@ tags:
 - assertNotVisible:
     id: "all-in-button"
 
-# Validate Word spends one lookup without submitting; the count dropping proves the tap landed
+# Check Word spends one lookup without submitting; the count dropping proves the tap landed
 # (the betting row used to sit over part of the button and swallow the press).
 - assertVisible:
-    text: "VALIDATE WORD 5/5"
+    text: "CHECK WORD 5/5"
 - tapOn:
     id: "word-check-button"
     waitToSettleTimeoutMs: 500
 - assertVisible:
-    text: "VALIDATE WORD 4/5"
+    text: "CHECK WORD 4/5"
 - assertVisible:
     text: "ZIG"
 

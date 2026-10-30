@@ -20,7 +20,7 @@ keeps its number for life: new material is appended as a new number, never slott
 | [Re-Buy, Leaving & Disconnects](rules/table-lifecycle.md) | 27–29 | Re-buys and top-ups, leaving the table, disconnects, idle removal, table closing |
 | [Seated Interface & Betting Controls](rules/interface-and-controls.md) | 30–31 | Seated table UI, betting control requirements |
 | [Edge Cases, Acceptance Criteria & Hand Summary](rules/edge-cases-and-acceptance.md) | 32–34 | Gameplay edge cases, acceptance criteria, complete hand summary |
-| [Table Features](rules/table-features.md) | 35–38, 43 | Shuffle, pre-selected actions, anonymity, chip and winner motion, Validate Word |
+| [Table Features](rules/table-features.md) | 35–38, 43 | Shuffle, pre-selected actions, anonymity, chip and winner motion, Check Word |
 | [Accessibility](rules/accessibility.md) | 39 | Text-to-speech, visual settings, audio and motion settings |
 | [Formats: Rooms, Tournaments & Cash Games](rules/formats.md) | 40–42 | Room variations, tournaments, cash-game stakes |
 | [Power-Ups](rules/power-ups.md) | 44 | The Power Draw, the held power, activation windows, the v1 powers, swapping a tile, visibility |

@@ -157,18 +157,6 @@ export const styles = StyleSheet.create({
   },
   coinDim: { backgroundColor: colors.surface },
   coinText: { ...type.numeric, color: colors.onGold, fontSize: fontSize.title },
-  coinTag: {
-    ...type.label,
-    backgroundColor: "#fff",
-    borderRadius: radius.pill,
-    color: colors.onGold,
-    fontSize: 10,
-    overflow: "hidden",
-    paddingHorizontal: 5,
-    position: "absolute",
-    right: -6,
-    top: -8,
-  },
   rackBonus: { ...type.label, color: colors.onGold },
   // A pill hung off the tray's top-right corner, half over its edge.
   rackBonusPill: {
@@ -199,9 +187,10 @@ export const styles = StyleSheet.create({
     paddingBottom: 0,
     paddingTop: spacing.xs,
   },
+  // Portrait has the width for shuffle and check side by side.
   trayActions: {
     alignItems: "center",
-    flexDirection: "column",
+    flexDirection: "row",
     gap: spacing.xs,
     justifyContent: "center",
     marginTop: spacing.xxs,
@@ -227,6 +216,7 @@ export const styles = StyleSheet.create({
   // pinned to the row's left edge so the rail stays centred on the screen.
   trayActionsLandscape: {
     alignItems: "center",
+    flexDirection: "column",
     gap: 6,
     left: 0,
     marginTop: 46,

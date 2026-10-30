@@ -36,7 +36,6 @@ export function DraftPlate({
   const checked = checkedResult ?? null;
   const refused = reason !== null || checked?.valid === false;
   const points = checked?.valid ? (checked.points ?? 0) : score?.total ?? null;
-  const multiplier = refused ? undefined : bestMultiplier(score);
 
   return (
     <>
@@ -74,9 +73,6 @@ export function DraftPlate({
           >
             {refused || points === null ? "–" : points}
           </Text>
-          {multiplier === undefined ? null : (
-            <Text style={styles.coinTag}>{multiplier}</Text>
-          )}
           {open && !refused && score !== null ? (
             <View style={styles.breakdown} testID="word-builder-breakdown">
               {score.letters.map((letter, at) => (
@@ -136,11 +132,4 @@ export function DraftPlate({
       )}
     </>
   );
-}
-
-/** The biggest tile multiplier the word plays, as the coin's tag; none when no tile has one. */
-function bestMultiplier(score: WordScore | null): string | undefined {
-  const kinds = score?.letters.map((letter) => letter.multiplier) ?? [];
-  if (kinds.includes("triple-letter")) return "3×";
-  return kinds.includes("double-letter") ? "2×" : undefined;
 }

@@ -514,8 +514,8 @@ export function WordCheckButton(): JSX.Element | null {
   return (
     <RackPill
       disabled={!canCheck}
-      label={`VALIDATE WORD ${remaining}/${WORD_CHECKS_PER_HAND}`}
-      accessibilityLabel={`Validate Word, ${remaining} of ${WORD_CHECKS_PER_HAND} checks remaining. Checks validity without submitting.`}
+      label={`CHECK WORD ${remaining}/${WORD_CHECKS_PER_HAND}`}
+      accessibilityLabel={`Check Word, ${remaining} of ${WORD_CHECKS_PER_HAND} checks remaining. Checks validity without submitting.`}
       scale={scale}
       onPress={handleCheck}
       testID="word-check-button"
