@@ -200,6 +200,8 @@ export const nightLobby = {
   alert: { background: "#3b1620", border: "#e5604a", text: "#ffb3a7" },
   sky: ["#02030a", "#050a1c", "#0a1532", "#0d1a3c"],
   coin: { gradient: ["#ffe28a", "#c98a2c"], text: ledger.parchment },
+  /** Design 1a's practice chip: bot tables only, so it is never mistaken for a coin. */
+  practiceChip: { gradient: ["#ffffff", "#8e9bb2"] },
 } as const;
 
 /* ── gradients (expo-linear-gradient: {...gradients.felt}) ───────── */

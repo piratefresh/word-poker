@@ -549,7 +549,10 @@ function GameScreenBody({
                   onPress={onSeatPress}
                   pill={landscape && slot.seat?.isHero === true}
                   labelScale={labelScale}
+                  // Free play (offline, tutorial) deals practice chips, never coins.
+                  practice={balance.state === "free-play"}
                   tabletop
+                  timed={game.wordSubmission != null && !waiting}
                   turnProgress={waiting ? undefined : view.elapsedFraction}
                 />
               )}

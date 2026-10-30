@@ -70,7 +70,7 @@ const BALANCE_CASES: [string, BalanceView, string, string][] = [
   ["empty", { state: "ready", amount: 0 }, "Balance $0", "$0"],
   ["loading", { state: "loading" }, "Balance loading", "···"],
   ["unavailable", { state: "unavailable" }, "Balance unavailable", "—"],
-  ["free-play", FREE_PLAY, "Free play", "FREE PLAY"],
+  ["free-play", FREE_PLAY, "Practice game", "PRACTICE"],
 ];
 
 test.each(BALANCE_CASES)(
@@ -111,9 +111,9 @@ test.each(READ_ONLY_CASES)("%s is a value, not a control", async (_name, balance
 test("hangs the mode's tag under the capsule, and only there", async () => {
   const view = await renderBar({ balance: FREE_PLAY, modeTag: true });
 
-  expect(view.getByLabelText("Free play")).toBeOnTheScreen();
+  expect(view.getByLabelText("Practice game")).toBeOnTheScreen();
   // One readout: the corner group is not drawing a second copy of it.
-  expect(view.getAllByLabelText("Free play")).toHaveLength(1);
+  expect(view.getAllByLabelText("Practice game")).toHaveLength(1);
 });
 
 test("keeps a mode's tag in the corner group where the screen cannot hang it", async () => {
@@ -121,7 +121,7 @@ test("keeps a mode's tag in the corner group where the screen cannot hang it", a
 
   // Without a tag under the capsule the chip rides the corner with the help button, where it
   // has always been: a room too short for the tag leaves the header as it was.
-  expect(view.getByLabelText("Free play")).toBeOnTheScreen();
+  expect(view.getByLabelText("Practice game")).toBeOnTheScreen();
   expect(view.getByRole("button", { name: "How to play" })).toBeOnTheScreen();
 });
 

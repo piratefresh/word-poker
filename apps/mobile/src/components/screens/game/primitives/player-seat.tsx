@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { RackTileBack } from "@/components/game";
 import { ChipSprite } from "@/components/chip/chip-sprite";
+import { CoinChip } from "@/components/chip/coin-chip";
 import { chipToneForAmount } from "@/components/chip/chip-value";
 import { ShadowBox } from "@/components/ui/shadow-box";
 
@@ -16,7 +17,7 @@ import {
   layout,
   palette,
 } from "@/constants/theme";
-import { formatAmount } from "@/lib/ui/format";
+import { formatAmount, formatCoins } from "@/lib/ui/format";
 import { webTestID } from "@/lib/ui/web-id";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
@@ -120,12 +121,6 @@ function seatStyles(m: SeatMetrics) {
       lineHeight: m.nameLine,
     },
     stackRow: { gap: m.coin * 0.4 },
-    coin: {
-      borderRadius: m.coin / 2,
-      borderWidth: m.scale,
-      height: m.coin,
-      width: m.coin,
-    },
     statusPill: {
       borderRadius: 999,
       borderWidth: m.pillBorder,
@@ -181,10 +176,12 @@ export function PlayerSeat({
   tabletop = false,
   level,
   turnProgress,
+  timed = false,
   onPress,
   direction: directionOverride,
   pill = false,
   labelScale = 1,
+  practice = false,
 }: SeatSlot<GamePlayer> & {
   /** The hand is dealt: an opponent still in it shows its two tiles face down in a rack. */
   dealt?: boolean;
@@ -194,6 +191,8 @@ export function PlayerSeat({
   level?: number;
   /** Elapsed share of the same turn timer displayed by the HUD. */
   turnProgress?: number;
+  /** The shared final-word window is open: every seat still in the hand runs the clock. */
+  timed?: boolean;
   onPress?: (player: GamePlayer) => void;
   /** Where the labels sit, over the one the seat's place at the table picks. */
   direction?: SeatDirection;
@@ -204,6 +203,8 @@ export function PlayerSeat({
   pill?: boolean;
   /** Grows the nameplate and status tag alone (`seatMetrics`): landscape's short felt shrinks them past reading. */
   labelScale?: number;
+  /** A bot table's stacks are practice chips (design 1a): silver, and named so. */
+  practice?: boolean;
 }) {
   const { metrics, scaled } = useSeatStyles(appearanceWidth ?? size.width, tabletop, labelScale);
   const direction = directionOverride ?? seatDirection(anchor, seatCount);
@@ -252,7 +253,10 @@ export function PlayerSeat({
   const winner = seat.status === "winner";
   const lit = active || winner;
   // The hero and opponents share the HUD's turn fill while they are acting.
-  const turn = active || seat.status === "thinking";
+  const turn =
+    active ||
+    seat.status === "thinking" ||
+    (timed && seat.status !== "fold" && seat.status !== "busted");
   const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";
@@ -318,14 +322,17 @@ export function PlayerSeat({
       </View>
       {labelColumn(
         <>
-          <View style={[styles.plate, scaled.plate, firstLabel]}>
-            <Text
-              numberOfLines={1}
-              style={[styles.playerName, scaled.playerName]}
-              testID={`seat-label-${seat.id}`}
-            >
-              {seat.isHero ? "YOU" : seat.name.toUpperCase()} · {seat.stack.toLocaleString()}
+          <View
+            accessible
+            accessibilityLabel={`${seat.name}, ${formatCoins(seat.stack)} ${practice ? "practice chips" : "chips"}`}
+            style={[styles.plate, styles.stackRow, scaled.plate, scaled.stackRow, firstLabel]}
+            testID={`seat-label-${seat.id}`}
+          >
+            <Text numberOfLines={1} style={[styles.playerName, scaled.playerName, styles.plateName]}>
+              {seat.isHero ? "YOU" : seat.name.toUpperCase()}
             </Text>
+            <CoinChip practice={practice} size={metrics.coin} />
+            <Text style={[styles.playerName, scaled.playerName]}>{formatCoins(seat.stack)}</Text>
           </View>
           {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View style={[styles.statusRow, scaled.statusRow]}>
@@ -502,8 +509,8 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   playerName: { color: "#35251b", fontFamily: fonts.sansBlack },
-  stackRow: { alignItems: "center", flexDirection: "row" },
-  coin: { backgroundColor: "#FFC72C", borderColor: "#8A5A00", boxShadow: "inset 0 0 0 2px #ffe787" },
+  stackRow: { alignItems: "center", flexDirection: "row", justifyContent: "center" },
+  plateName: { flexShrink: 1 },
   stack: { color: "#fff8e9", fontFamily: fonts.arcade },
   statusPill: {
     backgroundColor: "#171412",
