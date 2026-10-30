@@ -1,22 +1,10 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text } from "react-native";
 
-import {
-  AuthShell,
-  Field,
-  FooterLine,
-  GoldButton,
-} from "./auth-shell";
-import { colors, theme } from "@/constants/theme";
+import { MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT } from "./auth-form";
+import { AuthShell, CardNote, Field, FooterLine, GoldButton } from "./auth-shell";
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 import { authClient } from "@/auth/client/auth-client";
-
-/** `type` is the token group's own name: rename it so it reads as a style set. */
-const { type: typography } = theme;
-
-/** Better Auth's default floor (`password.minPasswordLength`). */
-const MIN_PASSWORD_LENGTH = 8;
 
 const NETWORK_ERROR =
   "Could not reach the server — check your connection and try again.";
@@ -27,17 +15,23 @@ const NETWORK_ERROR =
  */
 export function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string>();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
 
   const submit = async () => {
-    setPending(true);
     setError(null);
+    if (!email.trim()) {
+      setEmailError("Enter your email.");
+      return;
+    }
+
+    setPending(true);
 
     try {
       const { error: authError } = await authClient.requestPasswordReset({
-        email,
+        email: email.trim(),
         // The mail's button lands on Better Auth's callback, which hands the
         // token to this deep link.
         redirectTo: RESET_PASSWORD_DEEP_LINK,
@@ -60,60 +54,48 @@ export function ForgotPasswordScreen() {
   if (sent) {
     return (
       <AuthShell
-        greeting="Check your inbox."
-        sub={`If ${email} has an account, a reset link is on its way. The link is good for one hour.`}
+        footer={
+          <FooterLine
+            cta="TRY AGAIN"
+            onPress={() => {
+              setEmail("");
+              setSent(false);
+            }}
+            text="Wrong email?"
+          />
+        }
+        greeting="Check your email."
+        sub={`If ${email.trim()} has an account, we sent it a reset link. It expires in 30 minutes.`}
       >
-        <Text style={styles.note}>
-          Nothing after a minute? Check your spam folder, and make sure the
-          address is the one you signed up with.
-        </Text>
-        <GoldButton
-          kicker="BACK TO THE TABLE"
-          label="Back to sign in"
-          onPress={() => router.replace("/sign-in")}
-        />
-        <FooterLine
-          cta="Try another email"
-          onPress={() => {
-            setEmail("");
-            setSent(false);
-          }}
-          text="Wrong address?"
-        />
+        <GoldButton label="BACK TO SIGN IN" onPress={() => router.replace("/sign-in")} />
       </AuthShell>
     );
   }
 
   return (
     <AuthShell
+      footer={<FooterLine cta="SIGN IN" onPress={() => router.replace("/sign-in")} text="Remembered it?" />}
       greeting="Forgot your password?"
-      sub="Tell us the address on your account and we will send a link to set a new one."
+      sub="Enter your email and we'll send a reset link."
     >
       <Field
         autoCapitalize="none"
         autoComplete="email"
         autoCorrect={false}
+        error={emailError}
         keyboardType="email-address"
-        label="EMAIL"
-        onChangeText={setEmail}
-        placeholder="Email"
-        prefix="@"
+        label="Email"
+        onChangeText={(value) => {
+          setEmail(value);
+          setEmailError(undefined);
+        }}
+        placeholder="you@mail.com"
+        value={email}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <CardNote error>{error}</CardNote> : null}
 
-      <GoldButton
-        kicker="DEAL ME BACK IN"
-        label="Send reset link"
-        onPress={submit}
-        pending={pending}
-      />
-
-      <FooterLine
-        cta="Sign in"
-        onPress={() => router.replace("/sign-in")}
-        text="Remembered it?"
-      />
+      <GoldButton label="SEND RESET LINK" onPress={submit} pending={pending} pendingLabel="SENDING…" />
     </AuthShell>
   );
 }
@@ -129,6 +111,8 @@ export function ResetPasswordScreen() {
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [passwordError, setPasswordError] = useState<string>();
+  const [confirmError, setConfirmError] = useState<string>();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
@@ -138,18 +122,24 @@ export function ResetPasswordScreen() {
       return;
     }
 
+    setError(null);
+
+    if (!password) {
+      setPasswordError("Create a password.");
+      return;
+    }
+
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setPasswordError(PASSWORD_TOO_SHORT);
       return;
     }
 
     if (password !== confirm) {
-      setError("Those two passwords do not match.");
+      setConfirmError("Those two passwords do not match.");
       return;
     }
 
     setPending(true);
-    setError(null);
 
     try {
       const { error: authError } = await authClient.resetPassword({
@@ -174,19 +164,11 @@ export function ResetPasswordScreen() {
   if (!token || params.error) {
     return (
       <AuthShell
+        footer={<FooterLine cta="SIGN IN" onPress={() => router.replace("/sign-in")} text="Remembered it?" />}
         greeting="That link is spent."
-        sub="Reset links are good for one hour and can only be used once."
+        sub="Reset links expire in 30 minutes and can only be used once."
       >
-        <GoldButton
-          kicker="GET A NEW LINK"
-          label="Request another"
-          onPress={() => router.replace("/forgot-password")}
-        />
-        <FooterLine
-          cta="Sign in"
-          onPress={() => router.replace("/sign-in")}
-          text="Remembered it?"
-        />
+        <GoldButton label="REQUEST ANOTHER" onPress={() => router.replace("/forgot-password")} />
       </AuthShell>
     );
   }
@@ -197,61 +179,45 @@ export function ResetPasswordScreen() {
         greeting="Password updated."
         sub="Every other session on this account is signed out. Take your seat with the new password."
       >
-        <GoldButton
-          kicker="TAKE YOUR SEAT"
-          label="Sign in"
-          onPress={() => router.replace("/sign-in")}
-        />
+        <GoldButton label="SIGN IN" onPress={() => router.replace("/sign-in")} />
       </AuthShell>
     );
   }
 
   return (
     <AuthShell
+      footer={<FooterLine cta="REQUEST A NEW ONE" onPress={() => router.replace("/forgot-password")} text="Link expired?" />}
       greeting="Choose a new password."
       sub="Pick something you have not used at this table before."
     >
       <Field
         autoComplete="new-password"
-        label="NEW PASSWORD"
-        onChangeText={setPassword}
-        placeholder="Password"
-        prefix="•"
-        secureTextEntry
+        error={passwordError}
+        label="New password"
+        onChangeText={(value) => {
+          setPassword(value);
+          setPasswordError(undefined);
+        }}
+        placeholder="8 or more characters"
+        secret
+        value={password}
       />
       <Field
         autoComplete="new-password"
-        label="CONFIRM PASSWORD"
-        onChangeText={setConfirm}
-        placeholder="Password"
-        prefix="•"
-        secureTextEntry
+        error={confirmError}
+        label="Confirm password"
+        onChangeText={(value) => {
+          setConfirm(value);
+          setConfirmError(undefined);
+        }}
+        placeholder="Same again"
+        secret
+        value={confirm}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <CardNote error>{error}</CardNote> : null}
 
-      <GoldButton
-        kicker="SET NEW PASSWORD"
-        label="Update password"
-        onPress={submit}
-        pending={pending}
-      />
-
-      <FooterLine
-        cta="Request a new one"
-        onPress={() => router.replace("/forgot-password")}
-        text="Link expired?"
-      />
+      <GoldButton label="UPDATE PASSWORD" onPress={submit} pending={pending} pendingLabel="SAVING…" />
     </AuthShell>
   );
 }
-
-const styles = StyleSheet.create({
-  note: {
-    ...typography.bodyDim,
-  },
-  error: {
-    ...typography.body,
-    color: colors.danger,
-  },
-});

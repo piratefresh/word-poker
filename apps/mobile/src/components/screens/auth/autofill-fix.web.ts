@@ -8,10 +8,10 @@ const CSS = `
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {
-    -webkit-text-fill-color: #f4e4c1;
-    -webkit-box-shadow: 0 0 0px 1000px rgba(10, 20, 15, 0.95) inset;
-    box-shadow: 0 0 0px 1000px rgba(10, 20, 15, 0.95) inset;
-    caret-color: #f4e4c1;
+    -webkit-text-fill-color: #3a2210;
+    -webkit-box-shadow: 0 0 0px 1000px #fffdf6 inset;
+    box-shadow: 0 0 0px 1000px #fffdf6 inset;
+    caret-color: #3a2210;
     transition: background-color 9999s ease-in-out 0s;
   }
 `;

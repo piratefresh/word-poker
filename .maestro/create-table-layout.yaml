@@ -22,10 +22,10 @@ env:
     commands:
       - scrollUntilVisible:
           element:
-            text: "Email"
+            text: "you@mail.com or HANDLE"
           direction: DOWN
       - tapOn:
-          text: "Email"
+          text: "you@mail.com or HANDLE"
       - inputText: ${TEST_USER_EMAIL}
       - scrollUntilVisible:
           element:
@@ -36,12 +36,12 @@ env:
       - inputText: ${TEST_USER_PASSWORD}
       - scrollUntilVisible:
           element:
-            text: "Sign in"
+            text: "TAKE YOUR SEAT"
           direction: DOWN
       - tapOn:
-          text: "Sign in"
+          text: "TAKE YOUR SEAT"
       - extendedWaitUntil:
-          notVisible: "Sign in"
+          notVisible: "TAKE YOUR SEAT"
           timeout: 60000
 - openLink: ${APP_URL}/online
 - extendedWaitUntil:

@@ -1,10 +1,11 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
-import { anonymous, bearer } from "better-auth/plugins";
+import { anonymous, bearer, lastLoginMethod, username } from "better-auth/plugins";
 import { adoptGuestHistory, inTransaction } from "@wordpoker/db";
 import { config } from "dotenv";
 import { Pool } from "pg";
 
+import { isValidHandle, MAX_HANDLE_LENGTH, MIN_HANDLE_LENGTH } from "@/auth/handle";
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
 import { afterEmailVerification, attributeReferral, grantEligibleRewards, sendVerificationEmail } from "./auth-verification";
@@ -103,6 +104,11 @@ export const auth = betterAuth({
   plugins: [
     expo(),
     bearer(),
+    // The handle (STO-961): stored lowercase in `username` so it is unique across case, shown
+    // uppercase from `displayUsername`. Accounts from before handles have neither and sign in by email.
+    username({ minUsernameLength: MIN_HANDLE_LENGTH, maxUsernameLength: MAX_HANDLE_LENGTH, usernameValidator: isValidHandle }),
+    // The sign-in screen's "last login" tag on web; native keeps its own (`last-login-client.ts`).
+    lastLoginMethod({ customResolveMethod: (ctx) => (ctx.path === "/sign-in/username" ? "username" : null) }),
     // Registering from a guest session: Better Auth deletes the guest, so its hands move first —
     // through the same once-only claim the Game Center flow uses (STO-593). A second account
     // racing for the same guest gets nothing moved; it still exists, just without the history.
@@ -154,6 +160,7 @@ export const auth = betterAuth({
     // A reset is what a locked-out user reaches for when the account is
     // compromised, so it also drops every session the old password opened.
     revokeSessionsOnPasswordReset: true,
+    resetPasswordTokenExpiresIn: 30 * 60,
     sendResetPassword: async ({ user, url, token }) => {
       const deepLink = `${RESET_PASSWORD_DEEP_LINK}?token=${token}`;
 
