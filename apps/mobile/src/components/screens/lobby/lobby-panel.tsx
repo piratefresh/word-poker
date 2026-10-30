@@ -26,7 +26,7 @@ function Panel({ eyebrow, title, body, children, testID }: {
 }): ReactElement {
   return (
     <View style={styles.panel} testID={testID}>
-      <LinearGradient colors={nightLobby.panel.navy} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={nightLobby.panel.raised} style={StyleSheet.absoluteFill} />
       <Text style={styles.eyebrow}>{eyebrow}</Text>
       <Text accessibilityRole="header" style={styles.title}>{title}</Text>
       <Text style={styles.body}>{body}</Text>
