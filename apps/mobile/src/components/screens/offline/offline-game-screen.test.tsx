@@ -3,6 +3,7 @@ import { act, fireEvent, render, within, type RenderResult } from "@testing-libr
 import type { Tile } from "@wordpoker/contracts";
 import { dealHand, type Dictionary } from "@wordpoker/game-rules";
 
+import type { BalanceView } from "@/components/hud";
 import { FOUR_PLAYER_FLOP_FIXTURE } from "@/components/screens/game/game-fixtures";
 import { duration } from "@/constants/theme";
 import { testDictionary } from "@/test-support/dictionary-fixtures";
@@ -51,7 +52,7 @@ jest.mock("react-native-safe-area-context", () =>
 // thing that can pin the hand it plays.
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => false), replace: jest.fn() },
-  useLocalSearchParams: () => ({ seed: mockSeedParam, powers: mockPowerParam }),
+  useLocalSearchParams: () => ({ seed: mockSeedParam, powers: mockPowerParam, chips: mockChipsParam }),
   // The HUD's loop gate reads this to learn whether its screen is on top, and a suite stands
   // in for a screen that is: with nothing to run, the gate keeps its focused default.
   useFocusEffect: () => undefined,
@@ -95,6 +96,15 @@ const DRAWN_TILES: readonly Tile[] =
 /** What the route's params say, when they say anything: an absent seed is what a draw is for. */
 let mockSeedParam: string | undefined = String(SEED);
 let mockPowerParam: string | undefined;
+let mockChipsParam: string | undefined;
+
+// The out-of-practice-chips dialog names the Wallet's live coins, and a guest's line has no figure.
+let mockGuest = false;
+let mockBalance: BalanceView = { state: "loading" };
+jest.mock("@/auth/client/auth-client", () => ({
+  authClient: { useSession: () => ({ data: mockGuest ? { user: { name: "Guest", isAnonymous: true } } : null }) },
+}));
+jest.mock("@/lib/wallet/use-balance-view", () => ({ useBalanceView: () => mockBalance }));
 
 const mockRandomSeed = jest.fn(() => DRAWN_SEED);
 
@@ -519,22 +529,48 @@ describe("<OfflineGameScreen />", () => {
     };
   }
 
-  test("offers a busted hero the coin packs and a free refill", async () => {
+  test("offers a busted hero a free refill of the picked starting chips, naming the coins untouched", async () => {
+    mockChipsParam = "2500";
+    mockBalance = { state: "ready", amount: 5_450 };
     const newGame = jest.fn();
     jest.mocked(useOfflineGame).mockReturnValue(sessionOverGame(0, newGame, jest.fn()));
 
     const view = await renderTable();
 
-    expect(view.getByText("OUT OF CHIPS")).toBeOnTheScreen();
+    expect(view.getByLabelText("Out of practice chips. Your coins were not used.")).toBeOnTheScreen();
+    expect(view.getByText("OUT OF PRACTICE CHIPS")).toBeOnTheScreen();
+    expect(view.getByTestId("out-of-practice-chips-body")).toHaveTextContent(
+      "The bots got this one. Your 5,450 coins weren't touched: games against bots never use them.",
+    );
     expect(view.queryByTestId("results-deal")).toBeNull();
 
-    await fireEvent.press(view.getByTestId("free-refill-button"));
+    await fireEvent.press(view.getByRole("button", { name: "REFILL 2,500 CHIPS · FREE" }));
 
     expect(newGame).toHaveBeenCalledTimes(1);
     // The restart redraws the table, so the injected state must stay until the test is done.
     jest.mocked(useOfflineGame).mockImplementation(
       jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/features/offline/use-offline-game").useOfflineGame,
     );
+    mockChipsParam = undefined;
+    mockBalance = { state: "loading" };
+  });
+
+  test("tells a busted guest their coins were untouched without a figure, and refills the default", async () => {
+    mockGuest = true;
+    mockBalance = { state: "ready", amount: 300 };
+    jest.mocked(useOfflineGame).mockReturnValue(sessionOverGame(0, jest.fn(), jest.fn()));
+
+    const view = await renderTable();
+
+    expect(view.getByTestId("out-of-practice-chips-body")).toHaveTextContent(
+      "The bots got this one. Your coins weren't touched: games against bots never use them.",
+    );
+    expect(view.getByRole("button", { name: "REFILL 1,000 CHIPS · FREE" })).toBeOnTheScreen();
+    jest.mocked(useOfflineGame).mockImplementation(
+      jest.requireActual<{ useOfflineGame: typeof useOfflineGame }>("@/features/offline/use-offline-game").useOfflineGame,
+    );
+    mockGuest = false;
+    mockBalance = { state: "loading" };
   });
 
   test("ends a won session on the results, and their deal starts a new one", async () => {

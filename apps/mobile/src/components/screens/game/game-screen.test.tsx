@@ -69,7 +69,7 @@ test("shows one header, the HUD's own, and none of the header it replaced", asyn
   expect(view.queryAllByLabelText(/chat/)).toHaveLength(0);
 });
 
-test("keeps Free Play hanging on a short portrait phone after the controls are measured", async () => {
+test("keeps the PRACTICE pill hanging on a short portrait phone after the controls are measured", async () => {
   const original = Dimensions.get("window");
   const window = { ...original, width: 375, height: 667 };
   Dimensions.set({ window, screen: window });
@@ -78,8 +78,8 @@ test("keeps Free Play hanging on a short portrait phone after the controls are m
     await fireEvent(view.getByTestId("game-controls"), "layout", {
       nativeEvent: { layout: { width: 375, height: 280 } },
     });
-    expect(view.getByTestId("hud-mode-tag")).toHaveTextContent("FREE PLAY");
-    expect(view.getAllByLabelText("Free play")).toHaveLength(1);
+    expect(view.getByTestId("hud-mode-tag")).toHaveTextContent("PRACTICE");
+    expect(view.getAllByLabelText("Practice game")).toHaveLength(1);
   } finally {
     await act(() => Dimensions.set({ window: original, screen: original }));
   }
@@ -90,7 +90,7 @@ const BALANCE_STATES: [string, BalanceView, string, string][] = [
   ["ready figure", { state: "ready", amount: 1240 }, "Balance $1,240", "$1.2K"],
   ["loading balance", { state: "loading" }, "Balance loading", "···"],
   ["unavailable balance", { state: "unavailable" }, "Balance unavailable", "—"],
-  ["free play", FREE_PLAY, "Free play", "FREE PLAY"],
+  ["free play", FREE_PLAY, "Practice game", "PRACTICE"],
 ];
 
 test.each(BALANCE_STATES)(
@@ -422,4 +422,13 @@ describe("landscape", () => {
     await fireEvent.press(view.getByTestId("action-wager"));
     expect(onRaise).toHaveBeenCalledWith(FOUR_PLAYER_FLOP_FIXTURE.betting.minRaise);
   });
+});
+
+test.each<[string, BalanceView, string]>([
+  ["a free-play table's stacks practice chips", FREE_PLAY, "Ellis, 980 practice chips"],
+  ["an online table's stacks plain chips", { state: "ready", amount: 1240 }, "Ellis, 980 chips"],
+])("names %s", async (_name, balance, label) => {
+  const view = await renderScreen({ balance });
+
+  expect(view.getByLabelText(label)).toBeOnTheScreen();
 });

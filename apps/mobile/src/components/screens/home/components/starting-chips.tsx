@@ -2,6 +2,7 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { CoinChip } from "@/components/chip/coin-chip";
 import { fonts } from "@/constants/theme";
 import { formatCoins } from "@/lib/ui/format";
 import { webTestID } from "@/lib/ui/web-id";
@@ -37,7 +38,7 @@ export function StartingChips({ selected, onSelect }: { selected: number; onSele
               id={webTestID(`offline-chips-${chips}`)}
               style={({ pressed }) => [styles.option, checked ? styles.checked : styles.plain, pressed && styles.pressed]}
             >
-              <View accessible={false} style={styles.chip} />
+              <CoinChip practice size={14} />
               <Text style={[styles.amount, checked && styles.amountChecked]}>{formatCoins(chips)}</Text>
             </Pressable>
           );
@@ -57,8 +58,6 @@ const styles = StyleSheet.create({
   plain: { backgroundColor: "rgba(8,12,28,0.5)", borderColor: "rgba(243,230,196,0.2)" },
   checked: { backgroundColor: "#e0974a", borderColor: "#ffd877" },
   pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
-  // The silver practice chip: never the gold of a coin.
-  chip: { width: 14, height: 14, borderRadius: 7, backgroundColor: "#e3e7ee", borderWidth: 2, borderColor: "#8d96a6" },
   amount: { flexShrink: 1, fontFamily: fonts.arcade, fontSize: 16, color: "#f3e6c4" },
   amountChecked: { color: "#2a1906" },
 });

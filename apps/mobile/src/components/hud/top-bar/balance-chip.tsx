@@ -3,7 +3,7 @@
  * unknown, and each way of not knowing it reads differently to a player: a stalled fetch
  * painted as `$0` would tell them they are broke. So every unknown state gets its own
  * wording, and only the signed-out chip is a control. Free play is not a quantity at all
- * but the table's mode (offline, tutorial — ADR 0002), drawn as a static tag.
+ * but the table's mode (offline, tutorial — ADR 0002), drawn as design 1a's silver PRACTICE pill.
  */
 
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
@@ -18,6 +18,7 @@ import {
   radius,
   spacing,
 } from "@/constants/theme";
+import { CoinChip } from "@/components/chip/coin-chip";
 import { formatAmount, formatAmountCompact } from "@/lib/ui/format";
 import { webTestID } from "@/lib/ui/web-id";
 
@@ -63,6 +64,22 @@ export function BalanceChip({
     );
   }
 
+  if (balance.state === "free-play") {
+    return (
+      <View
+        accessibilityLabel="Practice game"
+        accessibilityRole="text"
+        accessible
+        id={webTestID(testID)}
+        style={[styles.practice, style]}
+        testID={testID}
+      >
+        <CoinChip practice size={12} />
+        <Text style={styles.practiceText}>PRACTICE</Text>
+      </View>
+    );
+  }
+
   const ready = balance.state === "ready";
   return (
     <View
@@ -73,14 +90,7 @@ export function BalanceChip({
       style={[styles.chip, style]}
       testID={testID}
     >
-      <Text
-        numberOfLines={1}
-        style={
-          balance.state === "free-play"
-            ? [styles.chipValue, styles.chipTag]
-            : [styles.chipValue, !ready && styles.chipPlaceholder]
-        }
-      >
+      <Text numberOfLines={1} style={[styles.chipValue, !ready && styles.chipPlaceholder]}>
         {balanceText(balance)}
       </Text>
     </View>
@@ -89,7 +99,7 @@ export function BalanceChip({
 
 /** Spoken balance. The compact value is on screen; the exact one is never dropped. */
 function balanceLabel(
-  balance: Exclude<BalanceView, { state: "signed-out" }>,
+  balance: Exclude<BalanceView, { state: "signed-out" | "free-play" }>,
 ): string {
   switch (balance.state) {
     case "ready":
@@ -98,13 +108,11 @@ function balanceLabel(
       return "Balance loading";
     case "unavailable":
       return "Balance unavailable";
-    case "free-play":
-      return "Free play";
   }
 }
 
 function balanceText(
-  balance: Exclude<BalanceView, { state: "signed-out" }>,
+  balance: Exclude<BalanceView, { state: "signed-out" | "free-play" }>,
 ): string {
   switch (balance.state) {
     case "ready":
@@ -113,8 +121,6 @@ function balanceText(
       return LOADING_PLACEHOLDER;
     case "unavailable":
       return UNAVAILABLE_PLACEHOLDER;
-    case "free-play":
-      return "FREE PLAY";
   }
 }
 
@@ -137,7 +143,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   chipPlaceholder: { color: colors.textDim },
-  /** Small caps tag text: the SIGN IN control's label, and the static FREE PLAY tag. */
+  /** Small caps tag text: the SIGN IN control's label. */
   chipTag: {
     color: colors.gold,
     fontFamily: fonts.mono,
@@ -145,4 +151,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   pressed: { opacity: opacity.pressed },
+  // Design 1a: a silver pill, so a bot table never reads as one played for coins.
+  practice: {
+    alignItems: "center",
+    backgroundColor: "#dfe5ef",
+    borderBottomColor: "#6f7c95",
+    borderBottomWidth: 3,
+    borderRadius: radius.pill,
+    flexDirection: "row",
+    gap: 5,
+    height: CHIP_HEIGHT,
+    paddingHorizontal: spacing.sm,
+  },
+  practiceText: { color: "#26324a", fontFamily: fonts.arcade, fontSize: fontSize.small, letterSpacing: 1 },
 });
