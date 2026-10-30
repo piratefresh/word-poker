@@ -9,7 +9,7 @@
  */
 import { readFileSync } from "node:fs";
 import { closeOrm, getOrm } from "@wordpoker/db";
-import { applyWalletChange, getCoinBalance } from "@wordpoker/economy";
+import { applyWalletChange, getCoinBalance, grantWelcome } from "@wordpoker/economy";
 
 interface Persona {
   readonly email: string;
@@ -25,6 +25,9 @@ try {
     const [user] = await db.execute<{ id: string }[]>(`select id from "user" where email = ?`, [email]);
     if (user === undefined) throw new Error(`${email} is missing; run scripts/seed-test-user.mjs first`);
 
+    // A verified account with no welcome row is paid one on its next wallet read, so record it
+    // here (a no-op once it exists) and let the adjustment below take the balance to the figure.
+    await grantWelcome(user.id);
     const balance = await getCoinBalance(user.id);
     if (balance === coins) {
       console.log(`${email}: ${coins} coins (unchanged)`);
