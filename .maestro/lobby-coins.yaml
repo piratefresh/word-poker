@@ -80,10 +80,10 @@ tags:
     visible: "TAKE YOUR SEAT"
     timeout: 30000
 - tapOn:
-    text: "Play as guest →"
+    text: "PLAY AS GUEST"
 # The guest session lands on the same screen, which now offers to move the guest's hands.
 - extendedWaitUntil:
-    visible: "Sign in & move hands"
+    visible: "Signing in moves this guest's hands into that account."
     timeout: 30000
 - openLink: ${output.web}/online
 - extendedWaitUntil:

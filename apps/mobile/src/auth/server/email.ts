@@ -17,8 +17,10 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
  */
 const DEFAULT_FROM = "Word Poker <hello@email.wordpoker.app>";
 
-/** One hour, matching `emailAndPassword.resetPasswordTokenExpiresIn`. */
-const LINK_LIFETIME = "one hour";
+/** Matches `emailAndPassword.resetPasswordTokenExpiresIn`. */
+const RESET_LINK_LIFETIME = "30 minutes";
+/** Better Auth's default `emailVerification.expiresIn`. */
+const VERIFY_LINK_LIFETIME = "one hour";
 
 export type Email = {
   to: string;
@@ -102,7 +104,7 @@ export function passwordResetEmail({
     `Hi ${name.trim() || "player"},`,
     "",
     "Someone asked to reset the password on your Word Poker account.",
-    `Open this link to choose a new one (good for ${LINK_LIFETIME}):`,
+    `Open this link to choose a new one (good for ${RESET_LINK_LIFETIME}):`,
     "",
     buttonUrl,
     "",
@@ -133,7 +135,7 @@ export function passwordResetEmail({
                     </td>
                   </tr>
                 </table>
-                <p style="margin:24px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">The link is good for ${LINK_LIFETIME} and can only be used once. If it wasn't you, ignore this email — your password stays as it is.</p>
+                <p style="margin:24px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">The link is good for ${RESET_LINK_LIFETIME} and can only be used once. If it wasn't you, ignore this email — your password stays as it is.</p>
                 <p style="margin:20px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">On a computer? <a href="${browserHref}" style="color:${brand.gold};text-decoration:none;">Continue in your browser</a>.</p>
                 <p style="margin:8px 0 0;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:18px;word-break:break-all;color:${brand.faint};">${appHref}</p>
               </td>
@@ -167,7 +169,7 @@ export function verifyEmailEmail({
   const text = [
     `Hi ${name.trim() || "player"},`,
     "",
-    `Confirm your email to claim your ${coins} welcome coins (link good for ${LINK_LIFETIME}):`,
+    `Confirm your email to claim your ${coins} welcome coins (link good for ${VERIFY_LINK_LIFETIME}):`,
     "",
     buttonUrl,
     "",
@@ -193,7 +195,7 @@ export function verifyEmailEmail({
                     </td>
                   </tr>
                 </table>
-                <p style="margin:24px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">The link is good for ${LINK_LIFETIME}. If you didn't create a Word Poker account, ignore this email.</p>
+                <p style="margin:24px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">The link is good for ${VERIFY_LINK_LIFETIME}. If you didn't create a Word Poker account, ignore this email.</p>
                 <p style="margin:8px 0 0;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:18px;word-break:break-all;color:${brand.faint};">${href}</p>
               </td>
             </tr>

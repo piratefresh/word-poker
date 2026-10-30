@@ -22,18 +22,18 @@
 # green local run and a suite that times out on CI.
 #
 # Non-UI agents don't need this flow; the same registration works over HTTP:
-#   POST /api/auth/sign-up/email {"name": ..., "email": ..., "password": ...}
+#   POST /api/auth/sign-up/email {"name": ..., "username": ..., "email": ..., "password": ...}
 url: http://localhost:8081/sign-up
 name: Register a new user through the real sign-up screen
 tags:
   - web
   - auth
 env:
-  SIGNUP_NAME: E2E Signup
-  SIGNUP_PASSWORD: wordpoker-signup-e2e
+    SIGNUP_PASSWORD: wordpoker-signup-e2e
 ---
 # A fresh email per run: the timestamp keeps "user already exists" impossible.
 - evalScript: ${output.email = 'e2e-signup-' + Date.now() + '@wordpoker.dev'}
+- evalScript: ${output.handle = 'E2E' + String(Date.now()).slice(-9)}
 
 - openLink: http://localhost:8081/sign-up
 
@@ -66,25 +66,19 @@ env:
 
 # The sign-up form.
 - extendedWaitUntil:
-    visible: "SIT DOWN"
+    visible: "Pull up a chair."
     timeout: 30000
-- assertVisible:
-    text: "Create an account"
 - tapOn:
-    text: "Name"
-    below:
-      text: "NAME"
-- inputText: ${SIGNUP_NAME}
+    text: "YOURHANDLE"
+- inputText: ${output.handle}
 - tapOn:
-    text: "Email"
+    text: "you@mail.com"
 - inputText: ${output.email}
 - tapOn:
-    text: "Password"
-    below:
-      text: "PASSWORD"
+    text: "8 or more characters"
 - inputText: ${SIGNUP_PASSWORD}
 - tapOn:
-    text: "Create an account"
+    text: "CREATE ACCOUNT"
 
 # Registered: Better Auth creates the account and the session together, so the
 # guard lets the fresh user through to the home screen.

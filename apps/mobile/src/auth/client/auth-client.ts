@@ -1,16 +1,19 @@
 import { expoClient } from "@better-auth/expo/client";
-import { anonymousClient, inferAdditionalFields } from "better-auth/client/plugins";
+import { anonymousClient, inferAdditionalFields, usernameClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
 
 import { apiBaseURL } from "@/lib/network/api-base-url";
 
+import { lastLoginClient } from "./last-login-client";
 import { platformAuthClient } from "./platform-auth-client";
 
 export const authClient = createAuthClient({
   baseURL: apiBaseURL,
   plugins: [
     anonymousClient(),
+    usernameClient(),
+    lastLoginClient(),
     platformAuthClient(),
     // Mirrors `user.additionalFields` in auth.ts (server-only, so its types cannot be imported here).
     inferAdditionalFields({
