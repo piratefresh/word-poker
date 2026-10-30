@@ -23,6 +23,7 @@ import { FeaturedTableCard } from "./featured-table";
 import { NightLobbyButton } from "./night-lobby-button";
 import { ParlorBackground } from "./parlor-background";
 import { ParlorNav } from "./parlor-nav";
+import { tableThatFits } from "./parlor-view";
 import { RoomDetailsSheet } from "./room-details-sheet";
 import { RoomRow } from "./room-row";
 
@@ -45,7 +46,8 @@ export function LobbyScreen() {
   const { data: session } = authClient.useSession();
   const { coins, refreshCoins, state: questState } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  /** A join the server turned down: its words, and the table RETRY asks for again. */
+  const [refusal, setRefusal] = useState<{ roomId: string; message: string } | null>(null);
   const [filter, setFilter] = useState<LobbyFilter>("All");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const { create } = useLocalSearchParams<{ create?: string }>();
@@ -77,8 +79,8 @@ export function LobbyScreen() {
 
   const selectedRoom = rooms.find((room) => room.roomId === selectedRoomId) ?? null;
   const filteredRooms = filterLobbyRooms(listRooms, filter);
-  const joiningRoom = joining === null ? undefined : rooms.find((room) => room.roomId === joining);
-  const banner = refusal ?? (joiningRoom === undefined ? null : `Taking a seat at ${joiningRoom.metadata.name}…`);
+  const guest = session?.user.isAnonymous === true;
+  const elsewhere = (room: RoomSummary | null) => tableThatFits(rooms, coins, room?.roomId ?? null);
   const currentReadout = status === "loading" && rooms.length === 0 ? "Looking for tables…" : readout;
 
   const back = () => {
@@ -101,23 +103,26 @@ export function LobbyScreen() {
     setTimeout(enter, TABLE_ENTRY_MS);
   };
 
-  const openTable = (room: RoomSummary) => {
-    if (room.roomId === activeRoomId) {
+  const openTable = (roomId: string) => {
+    if (roomId === activeRoomId) {
       setSelectedRoomId(null);
-      travelToTable(room.roomId);
+      travelToTable(roomId);
       return;
     }
 
     setRefusal(null);
-    setJoining(room.roomId);
-    void joinTable(room.roomId)
+    setJoining(roomId);
+    void joinTable(roomId)
       .then(() => {
         setSelectedRoomId(null);
-        travelToTable(room.roomId);
+        travelToTable(roomId);
       })
       .catch((failure: unknown) => {
-        setRefusal(failure instanceof Error ? failure.message : "That table could not be joined.");
+        setSelectedRoomId(null);
+        setRefusal({ roomId, message: failure instanceof Error ? failure.message : "That table could not be joined." });
         refresh();
+        // A refusal may have been the Wallet's: read it again so Join quotes the real balance.
+        refreshCoins();
       })
       .finally(() => setJoining(null));
   };
@@ -160,9 +165,11 @@ export function LobbyScreen() {
         {headliner ? (
           <FeaturedTableCard
             coins={coins}
+            elsewhere={elsewhere(headliner)}
+            guest={guest}
             joining={joining === headliner.roomId}
             onDetails={() => setSelectedRoomId(headliner.roomId)}
-            onJoin={() => openTable(headliner)}
+            onJoin={() => openTable(headliner.roomId)}
             room={headliner}
             yours={headliner.roomId === activeRoomId}
           />
@@ -201,7 +208,9 @@ export function LobbyScreen() {
 
           {filteredRooms.map((room) => (
             <RoomRow
+              coins={coins}
               disabled={joining !== null}
+              guest={guest}
               hosted={hostedRoomIds.has(room.roomId)}
               key={room.roomId}
               onPress={() => setSelectedRoomId(room.roomId)}
@@ -233,13 +242,19 @@ export function LobbyScreen() {
         <NightLobbyButton label="+ DEAL A NEW TABLE" onPress={() => setCreating(true)} testID="lobby-create" />
       </View>
 
-      {banner === null ? null : (
-        <Text
-          style={[styles.banner, joiningRoom === undefined ? styles.bannerRefusal : styles.bannerNotice, { bottom: insets.bottom + 158 }]}
-          testID={joiningRoom === undefined ? "lobby-refusal" : "lobby-joining"}
-        >
-          {banner}
-        </Text>
+      {refusal === null ? null : (
+        <View accessibilityRole="alert" style={[styles.banner, { top: insets.top + spacing.sm }]} testID="lobby-refusal">
+          <Text style={styles.bannerText}>{refusal.message}</Text>
+          <Pressable
+            accessibilityLabel="Retry joining the table"
+            accessibilityRole="button"
+            onPress={() => openTable(refusal.roomId)}
+            style={({ pressed }) => [styles.bannerRetry, pressed && styles.filterPressed]}
+            testID="lobby-refusal-retry"
+          >
+            <Text style={styles.bannerRetryText}>RETRY</Text>
+          </Pressable>
+        </View>
       )}
 
       <HomeNavRack active="home" onNavigate={(destination) => router.push(NAV_ROUTES[destination])} />
@@ -247,10 +262,12 @@ export function LobbyScreen() {
       <CreateTableForm visible={creating} onClose={() => setCreating(false)} onCreated={travelToTable} />
       <RoomDetailsSheet
         coins={coins}
+        elsewhere={elsewhere(selectedRoom)}
+        guest={guest}
         hosted={selectedRoom !== null && hostedRoomIds.has(selectedRoom.roomId)}
         joining={selectedRoom !== null && joining === selectedRoom.roomId}
         onClose={() => setSelectedRoomId(null)}
-        onJoin={() => selectedRoom && openTable(selectedRoom)}
+        onJoin={() => selectedRoom && openTable(selectedRoom.roomId)}
         room={selectedRoom}
         yours={selectedRoom !== null && selectedRoom.roomId === activeRoomId}
       />
@@ -280,7 +297,8 @@ const styles = StyleSheet.create({
   note: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.body, paddingHorizontal: spacing.sm, paddingVertical: spacing.lg },
   dropped: { gap: spacing.md, padding: spacing.md },
   refusal: { color: "#ff9387", fontFamily: fonts.rubikMedium, fontSize: fontSize.body, textAlign: "center" },
-  banner: { borderRadius: radius.md, fontFamily: fonts.rubikMedium, fontSize: fontSize.small, left: spacing.gutter, overflow: "hidden", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: spacing.gutter, textAlign: "center" },
-  bannerNotice: { backgroundColor: "rgba(10,16,40,0.95)", color: nightLobby.text.cream },
-  bannerRefusal: { backgroundColor: "#351a29", color: "#ffb3a7" },
+  banner: { alignItems: "center", backgroundColor: nightLobby.alert.background, borderColor: nightLobby.alert.border, borderRadius: radius.md, borderWidth: border.thick, flexDirection: "row", gap: spacing.sm, left: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: spacing.gutter },
+  bannerText: { color: nightLobby.alert.text, flex: 1, fontFamily: fonts.rubikMedium, fontSize: fontSize.small },
+  bannerRetry: { borderColor: nightLobby.alert.border, borderRadius: radius.pill, borderWidth: border.thick, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  bannerRetryText: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.small, letterSpacing: 0.8 },
 });

@@ -7,12 +7,12 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MAX_SEATS, type RoomSummary } from "@wordpoker/contracts";
 import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
 
-import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
-import { formatAmount } from "@/lib/ui/format";
-import { isJoinable, openSeats } from "@/features/online/lobby-view";
+import { formatCoins } from "@/lib/ui/format";
+import { openSeats } from "@/features/online/lobby-view";
 import { powersLabel } from "@/features/table/power-view";
-import { buyInNote, cannotAfford, needCoinsLabel, spokenTable } from "./parlor-view";
+import { JoinAction } from "./join-action";
+import { spokenTable } from "./parlor-view";
 
 export interface FeaturedTableCardProps {
   readonly room: RoomSummary;
@@ -22,6 +22,9 @@ export interface FeaturedTableCardProps {
   readonly yours?: boolean;
   /** The Wallet's coins; `null` while unread. */
   readonly coins?: number | null;
+  readonly guest?: boolean;
+  /** The table a full one points to. */
+  readonly elsewhere?: RoomSummary | null;
 }
 
 export function FeaturedTableCard({
@@ -31,13 +34,13 @@ export function FeaturedTableCard({
   joining = false,
   yours = false,
   coins = null,
+  guest = false,
+  elsewhere = null,
 }: FeaturedTableCardProps): ReactElement {
   const lastWord = room.metadata.lastWord;
   const players = room.metadata.players ?? [];
   const seats = Math.min(room.maxClients, MAX_SEATS);
   const mode = powersLabel(room.metadata.powerUps) ?? "Classic";
-  const short = !yours && cannotAfford(room, coins);
-  const canJoin = (isJoinable(room) && !short) || yours;
 
   return (
     <View style={styles.card} testID="parlor-featured">
@@ -59,7 +62,7 @@ export function FeaturedTableCard({
 
         <Text numberOfLines={1} style={styles.name}>{room.metadata.name}</Text>
         <Text numberOfLines={1} style={styles.subtitle}>
-          {mode} · {room.metadata.hostName ? `hosted by ${room.metadata.hostName}` : `${formatAmount(room.metadata.buyIn)} buy-in`}
+          {mode} · {room.metadata.hostName ? `hosted by ${room.metadata.hostName}` : `${formatCoins(room.metadata.buyIn)} coin buy-in`}
         </Text>
 
         {lastWord === undefined ? null : (
@@ -99,17 +102,17 @@ export function FeaturedTableCard({
           })}
           <Text style={styles.openCount}>{room.locked ? "UNAVAILABLE" : `${openSeats(room)} OPEN`}</Text>
         </View>
-        <Text style={styles.buyIn}>{formatAmount(room.metadata.buyIn)}</Text>
+        {yours ? null : <Text style={styles.buyIn}>{formatCoins(room.metadata.buyIn)}</Text>}
       </View>
 
-      <GoldButton
-        accessibilityLabel={spokenTable(room, yours)}
-        disabled={!canJoin || joining}
-        label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : short && isJoinable(room) ? needCoinsLabel(room) : `JOIN · ${formatAmount(room.metadata.buyIn)}`}
-        onPress={onJoin}
+      <JoinAction
+        context={{ yours, joining, guest, coins }}
+        elsewhere={elsewhere}
+        onJoin={onJoin}
+        room={room}
+        surface="card"
         testID="parlor-featured-join"
       />
-      {yours ? null : <Text style={styles.note}>{buyInNote(room)}</Text>}
     </View>
   );
 }
@@ -151,5 +154,4 @@ const styles = StyleSheet.create({
   seatInitialOpen: { color: nightLobby.text.muted },
   openCount: { color: nightLobby.status.open, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.caption, letterSpacing: 0.8, marginLeft: spacing.xs },
   buyIn: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.h3 },
-  note: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.small, marginTop: spacing.sm, textAlign: "center" },
 });

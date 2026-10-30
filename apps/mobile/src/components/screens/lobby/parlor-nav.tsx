@@ -51,7 +51,7 @@ export function ParlorNav({ onBack, me, readout, level, coins }: ParlorNavProps)
             </View>
           )}
           {coins == null ? null : (
-            <View accessibilityLabel={`${formatCoins(coins)} coins`} accessibilityRole="text" style={styles.wallet} testID="lobby-wallet">
+            <View accessibilityLabel={`Wallet, ${formatCoins(coins)} coins`} accessibilityRole="text" style={styles.wallet} testID="lobby-wallet">
               <View style={styles.coin} />
               <Text style={styles.walletText}>{formatCoins(coins)}</Text>
             </View>

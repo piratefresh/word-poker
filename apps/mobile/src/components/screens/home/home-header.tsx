@@ -62,7 +62,7 @@ export function HomeHeader({ width }: { width: number }) {
             </Pressable>
           ) : null}
           <Pressable
-            accessibilityLabel={coins == null ? "Credits unavailable" : `${coins} credits`}
+            accessibilityLabel={coins == null ? "Wallet unavailable" : `Wallet, ${formatCoins(coins)} coins`}
             accessibilityRole={coinStoreEnabled() ? "button" : "text"}
             disabled={!coinStoreEnabled()}
             onPress={() => router.push("/store")}

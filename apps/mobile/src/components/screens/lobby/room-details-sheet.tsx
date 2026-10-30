@@ -5,12 +5,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { MAX_SEATS, tableStatus, type RoomSummary } from "@wordpoker/contracts";
 
-import { GoldButton } from "@/components/ui/gold-button";
 import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
-import { formatAmount } from "@/lib/ui/format";
-import { isJoinable, openSeats } from "@/features/online/lobby-view";
+import { formatAmount, formatCoins } from "@/lib/ui/format";
+import { openSeats } from "@/features/online/lobby-view";
 import { powersLabel } from "@/features/table/power-view";
-import { buyInNote, cannotAfford, needCoinsLabel } from "./parlor-view";
+import { JoinAction } from "./join-action";
 
 export interface RoomDetailsSheetProps {
   room: RoomSummary | null;
@@ -19,6 +18,9 @@ export interface RoomDetailsSheetProps {
   joining?: boolean;
   /** The Wallet's coins; `null` while unread. */
   coins?: number | null;
+  guest?: boolean;
+  /** The table a full one points to. */
+  elsewhere?: RoomSummary | null;
   onClose: () => void;
   onJoin: () => void;
 }
@@ -29,13 +31,13 @@ export function RoomDetailsSheet({
   yours = false,
   joining = false,
   coins = null,
+  guest = false,
+  elsewhere = null,
   onClose,
   onJoin,
 }: RoomDetailsSheetProps) {
   const players = room?.metadata.players ?? [];
   const seats = Math.min(room?.maxClients ?? 0, MAX_SEATS);
-  const short = room !== null && !yours && cannotAfford(room, coins);
-  const available = room !== null && ((isJoinable(room) && !short) || yours);
 
   return (
     <BottomSheet
@@ -62,7 +64,7 @@ export function RoomDetailsSheet({
             </Text>
 
             <View style={styles.facts}>
-              <Fact label="BUY-IN" value={formatAmount(room.metadata.buyIn)} />
+              <Fact label="BUY-IN" value={`${formatCoins(room.metadata.buyIn)} coins`} />
               <Fact label="OPEN SEATS" value={room.locked ? "Unavailable" : `${openSeats(room)} of ${room.maxClients}`} />
               <Fact label="BLINDS" value={`${formatAmount(room.metadata.smallBlind)} / ${formatAmount(room.metadata.bigBlind)}`} />
               <Fact label="MODE" value={powersLabel(room.metadata.powerUps) ?? "Classic"} />
@@ -101,14 +103,14 @@ export function RoomDetailsSheet({
             ) : null}
 
             <View style={styles.actions}>
-              <GoldButton
-                disabled={!available || joining}
-                label={joining ? "TAKING YOUR SEAT…" : yours ? "BACK TO YOUR SEAT" : available ? `JOIN · ${formatAmount(room.metadata.buyIn)}` : room.locked ? "UNAVAILABLE" : !isJoinable(room) ? "TABLE FULL" : needCoinsLabel(room)}
-                onPress={onJoin}
+              <JoinAction
+                context={{ yours, joining, guest, coins }}
+                elsewhere={elsewhere}
+                onJoin={onJoin}
+                room={room}
+                surface="sheet"
                 testID="room-details-join"
               />
-              {joining ? <Text style={styles.joining}>Taking your seat at {room.metadata.name}…</Text>
-                : yours ? null : <Text style={styles.joining}>{buyInNote(room)}</Text>}
             </View>
           </ScrollView>
         </RNHostView>
@@ -150,6 +152,5 @@ const styles = StyleSheet.create({
   lastWordLine: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   word: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h2, letterSpacing: 1 },
   points: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.h3 },
-  actions: { gap: spacing.sm, paddingTop: spacing.sm },
-  joining: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.small, textAlign: "center" },
+  actions: { paddingTop: spacing.sm },
 });

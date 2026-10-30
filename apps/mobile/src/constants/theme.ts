@@ -177,7 +177,7 @@ export const ledger = {
 
 /** STO-688 design 2a. Scoped so the night lobby doesn't recolour existing screens. */
 export const nightLobby = {
-  text: { cream: ledger.onFelt, muted: "#aab3d6", label: "#9aa6cf" },
+  text: { cream: ledger.onFelt, muted: "#aab3d6", label: "#9aa6cf", disabled: "#c9bfa6", dashed: "#e6dcc0" },
   gold: {
     light: ledger.goldText,
     ring: ledger.goldEdge,
@@ -191,7 +191,11 @@ export const nightLobby = {
     row: "rgba(14,22,48,0.88)",
   },
   border: { subtle: "rgba(243,230,196,0.12)" },
-  status: { open: "#8fd19e", live: "#ff5a4a", full: "#7d86a8" },
+  status: { open: "#8fd19e", live: "#ff5a4a", full: "#7d86a8", seat: "#8fe3b0" },
+  /** Design 1a's cream face: the way back to your seat. */
+  cream: { face: "#fbefd6", edge: "#b8703a", seatInk: "#2a7a4b" },
+  /** Design 1a's alert banner: a join the server refused. */
+  alert: { background: "#3b1620", border: "#e5604a", text: "#ffb3a7" },
   sky: ["#02030a", "#050a1c", "#0a1532", "#0d1a3c"],
   coin: { gradient: ["#ffe28a", "#c98a2c"], text: ledger.parchment },
 } as const;

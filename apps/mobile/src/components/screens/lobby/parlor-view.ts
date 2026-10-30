@@ -39,7 +39,6 @@ export interface FeaturedTable {
   readonly yours: boolean;
   readonly status: TableStatus;
   readonly openSeats: number;
-  readonly action: { readonly label: string; readonly enabled: boolean };
 }
 
 export interface ParlorView {
@@ -49,37 +48,128 @@ export interface ParlorView {
   readonly stats: ParlorStat[];
 }
 
-/** §3: the Wallet is below the table's buy-in. Unknown coins (`null`) are left to the server to judge. */
-export function cannotAfford(room: RoomSummary, coins: number | null): boolean {
-  return coins !== null && coins < room.metadata.buyIn;
+/**
+ * Where a Join control stands (design 1a, Flow A). Your own seat comes first — a full table you
+ * are sitting at is the table you are sitting at — then a join in the air, then §3's refusals.
+ */
+export type JoinKind = "yours" | "joining" | "guest" | "locked" | "full" | "short" | "open";
+
+export interface JoinContext {
+  readonly yours?: boolean;
+  readonly joining?: boolean;
+  /** A guest has no Wallet, so no table takes them (STO-953 draws the panel that says so). */
+  readonly guest?: boolean;
+  /** The Wallet's coins; `null` while unread, which leaves affording to the server to judge. */
+  readonly coins?: number | null;
 }
 
-/** The disabled Join button's label when the Wallet is short. */
-export function needCoinsLabel(room: RoomSummary): string {
-  return `NEED ${formatCoins(room.metadata.buyIn)} COINS`;
+/** What a Join control says on each surface, and whether it does anything. */
+export interface JoinOffer {
+  readonly kind: JoinKind;
+  readonly enabled: boolean;
+  /** The big button's words. The `open` button draws `JOIN`, a coin, then `price`. */
+  readonly label: string;
+  readonly price: string | null;
+  /** The right-hand label on a table row. */
+  readonly rowLabel: string;
+  /** The button's screen-reader sentence. */
+  readonly spoken: string;
 }
 
-/** The line under a Join button: what sitting down takes, and when it comes back (§4, §5). */
-export function buyInNote(room: RoomSummary): string {
-  return `Takes ${formatCoins(room.metadata.buyIn)} coins from your wallet. Your chips come back as coins when you leave.`;
+export function joinKind(room: RoomSummary, { yours, joining, guest, coins = null }: JoinContext): JoinKind {
+  if (yours) return "yours";
+  if (joining) return "joining";
+  if (guest) return "guest";
+  if (room.locked) return "locked";
+  if (room.clients >= room.maxClients) return "full";
+  if (coins !== null && coins < room.metadata.buyIn) return "short";
+  return "open";
+}
+
+export function joinOffer(room: RoomSummary, context: JoinContext): JoinOffer {
+  const kind = joinKind(room, context);
+  const coins = context.coins ?? null;
+  const name = room.metadata.name;
+  const buyIn = room.metadata.buyIn;
+  const price = formatCoins(buyIn);
+  const shortfall = formatCoins(buyIn - (coins ?? 0));
+  const offer = (enabled: boolean, label: string, rowLabel: string, spoken: string): JoinOffer => ({
+    kind, enabled, label, price: kind === "open" ? price : null, rowLabel, spoken,
+  });
+
+  switch (kind) {
+    case "yours":
+      return offer(true, "BACK TO YOUR SEAT", "YOUR SEAT", `Back to your seat at ${name}.`);
+    case "joining":
+      return offer(false, "TAKING YOUR SEAT ···", `JOIN · ${price}`, `Taking your seat at ${name}.`);
+    case "guest":
+      return offer(false, "ACCOUNT NEEDED", "ACCOUNT NEEDED", "Join unavailable, online tables need an account.");
+    case "locked":
+      return offer(false, "LOCKED", "LOCKED", "Join unavailable, this table is locked.");
+    case "full":
+      return offer(false, "TABLE FULL", "FULL", "Join unavailable, this table is full.");
+    case "short":
+      return offer(
+        false,
+        `NEED ${shortfall} MORE COINS`,
+        `NEED ${shortfall} MORE`,
+        `Join unavailable. You need ${price} coins and have ${formatCoins(coins ?? 0)}.`,
+      );
+    case "open":
+      return offer(
+        true,
+        "JOIN",
+        `JOIN · ${price}`,
+        `Join ${name} for ${price} coins.${coins === null ? "" : ` You have ${formatCoins(coins)} coins.`}`,
+      );
+  }
 }
 
 /**
- * What the featured table's button says and whether it does anything. §3's Join rules decide the
- * disabled cases: full, temporarily unavailable, or a Wallet below the buy-in. Your own seat is
- * never disabled — a full table you are sitting at is the table you are sitting at.
+ * The line under a Join button. The hero card shows the Wallet moving; the details sheet says what
+ * the coins become (§4) and when they come back (§5). `elsewhere` is the table a full one points to.
  */
-export function featuredAction(
+export function joinNote(
   room: RoomSummary,
-  yours: boolean,
-  coins: number | null = null,
-): { label: string; enabled: boolean } {
-  if (yours) return { label: "BACK TO YOUR SEAT", enabled: true };
-  if (room.locked) return { label: "UNAVAILABLE", enabled: false };
-  if (room.clients >= room.maxClients) return { label: "TABLE FULL", enabled: false };
-  if (cannotAfford(room, coins)) return { label: needCoinsLabel(room), enabled: false };
-  if (openSeats(room) === 1) return { label: "TAKE THE LAST SEAT", enabled: true };
-  return { label: "TAKE A SEAT", enabled: true };
+  context: JoinContext,
+  surface: "card" | "sheet",
+  elsewhere: RoomSummary | null = null,
+): string | null {
+  const coins = context.coins ?? null;
+  const buyIn = room.metadata.buyIn;
+
+  switch (joinKind(room, context)) {
+    case "open":
+      return surface === "card" && coins !== null
+        ? `Wallet ${formatCoins(coins)} → ${formatCoins(coins - buyIn)} coins`
+        : `${formatCoins(buyIn)} coins become chips at this table. Whatever is left comes back as coins when you leave.`;
+    case "short":
+      return `You have ${formatCoins(coins ?? 0)} coins. This table takes ${formatCoins(buyIn)}.`;
+    case "joining":
+      return `Moving ${formatCoins(buyIn)} coins to the table`;
+    case "full": {
+      if (elsewhere === null) return "A seat opens when someone leaves.";
+      const seats = openSeats(elsewhere);
+      return `A seat opens when someone leaves. ${elsewhere.metadata.name} has ${seats} free ${seats === 1 ? "seat" : "seats"}.`;
+    }
+    default:
+      return null;
+  }
+}
+
+/** The cheapest table with a seat the Wallet covers — where a full or unaffordable table points. */
+export function tableThatFits(
+  rooms: readonly RoomSummary[],
+  coins: number | null,
+  except: string | null = null,
+): RoomSummary | null {
+  const fits = rooms.filter(
+    (room) => room.roomId !== except && joinKind(room, { coins }) === "open",
+  );
+  return fits.reduce<RoomSummary | null>(
+    (best, room) => (best === null || room.metadata.buyIn < best.metadata.buyIn ? room : best),
+    null,
+  );
 }
 
 /**
@@ -143,7 +233,6 @@ export function featuredTable(
     yours,
     status: tableStatus(room.metadata),
     openSeats: openSeats(room),
-    action: featuredAction(room, yours),
   };
 }
 

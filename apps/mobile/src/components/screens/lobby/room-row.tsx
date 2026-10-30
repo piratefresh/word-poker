@@ -5,24 +5,27 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MAX_SEATS, type RoomSummary } from "@wordpoker/contracts";
 
 import { border, colors, fonts, fontSize, nightLobby, opacity, radius, spacing } from "@/constants/theme";
-import { formatAmount } from "@/lib/ui/format";
 import { openSeats } from "@/features/online/lobby-view";
 import { powersLabel } from "@/features/table/power-view";
-import { spokenTable } from "./parlor-view";
+import { joinOffer, spokenTable } from "./parlor-view";
 
 export type RoomRowProps = {
   room: RoomSummary;
   yours?: boolean;
   hosted?: boolean;
+  /** The Wallet's coins; `null` while unread. */
+  coins?: number | null;
+  guest?: boolean;
   disabled?: boolean;
   onPress: () => void;
 };
 
-export function RoomRow({ room, yours = false, hosted = false, disabled = false, onPress }: RoomRowProps) {
+export function RoomRow({ room, yours = false, hosted = false, coins = null, guest = false, disabled = false, onPress }: RoomRowProps) {
   const players = room.metadata.players ?? [];
   const pipCount = Math.min(room.maxClients, MAX_SEATS);
   const mode = powersLabel(room.metadata.powerUps) ?? "Classic";
   const seatsOpen = openSeats(room);
+  const offer = joinOffer(room, { yours, guest, coins });
 
   return (
     <Pressable
@@ -68,10 +71,10 @@ export function RoomRow({ room, yours = false, hosted = false, disabled = false,
       </View>
 
       <View style={styles.terms}>
-        <Text style={styles.buyIn}>{formatAmount(room.metadata.buyIn)}</Text>
-        <Text style={[styles.open, room.locked || seatsOpen === 0 ? styles.full : null]}>
-          {room.locked ? "UNAVAILABLE" : seatsOpen === 0 ? "FULL" : `${seatsOpen} OPEN`}
+        <Text style={[styles.price, offer.kind === "yours" ? styles.seat : !offer.enabled && styles.unavailable]}>
+          {offer.rowLabel}
         </Text>
+        {offer.kind === "open" || offer.kind === "short" ? <Text style={styles.open}>{seatsOpen} OPEN</Text> : null}
       </View>
     </Pressable>
   );
@@ -102,7 +105,8 @@ const styles = StyleSheet.create({
   pip: { borderRadius: radius.pill, height: 8, width: 8 },
   pipOpen: { borderColor: "rgba(243,230,196,0.45)", borderWidth: border.thin },
   terms: { alignItems: "flex-end", gap: spacing.xs },
-  buyIn: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.bodyLg },
+  price: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.body, letterSpacing: 0.4 },
+  seat: { color: nightLobby.status.seat },
+  unavailable: { color: nightLobby.text.disabled },
   open: { color: nightLobby.status.open, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.micro, letterSpacing: 1 },
-  full: { color: nightLobby.status.full },
 });
