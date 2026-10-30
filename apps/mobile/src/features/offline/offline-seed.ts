@@ -62,3 +62,14 @@ export function pinnedPowerUps(param: string | string[] | undefined): PowerUpDea
   const raw = (Array.isArray(param) ? param[0] : param)?.trim().toLowerCase();
   return raw === "wild" ? "choose3" : "off";
 }
+
+/**
+ * The starting chips a URL asks for (`/offline?chips=2500`), or `undefined` for the table's own
+ * 1,000. The tray's STARTING CHIPS picker sets it; anything that is not a positive whole number
+ * is not a pick. A repeated param takes the first, as `pinnedSeed` does.
+ */
+export function pinnedStartingChips(param: string | string[] | undefined): number | undefined {
+  const raw = (Array.isArray(param) ? param[0] : param)?.trim();
+  const chips = raw ? Number(raw) : NaN;
+  return Number.isInteger(chips) && chips > 0 ? chips : undefined;
+}

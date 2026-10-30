@@ -377,6 +377,27 @@ describe("useOfflineGame — the dealt table", () => {
   });
 });
 
+describe("useOfflineGame — the starting chips", () => {
+  test("seats every player with the picked stack, and New game deals it again", async () => {
+    const { result } = await renderHook(() =>
+      useOfflineGame({ seed: SEED, dictionary: testDictionary([heroWord()]), startingStack: 2_500 }),
+    );
+    // Each seat's stack plus what it posted is the pick: the blinds come out of it.
+    const sat = () => result.current.game.players.map((player) => (player?.stack ?? 0) + (player?.bet ?? 0));
+
+    expect(sat()).toEqual([2_500, 2_500, 2_500, 2_500]);
+    await act(async () => {
+      result.current.newGame();
+    });
+    expect(sat()).toEqual([2_500, 2_500, 2_500, 2_500]);
+  });
+
+  test("is 1,000 when nobody picks", async () => {
+    const result = await table();
+    expect(result.current.game.players.map((player) => (player?.stack ?? 0) + (player?.bet ?? 0))).toEqual([1_000, 1_000, 1_000, 1_000]);
+  });
+});
+
 describe("useOfflineGame — the hero's clocks", () => {
   test("folds on the deadline when the blind is owed", async () => {
     const result = await table();

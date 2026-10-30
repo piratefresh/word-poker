@@ -40,7 +40,7 @@ import {
   spacing,
   type,
 } from "@/constants/theme";
-import { pinnedPowerUps, pinnedSeed, pinnedTurnMs, randomSeed } from "@/features/offline/offline-seed";
+import { pinnedPowerUps, pinnedSeed, pinnedStartingChips, pinnedTurnMs, randomSeed } from "@/features/offline/offline-seed";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
@@ -112,13 +112,15 @@ function OfflineTable({
 }) {
   const { data: authSession } = authClient.useSession();
   const history = useHistory();
-  const params = useLocalSearchParams<{ seed?: string; powers?: string; turn?: string }>();
+  const params = useLocalSearchParams<{ seed?: string; powers?: string; turn?: string; chips?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
   // The table's power-up mode rides the URL too (`?powers=wild`), and is the table's for the whole
   // session: read once, on the way in, like the seed.
   const [powerUps] = useState(() => pinnedPowerUps(params.powers));
+  // The tray's STARTING CHIPS (`?chips=2500`): every seat sits down with it, and New game deals it again.
+  const [startingStack] = useState(() => pinnedStartingChips(params.chips));
   const {
     game,
     words,
@@ -146,6 +148,7 @@ function OfflineTable({
     displayName: authSession?.user.name,
     turnDurationMs: turnDurationMs ?? pinnedTurnMs(params.turn),
     powerUps,
+    startingStack,
     history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
   });
   const payout = game.phase === "payout";

@@ -212,6 +212,7 @@ export function useOfflineGame({
   displayName,
   turnDurationMs,
   powerUps,
+  startingStack,
   session,
   history,
 }: {
@@ -238,6 +239,11 @@ export function useOfflineGame({
    * It is the table's, so a new session keeps it.
    */
   powerUps?: PowerUpDealMode;
+  /**
+   * The chips every seat sits down with — the tray's STARTING CHIPS. Absent is
+   * `DEFAULT_STAKES.startingStack`. It is the table's, so New game deals it again.
+   */
+  startingStack?: number;
   /** The tutorial's table; absent for ordinary offline play. */
   session?: OfflineSession;
   history?: { ownerId: string; capture: (record: HandRecord) => Promise<void> };
@@ -259,7 +265,7 @@ export function useOfflineGame({
     // roster — and that turn is taken on the same beat as every other one: the table is dealt
     // with a seat thinking, not with the opening already played out. At a Wild table the Power
     // Draw holds that turn back until it closes.
-    openTable({ seed, dictionary, turnDurationMs, powerUps, nowMs: startedAtMs });
+    openTable({ seed, dictionary, turnDurationMs, powerUps, startingStack, nowMs: startedAtMs });
     return { initial, startedAtMs };
   });
   const [state, setState] = useState<OfflineState>(opened.initial);
@@ -485,11 +491,11 @@ export function useOfflineGame({
     setPowerEvents([]);
     const table = sessionRef.current;
     const nowMs = now();
-    const next = table !== undefined ? table.open(nowMs) : openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps, nowMs });
+    const next = table !== undefined ? table.open(nowMs) : openTable({ seed: randomSeed(), dictionary, turnDurationMs, powerUps, startingStack, nowMs });
     const owner = historyRef.current;
     recorderRef.current = owner && !table ? new OfflineHandRecorder(next, nowMs, owner.ownerId) : null;
     commit(stateRef.current, next);
-  }, [commit, dictionary, now, powerUps, turnDurationMs]);
+  }, [commit, dictionary, now, powerUps, startingStack, turnDurationMs]);
 
   /**
    * Replaces the hero's draft with the one the seat has built — playing a tile, taking one back,
@@ -781,8 +787,8 @@ function powerViewOf(
 }
 
 /**
- * Deals a session's first hand at this table: the roster, the offline stakes, the table's clock
- * and its power-up mode. The first deal and New game both come through here, so a restarted
+ * Deals a session's first hand at this table: the roster, the offline stakes and starting chips,
+ * the table's clock and its power-up mode. The first deal and New game both come through here, so a restarted
  * session is the same table with a fresh seed.
  */
 function openTable({
@@ -790,12 +796,14 @@ function openTable({
   dictionary,
   turnDurationMs,
   powerUps,
+  startingStack = DEFAULT_STAKES.startingStack,
   nowMs = Date.now(),
 }: {
   seed: number;
   dictionary: Dictionary;
   turnDurationMs: number | undefined;
   powerUps: PowerUpDealMode | undefined;
+  startingStack?: number;
   nowMs?: number;
 }): OfflineState {
   return startHand({
@@ -803,7 +811,7 @@ function openTable({
     players: ROSTER.map((player) => player.id),
     nowMs,
     dictionary,
-    stakes: DEFAULT_STAKES,
+    stakes: { ...DEFAULT_STAKES, startingStack },
     turnDurationMs,
     ...(powerUps === "choose3" ? { powerUps: { deal: "choose3" } } : {}),
   });

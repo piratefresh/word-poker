@@ -64,12 +64,11 @@ const ENTER_ZOOM = 3.4;
 const SKY_RISE_MS = 1_100;
 const LOGO_MAX_WIDTH = 280;
 
-type Variant = ModeVariant & { href: Href };
+type Variant = ModeVariant & { params?: { powers: "wild" } };
 
 const OFFLINE_VARIANTS: readonly [Variant, ...Variant[]] = [
   {
     key: "normal",
-    href: "/offline",
     label: "Normal",
     description: "Standard rules",
     testID: "offline-normal",
@@ -77,7 +76,7 @@ const OFFLINE_VARIANTS: readonly [Variant, ...Variant[]] = [
   {
     key: "wild",
     // The table's power-ups switch (STO-484): the offline adapter reads it off the route.
-    href: { pathname: "/offline", params: { powers: "wild" } },
+    params: { powers: "wild" },
     label: "Wild Power",
     description: "Pick a power each hand",
     testID: "offline-wild",
@@ -339,7 +338,7 @@ export function HomeScreen() {
         <OfflineTray
           variants={OFFLINE_VARIANTS}
           onClose={closeOffline}
-          onDeal={(variant) => go(variant.href)}
+          onDeal={(variant, chips) => go({ pathname: "/offline", params: { ...variant.params, chips } })}
           maxHeight={Math.max(180, box.height - headerTop - headerHeight - 88)}
         />
       ) : null}
