@@ -91,15 +91,17 @@ function layerPots(
     for (const contribution of contributions) {
       amount += Math.max(0, Math.min(contribution, level) - previous);
     }
-    previous = level;
-
     const eligible = seats
       .map((seat, index) => ({ seat, index }))
       .filter(
         ({ seat }) =>
-          !seat.folded && !seat.sittingOut && (seat.committedHand >= level || (live && !seat.allIn)),
+          !seat.folded &&
+          !seat.sittingOut &&
+          (seat.committedHand >= level ||
+            (live && !seat.allIn && seat.committedHand + seat.stack > previous)),
       )
       .map(({ index }) => index);
+    previous = level;
 
     if (eligible.length === 0) {
       const below = pots[pots.length - 1];

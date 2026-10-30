@@ -231,7 +231,7 @@ export function Pot({
       ) : (
         plaque
       )}
-      {tabletop && !chipsBesidePot && plates.length === 1 ? blindsLine : null}
+      {tabletop && !chipsBesidePot ? blindsLine : null}
     </View>
   );
 }

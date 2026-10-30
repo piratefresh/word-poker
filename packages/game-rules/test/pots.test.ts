@@ -287,6 +287,20 @@ describe("buildLivePots — pots while betting is open", () => {
     ]);
   });
 
+  for (const stack of [10, 20, 21]) {
+    it(`limits an unmatched seat's eligibility with 10 committed and ${stack} remaining`, () => {
+      const pots = buildLivePots([
+        seat("alex", 30, { allIn: true, stack: 0 }),
+        seat("bree", 100),
+        seat("cam", 10, { stack }),
+      ]);
+      assert.deepEqual(pots, [
+        { amount: 70, eligible: [0, 1, 2] },
+        { amount: 70, eligible: stack > 20 ? [1, 2] : [1] },
+      ]);
+    });
+  }
+
   it("is empty before any chip is in", () => {
     assert.deepEqual(buildLivePots([seat("a", 0), seat("b", 0)]), []);
   });

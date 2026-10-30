@@ -399,7 +399,37 @@ test("draws one plate per pot, each with only its own chips and who can win it",
   // The headline is the main pot's own chips, not the 230 on the table.
   expect(view.getByTestId("pot-total")).toHaveTextContent("90");
   expect(view.getByTestId("side-pot-amount-0")).toHaveTextContent("140");
-  expect(view.getByTestId("side-pot-0")).toHaveAccessibilityValue({});
+  expect(view.getByTestId("pot-plate-main")).toHaveProp(
+    "accessibilityLabel",
+    "Main pot, 90 chips. Magnus, Ellis and Jay can win it.",
+  );
+  expect(view.getByTestId("side-pot-0")).toHaveProp(
+    "accessibilityLabel",
+    "Side pot, 140 chips. Ellis and Jay can win it.",
+  );
+});
+
+test("keeps blinds visible with side pots on a portrait tablet", async () => {
+  const original = Dimensions.get("window");
+  const window = { ...original, width: 768, height: 1024 };
+  Dimensions.set({ window, screen: window });
+  try {
+    const view = await renderScreen({
+      game: {
+        ...FOUR_PLAYER_FLOP_FIXTURE,
+        pot: 230,
+        pots: [
+          { amount: 90, eligible: ["magnus", "ellis", "jay"] },
+          { amount: 140, eligible: ["ellis", "jay"] },
+        ],
+      },
+      onBack: jest.fn(),
+    });
+    expect(view.getByTestId("side-pot-0")).toBeOnTheScreen();
+    expect(view.getByTestId("felt-blinds")).toHaveTextContent("BLINDS 10 / 20");
+  } finally {
+    await act(() => Dimensions.set({ window: original, screen: original }));
+  }
 });
 
 describe("landscape", () => {
