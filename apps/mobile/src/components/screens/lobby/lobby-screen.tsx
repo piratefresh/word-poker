@@ -18,14 +18,17 @@ import { useQuests } from "@/lib/quests/quests-provider";
 import { filterLobbyRooms, LOBBY_FILTERS, type LobbyFilter } from "@/features/online/lobby-view";
 import { joinTable, useActiveRoomId, useHostedRoomIds } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
+import { formatCoins } from "@/lib/ui/format";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
+import { GuestPanel, OutOfCoinsPanel } from "./lobby-panel";
 import { NightLobbyButton } from "./night-lobby-button";
 import { ParlorBackground } from "./parlor-background";
 import { ParlorNav } from "./parlor-nav";
 import { tableThatFits } from "./parlor-view";
 import { RoomDetailsSheet } from "./room-details-sheet";
 import { RoomRow } from "./room-row";
+import { useCoinsBack } from "./use-coins-back";
 
 const NAV_ROUTES: Record<HomeNavDestination, Href> = {
   home: "/",
@@ -35,6 +38,7 @@ const NAV_ROUTES: Record<HomeNavDestination, Href> = {
 };
 const TABLE_ENTRY_MS = 900;
 const TABLE_ENTRY_ZOOM = 3.4;
+const CHEAPEST_BUY_IN = Math.min(...BUY_IN_PRESETS);
 
 export function LobbyScreen() {
   const insets = useSafeAreaInsets();
@@ -44,7 +48,7 @@ export function LobbyScreen() {
   const activeRoomId = useActiveRoomId();
   const hostedRoomIds = useHostedRoomIds();
   const { data: session } = authClient.useSession();
-  const { coins, refreshCoins, state: questState } = useQuests();
+  const { coins, refreshCoins, state: questState, levelUp, streakBanner } = useQuests();
   const [joining, setJoining] = useState<string | null>(null);
   /** A join the server turned down: its words, and the table RETRY asks for again. */
   const [refusal, setRefusal] = useState<{ roomId: string; message: string } | null>(null);
@@ -78,8 +82,20 @@ export function LobbyScreen() {
   }, [create]);
 
   const selectedRoom = rooms.find((room) => room.roomId === selectedRoomId) ?? null;
-  const filteredRooms = filterLobbyRooms(listRooms, filter);
   const guest = session?.user.isAnonymous === true;
+  const broke = !guest && coins !== null && coins < CHEAPEST_BUY_IN;
+  const coinsBack = useCoinsBack(
+    coins,
+    CHEAPEST_BUY_IN,
+    levelUp !== null ? `Level ${levelUp.level} reached.` : streakBanner !== null ? `Day ${streakBanner.day} streak reward.` : null,
+    reduceMotion,
+  );
+  // Flow B: a panel takes the hero card's place, and its table joins the rows with the rest.
+  const panel = guest ? <GuestPanel /> : broke ? <OutOfCoinsPanel cheapest={CHEAPEST_BUY_IN} /> : null;
+  const featured = panel === null ? headliner : undefined;
+  const listed = panel !== null && headliner !== undefined ? [headliner, ...listRooms] : listRooms;
+  const selectElsewhere = (room: RoomSummary) => setSelectedRoomId(room.roomId);
+  const filteredRooms = filterLobbyRooms(listed, filter);
   const elsewhere = (room: RoomSummary | null) => tableThatFits(rooms, coins, room?.roomId ?? null);
   const currentReadout = status === "loading" && rooms.length === 0 ? "Looking for tables…" : readout;
 
@@ -145,33 +161,29 @@ export function LobbyScreen() {
         testID="lobby-scroll"
       >
         <ParlorNav
-          coins={coins}
+          coins={coinsBack.shown}
+          gained={coinsBack.gained}
+          guest={guest}
           level={questState?.level}
           me={session?.user.isAnonymous ? "Guest" : session?.user.name?.trim() || session?.user.email}
           onBack={back}
           readout={currentReadout}
         />
 
-        {coins !== null && coins < BUY_IN_PRESETS[0] ? (
-          <View style={styles.broke} testID="lobby-out-of-coins">
-            <Text style={styles.emptyTitle}>OUT OF COINS</Text>
-            <Text style={styles.emptyCopy}>
-              Finish quests or visit the store to get back to a table. Games against bots are always free.
-            </Text>
-            <GoldButton label="VISIT THE STORE" onPress={() => router.push(NAV_ROUTES.store)} testID="lobby-out-of-coins-store" />
-          </View>
-        ) : null}
+        {panel}
 
-        {headliner ? (
+        {featured ? (
           <FeaturedTableCard
             coins={coins}
-            elsewhere={elsewhere(headliner)}
+            elsewhere={elsewhere(featured)}
+            glow={coinsBack.glow}
             guest={guest}
-            joining={joining === headliner.roomId}
-            onDetails={() => setSelectedRoomId(headliner.roomId)}
-            onJoin={() => openTable(headliner.roomId)}
-            room={headliner}
-            yours={headliner.roomId === activeRoomId}
+            joining={joining === featured.roomId}
+            onDetails={() => setSelectedRoomId(featured.roomId)}
+            onElsewhere={selectElsewhere}
+            onJoin={() => openTable(featured.roomId)}
+            room={featured}
+            yours={featured.roomId === activeRoomId}
           />
         ) : null}
 
@@ -225,7 +237,7 @@ export function LobbyScreen() {
 
           {status === "ready" && rooms.length > 0 && filteredRooms.length === 0 ? (
             <Text style={styles.note} testID="lobby-no-filter-matches">
-              {filter === "All" && headliner ? "No other tables yet." : "No rooms match this filter."}
+              {filter === "All" && featured ? "No other tables yet." : "No rooms match this filter."}
             </Text>
           ) : null}
 
@@ -257,6 +269,16 @@ export function LobbyScreen() {
         </View>
       )}
 
+      {coinsBack.gained === null ? null : (
+        <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.toast, { bottom: insets.bottom + 160 }]} testID="lobby-coins-back">
+          <View style={styles.toastCoin} />
+          <View style={styles.toastCopy}>
+            <Text style={styles.toastTitle}>+{formatCoins(coinsBack.gained)} COINS</Text>
+            <Text style={styles.toastLine}>{coinsBack.reason === null ? "You're back in." : `${coinsBack.reason} You're back in.`}</Text>
+          </View>
+        </View>
+      )}
+
       <HomeNavRack active="home" onNavigate={(destination) => router.push(NAV_ROUTES[destination])} />
 
       <CreateTableForm visible={creating} onClose={() => setCreating(false)} onCreated={travelToTable} />
@@ -267,6 +289,7 @@ export function LobbyScreen() {
         hosted={selectedRoom !== null && hostedRoomIds.has(selectedRoom.roomId)}
         joining={selectedRoom !== null && joining === selectedRoom.roomId}
         onClose={() => setSelectedRoomId(null)}
+        onElsewhere={selectElsewhere}
         onJoin={() => selectedRoom && openTable(selectedRoom.roomId)}
         room={selectedRoom}
         yours={selectedRoom !== null && selectedRoom.roomId === activeRoomId}
@@ -281,7 +304,6 @@ const styles = StyleSheet.create({
   scene: { flex: 1 },
   createDock: { position: "absolute", left: spacing.gutter, right: spacing.gutter },
   empty: { alignItems: "center", gap: spacing.xs, marginHorizontal: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.xl },
-  broke: { alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
   emptyTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.h3, letterSpacing: 1 },
   emptyCopy: { color: nightLobby.text.muted, fontFamily: fonts.rubik, fontSize: fontSize.body, textAlign: "center" },
   section: { gap: spacing.sm, paddingHorizontal: spacing.gutter, paddingTop: spacing.lg },
@@ -300,5 +322,10 @@ const styles = StyleSheet.create({
   banner: { alignItems: "center", backgroundColor: nightLobby.alert.background, borderColor: nightLobby.alert.border, borderRadius: radius.md, borderWidth: border.thick, flexDirection: "row", gap: spacing.sm, left: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: spacing.gutter },
   bannerText: { color: nightLobby.alert.text, flex: 1, fontFamily: fonts.rubikMedium, fontSize: fontSize.small },
   bannerRetry: { borderColor: nightLobby.alert.border, borderRadius: radius.pill, borderWidth: border.thick, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  toast: { alignItems: "center", backgroundColor: nightLobby.cream.face, borderBottomColor: nightLobby.cream.edge, borderBottomWidth: 4, borderRadius: radius.md, flexDirection: "row", gap: spacing.sm, left: spacing.gutter, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: spacing.gutter },
+  toastCoin: { backgroundColor: nightLobby.coin.gradient[0], borderColor: nightLobby.coin.gradient[1], borderRadius: radius.pill, borderWidth: 2, height: 28, width: 28 },
+  toastCopy: { flex: 1, gap: 2 },
+  toastTitle: { color: nightLobby.gold.buttonText, fontFamily: fonts.arcade, fontSize: fontSize.bodyLg },
+  toastLine: { color: nightLobby.gold.buttonText, fontFamily: fonts.rubikMedium, fontSize: fontSize.small },
   bannerRetryText: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.small, letterSpacing: 0.8 },
 });

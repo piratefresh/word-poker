@@ -19,8 +19,9 @@ export interface RoomDetailsSheetProps {
   /** The Wallet's coins; `null` while unread. */
   coins?: number | null;
   guest?: boolean;
-  /** The table a full one points to. */
+  /** The table a full or short one points to. */
   elsewhere?: RoomSummary | null;
+  onElsewhere: (room: RoomSummary) => void;
   onClose: () => void;
   onJoin: () => void;
 }
@@ -33,6 +34,7 @@ export function RoomDetailsSheet({
   coins = null,
   guest = false,
   elsewhere = null,
+  onElsewhere,
   onClose,
   onJoin,
 }: RoomDetailsSheetProps) {
@@ -106,6 +108,7 @@ export function RoomDetailsSheet({
               <JoinAction
                 context={{ yours, joining, guest, coins }}
                 elsewhere={elsewhere}
+                onElsewhere={onElsewhere}
                 onJoin={onJoin}
                 room={room}
                 surface="sheet"

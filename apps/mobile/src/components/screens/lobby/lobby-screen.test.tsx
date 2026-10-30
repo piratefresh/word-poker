@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { WAITING_PHASE, type RoomSummary } from "@wordpoker/contracts";
 
@@ -13,12 +13,13 @@ jest.mock("@/features/online/room-session", () => ({
   useHostedRoomIds: () => new Set(),
 }));
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn(), setParams: jest.fn() },
+  router: { back: jest.fn(), canGoBack: jest.fn(() => true), navigate: jest.fn(), push: jest.fn(), replace: jest.fn(), setParams: jest.fn() },
   useLocalSearchParams: jest.fn(() => ({})),
   useFocusEffect: (callback: () => void) => { jest.requireActual("react").useEffect(callback, [callback]); },
 }));
+let mockReduceMotion = true;
 jest.mock("react-native-reanimated", () => ({
-  ...jest.requireActual("react-native-reanimated/mock"), useReducedMotion: () => true,
+  ...jest.requireActual("react-native-reanimated/mock"), useReducedMotion: () => mockReduceMotion,
 }));
 jest.mock("@expo/ui", () => {
   const { View } = jest.requireActual("react-native");
@@ -27,7 +28,7 @@ jest.mock("@expo/ui", () => {
 let mockCoins: number | null = 5450;
 const mockRefreshCoins = jest.fn();
 jest.mock("@/lib/quests/quests-provider", () => ({
-  useQuests: () => ({ coins: mockCoins, refreshCoins: mockRefreshCoins, state: { level: 2 } }),
+  useQuests: () => ({ coins: mockCoins, refreshCoins: mockRefreshCoins, state: { level: 2 }, levelUp: null, streakBanner: null }),
 }));
 let mockGuest = false;
 jest.mock("@/auth/client/auth-client", () => ({
@@ -57,6 +58,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockCoins = 5450;
   mockGuest = false;
+  mockReduceMotion = true;
   jest.mocked(useActiveRoomId).mockReturnValue(null);
   jest.mocked(useLocalSearchParams).mockReturnValue({});
   jest.mocked(joinTable).mockResolvedValue(undefined);
@@ -191,15 +193,102 @@ test("labels seated, locked and guest rows", async () => {
   mockCoins = null;
   const guest = await show([room("hero"), room("row")]);
   expect(within(guest.getByTestId("lobby-room-row")).getByText("ACCOUNT NEEDED")).toBeOnTheScreen();
-  expect(guest.getByTestId("parlor-featured-join")).toBeDisabled();
 });
 
-test("points a player with no coins to quests, the store, and free bot games", async () => {
-  mockCoins = 0;
-  const view = await show([room("hero")]);
-  expect(view.getByTestId("lobby-out-of-coins")).toBeOnTheScreen();
+function named(roomId: string, name: string, buyIn: RoomSummary["metadata"]["buyIn"]) {
+  return room(roomId, { metadata: { ...room(roomId).metadata, name, buyIn } });
+}
+
+test("out of coins: a panel of ways back replaces the hero, and every table shows its shortfall", async () => {
+  mockCoins = 320;
+  const view = await show([named("high", "High Stakes", 5000), named("corner", "Corner Table", 500)]);
+  const panel = view.getByTestId("lobby-out-of-coins");
+  expect(within(panel).getByText("ONLINE TABLES START AT 500")).toBeOnTheScreen();
+  expect(within(panel).getByText("OUT OF COINS")).toBeOnTheScreen();
+  expect(within(panel).getByText("Earn coins from quests")).toBeOnTheScreen();
+  expect(view.queryByTestId("parlor-featured")).toBeNull();
+  expect(within(view.getByTestId("lobby-room-high")).getByText("NEED 4,680 MORE")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-room-corner")).getByText("NEED 180 MORE")).toBeOnTheScreen();
   await fireEvent.press(view.getByTestId("lobby-out-of-coins-store"));
   expect(router.push).toHaveBeenCalledWith("/store");
+  await fireEvent.press(view.getByTestId("lobby-out-of-coins-quests"));
+  expect(router.push).toHaveBeenCalledWith("/quests");
+  await fireEvent.press(view.getByTestId("lobby-out-of-coins-practice"));
+  expect(router.navigate).toHaveBeenCalledWith({ pathname: "/", params: { offline: "1" } });
+});
+
+test("short for this table: no panel, and the hero points to the table that fits", async () => {
+  mockCoins = 1200;
+  const view = await show([named("high", "High Stakes", 5000), named("corner", "Corner Table", 500)]);
+  expect(view.queryByTestId("lobby-out-of-coins")).toBeNull();
+  expect(within(view.getByTestId("parlor-featured-join")).getByText("NEED 3,800 MORE COINS")).toBeOnTheScreen();
+  expect(view.getByTestId("parlor-featured-join-note")).toHaveTextContent("Corner Table fits your wallet.");
+  expect(view.queryByTestId("parlor-featured-join-store")).toBeNull();
+  await fireEvent.press(view.getByTestId("parlor-featured-join-elsewhere"));
+  expect(view.getByTestId("room-details-sheet").props.isPresented).toBe(true);
+  expect(view.getByTestId("room-details-join").props.accessibilityLabel).toBe("Join Corner Table for 500 coins. You have 1,200 coins.");
+  expect(within(view.getByTestId("parlor-featured-join-elsewhere")).getByText("TRY CORNER TABLE · 500")).toBeOnTheScreen();
+  expect(joinTable).not.toHaveBeenCalled();
+});
+
+test("guest: the chip says GUEST, the panel sells the account, and every row needs one", async () => {
+  mockGuest = true;
+  mockCoins = null;
+  const view = await show([named("high", "High Stakes", 5000), named("corner", "Corner Table", 500)]);
+  const chip = view.getByTestId("lobby-wallet");
+  expect(chip).toHaveTextContent("GUEST");
+  expect(chip.props.accessibilityLabel).toBe("Playing as a guest");
+  const panel = view.getByTestId("lobby-guest");
+  expect(within(panel).getByText("CREATE AN ACCOUNT TO PLAY ONLINE")).toBeOnTheScreen();
+  expect(within(panel).getByText("Online tables need a wallet. New accounts start with 5,000 coins.")).toBeOnTheScreen();
+  expect(view.queryByTestId("parlor-featured")).toBeNull();
+  expect(within(view.getByTestId("lobby-room-high")).getByText("ACCOUNT NEEDED")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-room-corner")).getByText("ACCOUNT NEEDED")).toBeOnTheScreen();
+  await fireEvent.press(view.getByTestId("lobby-guest-sign-up"));
+  expect(router.push).toHaveBeenCalledWith("/sign-up");
+  await fireEvent.press(view.getByTestId("lobby-guest-practice"));
+  expect(router.navigate).toHaveBeenCalledWith({ pathname: "/", params: { offline: "1" } });
+});
+
+test("coins back under reduced motion: the end values land at once, with the badge and toast but no glow", async () => {
+  mockCoins = 320;
+  const rooms = [named("corner", "Corner Table", 500)];
+  const view = await show(rooms);
+  mockCoins = 1320;
+  await view.rerender(<LobbyScreen />);
+  expect(view.queryByTestId("lobby-out-of-coins")).toBeNull();
+  expect(within(view.getByTestId("lobby-wallet")).getByText("1,320")).toBeOnTheScreen();
+  expect(view.getByTestId("lobby-wallet-gained")).toHaveTextContent("+1,000");
+  expect(within(view.getByTestId("lobby-coins-back")).getByText("+1,000 COINS")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-coins-back")).getByText("You're back in.")).toBeOnTheScreen();
+  expect(view.getByTestId("parlor-featured-join")).toBeEnabled();
+  expect(view.queryByTestId("parlor-featured-join-glow")).toBeNull();
+});
+
+test("coins back: the wallet counts up and Join glows for about a second", async () => {
+  jest.useFakeTimers();
+  mockReduceMotion = false;
+  mockCoins = 320;
+  const view = await show([named("corner", "Corner Table", 500)]);
+  mockCoins = 1320;
+  await view.rerender(<LobbyScreen />);
+  expect(within(view.getByTestId("lobby-wallet")).getByText("320")).toBeOnTheScreen();
+  expect(view.getByTestId("parlor-featured-join-glow")).toBeOnTheScreen();
+  await act(() => jest.advanceTimersByTime(1000));
+  expect(view.queryByTestId("parlor-featured-join-glow")).toBeNull();
+  expect(within(view.getByTestId("lobby-wallet")).getByText("1,320")).toBeOnTheScreen();
+  await act(() => jest.advanceTimersByTime(2000));
+  expect(view.queryByTestId("lobby-coins-back")).toBeNull();
+  expect(view.queryByTestId("lobby-wallet-gained")).toBeNull();
+  jest.useRealTimers();
+});
+
+test("no crossing, no celebration: coins that stay above the cheapest table move quietly", async () => {
+  const view = await show([named("corner", "Corner Table", 500)]);
+  mockCoins = 6450;
+  await view.rerender(<LobbyScreen />);
+  expect(view.queryByTestId("lobby-coins-back")).toBeNull();
+  expect(view.getByTestId("lobby-wallet")).toHaveTextContent("6,450");
 });
 
 test("re-reads the Wallet whenever the lobby comes into focus", async () => {

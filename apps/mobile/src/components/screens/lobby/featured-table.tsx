@@ -23,8 +23,11 @@ export interface FeaturedTableCardProps {
   /** The Wallet's coins; `null` while unread. */
   readonly coins?: number | null;
   readonly guest?: boolean;
-  /** The table a full one points to. */
+  /** The table a full or short one points to. */
   readonly elsewhere?: RoomSummary | null;
+  readonly onElsewhere: (room: RoomSummary) => void;
+  /** The coins just came back: Join glows for a moment. */
+  readonly glow?: boolean;
 }
 
 export function FeaturedTableCard({
@@ -36,6 +39,8 @@ export function FeaturedTableCard({
   coins = null,
   guest = false,
   elsewhere = null,
+  onElsewhere,
+  glow = false,
 }: FeaturedTableCardProps): ReactElement {
   const lastWord = room.metadata.lastWord;
   const players = room.metadata.players ?? [];
@@ -108,6 +113,8 @@ export function FeaturedTableCard({
       <JoinAction
         context={{ yours, joining, guest, coins }}
         elsewhere={elsewhere}
+        glow={glow}
+        onElsewhere={onElsewhere}
         onJoin={onJoin}
         room={room}
         surface="card"
