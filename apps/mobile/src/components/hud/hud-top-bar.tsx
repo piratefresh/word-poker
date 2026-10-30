@@ -170,7 +170,7 @@ export function HudTopBar({
       loopsEnabled={loopsOn}
       phrase={turnPhrase}
       reduceMotion={reduce}
-      showClock={stamp === undefined}
+      showClock={stamp === undefined || turn !== null}
       stacked={stacked}
       testID="phase-capsule"
       turn={turn}

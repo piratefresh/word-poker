@@ -552,6 +552,7 @@ function GameScreenBody({
                   // Free play (offline, tutorial) deals practice chips, never coins.
                   practice={balance.state === "free-play"}
                   tabletop
+                  timed={game.wordSubmission != null && !waiting}
                   turnProgress={waiting ? undefined : view.elapsedFraction}
                 />
               )}

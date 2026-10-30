@@ -176,6 +176,7 @@ export function PlayerSeat({
   tabletop = false,
   level,
   turnProgress,
+  timed = false,
   onPress,
   direction: directionOverride,
   pill = false,
@@ -190,6 +191,8 @@ export function PlayerSeat({
   level?: number;
   /** Elapsed share of the same turn timer displayed by the HUD. */
   turnProgress?: number;
+  /** The shared final-word window is open: every seat still in the hand runs the clock. */
+  timed?: boolean;
   onPress?: (player: GamePlayer) => void;
   /** Where the labels sit, over the one the seat's place at the table picks. */
   direction?: SeatDirection;
@@ -250,7 +253,10 @@ export function PlayerSeat({
   const winner = seat.status === "winner";
   const lit = active || winner;
   // The hero and opponents share the HUD's turn fill while they are acting.
-  const turn = active || seat.status === "thinking";
+  const turn =
+    active ||
+    seat.status === "thinking" ||
+    (timed && seat.status !== "fold" && seat.status !== "busted");
   const statusColor = tabletop ? "#ffce00" : winner ? colors.goldHi : colors.gold;
   // A busted seat is dimmed like a folded one: it is at the table, and it is not playing.
   const out = seat.status === "fold" || seat.status === "busted";

@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
-import { type TurnTimerView } from "@/components/hud/turn-clock";
+import { formatClockMs, type TurnTimerView } from "@/components/hud/turn-clock";
 import { CoachTarget } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts } from "@/constants/theme";
@@ -40,6 +40,11 @@ export function WordSubmissionControls({
             <CoachTarget id="check">
               <GameButton
                 label={status === "submitting" ? "SUBMITTING…" : "SUBMIT WORD"}
+                labelAccent={
+                  status === "submitting" || timer === undefined
+                    ? undefined
+                    : formatClockMs(timer.remainingMs)
+                }
                 accessibilityLabel={
                   status === "submitting" ? "Submitting word" : "Submit word"
                 }
