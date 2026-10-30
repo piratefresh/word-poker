@@ -30,12 +30,11 @@ export function StartingChips({ selected, onSelect }: { selected: number; onSele
       <View accessibilityRole="radiogroup" accessibilityLabel="Starting chips" style={styles.row}>
         {OPTIONS.map(({ chips, label }) => {
           const checked = chips === selected;
-          const isDefault = chips === DEFAULT_STARTING_CHIPS;
           return (
             <Pressable
               key={chips}
               accessibilityRole="radio"
-              accessibilityLabel={`${formatCoins(chips)} practice chips${isDefault ? ", default" : ""}`}
+              accessibilityLabel={`${formatCoins(chips)} practice chips`}
               accessibilityState={{ checked }}
               aria-checked={checked}
               onPress={() => onSelect(chips)}
@@ -45,9 +44,6 @@ export function StartingChips({ selected, onSelect }: { selected: number; onSele
             >
               <View accessible={false} style={styles.chip} />
               <Text style={[styles.amount, checked && styles.amountChecked]}>{label}</Text>
-              {isDefault ? (
-                <View accessible={false} style={styles.tag}><Text style={styles.tagText}>DEFAULT</Text></View>
-              ) : null}
             </Pressable>
           );
         })}
@@ -61,7 +57,7 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
   label: { fontFamily: fonts.rubikSemiBold, fontSize: 12, letterSpacing: 1.4, color: "#d8ccaf" },
   helper: { flexShrink: 1, fontFamily: fonts.rubikMedium, fontSize: 12, color: "#d8ccaf", textAlign: "right" },
-  row: { flexDirection: "row", gap: 8, paddingTop: 6 },
+  row: { flexDirection: "row", gap: 8 },
   option: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, borderWidth: 2 },
   plain: { backgroundColor: "rgba(8,12,28,0.5)", borderColor: "rgba(243,230,196,0.2)" },
   checked: { backgroundColor: "#e0974a", borderColor: "#ffd877" },
@@ -70,6 +66,4 @@ const styles = StyleSheet.create({
   chip: { width: 14, height: 14, borderRadius: 7, backgroundColor: "#e3e7ee", borderWidth: 2, borderColor: "#8d96a6" },
   amount: { fontFamily: fonts.arcade, fontSize: 17, color: "#f3e6c4" },
   amountChecked: { color: "#2a1906" },
-  tag: { position: "absolute", top: -9, right: 4, paddingHorizontal: 5, borderRadius: 6, borderWidth: 1, borderColor: "#e0974a", backgroundColor: "#1f4a33" },
-  tagText: { fontFamily: fonts.arcade, fontSize: 9.5, color: "#f7d77a" },
 });

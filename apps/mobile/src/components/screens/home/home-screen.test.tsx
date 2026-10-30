@@ -283,7 +283,7 @@ test("DEAL defaults to the normal offline route on 1,000 practice chips, and say
   const view = await render(<HomeScreen />);
   await fireEvent.press(view.getByTestId("home-slab-offline"));
   expect(view.getByTestId("offline-chips-1000").props.accessibilityState.checked).toBe(true);
-  expect(view.getByLabelText("1,000 practice chips, default")).toBeTruthy();
+  expect(view.getByLabelText("1,000 practice chips")).toBeTruthy();
   expect(view.getByLabelText("Deal. Free practice game, your coins are not used.")).toBeTruthy();
   expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 1,000 practice chips. Your coins stay in your wallet.");
   await fireEvent.press(view.getByTestId("offline-deal"));
