@@ -145,14 +145,15 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
 
   const playAsGuest = async () => {
     if (pending) return;
-    if (guestId) {
-      router.replace("/");
-      return;
-    }
     setPending(true);
     setError(null);
     try {
+      // Persisted for an existing guest too (an invite's): the tap is still the player's choice.
       await setAutoRestore(false);
+      if (guestId) {
+        router.replace("/");
+        return;
+      }
       guestTapped = true;
       const { error: authError } = await changeSession(() => authClient.signIn.anonymous());
       if (authError) {
