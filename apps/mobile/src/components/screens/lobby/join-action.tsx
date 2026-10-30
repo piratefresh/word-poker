@@ -1,6 +1,7 @@
 /**
  * join-action.tsx — design 1a's price-tag Join: the button says what sitting down costs, the line
- * under it says what happens to the coins, and a short Wallet gets its two ways back. The hero card
+ * under it says what happens to the coins, and a short Wallet gets the table that fits it, or its two
+ * ways back when none does (Flow B). The hero card
  * and the details sheet both draw it, so the two can never quote a table differently.
  */
 
@@ -11,6 +12,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { type RoomSummary } from "@wordpoker/contracts";
 
 import { fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
+import { formatCoins } from "@/lib/ui/format";
 import { NightLobbyButton } from "./night-lobby-button";
 import { joinNote, joinOffer, type JoinContext } from "./parlor-view";
 
@@ -21,37 +23,50 @@ export interface JoinActionProps {
   readonly room: RoomSummary;
   readonly context: JoinContext;
   readonly surface: "card" | "sheet";
-  /** The table a full one points to; see `tableThatFits`. */
+  /** The table a full or short one points to; see `tableThatFits`. */
   readonly elsewhere?: RoomSummary | null;
+  /** Selects `elsewhere` — the short Wallet's TRY button. */
+  readonly onElsewhere: (room: RoomSummary) => void;
+  /** The coins just came back: Join glows gold for a moment. */
+  readonly glow?: boolean;
   readonly onJoin: () => void;
   readonly testID: string;
 }
 
-export function JoinAction({ room, context, surface, elsewhere = null, onJoin, testID }: JoinActionProps): ReactElement {
+export function JoinAction({ room, context, surface, elsewhere = null, onElsewhere, glow = false, onJoin, testID }: JoinActionProps): ReactElement {
   const offer = joinOffer(room, context);
   const note = joinNote(room, context, surface, elsewhere);
 
   return (
     <View style={styles.action}>
       {offer.kind === "yours" ? <Text style={styles.eyebrow}>YOU&apos;RE SEATED</Text> : null}
-      <NightLobbyButton
-        accessibilityLabel={offer.spoken}
-        busy={offer.kind === "joining"}
-        disabled={!offer.enabled}
-        label={offer.label}
-        onPress={onJoin}
-        testID={testID}
-        tone={offer.kind === "yours" ? "cream" : "gold"}
-      >
-        {offer.price === null ? null : (
-          <>
-            <View style={styles.coin} />
-            <Text style={styles.price}>{offer.price}</Text>
-          </>
-        )}
-      </NightLobbyButton>
+      <View style={glow && styles.glow} testID={glow ? `${testID}-glow` : undefined}>
+        <NightLobbyButton
+          accessibilityLabel={offer.spoken}
+          busy={offer.kind === "joining"}
+          disabled={!offer.enabled}
+          label={offer.label}
+          onPress={onJoin}
+          testID={testID}
+          tone={offer.kind === "yours" ? "cream" : "gold"}
+        >
+          {offer.price === null ? null : (
+            <>
+              <View style={styles.coin} />
+              <Text style={styles.price}>{offer.price}</Text>
+            </>
+          )}
+        </NightLobbyButton>
+      </View>
       {note === null ? null : <Text style={styles.note} testID={`${testID}-note`}>{note}</Text>}
-      {offer.kind === "short" ? (
+      {offer.kind === "short" && elsewhere !== null ? (
+        <NightLobbyButton
+          label={`TRY ${elsewhere.metadata.name.toUpperCase()} · ${formatCoins(elsewhere.metadata.buyIn)}`}
+          onPress={() => onElsewhere(elsewhere)}
+          testID={`${testID}-elsewhere`}
+          tone="outline"
+        />
+      ) : offer.kind === "short" ? (
         <View style={styles.ways}>
           <View style={styles.way}>
             <NightLobbyButton label="STORE" onPress={() => router.push("/store")} testID={`${testID}-store`} tone="outline" />
@@ -68,6 +83,7 @@ export function JoinAction({ room, context, surface, elsewhere = null, onJoin, t
 
 const styles = StyleSheet.create({
   action: { gap: spacing.sm },
+  glow: { borderRadius: 16, boxShadow: "0 0 0 4px rgba(255,216,119,.35), 0 0 30px rgba(255,216,119,.7)" },
   eyebrow: { color: nightLobby.status.seat, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.caption, letterSpacing: 1.8, textAlign: "center" },
   coin: { backgroundColor: nightLobby.coin.gradient[0], borderColor: nightLobby.coin.gradient[1], borderRadius: radius.pill, borderWidth: 2, height: 18, width: 18 },
   price: { color: nightLobby.gold.buttonText, fontFamily: fonts.arcade, fontSize: 21, letterSpacing: 0.6 },

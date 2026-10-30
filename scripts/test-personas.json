@@ -1,0 +1,7 @@
+[
+  { "email": "zero@wordpoker.dev", "name": "Zero Coins", "coins": 0 },
+  { "email": "broke@wordpoker.dev", "name": "Broke Tester", "coins": 320 },
+  { "email": "short@wordpoker.dev", "name": "Short Tester", "coins": 1200 },
+  { "email": "rich@wordpoker.dev", "name": "Rich Tester", "coins": 60000 },
+  { "email": "unverified@wordpoker.dev", "name": "Unverified Tester", "coins": null }
+]

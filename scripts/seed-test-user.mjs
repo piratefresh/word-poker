@@ -14,7 +14,14 @@
  * `--env-file` supplies DATABASE_* exactly as the API route reads them; a shell
  * that already exports those variables works too (process env wins). Override
  * one identity with TEST_USER_EMAIL / TEST_USER_NAME, the shared password with TEST_USER_PASSWORD.
+ *
+ * It also seeds the wallet personas in `test-personas.json` (zero, broke, short, rich, unverified)
+ * under the same password. Those with a `coins` figure are written email-verified, so the app reads
+ * their Wallet; `apps/server/scripts/seed-wallets.ts` then sets that Wallet to the figure.
+ * `pnpm seed:test-users` runs both.
  */
+
+import { readFileSync } from "node:fs";
 
 import { generateRandomString, hashPassword } from "better-auth/crypto";
 import { Pool } from "pg";
@@ -25,7 +32,11 @@ const USERS = process.env.TEST_USER_EMAIL
   ? [{ email: process.env.TEST_USER_EMAIL, name: process.env.TEST_USER_NAME ?? "E2E Test" }]
   : [1, 2, 3, 4].map((n) => n === 1
     ? { email: "e2e@wordpoker.dev", name: "E2E Test" }
-    : { email: `e2e-${n}@wordpoker.dev`, name: `E2E Test ${n}` });
+    : { email: `e2e-${n}@wordpoker.dev`, name: `E2E Test ${n}` })
+    .concat(
+      JSON.parse(readFileSync(new URL("./test-personas.json", import.meta.url), "utf8"))
+        .map(({ email, name, coins }) => ({ email, name, verified: coins !== null })),
+    );
 
 function required(name) {
   const value = process.env[name];
@@ -47,17 +58,19 @@ try {
   await client.query("BEGIN");
 
   const passwordHash = await hashPassword(PASSWORD);
-  for (const { email, name } of USERS) {
+  // `verified` unset (the E2E users) keeps whatever the row already says.
+  for (const { email, name, verified = null } of USERS) {
     const existing = await client.query(`SELECT id FROM "user" WHERE email = $1`, [email]);
     const userId = existing.rows[0]?.id ?? generateRandomString(32);
     const now = new Date();
 
     await client.query(
       `INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, false, $4, $4)
+       VALUES ($1, $2, $3, COALESCE($5::boolean, false), $4, $4)
        ON CONFLICT (email) DO UPDATE
-         SET name = EXCLUDED.name, "updatedAt" = EXCLUDED."updatedAt"`,
-      [userId, name, email, now],
+         SET name = EXCLUDED.name, "updatedAt" = EXCLUDED."updatedAt",
+             "emailVerified" = COALESCE($5::boolean, "user"."emailVerified")`,
+      [userId, name, email, now, verified],
     );
 
     // One credential account per user, keyed by the user's id (Better Auth's

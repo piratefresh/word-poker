@@ -187,6 +187,8 @@ export const nightLobby = {
   },
   panel: {
     navy: ["#141f45", "#0a1028"],
+    /** Flow B's panel: a lighter navy that lifts off the night sky. */
+    raised: ["#2a3b85", "#1b2864"],
     headliner: ["#1b2650", "#0f1734"],
     row: "rgba(14,22,48,0.88)",
   },

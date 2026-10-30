@@ -147,6 +147,12 @@ it resets the password and keeps the user's id:
 node --env-file=apps/mobile/.env scripts/seed-test-user.mjs
 ```
 
+For Wallet states, `pnpm seed:test-users` also seeds the personas in `scripts/test-personas.json`
+(same password) and sets each one's coins through `applyWalletChange` as an `adjustment`:
+`zero@` 0, `broke@` 320 (out of coins), `short@` 1,200 (short for 5,000 tables), `rich@` 60,000, and
+`unverified@`, which has no Wallet to read. Rerun it to put the balances back after a test.
+For a guest, use "play as guest" in the app.
+
 The same script also seeds `e2e-2@wordpoker.dev`, `e2e-3@…` and `e2e-4@…` (same password). An online
 table seats an account only once, so multi-seat smokes give each seat its own account. The scripted
 opponent and the cross-platform browser seat use `e2e-2`, and four-seat seats P2–P4 use `e2e-2`

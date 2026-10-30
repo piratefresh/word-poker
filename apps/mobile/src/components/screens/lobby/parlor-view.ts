@@ -127,7 +127,8 @@ export function joinOffer(room: RoomSummary, context: JoinContext): JoinOffer {
 
 /**
  * The line under a Join button. The hero card shows the Wallet moving; the details sheet says what
- * the coins become (§4) and when they come back (§5). `elsewhere` is the table a full one points to.
+ * the coins become (§4) and when they come back (§5). `elsewhere` is the table a full or short one
+ * points to.
  */
 export function joinNote(
   room: RoomSummary,
@@ -144,7 +145,9 @@ export function joinNote(
         ? `Wallet ${formatCoins(coins)} → ${formatCoins(coins - buyIn)} coins`
         : `${formatCoins(buyIn)} coins become chips at this table. Whatever is left comes back as coins when you leave.`;
     case "short":
-      return `You have ${formatCoins(coins ?? 0)} coins. This table takes ${formatCoins(buyIn)}.`;
+      return elsewhere === null
+        ? `You have ${formatCoins(coins ?? 0)} coins. This table takes ${formatCoins(buyIn)}.`
+        : `${elsewhere.metadata.name} fits your wallet.`;
     case "joining":
       return `Moving ${formatCoins(buyIn)} coins to the table`;
     case "full": {

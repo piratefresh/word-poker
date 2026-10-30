@@ -13,9 +13,13 @@ export interface ParlorNavProps {
   readout: string;
   level?: number | null;
   coins?: number | null;
+  /** A guest has no Wallet: the chip says so instead of a balance. */
+  guest?: boolean;
+  /** Coins that just landed, drawn as a badge under the chip. */
+  gained?: number | null;
 }
 
-export function ParlorNav({ onBack, me, readout, level, coins }: ParlorNavProps): ReactElement {
+export function ParlorNav({ onBack, me, readout, level, coins, guest = false, gained = null }: ParlorNavProps): ReactElement {
   const name = me?.trim();
   const initial = name === undefined || name.length === 0 ? null : Array.from(name)[0]?.toUpperCase();
 
@@ -43,17 +47,26 @@ export function ParlorNav({ onBack, me, readout, level, coins }: ParlorNavProps)
         </View>
       </View>
 
-      {level == null && coins == null ? null : (
+      {level == null && coins == null && !guest ? null : (
         <View style={styles.stats}>
           {level == null ? null : (
             <View accessibilityLabel={`Level ${level}`} accessibilityRole="text" style={styles.level} testID="lobby-level">
               <Text style={styles.levelText}>LV {level}</Text>
             </View>
           )}
-          {coins == null ? null : (
+          {guest ? (
+            <View accessibilityLabel="Playing as a guest" accessibilityRole="text" style={styles.wallet} testID="lobby-wallet">
+              <Text style={styles.walletText}>GUEST</Text>
+            </View>
+          ) : coins == null ? null : (
             <View accessibilityLabel={`Wallet, ${formatCoins(coins)} coins`} accessibilityRole="text" style={styles.wallet} testID="lobby-wallet">
               <View style={styles.coin} />
               <Text style={styles.walletText}>{formatCoins(coins)}</Text>
+              {gained === null ? null : (
+                <View style={styles.gained} testID="lobby-wallet-gained">
+                  <Text style={styles.gainedText}>+{formatCoins(gained)}</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -113,4 +126,6 @@ const styles = StyleSheet.create({
   },
   coin: { backgroundColor: "#ffe28a", borderColor: "#c98a2c", borderRadius: radius.pill, borderWidth: 2, height: 15, width: 15 },
   walletText: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: fontSize.body },
+  gained: { backgroundColor: nightLobby.status.seat, borderRadius: radius.pill, paddingHorizontal: spacing.xs, position: "absolute", right: 0, top: "100%", marginTop: 4 },
+  gainedText: { color: "#0e3b22", fontFamily: fonts.arcade, fontSize: fontSize.caption },
 });

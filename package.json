@@ -15,6 +15,7 @@
     "android:distribute": "node --env-file=apps/mobile/.env scripts/distribute-android.mjs",
     "start:local": "powershell -NoProfile -Command \"$env:EXPO_PUBLIC_LOCAL_API='1'; $env:EXPO_PUBLIC_GAME_URL='local'; pnpm start --clear\"",
     "dev:history": "node --env-file=apps/mobile/.env scripts/dev-history.mjs",
+    "seed:test-users": "node --env-file=apps/mobile/.env scripts/seed-test-user.mjs && pnpm --filter @wordpoker/server exec tsx --env-file=../mobile/.env scripts/seed-wallets.ts",
     "deploy:colyseus": "npx @colyseus/cloud deploy",
     "test:colyseus-runtime": "node --test scripts/colyseus-runtime.test.mjs",
     "start": "pnpm kill:ports && pnpm --filter @wordpoker/mobile start",
