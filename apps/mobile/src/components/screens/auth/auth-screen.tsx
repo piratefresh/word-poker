@@ -1,5 +1,5 @@
 import { router, type Href } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
 import {
@@ -74,6 +74,9 @@ const Copy: Record<
   },
 };
 
+/** Set by the guest tap until its session lands; see `playAsGuest`. */
+let guestTapped = false;
+
 function AuthScreen({ mode }: { mode: AuthMode }) {
   const copy = Copy[mode];
   const { data: session } = authClient.useSession();
@@ -130,15 +133,35 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   };
 
+  // A guest may stay on these screens (to make an account later), so the guard never moves them
+  // off: the guest tap goes home itself, once the session has reached the guard — not before, or
+  // the guard would still be closed and bounce the player straight back here. The flag is the
+  // module's because the guard flipping remounts this screen.
+  useEffect(() => {
+    if (!guestTapped || !guestId) return;
+    guestTapped = false;
+    router.replace("/");
+  }, [guestId]);
+
   const playAsGuest = async () => {
     if (pending) return;
     setPending(true);
     setError(null);
     try {
+      // Persisted for an existing guest too (an invite's): the tap is still the player's choice.
       await setAutoRestore(false);
+      if (guestId) {
+        router.replace("/");
+        return;
+      }
+      guestTapped = true;
       const { error: authError } = await changeSession(() => authClient.signIn.anonymous());
-      if (authError) setError(authError.message ?? "Something went wrong. Please try again.");
+      if (authError) {
+        guestTapped = false;
+        setError(authError.message ?? "Something went wrong. Please try again.");
+      }
     } catch {
+      guestTapped = false;
       setError(NETWORK_ERROR);
     } finally {
       setPending(false);
