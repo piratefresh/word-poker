@@ -17,7 +17,7 @@ export const FOUR_PLAYER_FLOP_FIXTURE: GameScreenState = {
   secondsRemaining: 44,
   seatCount: 4,
   pot: 60,
-  sidePots: [],
+  pots: [],
   // Nothing is in the air on a board that has stopped: the fixture is a still frame, and the
   // flop's bets are already in the pot.
   flights: [],

@@ -47,6 +47,7 @@ import {
   availableTiles,
   canUsePower,
   chooseOfflineWord,
+  buildLivePots,
   chooseBotPower,
   decideBotPowerUse,
   decideOfflineMove,
@@ -1088,7 +1089,11 @@ function perspectiveOf(
         result: null,
       },
     result: state.result,
-    sidePots: state.result?.payout.pots.slice(1).map((pot) => pot.amount) ?? [],
+    // Live layers: built off the commitments so a side pot shows the moment an all-in makes it.
+    pots: buildLivePots(state.seats).map((pot) => ({
+      amount: pot.amount,
+      eligible: pot.eligible.map((index) => state.seats[index]?.id ?? ""),
+    })),
     // The session ends when the table cannot seat a hand any more, and for this screen also when
     // the seat it speaks for has busted: the session is the hero's run, and a table that plays on
     // without the hero has nothing left to show.

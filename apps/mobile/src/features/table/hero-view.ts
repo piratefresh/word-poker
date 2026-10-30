@@ -44,6 +44,7 @@ import type {
   BettingState,
   ChipFlight,
   GamePlayer,
+  GamePot,
   GameScreenState,
   PlayerRole,
   PlayerStatus,
@@ -133,7 +134,7 @@ export interface HeroPerspective {
     winner: PlayerId;
     standings: readonly { playerId: PlayerId; score: number; place: number; word: string | null }[];
   } | null;
-  sidePots: readonly number[];
+  pots: readonly GamePot[];
   sessionOver: boolean;
   dictionary: Dictionary;
 }
@@ -260,7 +261,7 @@ function screenState(p: HeroPerspective, local: HeroLocal): GameScreenState {
     players,
     // Every chip committed this hand, in §25's layers: the main pot first, side pots above it.
     pot: p.seats.reduce((total, seat) => total + seat.committedHand, 0),
-    sidePots: p.sidePots,
+    pots: p.pots,
     flights: p.flights,
     sessionOver: p.sessionOver,
     community: p.community,

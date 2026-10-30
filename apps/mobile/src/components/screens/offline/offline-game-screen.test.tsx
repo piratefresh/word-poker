@@ -280,7 +280,7 @@ describe("<OfflineGameScreen />", () => {
     // The pinned hand posts 10 / 20 and then raises to 60, so the felt states a real call and a
     // real pot — the numbers the engine counted, not a placeholder row.
     expect(view.getByRole("button", { name: "Call $60" })).toBeOnTheScreen();
-    expect(view.getByTestId("pot")).toHaveTextContent(/\$90/);
+    expect(view.getByTestId("pot")).toHaveTextContent(/90/);
     expect(control(view, "action-raise").getByText("RAISE ▲")).toBeOnTheScreen();
   });
 

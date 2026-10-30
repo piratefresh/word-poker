@@ -499,7 +499,8 @@ function GameScreenBody({
                       landscape && !hidePot ? (
                         <Pot
                           amount={game.pot}
-                          sidePots={game.sidePots}
+                          pots={game.pots}
+                          players={game.players}
                           blinds={game.blinds}
                           beside
                           tableWidth={chromeWidth}
@@ -534,7 +535,8 @@ function GameScreenBody({
                 hidePot || landscape ? null : (
                   <Pot
                     amount={game.pot}
-                    sidePots={game.sidePots}
+                    pots={game.pots}
+                          players={game.players}
                     blinds={game.blinds}
                     tableWidth={appearanceWidth ?? size.width}
                     tabletop
@@ -752,7 +754,7 @@ function CommunityInTable({
   tiles: GameScreenState["community"];
   scale: number;
   onPick?: (tile: LetterTileData) => void;
-  /** Landscape's pot, hung under the board. */
+  /** Landscape's pots, hung under the board. */
   beside?: ReactNode;
 }) {
   const { layout, resolveContainer } = useTableLayout();

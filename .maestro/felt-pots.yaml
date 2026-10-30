@@ -1,0 +1,51 @@
+# The felt's pot plates (STO-958) on the dev stage `/dev-pots?n=1…4`: one plate per layered pot,
+# the main pot's own amount as the headline, and each plate's who-can-win initials. Screenshots
+# land in Maestro's output directory (`maestro test --test-output-dir=… `), one per pot count.
+#
+#   pnpm --filter @wordpoker/mobile web
+#   maestro test --platform web --test-output-dir=.maestro/shots .maestro/felt-pots.yaml
+url: http://localhost:8081/dev-pots?n=1
+name: Felt pots — one to four plates
+tags:
+  - web
+---
+- openLink: http://localhost:8081/dev-pots?n=1
+- extendedWaitUntil:
+    visible:
+      id: "pot-plate-main"
+    timeout: 60000
+- assertVisible:
+    id: "pot-total"
+    text: "90"
+- assertNotVisible:
+    id: "side-pot-0"
+- takeScreenshot: pots-1
+
+- openLink: http://localhost:8081/dev-pots?n=2
+- extendedWaitUntil:
+    visible:
+      id: "side-pot-0"
+    timeout: 30000
+- assertVisible:
+    id: "side-pot-amount-0"
+    text: "140"
+- assertVisible: "MAIN POT"
+- assertVisible: "SIDE POT"
+- takeScreenshot: pots-2
+
+- openLink: http://localhost:8081/dev-pots?n=3
+- extendedWaitUntil:
+    visible:
+      id: "side-pot-1"
+    timeout: 30000
+- assertVisible: "SIDE 1"
+- assertVisible: "SIDE 2"
+- takeScreenshot: pots-3
+
+- openLink: http://localhost:8081/dev-pots?n=4
+- extendedWaitUntil:
+    visible:
+      id: "side-pot-2"
+    timeout: 30000
+- assertVisible: "SIDE 3"
+- takeScreenshot: pots-4

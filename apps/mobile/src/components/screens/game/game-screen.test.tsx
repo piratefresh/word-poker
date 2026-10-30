@@ -373,22 +373,63 @@ test("holds every action in the row while a lesson locks it, and keeps the mode'
   expect(onLeading).toHaveBeenCalledTimes(1);
 });
 
-test("draws each side pot under the main pot, and none when the hand has one pot", async () => {
+test("draws one plate per pot, each with only its own chips and who can win it", async () => {
   const view = await renderScreen();
 
   expect(view.getByTestId("pot")).toBeOnTheScreen();
+  expect(view.getByTestId("pot-total")).toHaveTextContent("60");
   expect(view.queryByTestId("side-pot-0")).toBeNull();
 
+  const [alex, bree, cam] = FOUR_PLAYER_FLOP_FIXTURE.players.flatMap((player) => (player ? [player] : []));
   await view.rerender(
     <GameScreen
       balance={LOADING_BALANCE}
-      game={{ ...FOUR_PLAYER_FLOP_FIXTURE, sidePots: [500, 250] }}
+      game={{
+        ...FOUR_PLAYER_FLOP_FIXTURE,
+        pot: 230,
+        pots: [
+          { amount: 90, eligible: [alex!.id, bree!.id, cam!.id] },
+          { amount: 140, eligible: [bree!.id, cam!.id] },
+        ],
+      }}
       onBack={jest.fn()}
     />,
   );
 
-  expect(view.getByTestId("side-pot-0")).toHaveTextContent("SIDE POT $500");
-  expect(view.getByTestId("side-pot-1")).toHaveTextContent("SIDE POT $250");
+  // The headline is the main pot's own chips, not the 230 on the table.
+  expect(view.getByTestId("pot-total")).toHaveTextContent("90");
+  expect(view.getByTestId("side-pot-amount-0")).toHaveTextContent("140");
+  expect(view.getByTestId("pot-plate-main")).toHaveProp(
+    "accessibilityLabel",
+    "Main pot, 90 chips. Magnus, Ellis and Jay can win it.",
+  );
+  expect(view.getByTestId("side-pot-0")).toHaveProp(
+    "accessibilityLabel",
+    "Side pot, 140 chips. Ellis and Jay can win it.",
+  );
+});
+
+test("keeps blinds visible with side pots on a portrait tablet", async () => {
+  const original = Dimensions.get("window");
+  const window = { ...original, width: 768, height: 1024 };
+  Dimensions.set({ window, screen: window });
+  try {
+    const view = await renderScreen({
+      game: {
+        ...FOUR_PLAYER_FLOP_FIXTURE,
+        pot: 230,
+        pots: [
+          { amount: 90, eligible: ["magnus", "ellis", "jay"] },
+          { amount: 140, eligible: ["ellis", "jay"] },
+        ],
+      },
+      onBack: jest.fn(),
+    });
+    expect(view.getByTestId("side-pot-0")).toBeOnTheScreen();
+    expect(view.getByTestId("felt-blinds")).toHaveTextContent("BLINDS 10 / 20");
+  } finally {
+    await act(() => Dimensions.set({ window: original, screen: original }));
+  }
 });
 
 describe("landscape", () => {

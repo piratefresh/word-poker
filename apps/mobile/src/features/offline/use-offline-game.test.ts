@@ -224,7 +224,7 @@ describe("useOfflineGame — the dealt table", () => {
       // The blinds are posted before the deal (§5, §14): the small blind's 10 and the big
       // blind's 20 are already in the middle.
       pot: 30,
-      sidePots: [],
+      pots: [{ amount: 30, eligible: expect.any(Array) }],
       sessionOver: false,
       secondsRemaining: 60,
     });

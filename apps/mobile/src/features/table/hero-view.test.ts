@@ -55,7 +55,7 @@ function perspective(overrides: Partial<HeroPerspective> = {}): HeroPerspective 
     available: RACK,
     word: { open: false, hero: null, confirmedPlays: null },
     result: null,
-    sidePots: [],
+    pots: [],
     sessionOver: false,
     dictionary: testDictionary(["GO"]),
     wordCheck: { checksRemaining: WORD_CHECKS_PER_HAND, result: null },
