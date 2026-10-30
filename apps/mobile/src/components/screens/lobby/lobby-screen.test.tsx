@@ -26,7 +26,7 @@ jest.mock("@expo/ui", () => {
   return { BottomSheet: View, RNHostView: View };
 });
 let mockCoins: number | null = 5450;
-const mockRefreshCoins = jest.fn();
+const mockRefreshCoins = jest.fn(async () => mockCoins);
 jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ coins: mockCoins, refreshCoins: mockRefreshCoins, state: { level: 2 }, levelUp: null, streakBanner: null }),
 }));
@@ -62,6 +62,7 @@ beforeEach(() => {
   jest.mocked(useActiveRoomId).mockReturnValue(null);
   jest.mocked(useLocalSearchParams).mockReturnValue({});
   jest.mocked(joinTable).mockResolvedValue(undefined);
+  mockRefreshCoins.mockImplementation(async () => mockCoins);
 });
 
 test("keeps Deal a New Table below the scrollable rooms and opens its sheet", async () => {
@@ -289,6 +290,61 @@ test("no crossing, no celebration: coins that stay above the cheapest table move
   await view.rerender(<LobbyScreen />);
   expect(view.queryByTestId("lobby-coins-back")).toBeNull();
   expect(view.getByTestId("lobby-wallet")).toHaveTextContent("6,450");
+});
+
+/** Back from Corner Table: the balance read before leaving, and the Wallet once the stack lands. */
+function backFromCorner(before: number, credited: () => number) {
+  mockCoins = 5450; // the lobby's read from before the buy-in, until the Wallet is read again
+  jest.mocked(useLocalSearchParams).mockReturnValue({ left: "Corner Table", before: String(before) });
+  mockRefreshCoins.mockImplementation(async () => (mockCoins = credited()));
+  return show([named("corner", "Corner Table", 500)]);
+}
+
+test("coins back after leaving: the stack cashed out shows as the Wallet's gain", async () => {
+  const view = await backFromCorner(4950, () => 5690);
+  await waitFor(() => expect(view.getByTestId("lobby-coins-back")).toBeOnTheScreen());
+  expect(within(view.getByTestId("lobby-coins-back")).getByText("+740 COINS BACK")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-coins-back")).getByText("Your chips from Corner Table are back in your wallet.")).toBeOnTheScreen();
+  expect(view.getByTestId("lobby-wallet-gained")).toHaveTextContent("+740");
+  expect(within(view.getByTestId("lobby-wallet")).getByText("5,690")).toBeOnTheScreen();
+  expect(router.setParams).toHaveBeenCalledWith({ left: undefined, before: undefined });
+});
+
+test("coins back after leaving: a busted stack adds nothing, so nothing is said", async () => {
+  jest.useFakeTimers();
+  const view = await backFromCorner(4950, () => 4950);
+  await act(() => jest.advanceTimersByTime(5000));
+  expect(view.queryByTestId("lobby-coins-back")).toBeNull();
+  expect(view.queryByTestId("lobby-wallet-gained")).toBeNull();
+  expect(within(view.getByTestId("lobby-wallet")).getByText("4,950")).toBeOnTheScreen();
+  jest.useRealTimers();
+});
+
+test("coins back after leaving: a Wallet that is late is read again until the stack shows", async () => {
+  jest.useFakeTimers();
+  let landed = false;
+  const view = await backFromCorner(4950, () => (landed ? 5690 : 4950));
+  expect(view.queryByTestId("lobby-coins-back")).toBeNull();
+  // The chip holds the balance from before leaving, not the stale pre-buy-in read.
+  expect(within(view.getByTestId("lobby-wallet")).getByText("4,950")).toBeOnTheScreen();
+  landed = true;
+  await act(() => jest.advanceTimersByTime(750));
+  expect(within(view.getByTestId("lobby-coins-back")).getByText("+740 COINS BACK")).toBeOnTheScreen();
+  jest.useRealTimers();
+});
+
+test("coins back after leaving: the chip counts up after a beat, then the toast goes", async () => {
+  jest.useFakeTimers();
+  mockReduceMotion = false;
+  const view = await backFromCorner(4950, () => 5690);
+  await act(async () => {});
+  expect(within(view.getByTestId("lobby-wallet")).getByText("4,950")).toBeOnTheScreen();
+  await act(() => jest.advanceTimersByTime(1700));
+  expect(within(view.getByTestId("lobby-wallet")).getByText("5,690")).toBeOnTheScreen();
+  expect(view.queryByTestId("parlor-featured-join-glow")).toBeNull();
+  await act(() => jest.advanceTimersByTime(1400));
+  expect(view.queryByTestId("lobby-coins-back")).toBeNull();
+  jest.useRealTimers();
 });
 
 test("re-reads the Wallet whenever the lobby comes into focus", async () => {

@@ -31,6 +31,7 @@ let mockSession: RoomSessionView = { status: "idle" };
 const mockJoinTable = jest.fn(async (_roomId: string) => {});
 const mockLeaveTable = jest.fn(async () => {});
 const mockDismissTo = jest.fn();
+const mockFetchWallet = jest.fn();
 
 // `useActiveRoomId` is the seat the session holds — the session's `seated` room, or none. The
 // screen asks it before joining, so a test seated at the routed room must not see a join.
@@ -64,6 +65,8 @@ jest.mock("expo-router", () => ({
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: () => ({ data: null, isPending: false }) },
 }));
+// Leave reads the Wallet first, so the lobby can count the cashed-out stack back (STO-954).
+jest.mock("@/lib/wallet/wallet-client", () => ({ fetchWallet: () => mockFetchWallet() }));
 jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ lastCompletions: [], reportHand: jest.fn() }),
 }));
@@ -98,6 +101,8 @@ describe("<SeatedScreen />", () => {
     mockLeaveTable.mockReset();
     mockLeaveTable.mockResolvedValue(undefined);
     mockDismissTo.mockReset();
+    mockFetchWallet.mockReset();
+    mockFetchWallet.mockRejectedValue(new Error("offline"));
   });
 
   test("takes the seat the route names on a cold mount", async () => {
@@ -206,6 +211,20 @@ describe("<SeatedScreen />", () => {
     expect(mockLeaveTable).toHaveBeenCalledTimes(1);
     expect(mockDismissTo).toHaveBeenCalledTimes(1);
     expect(mockDismissTo).toHaveBeenCalledWith("/online");
+  });
+
+  test("hands the lobby the table and the balance read before leaving", async () => {
+    mockSession = seated(TABLE);
+    mockFetchWallet.mockResolvedValue({ coins: 4_950 });
+
+    const view = await render(<SeatedScreen />);
+    await fireEvent.press(view.getByTestId("seated-leave"));
+
+    expect(mockFetchWallet.mock.invocationCallOrder[0]).toBeLessThan(mockLeaveTable.mock.invocationCallOrder[0]);
+    expect(mockDismissTo).toHaveBeenCalledWith({
+      pathname: "/online",
+      params: { left: "Thursday Felt", before: "4950" },
+    });
   });
 
   test("leaves once however many times the control is tapped", async () => {
