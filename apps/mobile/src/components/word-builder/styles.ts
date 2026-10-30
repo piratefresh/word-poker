@@ -11,6 +11,8 @@ import {
   type,
 } from "@/constants/theme";
 
+import { HOLDER } from "./rack-holder-box";
+
 /** The word plate's height, and the strike line's colour when the word will not count. */
 
 const REFUSED_STRIKE = "#ffb4a0";
@@ -62,10 +64,12 @@ export const styles = StyleSheet.create({
     position: "absolute",
     width: 1,
   },
-  // The draft's line above the tray, on the wood: one line, centred, as tall when empty.
+  // The draft's line above the tray, on the wood: one line, centred, as tall when empty. The
+  // rack's frame rises `HOLDER.top` above the tiles, so the line keeps clear of it.
   previewSlot: {
     alignItems: "center",
     justifyContent: "flex-end",
+    marginBottom: HOLDER.top,
   },
   // The word as a plate: fixed height in every state, so a refused word does not move the felt.
   plate: {
