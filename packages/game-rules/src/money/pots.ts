@@ -56,7 +56,33 @@ export interface PotContest {
 export function buildPots(seats: readonly BettingSeatState[]): readonly PotContest[] {
   const contributions = seats.map((seat) => seat.committedHand);
   const levels = [...new Set(contributions.filter((amount) => amount > 0))].sort((a, b) => a - b);
+  return layerPots(seats, levels);
+}
 
+/**
+ * The pots as they stand while betting is still open. Mid-round, seats sit at different
+ * commitments only because some have not matched the bet yet, so `buildPots`'s every-level
+ * layering would call the blinds a side pot. A layer is real only where a seat is all-in: the
+ * boundaries are the all-in seats' commitments, and everything above the highest one is one
+ * pot. At a payout the two agree.
+ */
+export function buildLivePots(seats: readonly BettingSeatState[]): readonly PotContest[] {
+  const top = Math.max(0, ...seats.map((seat) => seat.committedHand));
+  if (top === 0) return [];
+  const capped = seats
+    .filter((seat) => seat.allIn && !seat.folded && seat.committedHand > 0)
+    .map((seat) => seat.committedHand);
+  const levels = [...new Set([...capped, top])].sort((a, b) => a - b);
+  return layerPots(seats, levels, true);
+}
+
+/** `live`: a seat still to act has not matched the bet yet, but is not capped below it. */
+function layerPots(
+  seats: readonly BettingSeatState[],
+  levels: readonly number[],
+  live = false,
+): readonly PotContest[] {
+  const contributions = seats.map((seat) => seat.committedHand);
   const pots: PotContest[] = [];
   let previous = 0;
 
@@ -69,7 +95,10 @@ export function buildPots(seats: readonly BettingSeatState[]): readonly PotConte
 
     const eligible = seats
       .map((seat, index) => ({ seat, index }))
-      .filter(({ seat }) => !seat.folded && !seat.sittingOut && seat.committedHand >= level)
+      .filter(
+        ({ seat }) =>
+          !seat.folded && !seat.sittingOut && (seat.committedHand >= level || (live && !seat.allIn)),
+      )
       .map(({ index }) => index);
 
     if (eligible.length === 0) {

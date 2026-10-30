@@ -373,22 +373,33 @@ test("holds every action in the row while a lesson locks it, and keeps the mode'
   expect(onLeading).toHaveBeenCalledTimes(1);
 });
 
-test("draws each side pot under the main pot, and none when the hand has one pot", async () => {
+test("draws one plate per pot, each with only its own chips and who can win it", async () => {
   const view = await renderScreen();
 
   expect(view.getByTestId("pot")).toBeOnTheScreen();
+  expect(view.getByTestId("pot-total")).toHaveTextContent("60");
   expect(view.queryByTestId("side-pot-0")).toBeNull();
 
+  const [alex, bree, cam] = FOUR_PLAYER_FLOP_FIXTURE.players.flatMap((player) => (player ? [player] : []));
   await view.rerender(
     <GameScreen
       balance={LOADING_BALANCE}
-      game={{ ...FOUR_PLAYER_FLOP_FIXTURE, sidePots: [500, 250] }}
+      game={{
+        ...FOUR_PLAYER_FLOP_FIXTURE,
+        pot: 230,
+        pots: [
+          { amount: 90, eligible: [alex!.id, bree!.id, cam!.id] },
+          { amount: 140, eligible: [bree!.id, cam!.id] },
+        ],
+      }}
       onBack={jest.fn()}
     />,
   );
 
-  expect(view.getByTestId("side-pot-0")).toHaveTextContent("SIDE POT $500");
-  expect(view.getByTestId("side-pot-1")).toHaveTextContent("SIDE POT $250");
+  // The headline is the main pot's own chips, not the 230 on the table.
+  expect(view.getByTestId("pot-total")).toHaveTextContent("90");
+  expect(view.getByTestId("side-pot-amount-0")).toHaveTextContent("140");
+  expect(view.getByTestId("side-pot-0")).toHaveAccessibilityValue({});
 });
 
 describe("landscape", () => {

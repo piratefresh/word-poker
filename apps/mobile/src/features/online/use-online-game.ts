@@ -237,7 +237,7 @@ interface RoomView {
   seats: readonly SeatView[];
   community: readonly Tile[];
   betting: { currentBet: number; minRaise: number; bigBlind: number } | null;
-  pots: readonly number[];
+  pots: readonly { amount: number; eligible: readonly string[] }[];
   word: { status: "open" | "settled"; slots: readonly WordSlotView[]; endsAtMs?: number; deadline?: number } | null;
   result: ResultView | null;
   /** §40: the table deals powers (Wild). */
@@ -823,7 +823,7 @@ function perspectiveOf(
       result: null,
     },
     result: waiting ? null : view.result,
-    sidePots: waiting ? [] : view.pots.slice(1),
+    pots: waiting ? [] : view.pots,
     // The server owns the session's end (§27/§28); the online felt plays on until it says so.
     sessionOver: false,
     dictionary,
@@ -877,7 +877,10 @@ function decodeRoom(state: unknown, previous?: RoomView | null): RoomView | null
             bigBlind: numberOf(betting.bigBlind),
           }
         : null,
-    pots: iterate(state.pots).map((pot) => numberOf((pot as Record<string, unknown>).amount)),
+    pots: iterate(state.pots).map((pot) => ({
+      amount: numberOf((pot as Record<string, unknown>).amount),
+      eligible: iterate((pot as Record<string, unknown>).eligible).map(String),
+    })),
     word:
       word?.status === "open" || word?.status === "settled"
         ? { status: word.status, slots: iterate(word.slots).map(decodeWordSlot), endsAtMs: wordEndsAtMs, deadline: numberOf(word.deadline) }

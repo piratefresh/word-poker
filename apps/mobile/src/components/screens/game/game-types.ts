@@ -95,6 +95,12 @@ export interface ChipFlight {
   direction: "in" | "out";
 }
 
+/** One contest layer as the felt draws it: its own chips and the seats that can still win them. */
+export interface GamePot {
+  amount: number;
+  eligible: readonly string[];
+}
+
 export interface GameScreenState {
   id: string;
   /**
@@ -112,8 +118,8 @@ export interface GameScreenState {
   players: readonly (GamePlayer | null)[];
   /** Every chip in the middle: the seats' committed-this-hand, pots layered or not. */
   pot: number;
-  /** The side pots above the main pot, in the order §25 layered them; empty when there is one. */
-  sidePots: readonly number[];
+  /** §25's layers, main pot first, each with the players who can win it; empty before any chip is in. */
+  pots: readonly GamePot[];
   /**
    * The chips in flight, oldest first: one per seat per street that has committed since the felt
    * last finished one. Empty at rest — an empty array is a layer that draws nothing — and the

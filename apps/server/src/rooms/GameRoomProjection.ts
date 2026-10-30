@@ -8,7 +8,7 @@ import {
   type PrivateWordState,
 } from "@wordpoker/contracts";
 import type { Tile } from "@wordpoker/contracts";
-import { buildPots, canUsePower, playedWord, riverReview, type OfflineState } from "@wordpoker/game-rules";
+import { buildLivePots, canUsePower, playedWord, riverReview, type OfflineState } from "@wordpoker/game-rules";
 
 import {
   BettingState,
@@ -162,7 +162,7 @@ export class GameRoomProjection {
     this.state.pots.splice(0, this.state.pots.length);
     if (input.game === null) return;
 
-    for (const pot of buildPots(input.game.seats)) {
+    for (const pot of buildLivePots(input.game.seats)) {
       this.state.pots.push(
         projectPot({
           amount: pot.amount,

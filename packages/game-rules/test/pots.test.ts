@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import type { WordScore } from "@wordpoker/contracts";
 
 import type { BettingSeatState } from "../src/money/betting";
-import { buildPots, resolvePayout, splitAward, type JudgedSeat } from "../src/money/pots";
+import { buildLivePots, buildPots, resolvePayout, splitAward, type JudgedSeat } from "../src/money/pots";
 
 const START = 1_000;
 
@@ -266,5 +266,28 @@ describe("resolvePayout", () => {
     assert.deepEqual(payout.stackDeltas.map((delta) => delta.end).sort((a, b) => a - b), [
       0, 990, 2_010,
     ]);
+  });
+});
+
+describe("buildLivePots — pots while betting is open", () => {
+  it("keeps unmatched blinds in one pot", () => {
+    const pots = buildLivePots([seat("a", 10), seat("b", 20), seat("c", 20)]);
+    assert.deepEqual(pots, [{ amount: 50, eligible: [0, 1, 2] }]);
+  });
+
+  it("splits only at an all-in: Alex all-in for 30, Bree and Cam in for 100", () => {
+    const pots = buildLivePots([
+      seat("alex", 30, { allIn: true }),
+      seat("bree", 100),
+      seat("cam", 100),
+    ]);
+    assert.deepEqual(pots, [
+      { amount: 90, eligible: [0, 1, 2] },
+      { amount: 140, eligible: [1, 2] },
+    ]);
+  });
+
+  it("is empty before any chip is in", () => {
+    assert.deepEqual(buildLivePots([seat("a", 0), seat("b", 0)]), []);
   });
 });
