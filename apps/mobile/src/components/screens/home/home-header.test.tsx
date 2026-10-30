@@ -58,10 +58,10 @@ jest.mock("@expo/ui/community/menu", () => ({
 
 beforeEach(() => jest.clearAllMocks());
 
-test("shows credits and XP, opens Settings, and signs out through the avatar menu", async () => {
+test("shows coins and XP, opens Settings, and signs out through the avatar menu", async () => {
   jest.mocked(authClient.signOut).mockResolvedValue({ data: { success: true }, error: null } as never);
   const view = await render(<HomeHeader width={342} />);
-  expect(view.getByLabelText("1250 credits")).toBeTruthy();
+  expect(view.getByLabelText("Wallet, 1,250 coins")).toBeTruthy();
   expect(view.getByTestId("home-level")).toBeTruthy();
 
   await fireEvent(view.getByTestId("home-account-menu"), "pressAction", { nativeEvent: { event: "settings" } });

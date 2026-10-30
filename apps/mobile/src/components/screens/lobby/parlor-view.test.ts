@@ -1,11 +1,13 @@
 import { WAITING_PHASE, ROUND_PHASES, type RoomSummary } from "@wordpoker/contracts";
 
 import {
-  featuredAction,
   featuredTable,
+  joinNote,
+  joinOffer,
   openSeats,
   parlorStats,
   parlorView,
+  tableThatFits,
 } from "./parlor-view";
 
 /** One table as the listing carries it: the config it was created with, and its live seats. */
@@ -53,44 +55,109 @@ describe("openSeats", () => {
   });
 });
 
-describe("featuredAction", () => {
-  test("offers the last seat at a table that is one short", () => {
-    expect(featuredAction(table("a", { clients: 5 }), false)).toEqual({
-      label: "TAKE THE LAST SEAT",
+// Design 1a's example: a 5,450 Wallet, Corner Table at 500, High Stakes at 5,000, Penthouse at 50,000.
+const corner = table("corner", { clients: 4, metadata: { name: "Corner Table", buyIn: 500, smallBlind: 10, bigBlind: 20 } });
+const high = table("high", { clients: 2, metadata: { name: "High Stakes", buyIn: 5_000, smallBlind: 100, bigBlind: 200 } });
+const penthouse = table("penthouse", { metadata: { name: "Penthouse", buyIn: 50_000, smallBlind: 1_000, bigBlind: 2_000 } });
+
+describe("joinOffer", () => {
+  test("puts the price on a Join the Wallet covers", () => {
+    expect(joinOffer(corner, { coins: 5_450 })).toEqual({
+      kind: "open",
       enabled: true,
+      label: "JOIN",
+      price: "500",
+      rowLabel: "JOIN · 500",
+      spoken: "Join Corner Table for 500 coins. You have 5,450 coins.",
     });
   });
 
-  test("offers a seat plainly when several are open", () => {
-    expect(featuredAction(table("a", { clients: 2 }), false)).toEqual({
-      label: "TAKE A SEAT",
-      enabled: true,
+  test("names the shortfall, not the price, when the Wallet is short (§3)", () => {
+    expect(joinOffer(high, { coins: 1_200 })).toMatchObject({
+      kind: "short",
+      enabled: false,
+      label: "NEED 3,800 MORE COINS",
+      rowLabel: "NEED 3,800 MORE",
+      spoken: "Join unavailable. You need 5,000 coins and have 1,200.",
+    });
+    expect(joinOffer(penthouse, { coins: 5_450 }).rowLabel).toBe("NEED 44,550 MORE");
+    expect(joinOffer(high, { coins: 5_000 }).kind).toBe("open");
+  });
+
+  test("leaves an unread Wallet to the server to judge", () => {
+    expect(joinOffer(penthouse, { coins: null })).toMatchObject({
+      kind: "open",
+      spoken: "Join Penthouse for 50,000 coins.",
     });
   });
 
-  test("turns the card into the way back to a seat this device holds", () => {
-    expect(featuredAction(table("a", { clients: 6 }), true)).toEqual({
+  test("cannot be pressed while the seat is being taken", () => {
+    expect(joinOffer(high, { coins: 5_450, joining: true })).toMatchObject({
+      kind: "joining",
+      enabled: false,
+      label: "TAKING YOUR SEAT ···",
+      price: null,
+    });
+  });
+
+  test("is the way back to a seat this device holds, whatever the table or Wallet", () => {
+    expect(joinOffer(table("a", { clients: 6 }), { yours: true, coins: 0 })).toMatchObject({
+      kind: "yours",
+      enabled: true,
       label: "BACK TO YOUR SEAT",
-      enabled: true,
+      price: null,
+      rowLabel: "YOUR SEAT",
     });
   });
 
   test.each([
-    ["a full table", table("a", { clients: 6 }), "TABLE FULL"],
-    ["a locked table", table("a", { locked: true }), "UNAVAILABLE"],
-  ])("cannot be pressed at %s", (_case, room, label) => {
-    expect(featuredAction(room, false)).toEqual({ label, enabled: false });
+    ["a full table", table("a", { clients: 6 }), {}, "full", "TABLE FULL", "FULL", "Join unavailable, this table is full."],
+    ["a locked table", table("a", { locked: true }), {}, "locked", "LOCKED", "LOCKED", "Join unavailable, this table is locked."],
+    ["a guest", table("a"), { guest: true }, "guest", "ACCOUNT NEEDED", "ACCOUNT NEEDED", "Join unavailable, online tables need an account."],
+  ])("cannot be pressed at %s", (_case, room, context, kind, label, rowLabel, spoken) => {
+    expect(joinOffer(room, context)).toEqual({ kind, enabled: false, label, price: null, rowLabel, spoken });
+  });
+});
+
+describe("joinNote", () => {
+  test("shows the Wallet moving on the hero card, and what the coins become on the sheet", () => {
+    expect(joinNote(corner, { coins: 5_450 }, "card")).toBe("Wallet 5,450 → 4,950 coins");
+    expect(joinNote(high, { coins: 5_450 }, "sheet")).toBe(
+      "5,000 coins become chips at this table. Whatever is left comes back as coins when you leave.",
+    );
   });
 
-  test("cannot be pressed when the Wallet is below the buy-in (§3)", () => {
-    const room = table("a", { clients: 2 });
-    expect(featuredAction(room, false, room.metadata.buyIn - 1)).toEqual({
-      label: `NEED ${room.metadata.buyIn.toLocaleString("en-US")} COINS`,
-      enabled: false,
-    });
-    expect(featuredAction(room, false, room.metadata.buyIn).enabled).toBe(true);
-    expect(featuredAction(room, false, null).enabled).toBe(true);
-    expect(featuredAction(room, true, 0).enabled).toBe(true);
+  test("says what the Wallet holds against what the table takes", () => {
+    expect(joinNote(high, { coins: 1_200 }, "sheet")).toBe("You have 1,200 coins. This table takes 5,000.");
+  });
+
+  test("says the coins are moving while the seat is taken", () => {
+    expect(joinNote(high, { coins: 5_450, joining: true }, "sheet")).toBe("Moving 5,000 coins to the table");
+  });
+
+  test("points a full table at one that fits", () => {
+    const full = table("full", { clients: 6 });
+    expect(joinNote(full, {}, "sheet", corner)).toBe(
+      "A seat opens when someone leaves. Corner Table has 2 free seats.",
+    );
+    expect(joinNote(full, {}, "sheet")).toBe("A seat opens when someone leaves.");
+  });
+
+  test("says nothing under your own seat", () => {
+    expect(joinNote(corner, { yours: true, coins: 5_450 }, "card")).toBeNull();
+  });
+});
+
+describe("tableThatFits", () => {
+  test("is the cheapest table with a seat the Wallet covers", () => {
+    expect(tableThatFits([penthouse, high, corner], 5_450)?.roomId).toBe("corner");
+    expect(tableThatFits([penthouse, high], 1_200)).toBeNull();
+  });
+
+  test("skips the table it is pointing away from, full ones and locked ones", () => {
+    const full = table("full", { clients: 6, metadata: { buyIn: 500 } });
+    const locked = table("locked", { locked: true, metadata: { buyIn: 500 } });
+    expect(tableThatFits([full, locked, corner, high], 5_450, "corner")?.roomId).toBe("high");
   });
 });
 
@@ -133,7 +200,6 @@ describe("featuredTable", () => {
     );
 
     expect(featured?.room.roomId).toBe("full");
-    expect(featured?.action).toEqual({ label: "TABLE FULL", enabled: false });
   });
 
   test("reads the seat this device holds as its own", () => {

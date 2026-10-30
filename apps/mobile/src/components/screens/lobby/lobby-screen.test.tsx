@@ -29,7 +29,10 @@ const mockRefreshCoins = jest.fn();
 jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ coins: mockCoins, refreshCoins: mockRefreshCoins, state: { level: 2 } }),
 }));
-jest.mock("@/auth/client/auth-client", () => ({ authClient: { useSession: () => ({ data: { user: { name: "Dylan" } } }) } }));
+let mockGuest = false;
+jest.mock("@/auth/client/auth-client", () => ({
+  authClient: { useSession: () => ({ data: { user: { name: "Dylan", isAnonymous: mockGuest } } }) },
+}));
 jest.mock("@/components/word-builder/haptics", () => ({ haptic: jest.fn() }));
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual("react-native-safe-area-context/jest/mock").default,
@@ -53,6 +56,7 @@ function show(rooms: RoomSummary[] = [], extra: Partial<LobbyView> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockCoins = 5450;
+  mockGuest = false;
   jest.mocked(useActiveRoomId).mockReturnValue(null);
   jest.mocked(useLocalSearchParams).mockReturnValue({});
   jest.mocked(joinTable).mockResolvedValue(undefined);
@@ -102,23 +106,92 @@ test("opens room details before joining the selected room", async () => {
   expect(router.push).toHaveBeenCalledWith({ pathname: "/online/[roomId]", params: { roomId: "row" } });
 });
 
-test("keeps full rooms visible with a disabled join action", async () => {
-  const view = await show([room("hero"), room("full", { clients: 4 })]);
+test("keeps full rooms visible with a disabled join action that points to a table that fits", async () => {
+  const view = await show([room("hero", { metadata: { ...room("hero").metadata, name: "Corner Table" } }), room("full", { clients: 4 })]);
   expect(within(view.getByTestId("lobby-room-full")).getByText("FULL")).toBeOnTheScreen();
   await fireEvent.press(view.getByTestId("lobby-room-full"));
   expect(view.getByTestId("room-details-join")).toBeDisabled();
+  expect(view.getByTestId("room-details-join").props.accessibilityLabel).toBe("Join unavailable, this table is full.");
+  expect(view.getByTestId("room-details-join-note")).toHaveTextContent(
+    "A seat opens when someone leaves. Corner Table has 3 free seats.",
+  );
   expect(joinTable).not.toHaveBeenCalled();
 });
 
-test("disables Join when the Wallet is below the buy-in, and says what it costs", async () => {
-  mockCoins = 400;
-  const view = await show([room("hero"), room("row")]);
-  expect(view.getByTestId("parlor-featured-join")).toBeDisabled();
-  expect(view.getByText("NEED 500 COINS")).toBeOnTheScreen();
+test("puts the price on Join and shows the Wallet it moves", async () => {
+  const view = await show([room("hero", { metadata: { ...room("hero").metadata, name: "Corner Table" } }), room("row")]);
+  const join = view.getByTestId("parlor-featured-join");
+  expect(within(join).getByText("JOIN")).toBeOnTheScreen();
+  expect(within(join).getByText("500")).toBeOnTheScreen();
+  expect(join.props.accessibilityLabel).toBe("Join Corner Table for 500 coins. You have 5,450 coins.");
+  expect(view.getByText("Wallet 5,450 → 4,950 coins")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-room-row")).getByText("JOIN · 500")).toBeOnTheScreen();
   await fireEvent.press(view.getByTestId("lobby-room-row"));
-  expect(view.getByTestId("room-details-join")).toBeDisabled();
-  expect(view.getAllByText("Takes 500 coins from your wallet. Your chips come back as coins when you leave.").length).toBeGreaterThan(0);
+  expect(view.getByTestId("room-details-join-note")).toHaveTextContent(
+    "500 coins become chips at this table. Whatever is left comes back as coins when you leave.",
+  );
+});
+
+test("disables Join when the Wallet is short, names the shortfall, and points to the store and quests", async () => {
+  mockCoins = 1200;
+  const high = (roomId: string) => room(roomId, { metadata: { ...room(roomId).metadata, buyIn: 5000 } });
+  const view = await show([high("hero"), high("row")]);
+  const join = view.getByTestId("parlor-featured-join");
+  expect(join).toBeDisabled();
+  expect(within(join).getByText("NEED 3,800 MORE COINS")).toBeOnTheScreen();
+  expect(join.props.accessibilityLabel).toBe("Join unavailable. You need 5,000 coins and have 1,200.");
+  expect(view.getByTestId("parlor-featured-join-note")).toHaveTextContent("You have 1,200 coins. This table takes 5,000.");
+  expect(within(view.getByTestId("lobby-room-row")).getByText("NEED 3,800 MORE")).toBeOnTheScreen();
+  await fireEvent.press(view.getByTestId("parlor-featured-join-store"));
+  expect(router.push).toHaveBeenCalledWith("/store");
+  await fireEvent.press(view.getByTestId("parlor-featured-join-quests"));
+  expect(router.push).toHaveBeenCalledWith("/quests");
   expect(joinTable).not.toHaveBeenCalled();
+});
+
+test("holds Join while the seat is taken and says the coins are moving", async () => {
+  jest.mocked(joinTable).mockReturnValue(new Promise(() => {}));
+  const view = await show([room("hero")]);
+  await fireEvent.press(view.getByTestId("parlor-featured-join"));
+  const join = view.getByTestId("parlor-featured-join");
+  expect(within(join).getByText("TAKING YOUR SEAT ···")).toBeOnTheScreen();
+  expect(join).toBeDisabled();
+  expect(view.getByTestId("parlor-featured-join-note")).toHaveTextContent("Moving 500 coins to the table");
+});
+
+test("closes the sheet on a refusal, shows the server's words at the top, and RETRY joins again", async () => {
+  jest.mocked(joinTable).mockRejectedValueOnce(new Error("Your coins couldn't be reached. Try again."));
+  const view = await show([room("hero"), room("row")]);
+  await fireEvent.press(view.getByTestId("lobby-room-row"));
+  await fireEvent.press(view.getByTestId("room-details-join"));
+  await waitFor(() => expect(view.getByTestId("lobby-refusal")).toHaveTextContent(/Your coins couldn't be reached\. Try again\./));
+  expect(view.getByTestId("room-details-sheet").props.isPresented).toBe(false);
+  expect(mockRefreshCoins).toHaveBeenCalled();
+  await fireEvent.press(view.getByTestId("lobby-refusal-retry"));
+  await waitFor(() => expect(router.push).toHaveBeenCalledWith({ pathname: "/online/[roomId]", params: { roomId: "row" } }));
+  expect(joinTable).toHaveBeenCalledTimes(2);
+  expect(view.queryByTestId("lobby-refusal")).toBeNull();
+});
+
+test("shows a seated player the way back, with no cost", async () => {
+  jest.mocked(useActiveRoomId).mockReturnValue("hero");
+  const view = await show([room("hero"), room("row")]);
+  expect(view.getByText("YOU'RE SEATED")).toBeOnTheScreen();
+  expect(within(view.getByTestId("parlor-featured-join")).getByText("BACK TO YOUR SEAT")).toBeOnTheScreen();
+  expect(view.queryByTestId("parlor-featured-join-note")).toBeNull();
+});
+
+test("labels seated, locked and guest rows", async () => {
+  jest.mocked(useActiveRoomId).mockReturnValue("mine");
+  const view = await show([room("hero"), room("mine"), room("locked", { locked: true })]);
+  expect(within(view.getByTestId("lobby-room-mine")).getByText("YOUR SEAT")).toBeOnTheScreen();
+  expect(within(view.getByTestId("lobby-room-locked")).getByText("LOCKED")).toBeOnTheScreen();
+  await view.unmount();
+  mockGuest = true;
+  mockCoins = null;
+  const guest = await show([room("hero"), room("row")]);
+  expect(within(guest.getByTestId("lobby-room-row")).getByText("ACCOUNT NEEDED")).toBeOnTheScreen();
+  expect(guest.getByTestId("parlor-featured-join")).toBeDisabled();
 });
 
 test("points a player with no coins to quests, the store, and free bot games", async () => {
