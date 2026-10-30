@@ -71,7 +71,7 @@ tags:
 - assertVisible:
     text: "BUSTED"
 - tapOn:
-    id: "Leave the table"
+    id: "hud-leave-button"
 - extendedWaitUntil:
-    visible: "Deal a new table"
+    visible: ".*DEAL A NEW TABLE"
     timeout: 30000

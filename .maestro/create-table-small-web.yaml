@@ -25,10 +25,10 @@ tags:
 - openLink: http://localhost:8081/online
 
 - extendedWaitUntil:
-    visible: "Tonight at the parlor.*"
+    visible: ".*DEAL A NEW TABLE"
     timeout: 30000
 - tapOn:
-    id: "lobby-create"
+    text: ".*DEAL A NEW TABLE"
 
 # At 432 × 662 these assertions fail against the old unsnapped 85vh sheet because the action row is
 # below the visible sheet. They also verify the controls by their stable test IDs, not ambiguous

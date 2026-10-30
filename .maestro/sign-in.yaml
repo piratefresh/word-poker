@@ -72,8 +72,10 @@ tags:
     below:
       text: "EMAIL OR HANDLE"
 - inputText: wordpoker-e2e
+# A guest session (a fresh profile that opened /online is seated as one, STO-581) words the button
+# "Sign in & move hands": the guest's hands move into the account.
 - tapOn:
-    text: "Sign in"
+    text: "Sign in( & move hands)?"
 
 # Past the guard: verify the account email in Settings, then return to Home.
 - extendedWaitUntil:

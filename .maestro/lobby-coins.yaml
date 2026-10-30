@@ -1,0 +1,98 @@
+# The lobby's coin states (design 1a, STO-952 / STO-953), read off one held table by three players:
+# a Wallet that covers it, a Wallet that does not, and a guest with no Wallet at all.
+#
+#   pnpm dev:server                                # the Colyseus server on 2567
+#   pnpm start:local                               # Expo with local API and game, web on 8081
+#   pnpm seed:test-users                           # the Wallet personas, and their balances back
+#   pnpm --filter @wordpoker/server exec tsx scripts/hold-table.ts   # "Node Table", 500 coins
+#   maestro test --platform web .maestro/lobby-coins.yaml
+#
+# The personas are scripts/test-personas.json's: short@ is seeded with 1,200 (enough for Node
+# Table's 500) and broke@ with 320 (short of the cheapest table). Signing in can pay a daily streak
+# reward on top, so the flow matches amounts by shape and leans on the side of 500 each one is on.
+#
+# Selectors: a control with an accessibility label is matched by that sentence (`id:`), which is
+# the one parlor-view.ts writes for screen readers; text the screen prints is matched by `text:`.
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
+name: Lobby coin states — a Wallet that fits, out of coins, and a guest
+tags:
+  - web
+  - online
+---
+- evalScript: "${output.web = typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+
+# Flow A — a Wallet that covers the table: Join carries its price, and the line under it shows the
+# Wallet moving.
+- runFlow:
+    file: sign-in.yaml
+    env:
+      TEST_USER_EMAIL: short@wordpoker.dev
+- openLink: ${output.web}/online
+- extendedWaitUntil:
+    visible:
+      id: "Wallet, [0-9,]+ coins"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "Join Node Table for 500 coins\\. You have [0-9,]+ coins\\."
+    timeout: 30000
+- assertVisible:
+    text: "Wallet [0-9,]+ → [0-9,]+ coins"
+
+# Flow B — out of coins: a panel of ways back takes the hero card's place, the held table drops into
+# the rows, and the row says what is missing instead of offering a seat.
+- runFlow:
+    file: sign-in.yaml
+    env:
+      TEST_USER_EMAIL: broke@wordpoker.dev
+- openLink: ${output.web}/online
+- extendedWaitUntil:
+    visible:
+      id: "Wallet, [0-9]{1,3} coins"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "OUT OF COINS"
+    timeout: 30000
+- assertVisible:
+    text: "VISIT THE STORE"
+- assertVisible:
+    id: "QUESTS\\. Earn coins from quests"
+- assertVisible:
+    id: "PRACTICE\\. Free game against bots"
+- assertNotVisible:
+    id: "Join Node Table for .*"
+- assertVisible:
+    text: "NEED [0-9]+ MORE"
+
+# Flow B — a guest: no Wallet, so the chip says GUEST, the panel sells the account, and the row
+# needs one. A fresh session is seated as a guest by "Play as guest" on the sign-in screen.
+- openLink: ${output.web}/
+- extendedWaitUntil:
+    visible:
+      id: "home-account-menu"
+    timeout: 30000
+- tapOn:
+    id: "home-account-menu"
+- tapOn:
+    text: "Sign out"
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 30000
+- tapOn:
+    text: "Play as guest →"
+# The guest session lands on the same screen, which now offers to move the guest's hands.
+- extendedWaitUntil:
+    visible: "Sign in & move hands"
+    timeout: 30000
+- openLink: ${output.web}/online
+- extendedWaitUntil:
+    visible:
+      id: "Playing as a guest"
+    timeout: 30000
+- assertVisible:
+    text: "CREATE AN ACCOUNT TO PLAY ONLINE"
+- assertVisible:
+    text: "Online tables need a wallet\\. New accounts start with 5,000 coins\\."
+- assertVisible:
+    text: "ACCOUNT NEEDED"

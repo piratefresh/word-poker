@@ -8,4 +8,4 @@ name: Four-seat - join by room id
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU"
+    text: "YOU · .*"

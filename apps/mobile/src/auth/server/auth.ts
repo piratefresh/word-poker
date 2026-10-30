@@ -14,8 +14,14 @@ import { platformAuth } from "./platform-auth";
 
 // `dotenv` leaves pre-existing variables untouched by default, so a shell that
 // carries stale copies of these names would silently win over this app's `.env`.
-// For the local API-route server the file is the source of truth.
-const fileEnv = config({ override: true }).parsed ?? {};
+// For the local API-route server the file is the source of truth — except the
+// `EXPO_PUBLIC_*` names: these routes run inside Metro, which builds the client's
+// env from the same `process.env`, so overriding them would repoint every later
+// bundle away from the URLs Metro was started with (the smoke runners' local ones).
+const fileEnv = config({ processEnv: {} }).parsed ?? {};
+for (const [name, value] of Object.entries(fileEnv)) {
+  if (!name.startsWith("EXPO_PUBLIC_")) process.env[name] = value;
+}
 
 // Better Auth ranks a configured base URL above the origin the request arrived
 // on, and this app derives its origin from the request (localhost in a browser,
