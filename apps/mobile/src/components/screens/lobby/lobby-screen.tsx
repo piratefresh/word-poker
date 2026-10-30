@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import Animated, { Easing, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BUY_IN_PRESETS, type RoomSummary } from "@wordpoker/contracts";
@@ -18,7 +18,6 @@ import { useQuests } from "@/lib/quests/quests-provider";
 import { filterLobbyRooms, LOBBY_FILTERS, type LobbyFilter } from "@/features/online/lobby-view";
 import { joinTable, useActiveRoomId, useHostedRoomIds } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
-import { formatCoins } from "@/lib/ui/format";
 import { CreateTableForm } from "./create-table-form";
 import { FeaturedTableCard } from "./featured-table";
 import { GuestPanel, OutOfCoinsPanel } from "./lobby-panel";
@@ -28,7 +27,7 @@ import { ParlorNav } from "./parlor-nav";
 import { tableThatFits } from "./parlor-view";
 import { RoomDetailsSheet } from "./room-details-sheet";
 import { RoomRow } from "./room-row";
-import { useCoinsBack } from "./use-coins-back";
+import { useCoinsBack, type CashOut } from "./use-coins-back";
 
 const NAV_ROUTES: Record<HomeNavDestination, Href> = {
   home: "/",
@@ -39,6 +38,8 @@ const NAV_ROUTES: Record<HomeNavDestination, Href> = {
 const TABLE_ENTRY_MS = 900;
 const TABLE_ENTRY_ZOOM = 3.4;
 const CHEAPEST_BUY_IN = Math.min(...BUY_IN_PRESETS);
+/** The coins-back toast rises 30px as it fades in. */
+const TOAST_ENTRY = FadeInDown.duration(800).withInitialValues({ opacity: 0, transform: [{ translateY: 30 }] });
 
 export function LobbyScreen() {
   const insets = useSafeAreaInsets();
@@ -54,8 +55,16 @@ export function LobbyScreen() {
   const [refusal, setRefusal] = useState<{ roomId: string; message: string } | null>(null);
   const [filter, setFilter] = useState<LobbyFilter>("All");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const { create } = useLocalSearchParams<{ create?: string }>();
+  // `left`/`before`: the table a Leave came back from, and the Wallet read just before it (STO-954).
+  const { create, left, before } = useLocalSearchParams<{ create?: string; left?: string; before?: string }>();
   const [creating, setCreating] = useState(create === "1");
+  const [cashOut, setCashOut] = useState<CashOut | null>(null);
+  const leftKey = left !== undefined && before !== undefined ? `${left}|${before}` : null;
+  const [seenLeft, setSeenLeft] = useState<string | null>(null);
+  if (leftKey !== seenLeft) {
+    setSeenLeft(leftKey);
+    if (leftKey !== null && Number.isFinite(Number(before))) setCashOut({ table: left!, before: Number(before) });
+  }
   const travel = useSharedValue(0);
   const travelStarted = useRef(false);
 
@@ -81,6 +90,10 @@ export function LobbyScreen() {
     if (create === "1") router.setParams({ create: undefined });
   }, [create]);
 
+  useEffect(() => {
+    if (leftKey !== null) router.setParams({ left: undefined, before: undefined });
+  }, [leftKey]);
+
   const selectedRoom = rooms.find((room) => room.roomId === selectedRoomId) ?? null;
   const guest = session?.user.isAnonymous === true;
   const broke = !guest && coins !== null && coins < CHEAPEST_BUY_IN;
@@ -89,6 +102,8 @@ export function LobbyScreen() {
     CHEAPEST_BUY_IN,
     levelUp !== null ? `Level ${levelUp.level} reached.` : streakBanner !== null ? `Day ${streakBanner.day} streak reward.` : null,
     reduceMotion,
+    cashOut,
+    refreshCoins,
   );
   // Flow B: a panel takes the hero card's place, and its table joins the rows with the rest.
   const panel = guest ? <GuestPanel /> : broke ? <OutOfCoinsPanel cheapest={CHEAPEST_BUY_IN} /> : null;
@@ -269,14 +284,20 @@ export function LobbyScreen() {
         </View>
       )}
 
-      {coinsBack.gained === null ? null : (
-        <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.toast, { bottom: insets.bottom + 160 }]} testID="lobby-coins-back">
+      {coinsBack.title === null ? null : (
+        <Animated.View
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+          entering={TOAST_ENTRY}
+          style={[styles.toast, { bottom: insets.bottom + 160 }]}
+          testID="lobby-coins-back"
+        >
           <View style={styles.toastCoin} />
           <View style={styles.toastCopy}>
-            <Text style={styles.toastTitle}>+{formatCoins(coinsBack.gained)} COINS</Text>
-            <Text style={styles.toastLine}>{coinsBack.reason === null ? "You're back in." : `${coinsBack.reason} You're back in.`}</Text>
+            <Text style={styles.toastTitle}>{coinsBack.title}</Text>
+            <Text style={styles.toastLine}>{coinsBack.line}</Text>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       <HomeNavRack active="home" onNavigate={(destination) => router.push(NAV_ROUTES[destination])} />

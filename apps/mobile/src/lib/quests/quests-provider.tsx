@@ -100,8 +100,11 @@ export interface QuestsValue {
   readonly reportHand: (facts: QuestHandFacts | null) => HandReport | null;
   /** Re-reads the streak and quest state — the quests screen's own pull on mount. */
   readonly refresh: () => void;
-  /** Re-reads only the Wallet's coins — the lobby's pull, after a purchase or a cash-out. */
-  readonly refreshCoins: () => void;
+  /**
+   * Re-reads only the Wallet's coins — the lobby's pull, after a purchase or a cash-out. Resolves
+   * with the coins read, or null when the read failed.
+   */
+  readonly refreshCoins: () => Promise<number | null>;
 }
 
 const DEFAULT_VALUE: QuestsValue = {
@@ -115,7 +118,7 @@ const DEFAULT_VALUE: QuestsValue = {
   claimOutcomes: {},
   reportHand: () => null,
   refresh: () => {},
-  refreshCoins: () => {},
+  refreshCoins: async () => null,
 };
 
 const QuestsContext = createContext<QuestsValue>(DEFAULT_VALUE);
@@ -174,11 +177,16 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
   // Stored claims with a request out — so overlapping flushes don't send one twice.
   const inFlight = useRef(new Set<string>());
 
-  const readWallet = useCallback(() => {
-    fetchWallet()
-      .then((wallet) => setCoins(wallet.coins))
-      .catch(() => {});
-  }, []);
+  const readWallet = useCallback(
+    () =>
+      fetchWallet()
+        .then((wallet) => {
+          setCoins(wallet.coins);
+          return wallet.coins;
+        })
+        .catch(() => null),
+    [],
+  );
 
   const refresh = useCallback(() => {
     fetchQuestState()

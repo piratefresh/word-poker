@@ -35,12 +35,15 @@ import {
 } from "@/features/online/room-session";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { fullWidth } from "@/lib/ui/full-width";
+import { fetchWallet } from "@/lib/wallet/wallet-client";
 
 import { OnlineFelt } from "./online-felt";
 
 /** The session always names its failure; these stand in only for the impossible empty one. */
 const REFUSAL_FALLBACK = "Couldn't take that seat.";
 const LOST_FALLBACK = "You're no longer at that table.";
+/** How long Leave waits on the Wallet read the lobby's coins-back counts from. */
+const BALANCE_READ_MS = 1000;
 
 /** The screen's ink, in the design system's terms — no colour, family or size is literal. */
 const kickerText = {
@@ -137,7 +140,21 @@ export function SeatedScreen() {
     if (leavingOnce.current) return;
     leavingOnce.current = true;
     setLeaving(true);
-    void leaveTable(roomId).finally(toLobby);
+    const name = table?.name;
+    // The cash-out is credited after the seat is gone, so the lobby counts the coins back from
+    // the balance read here (STO-954). A slow read is given up on rather than holding the leave.
+    void Promise.race([
+      fetchWallet().then((wallet) => wallet.coins, () => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), BALANCE_READ_MS)),
+    ]).then((before) =>
+      leaveTable(roomId).finally(() =>
+        router.dismissTo(
+          before === null || name === undefined
+            ? "/online"
+            : { pathname: "/online", params: { left: name, before: String(before) } },
+        ),
+      ),
+    );
   };
 
   // A seat held at some other table is not this table's face — the join above is what moves it.
