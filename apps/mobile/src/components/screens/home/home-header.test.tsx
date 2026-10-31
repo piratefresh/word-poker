@@ -16,6 +16,8 @@ jest.mock("@/auth/client/auth-client", () => ({
 }));
 
 // The coordinator leaves the online table first, which loads Colyseus; these tests only need the call.
+jest.mock("@/auth/client/social-sign-in", () => ({ SOCIAL_PROVIDERS: [], linkSocial: jest.fn() }));
+
 jest.mock("@/auth/client/session-coordinator", () => ({
   changeSession: (change: () => Promise<unknown>) => change(),
   setAutoRestore: jest.fn(async () => {}),

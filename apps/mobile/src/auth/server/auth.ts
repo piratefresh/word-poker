@@ -1,5 +1,6 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
+import { addOAuthServerContext, createAuthMiddleware, getOAuthState } from "better-auth/api";
 import { anonymous, bearer, lastLoginMethod, username } from "better-auth/plugins";
 import { adoptGuestHistory, eraseAccountData, inTransaction } from "@wordpoker/db";
 import { deleteWallet } from "@wordpoker/economy";
@@ -9,7 +10,8 @@ import { Pool } from "pg";
 import { isValidHandle, MAX_HANDLE_LENGTH, MIN_HANDLE_LENGTH } from "@/auth/handle";
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
-import { afterEmailVerification, attributeReferral, grantEligibleRewards, sendVerificationEmail } from "./auth-verification";
+import { revokeAppleToken } from "./apple-revoke";
+import { afterEmailVerification, attributeReferral, grantEligibleRewards, REFERRAL_HEADER, sendVerificationEmail } from "./auth-verification";
 import { passwordResetEmail, sendEmail } from "./email";
 import { gameCenterVerifier } from "./game-center";
 import { platformAuth } from "./platform-auth";
@@ -78,6 +80,9 @@ const authAllowedHosts = [
     .filter(Boolean) ?? []),
 ];
 
+/** The first name only: `name` is what other players see at the table, and a full name stays private. */
+const displayName = (firstName: string | undefined) => ({ name: firstName?.trim().split(" ")[0] || "Player" });
+
 export const auth = betterAuth({
   database: authPool,
   baseURL:
@@ -89,6 +94,7 @@ export const auth = betterAuth({
       : undefined,
   trustedOrigins: [
     "wordpoker://*", // Deep links back into the native app after auth.
+    "https://appleid.apple.com", // Apple posts its OAuth callback from here.
     ...(process.env.NODE_ENV === "development"
       ? [
           "exp://", // Trust any host of the exp:// scheme
@@ -100,6 +106,40 @@ export const auth = betterAuth({
         ]
       : []),
   ],
+  // Each provider is on only when its credentials are set. EXPO_PUBLIC_SOCIAL_SIGN_IN shows its button.
+  socialProviders: {
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            prompt: "select_account" as const,
+            mapProfileToUser: (profile) => displayName(profile.given_name),
+          },
+        }
+      : {}),
+    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
+      ? {
+          apple: {
+            clientId: process.env.APPLE_CLIENT_ID,
+            clientSecret: process.env.APPLE_CLIENT_SECRET,
+            // Apple names the player only on the first sign-in, as "First Last".
+            mapProfileToUser: (profile) => displayName(profile.name),
+          },
+        }
+      : {}),
+  },
+  // A matching email never joins accounts (STO-594): a login is added on purpose, from Account settings.
+  account: {
+    accountLinking: { enabled: true, disableImplicitLinking: true, allowDifferentEmails: true, updateUserInfoOnLink: false },
+  },
+  // Google and Apple never echo the referral header, so it rides in the server-side OAuth state.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      const referral = ctx.path === "/sign-in/social" ? ctx.headers?.get(REFERRAL_HEADER) : null;
+      if (referral) await addOAuthServerContext({ referral });
+    }),
+  },
   // Anonymous: a friend invited by link plays as a guest with a real session (STO-581), since
   // GameRoom.onAuth seats sessions, not devices. Guests never verify, so they never touch the Wallet.
   plugins: [
@@ -141,11 +181,17 @@ export const auth = betterAuth({
     // the player. The Wallet goes last, so a RevenueCat failure rolls back and the player can retry.
     deleteUser: {
       enabled: true,
-      beforeDelete: (user) =>
-        inTransaction(authPool, async (sql) => {
+      beforeDelete: async (user) => {
+        const { rows } = await authPool.query<{ refreshToken: string | null }>(
+          `select "refreshToken" from account where "userId" = $1 and "providerId" = 'apple'`,
+          [user.id],
+        );
+        await inTransaction(authPool, async (sql) => {
           await eraseAccountData(sql, user.id);
           await deleteWallet(user.id);
-        }),
+        });
+        if (rows[0]?.refreshToken) await revokeAppleToken(rows[0].refreshToken);
+      },
     },
     additionalFields: {
       notifyTableInvite: { type: "boolean", defaultValue: true, required: false },
@@ -158,7 +204,15 @@ export const auth = betterAuth({
   },
   databaseHooks: {
     // The sign-up call carries the inviter's friend code in a header (STO-582).
-    user: { create: { after: async (user, context) => attributeReferral(user, context?.headers ?? context?.request?.headers) } },
+    user: {
+      create: {
+        after: async (user, context) => {
+          // Reading the state throws outside an OAuth request, which simply means there is none.
+          const state = await getOAuthState().catch(() => null);
+          await attributeReferral(user, context?.headers ?? context?.request?.headers, state?.serverContext?.referral);
+        },
+      },
+    },
   },
   // Verifying pays the Wallet's welcome grant (STO-346); signing in does not wait on it.
   emailVerification: {
