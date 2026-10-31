@@ -120,6 +120,7 @@ describe("referrals", () => {
   test("a sign-up carrying a friend code is attributed; a guest, a bad code or no header is not", async () => {
     jest.mocked(recordReferral).mockClear();
     await attributeReferral({ id: "new" }, withRef("ABCD2345"));
+    await attributeReferral({ id: "oauth" }, undefined, "ABCD2345");
     expect(recordReferral).toHaveBeenCalledWith("new", "ABCD2345");
 
     jest.mocked(recordReferral).mockClear();

@@ -18,3 +18,8 @@ export const lastLoginClient = () =>
       return Object.entries(METHOD_BY_PATH).find(([path]) => pathname.endsWith(path))?.[1];
     },
   });
+
+/** `/sign-in/social` is the same URL for every provider, so the caller names the one that worked. */
+export function rememberLastLogin(method: string): void {
+  SecureStore.setItem("wordpoker_last_login_method", method);
+}

@@ -9,6 +9,8 @@ const mockSignUpEmail = jest.fn();
 const mockIsUsernameAvailable = jest.fn();
 const mockRequestPasswordReset = jest.fn();
 const mockLastLogin = jest.fn();
+const mockSignInSocial = jest.fn();
+const mockSignInGameCenter = jest.fn();
 
 jest.mock("expo-router", () => ({
   router: { push: jest.fn(), replace: jest.fn() },
@@ -31,7 +33,13 @@ jest.mock("@/auth/client/auth-client", () => ({
 
 jest.mock("@/auth/client/game-center", () => ({
   GAME_CENTER_AVAILABLE: true,
-  signInWithGameCenter: jest.fn(),
+  signInWithGameCenter: (...args: unknown[]) => mockSignInGameCenter(...args),
+}));
+
+jest.mock("@/auth/client/social-sign-in", () => ({
+  APPLE_FOOTER_LINK: true,
+  SOCIAL_PROVIDERS: ["apple", "google"],
+  signInWithSocial: (...args: unknown[]) => mockSignInSocial(...args),
 }));
 
 jest.mock("@/auth/client/session-coordinator", () => ({
@@ -104,13 +112,44 @@ describe("sign in", () => {
 
   it("offers the street pills only on sign in", async () => {
     const { unmount } = await render(<SignInScreen />);
-    expect(screen.getByText("GAME CENTER")).toBeTruthy();
+    expect(screen.getByText("Apple")).toBeTruthy();
+    expect(screen.getByText("Google")).toBeTruthy();
     expect(screen.getByText("PLAY AS GUEST")).toBeTruthy();
     await unmount();
 
     await render(<SignUpScreen />);
-    expect(screen.queryByText("GAME CENTER")).toBeNull();
+    expect(screen.queryByText("Apple")).toBeNull();
+    expect(screen.queryByText("USE GAME CENTER")).toBeNull();
+    expect(screen.queryByText("USE APPLE")).toBeNull();
     expect(screen.queryByText("PLAY AS GUEST")).toBeNull();
+  });
+
+  it("keeps a way back for Game Center accounts", async () => {
+    mockSignInGameCenter.mockResolvedValue({ ok: true });
+    await render(<SignInScreen />);
+
+    await fireEvent.press(screen.getByText("USE GAME CENTER"));
+
+    await waitFor(() => expect(mockSignInGameCenter).toHaveBeenCalledWith({ adoptGuestProgress: false }));
+  });
+
+  it("keeps a way in for Apple accounts on a platform with no Apple button", async () => {
+    mockSignInSocial.mockResolvedValue({ ok: true });
+    await render(<SignInScreen />);
+
+    await fireEvent.press(screen.getByText("USE APPLE"));
+
+    await waitFor(() => expect(mockSignInSocial).toHaveBeenCalledWith("apple", undefined));
+  });
+
+  it("starts the provider's sign-in and shows why it could not", async () => {
+    mockSignInSocial.mockResolvedValue({ ok: false, message: "Nope." });
+    await render(<SignInScreen />);
+
+    await fireEvent.press(screen.getByText("Google"));
+
+    expect(await screen.findByText("Nope.")).toBeTruthy();
+    expect(mockSignInSocial).toHaveBeenCalledWith("google", undefined);
   });
 });
 
@@ -132,8 +171,8 @@ describe("last login tag", () => {
     expect(tagInside("TAKE YOUR SEAT")).toBeTruthy();
   });
 
-  it("marks the Game Center pill after a Game Center login", async () => {
-    mockLastLogin.mockReturnValue("game-center");
+  it("marks the provider's pill after a social login", async () => {
+    mockLastLogin.mockReturnValue("google");
     await render(<SignInScreen />);
 
     expect(screen.getAllByText("LAST LOGIN")).toHaveLength(1);

@@ -42,6 +42,7 @@ jobs:
           EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY }}
           EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY }}
           EXPO_PUBLIC_COIN_STORE: ${{ vars.EXPO_PUBLIC_COIN_STORE }}
+          EXPO_PUBLIC_SOCIAL_SIGN_IN: ${{ vars.EXPO_PUBLIC_SOCIAL_SIGN_IN }}
 
       # Colyseus Cloud deploys a git branch, so the export travels as a commit on top of main.
       # Force-pushed each time; never merge it back.

@@ -87,11 +87,12 @@ export async function afterEmailVerification(user: VerifiedUser): Promise<void> 
 export const REFERRAL_HEADER = "x-wordpoker-ref";
 
 /**
- * Attributes a new account to the inviter whose code rode on the sign-up call. Never throws: a
- * bad or missing code just means no referral. Guests (the anonymous plugin's users) are skipped.
+ * Attributes a new account to the inviter whose code rode on the sign-up call, or in the OAuth
+ * state (`oauthReferral`) when it came back from Google or Apple. Never throws: a bad or missing
+ * code just means no referral. Guests (the anonymous plugin's users) are skipped.
  */
-export async function attributeReferral(user: { id: string; isAnonymous?: unknown }, headers: Headers | undefined): Promise<void> {
-  const code = headers?.get(REFERRAL_HEADER);
+export async function attributeReferral(user: { id: string; isAnonymous?: unknown }, headers: Headers | undefined, oauthReferral?: unknown): Promise<void> {
+  const code = headers?.get(REFERRAL_HEADER) ?? oauthReferral;
   if (user.isAnonymous === true || !isFriendCode(code)) return;
   try {
     await recordReferral(user.id, code);

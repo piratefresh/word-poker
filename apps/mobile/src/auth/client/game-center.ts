@@ -72,8 +72,9 @@ async function signedInToGameCenter(): Promise<GameCenterResult & { displayName?
 }
 
 /**
- * The player tapped "Continue with Game Center". A guest must have agreed to move its hands
- * (`adoptGuestProgress`) and flushed them first, as for email sign-in.
+ * The player tapped "Use Game Center": the way back after a sign-out or guest play turned the launch
+ * restore off. A guest must have agreed to move its hands (`adoptGuestProgress`) and flushed them
+ * first, as for email sign-in.
  */
 export async function signInWithGameCenter({ adoptGuestProgress }: { adoptGuestProgress: boolean }): Promise<GameCenterResult> {
   const native = await signedInToGameCenter();

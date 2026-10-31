@@ -152,6 +152,32 @@ export function deepLinkInterstitial(deepLink: string): Response {
   );
 }
 
+/** Fixed copy per Better Auth error code: the query string is never echoed into the page. */
+const OAUTH_FAILURES: Record<string, string> = {
+  account_not_linked: "That email already has a Word Poker account. Sign in the way you usually do, then add this login in Account settings.",
+  account_already_linked_to_different_user: "That login already belongs to a different Word Poker account. Nothing was changed.",
+  access_denied: "Sign-in was cancelled.",
+  user_cancelled_authorize: "Sign-in was cancelled.",
+};
+
+/**
+ * Where a refused Google or Apple login ends up. The Expo client discards the browser's result, so
+ * the app cannot tell a refusal from a cancel: the reason has to be read here, in the sheet itself.
+ */
+export function oauthFailedPage(error: string | null, back: string): Response {
+  return htmlResponse(
+    pageShell(
+      "Word Poker sign-in",
+      `
+        <p class="eyebrow">Word Poker</p>
+        <h1>Couldn't sign you in.</h1>
+        <p class="sub">${(error && OAUTH_FAILURES[error]) || "That didn't work. Try again."}</p>
+        <a class="btn" href="${back}">Back to Word Poker</a>
+      `,
+    ),
+  );
+}
+
 /**
  * Reset the password from a desktop browser, against the same Better Auth POST
  * endpoint the app uses. The token is validated (and consumed) server-side on
