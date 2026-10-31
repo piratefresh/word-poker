@@ -1,10 +1,10 @@
 /**
  * results-screen.tsx — the hand's payoff, over the felt it was played on.
  *
- * One screen, after every hand: the hand's number, a headline with its one gold span, the
- * pot, the two ways out, a card per seat dealt into the hand, and a rating card. It is a
- * scroll view over the felt rather than a live surface — no timers of its own, no sockets, one
- * frozen payload and one entrance sequence (STO-379).
+ * One screen, after every hand: the hand's number, the table with every seat still in its place
+ * and the pot in the middle (STO-960), the two ways out, and a rating card. It is a scroll view
+ * rather than a live surface — no timers of its own, no sockets, one frozen payload and one
+ * entrance sequence (STO-379).
  *
  * It is not a route. The engine lives in `useOfflineGame`, owned by the offline screen, and a
  * pushed route would need the adapter hoisted or bridged — that is STO-277's store. This is a
@@ -17,9 +17,8 @@
  */
 
 import { QUEST_CATALOG } from "@wordpoker/game-rules";
-import { LinearGradient } from "expo-linear-gradient";
 import { useState, type ReactElement } from "react";
-import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -27,10 +26,8 @@ import {
   colors,
   fonts,
   fontSize,
-  gradients,
-  layout,
   radius,
-  resultsEntrance,
+  resultsTable,
   spacing,
 } from "@/constants/theme";
 import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
@@ -38,11 +35,10 @@ import { useQuests } from "@/lib/quests/quests-provider";
 import { useResultsEntrance } from "./use-results-entrance";
 
 import { RatingCard } from "./rating-card";
-import { ResultCard } from "./result-card";
 import { ResultsActions } from "./results-actions";
 import { ResultsHeader } from "./results-header";
+import { ResultsTable } from "./results-table";
 import { RiverReview, type RiverReviewProps } from "./river-review";
-import { ResultsHeadlineView } from "./results-headline";
 import type { ResultsSnapshot } from "./results-types";
 
 export interface ResultsScreenProps {
@@ -59,6 +55,8 @@ export interface ResultsScreenProps {
 
 export function ResultsScreen({ snapshot, replay, review, onDeal, onExit }: ResultsScreenProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const landscape = width > height;
   // Frozen here, once: the surface renders the hand it was opened on, whatever the table does
   // next (STO-380's acceptance criterion, and the reason this is a `useState` and not a prop).
   const [hand] = useState(() => snapshot);
@@ -80,51 +78,34 @@ export function ResultsScreen({ snapshot, replay, review, onDeal, onExit }: Resu
       transparent
       visible
     >
-      <LinearGradient {...gradients.felt} style={styles.surface}>
+      <View style={styles.surface}>
         <ResultsHeader hand={hand.hand} onBack={onExit} />
         <Animated.View style={[styles.body, content]}>
           <ScrollView
             contentContainerStyle={[
               styles.content,
-              { paddingBottom: insets.bottom + spacing.huge },
+              {
+                paddingBottom: insets.bottom + spacing.huge,
+                paddingLeft: Math.max(spacing.gutter, insets.left),
+                paddingRight: Math.max(spacing.gutter, insets.right),
+              },
             ]}
             testID="results-scroll">
-            <ResultsHeadlineView clock={clock} snapshot={hand} />
+            <ResultsTable clock={clock} landscape={landscape} snapshot={hand} />
 
-            <View style={styles.actions}>
-              <ResultsActions
-                clock={clock}
-                onDeal={onDeal}
-                onExit={onExit}
-                ready={ready}
-                replay={replay}
-              />
-            </View>
-
-            <View style={styles.boardHead}>
-              <Text style={styles.boardLabel}>SCOREBOARD</Text>
-              <Text style={styles.boardSummary} testID="results-summary">
+            <View style={landscape ? styles.footerRow : styles.footer}>
+              <Text style={[styles.summary, landscape && styles.summaryRow]} testID="results-summary">
                 {hand.summary}
               </Text>
-            </View>
-
-            <View style={styles.cards}>
-              {hand.seats.map((seat, index) => (
-                <ResultCard
-                  key={seat.playerId}
-                  motion={{
-                    clock,
-                    // The winner is the ladder's first place (§20), so it enters on its own
-                    // beat and the field follows it in, one card after another.
-                    at:
-                      index === 0
-                        ? resultsEntrance.winner
-                        : resultsEntrance.cards + (index - 1) * resultsEntrance.cardStagger,
-                    winner: seat.takesPot,
-                  }}
-                  seat={seat}
+              <View style={[styles.actions, landscape && styles.actionsRow]}>
+                <ResultsActions
+                  clock={clock}
+                  onDeal={onDeal}
+                  onExit={onExit}
+                  ready={ready}
+                  replay={replay}
                 />
-              ))}
+              </View>
             </View>
 
             {review === undefined ? null : <RiverReview {...review} />}
@@ -153,47 +134,31 @@ export function ResultsScreen({ snapshot, replay, review, onDeal, onExit }: Resu
             ) : null}
           </ScrollView>
         </Animated.View>
-      </LinearGradient>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  // The felt's own ramp, opaque: the results are a surface over the table, not a pane on it.
-  surface: { flex: 1 },
+  // The wooden room the table stands in, opaque: the results are a surface over the live table.
+  surface: { backgroundColor: resultsTable.room, flex: 1 },
   body: { flex: 1 },
   content: {
-    // Every screen in the app is the same column width, and the results are no exception.
-    alignSelf: "center",
-    gap: spacing.lg,
-    maxWidth: layout.maxContentWidth,
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.xl,
+    gap: spacing.md,
+    paddingTop: spacing.sm,
     width: "100%",
   },
-  actions: { marginTop: spacing.xs },
-  boardHead: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-    marginTop: spacing.sm,
-  },
-  boardLabel: {
+  footer: { flexDirection: "column-reverse", gap: spacing.sm },
+  footerRow: { alignItems: "center", flexDirection: "row", gap: spacing.lg },
+  summary: {
     color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.micro,
-    letterSpacing: 2,
-  },
-  boardSummary: {
-    color: colors.textFaint,
     fontFamily: fonts.mono,
     fontSize: fontSize.micro,
     letterSpacing: 1.4,
   },
-  // Tight under the head they belong to: the cards are one scoreboard, not a list of screens.
-  cards: { gap: spacing.md, marginTop: -spacing.xs },
+  summaryRow: { flex: 1 },
+  actions: { alignSelf: "stretch" },
+  actionsRow: { flex: 1 },
   // The rating is the afterthought of the payoff: under the scoreboard, spaced off it.
   rating: { marginTop: spacing.md },
   questChips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.sm },

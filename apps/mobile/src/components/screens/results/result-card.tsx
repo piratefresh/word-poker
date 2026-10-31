@@ -1,6 +1,6 @@
 /**
- * result-card.tsx — one seat's hand, as the results draw it: who it was, what it played, what that
- * was worth, and the tiles it was worth that on.
+ * result-card.tsx — one seat at the results table: who sat there, what the hand did to them, and
+ * the word they played (STO-960).
  *
  * The payload already decided everything the card prints (`results-types.ts`), so this is drawing
  * and nothing else: no sum, no rank, no dictionary, no engine. The one thing the seat cannot read
@@ -8,15 +8,14 @@
  * builder refuses a draft with — one sentence, two surfaces.
  *
  * The card is also one accessibility element (STO-387). A composed label says the whole seat in one
- * breath, and the badge and the row of tiles are hidden from the tree underneath it: six tile labels
- * read out beside the sentence that already names the word is noise, not information.
+ * breath, and the row of tiles is hidden from the tree underneath it: six tile labels read out
+ * beside the sentence that already names the word is noise, not information.
  *
  * Motion is passed in, never owned: with a `motion` prop the card reads the screen's one clock
  * inside `useAnimatedStyle`, and without one it draws its final state — which is what a component
  * test renders, and why nothing here is gated on an animated value.
  */
 
-import { LinearGradient } from "expo-linear-gradient";
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -35,16 +34,18 @@ import {
   fonts,
   fontSize,
   glow,
-  gradients,
   layout,
   palette,
   radius,
   resultsEntrance,
+  resultsTable,
   spacing,
 } from "@/constants/theme";
-import { beatProgress } from "./use-results-entrance";
 import { WORD_REJECTION_COPY } from "@/features/table/word-rejection-copy";
+import { formatAmount } from "@/lib/ui/format";
+import { beatProgress } from "./use-results-entrance";
 
+import { formatNet, placeCopy, SEAT_TAG_COPY } from "./results-copy";
 import type { ResultsSeat } from "./results-types";
 
 export interface ResultCardMotion {
@@ -56,19 +57,16 @@ export interface ResultCardMotion {
   readonly winner: boolean;
 }
 
-/**
- * The winner's pill and avatar sit on gold rather than on the felt, and `colors.onGold` is the ink
- * on both: the same colour at 15% and 18%, which the token set has no pair of alphas for.
- */
-const ON_GOLD_WASH = "rgba(26,18,8,0.15)";
-const ON_GOLD_FILL = "rgba(26,18,8,0.18)";
-/** `gradients.goldButton`'s ramp turned to face the top edge: the design draws the gold downward. */
-const GOLD_DOWN = { start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 1 } } as const;
+/** Which edge of the table the seat is on: it decides where the avatar sits against the plate. */
+export type ResultCardSide = "left" | "top" | "right" | "bottom";
+
 /** How far the card rises into place (§3's beat), and how far its ring travels back out of it. */
 const RISE = 14;
 const RING_OUT = 1.06;
 /** A tile's entrance overshoots the mark and settles, which is what a spring would have done. */
 const TILE_SCALE = [0.8, 1.06, 1];
+/** The plate's mini tiles: seven have to fit a side seat without wrapping. */
+const TILE_SCALE_ON_PLATE = 0.62;
 /** The words a seat with no word shows when there is no §11 reason behind it: §26's fold-out. */
 const NO_WORD = "NO WORD";
 
@@ -78,10 +76,14 @@ const NO_WORD = "NO WORD";
 export function ResultCard({
   seat,
   motion,
+  side = "bottom",
+  landscape = false,
 }: {
   seat: ResultsSeat;
   /** The card's beat of the screen's entrance, or absent for a card that is simply there. */
   motion?: ResultCardMotion;
+  side?: ResultCardSide;
+  landscape?: boolean;
 }): ReactElement {
   const winner = seat.takesPot;
 
@@ -94,7 +96,7 @@ export function ResultCard({
     };
   });
 
-  // The winner's one ring, behind the card and out of it: a second beat, after the card has landed.
+  // The winner's one ring, behind the plate and out of it: a second beat, after it has landed.
   const ring = useAnimatedStyle(() => {
     if (motion === undefined) return { opacity: 0, transform: [{ scale: 1 }] };
     const progress = beatProgress(
@@ -108,8 +110,18 @@ export function ResultCard({
     };
   });
 
+  // A fold-out has no ladder (§26): its winner has no `decidedBy`, and so no place to print.
+  const placed = !seat.folded && seat.decidedBy !== null ? placeCopy(seat.place) : null;
+  const cap = seat.folded
+    ? "FOLD"
+    : [placed, seat.allIn ? "ALL-IN" : null].filter((part) => part !== null).join(" · ");
+
+  const stats = seat.folded
+    ? `IN ${formatAmount(seat.committed)}`
+    : `${seat.total} PTS · IN ${formatAmount(seat.committed)}`;
+
   // STO-387's one sentence for the whole card: the word (or the reason there is none), §7's three
-  // numbers, the score they add up to, and the pot when the pot's this seat's.
+  // numbers, the score they add up to, what the hand did to the seat, and the pot if it took one.
   const label = [
     seat.isYou ? `${seat.name} (you)` : seat.name,
     ...(seat.folded
@@ -121,84 +133,30 @@ export function ResultCard({
           `mult +${seat.mult}`,
           `rack +${seat.rack}`,
         ]),
+    ...(placed === null ? [] : [`${placed.toLowerCase()} place`]),
+    `net ${formatNet(seat.net)}`,
+    `in ${formatAmount(seat.committed)}`,
+    ...(seat.tag === null || seat.folded ? [] : [SEAT_TAG_COPY[seat.tag].toLowerCase()]),
+    ...(seat.capped === null ? [] : [seat.capped.toLowerCase()]),
     ...(winner ? ["takes the pot"] : []),
   ].join(", ");
 
-  const identity = (
-    <View style={styles.row}>
-      <View style={[styles.avatar, winner ? styles.winnerAvatar : { backgroundColor: seat.color }]}>
-        <Text
-          allowFontScaling
-          style={[styles.initials, winner ? styles.onGoldInk : styles.fieldInk]}
-        >
+  const avatar = (
+    <View style={styles.avatarSlot}>
+      <View style={[styles.avatar, { backgroundColor: seat.color }, winner && styles.avatarWinner]}>
+        <Text allowFontScaling style={styles.initials}>
           {seat.initials}
         </Text>
       </View>
-
-      <View style={styles.column}>
-        <View style={styles.head}>
-          {/* A long name gives up its tail; the score never moves off the card for it. */}
-          <Text
-            allowFontScaling
-            ellipsizeMode="tail"
-            numberOfLines={1}
-            style={[styles.name, winner && styles.onGoldInk]}
-          >
-            {seat.name}
-            {seat.isYou ? (
-              <Text allowFontScaling style={styles.you}>
-                {" (you)"}
-              </Text>
-            ) : null}
+      {cap === "" ? null : (
+        <View style={styles.cap}>
+          <Text allowFontScaling numberOfLines={1} style={styles.capText}>
+            {cap}
           </Text>
-          {seat.folded ? null : (
-            <View style={styles.score}>
-              <Text allowFontScaling style={[styles.total, winner && styles.onGoldInk]}>
-                {seat.total}
-              </Text>
-              <Text allowFontScaling style={[styles.points, winner && styles.onGoldInk]}>
-                PTS
-              </Text>
-            </View>
-          )}
         </View>
-
-        <Text
-          allowFontScaling
-          style={[
-            seat.word === null ? styles.reason : styles.word,
-            winner && styles.onGoldInk,
-          ]}
-        >
-          {seat.folded
-            ? "FOLDED"
-            : seat.word ?? (seat.reason === null ? NO_WORD : WORD_REJECTION_COPY[seat.reason])}
-        </Text>
-
-        {/* §7's three numbers, all three of them: `Mult +0` and `Rack +0` say what did not happen. */}
-        {seat.folded ? null : (
-          <Text allowFontScaling style={[styles.breakdown, winner && styles.onGoldInk]}>
-            {`Base ${seat.base} · Mult +${seat.mult} · Rack +${seat.rack}`}
-          </Text>
-        )}
-      </View>
+      )}
     </View>
   );
-
-  const badge = winner ? (
-    <View style={styles.badgeRow}>
-      {/* The card's label already says the pot is this seat's, so the pill is drawn, not spoken. */}
-      <View
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        style={styles.badge}
-      >
-        <Text allowFontScaling style={styles.badgeText}>
-          ★ TAKES THE POT
-        </Text>
-      </View>
-    </View>
-  ) : null;
 
   const tiles =
     seat.tiles.length === 0 ? null : (
@@ -225,37 +183,68 @@ export function ResultCard({
       </View>
     );
 
+  const plate = (
+    <View style={[styles.plate, winner && styles.plateWinner]}>
+      {motion !== undefined && motion.winner ? (
+        <Animated.View pointerEvents="none" style={[styles.ring, ring]} />
+      ) : null}
+
+      <View style={styles.head}>
+        {/* A long name gives up its tail; the net never moves off the card for it. */}
+        <Text allowFontScaling ellipsizeMode="tail" numberOfLines={1} style={styles.name}>
+          {seat.isYou ? "You" : seat.name}
+        </Text>
+        <Text
+          allowFontScaling
+          style={[styles.net, seat.net > 0 && styles.netUp, seat.net < 0 && styles.netDown]}
+        >
+          {formatNet(seat.net)}
+        </Text>
+      </View>
+
+      {tiles}
+
+      {!seat.folded && seat.word === null ? (
+        <Text allowFontScaling style={styles.reason}>
+          {seat.reason === null ? NO_WORD : WORD_REJECTION_COPY[seat.reason]}
+        </Text>
+      ) : null}
+
+      <View style={styles.foot}>
+        <Text allowFontScaling style={styles.stats}>
+          {stats}
+        </Text>
+        {seat.tag === null ? null : (
+          <View style={[styles.tag, { backgroundColor: resultsTable.tag[seat.tag].background }]}>
+            <Text allowFontScaling style={[styles.tagText, { color: resultsTable.tag[seat.tag].ink }]}>
+              {SEAT_TAG_COPY[seat.tag]}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {seat.capped === null ? null : (
+        <Text allowFontScaling style={styles.capped}>
+          {seat.capped}
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <Animated.View
       accessibilityLabel={label}
       accessibilityRole="text"
       accessible
-      style={enter}
+      style={[
+        landscape ? styles.beside : styles.stacked,
+        side === "right" && landscape && styles.besideReversed,
+        enter,
+      ]}
       testID={`result-card-${seat.playerId}`}
     >
-      {motion !== undefined && motion.winner ? (
-        <Animated.View pointerEvents="none" style={[styles.ring, ring]} />
-      ) : null}
-
-      {winner ? (
-        <LinearGradient
-          {...gradients.goldButton}
-          end={GOLD_DOWN.end}
-          start={GOLD_DOWN.start}
-          style={[styles.card, styles.winner]}
-        >
-          {/* The design's 1px light along the top edge: gold needs a highlight to look raised. */}
-          <View style={styles.inset} />
-          {badge}
-          {identity}
-          {tiles}
-        </LinearGradient>
-      ) : (
-        <View style={[styles.card, styles.field]}>
-          {identity}
-          {tiles}
-        </View>
-      )}
+      {avatar}
+      {plate}
     </Animated.View>
   );
 }
@@ -309,23 +298,25 @@ function ResultTile({
         animation="none"
         // §44: a tile a power handed the seat shows the table its ⚡, and nothing it replaced.
         powered={isSwappedTileId(tile.id)}
+        scale={TILE_SCALE_ON_PLATE}
         side="front"
         size="small"
         testID={testID}
         tile={shown}
       />
       {choice === null ? null : (
-        <View style={builderStyles.faces}>
+        <View style={[builderStyles.faces, styles.tileFaces]}>
           {[choice.letter, choice.alternativeLetter].map((letter) => (
             <View
               key={letter}
               style={[
                 builderStyles.chip,
+                styles.tileChip,
                 letter === face ? builderStyles.chipChosen : builderStyles.chipSpent,
               ]}
               testID={`${testID}-face-${letter}`}
             >
-              <Text allowFontScaling style={builderStyles.chipFace}>
+              <Text allowFontScaling style={[builderStyles.chipFace, styles.tileChipFace]}>
                 {letter}
               </Text>
             </View>
@@ -336,34 +327,58 @@ function ResultTile({
   );
 }
 
+const AVATAR = layout.minTouch;
+
 const styles = StyleSheet.create({
-  // The winner's card is the gold surface; a field card is the felt's own dark pane.
-  card: {
-    borderRadius: radius.card,
+  stacked: { alignItems: "center", gap: spacing.xs },
+  beside: { alignItems: "center", flexDirection: "row", gap: spacing.sm },
+  besideReversed: { flexDirection: "row-reverse" },
+
+  avatarSlot: { alignItems: "center" },
+  avatar: {
+    alignItems: "center",
+    borderColor: palette.cream100,
+    borderRadius: AVATAR / 2,
+    borderWidth: border.thin,
+    height: AVATAR,
+    justifyContent: "center",
+    width: AVATAR,
+  },
+  avatarWinner: { borderColor: colors.gold, ...glow(colors.gold) },
+  initials: {
+    color: palette.felt800,
+    fontFamily: fonts.arcade,
+    fontSize: fontSize.bodyLg,
+  },
+  // The cap sits on the avatar's top edge and runs wider than it, so it is out of the flow.
+  cap: {
+    backgroundColor: palette.felt800,
+    borderColor: palette.cream100,
+    borderRadius: radius.pill,
     borderWidth: border.hairline,
-    padding: spacing.lg,
-  },
-  winner: {
-    borderColor: palette.gold600,
-    // `glow()` is the app's winner glow at full strength; the bloom is the same gold and radius,
-    // turned down to the design's 0.18 and to a 6pt Android lift.
-    ...glow(colors.gold),
-    elevation: 6,
-    shadowOpacity: 0.18,
-  },
-  field: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-  },
-  inset: {
-    backgroundColor: "rgba(255,255,255,0.35)",
-    height: border.hairline,
-    left: 0,
+    paddingHorizontal: spacing.sm,
     position: "absolute",
-    right: 0,
-    top: 0,
+    top: -spacing.xs,
   },
-  // Behind the card, one hairline of gold: the winner's only ornament that is not the gold itself.
+  capText: {
+    color: palette.cream100,
+    fontFamily: fonts.ui,
+    fontSize: fontSize.micro,
+    letterSpacing: 0.6,
+  },
+
+  plate: {
+    backgroundColor: resultsTable.plate,
+    borderColor: resultsTable.plateEdge,
+    borderRadius: radius.card,
+    borderWidth: border.thin,
+    flexShrink: 1,
+    gap: spacing.xs,
+    minWidth: 132,
+    padding: spacing.sm,
+  },
+  plateWinner: { borderColor: colors.gold },
+  // Behind the plate, one line of gold: the winner's pulse.
   ring: {
     borderColor: colors.gold,
     borderRadius: radius.card,
@@ -375,122 +390,69 @@ const styles = StyleSheet.create({
     top: 0,
   },
 
-  badgeRow: {
+  head: {
+    alignItems: "baseline",
     flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: spacing.sm,
+    gap: spacing.md,
+    justifyContent: "space-between",
   },
-  badge: {
-    backgroundColor: ON_GOLD_WASH,
+  name: {
+    color: palette.cream100,
+    flexShrink: 1,
+    fontFamily: fonts.uiMedium,
+    fontSize: fontSize.body,
+  },
+  net: {
+    color: palette.cream100,
+    fontFamily: fonts.arcade,
+    fontSize: fontSize.body,
+    fontVariant: ["tabular-nums"],
+  },
+  netUp: { color: resultsTable.gain },
+  netDown: { color: resultsTable.loss },
+
+  // Wrapping, not clipping: a long word runs onto a second row of tiles inside the plate.
+  tiles: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xxs,
+  },
+  // The word builder's face chips, cut down to sit under a mini tile rather than widen its column.
+  tileFaces: { borderRadius: 4, borderWidth: 1, marginTop: 1 },
+  tileChip: { height: 12, width: 9.5 },
+  tileChipFace: { fontSize: 7 },
+  reason: {
+    color: resultsTable.meta,
+    fontFamily: fonts.uiMedium,
+    fontSize: fontSize.caption,
+  },
+
+  foot: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  stats: {
+    color: resultsTable.meta,
+    fontFamily: fonts.uiMedium,
+    fontSize: fontSize.caption,
+    fontVariant: ["tabular-nums"],
+  },
+  tag: {
     borderRadius: radius.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
   },
-  badgeText: {
-    color: colors.onGold,
-    fontFamily: fonts.monoBold,
-    fontSize: fontSize.micro,
-    letterSpacing: 2,
-  },
-
-  row: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: spacing.md,
-  },
-  avatar: {
-    alignItems: "center",
-    borderRadius: radius.pill,
-    height: layout.minTouch,
-    justifyContent: "center",
-    width: layout.minTouch,
-  },
-  winnerAvatar: {
-    backgroundColor: ON_GOLD_FILL,
-  },
-  initials: {
-    fontFamily: fonts.sansBlack,
-    fontSize: fontSize.bodyLg,
-  },
-  // The seat's own colour is the avatar's fill, so its letters have to read against an accent
-  // rather than against the felt: the darkest token, which is the design's `#0c1410` in our ramps.
-  fieldInk: {
-    color: palette.felt800,
-  },
-  onGoldInk: {
-    color: colors.onGold,
-  },
-
-  column: {
-    flex: 1,
-  },
-  head: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  name: {
-    color: colors.textBright,
-    flexShrink: 1,
-    fontFamily: fonts.serif,
-    fontSize: fontSize.bodyLg,
-  },
-  you: {
-    fontStyle: "italic",
-    opacity: 0.65,
-  },
-  score: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  total: {
-    color: colors.textBright,
-    fontFamily: fonts.serifBold,
-    fontSize: fontSize.h3,
-  },
-  points: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.micro,
-    letterSpacing: 1.6,
-    opacity: 0.7,
-  },
-
-  // The word is a stamp on the card: mono, upper, spaced out. The reason a word is missing is a
-  // sentence, so it keeps the slot and gives up the stamp.
-  word: {
-    color: colors.text,
-    fontFamily: fonts.monoBold,
+  tagText: {
+    fontFamily: fonts.ui,
     fontSize: fontSize.caption,
-    letterSpacing: 2.4,
-    marginTop: spacing.xs,
-    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
-  reason: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.caption,
-    letterSpacing: 1.4,
-    marginTop: spacing.xs,
-  },
-  // The design sets this line at 10pt, which the ramp has no token for: `micro` keeps it a step
-  // under the word's `caption`, which is the step the design draws.
-  breakdown: {
-    color: colors.textDim,
-    fontFamily: fonts.mono,
+  capped: {
+    color: resultsTable.meta,
+    fontFamily: fonts.uiMedium,
     fontSize: fontSize.micro,
-    letterSpacing: 0.8,
-    marginTop: spacing.xs,
-    opacity: 0.65,
-  },
-
-  // Wrapping, not clipping: a long word runs onto a second row of tiles inside the card.
-  tiles: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginTop: spacing.md,
   },
 });

@@ -2,14 +2,14 @@
  * result-card.test.tsx — what one seat's card says, and to whom.
  *
  * The card is drawn from the frozen payload and nothing else, so these render one `ResultsSeat`
- * from `results-fixtures.ts` and read the screen: the badge lands on the pot's seats only, `(you)`
- * lands on the local player's seat wherever it placed, §7's three numbers print even at zero, a
- * seat with no word prints §11's reason instead of one, and the whole card is one accessibility
- * node whose tiles are not separately reachable (STO-381, STO-387).
+ * from `results-fixtures.ts` and read the screen: the local player's seat reads `You` wherever it
+ * placed, every seat prints its net, score, stake and read tag, a seat with no word prints §11's
+ * reason instead of one, and the whole card is one accessibility node whose tiles are not
+ * separately reachable (STO-381, STO-387, STO-960).
  *
- * The badge and the tile row are deliberately outside the accessibility tree, so the two tests that
- * read them pass `includeHiddenElements` — that is the point of the hiding, and `queryByLabelText`
- * finding nothing is the other half of it.
+ * The tile row is deliberately outside the accessibility tree, so the tests that read it pass
+ * `includeHiddenElements` — that is the point of the hiding, and `queryByLabelText` finding nothing
+ * is the other half of it.
  */
 
 import { render, within } from "@testing-library/react-native";
@@ -24,7 +24,6 @@ import {
   seatFixture,
   longWordSnapshot,
   snapshotFixture,
-  splitSnapshot,
   youWonSnapshot,
 } from "./results-fixtures";
 import type { ResultsSeat } from "./results-types";
@@ -37,73 +36,65 @@ jest.mock("react-native-reanimated", () => ({
 }));
 
 describe("<ResultCard />", () => {
-  test("labels a folded player without a word, score, tiles, or winner badge", async () => {
-    const view = await render(<ResultCard seat={seatFixture({ name: "Guest", isYou: true, folded: true })} />);
-
-    expect(view.getByLabelText("Guest (you), folded")).toBeOnTheScreen();
-    expect(view.getByText("FOLDED")).toBeOnTheScreen();
-    expect(view.queryByText("PTS")).toBeNull();
-    expect(view.queryByText(/Base /)).toBeNull();
-    expect(view.queryByText("NO WORD")).toBeNull();
-    expect(view.queryByTestId("result-card-guest-tiles", { includeHiddenElements: true })).toBeNull();
-    expect(view.queryByText("★ TAKES THE POT", { includeHiddenElements: true })).toBeNull();
-  });
-  test("prints the badge on the seats the pot paid, and on no others", async () => {
+  test("labels a folded player without a word, score or tiles", async () => {
     const view = await render(
-      <>
-        {splitSnapshot.seats.map((seat) => (
-          <ResultCard key={seat.playerId} seat={seat} />
-        ))}
-      </>,
+      <ResultCard seat={seatFixture({ name: "Guest", isYou: true, folded: true, tag: "folded" })} />,
     );
 
-    // §21.3's draw: both halves of the pot wear the gold and say so.
-    for (const seat of splitSnapshot.seats.filter((candidate) => candidate.takesPot)) {
-      expect(
-        within(view.getByTestId(`result-card-${seat.playerId}`)).getByText("★ TAKES THE POT", {
-          includeHiddenElements: true,
-        }),
-      ).toBeOnTheScreen();
-    }
-
-    // The seat the draw did not pay keeps the field's dark card, and no badge with it.
-    const field = splitSnapshot.seats.find((seat) => !seat.takesPot);
-    expect(field).toBeDefined();
-    expect(
-      within(view.getByTestId(`result-card-${field?.playerId}`)).queryByText("★ TAKES THE POT", {
-        includeHiddenElements: true,
-      }),
-    ).toBeNull();
+    expect(view.getByLabelText("Guest (you), folded, net $0, in $0")).toBeOnTheScreen();
+    expect(view.getByText("FOLD")).toBeOnTheScreen();
+    expect(view.getByText("FOLDED")).toBeOnTheScreen();
+    expect(view.queryByText(/PTS/)).toBeNull();
+    expect(view.queryByText("NO WORD")).toBeNull();
+    expect(view.queryByTestId("result-card-guest-tiles", { includeHiddenElements: true })).toBeNull();
   });
 
-  test("marks the local player's seat with `(you)`, wherever it placed", async () => {
-    // Third of four, and not the pot's: the mark belongs to the seat, not to the win.
+  test("calls the local player `You`, wherever they placed", async () => {
     const placed = await render(<ResultCard seat={snapshotFixture().seats[2]} />);
+    expect(placed.getByText("You")).toBeOnTheScreen();
 
-    expect(placed.getByText("Guest (you)")).toBeOnTheScreen();
-    expect(placed.queryByText("★ TAKES THE POT", { includeHiddenElements: true })).toBeNull();
-
-    // And on the winner's card, beside the badge and the gold.
     const won = await render(<ResultCard seat={youWonSnapshot.seats[0]} />);
-
-    expect(won.getByText("Guest (you)")).toBeOnTheScreen();
-    expect(won.getByText("★ TAKES THE POT", { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(won.getByText("You")).toBeOnTheScreen();
   });
 
-  test("prints the word, the score, and §7's three numbers behind them", async () => {
-    const view = await render(<ResultCard seat={snapshotFixture().seats[0]} />);
+  test("prints the seat's net, score, stake and read tag", async () => {
+    const winner = await render(<ResultCard seat={snapshotFixture().seats[0]} />);
+    expect(winner.getByText("+$60")).toBeOnTheScreen();
+    expect(winner.getByText("17 PTS · IN $20")).toBeOnTheScreen();
+    expect(winner.getByText("BEST WORD")).toBeOnTheScreen();
 
-    expect(view.getByText("ENVIRO")).toBeOnTheScreen();
-    expect(view.getByText("17")).toBeOnTheScreen();
-    expect(view.getByText("PTS")).toBeOnTheScreen();
-    expect(view.getByText("Base 12 · Mult +5 · Rack +0")).toBeOnTheScreen();
+    const loser = await render(<ResultCard seat={snapshotFixture().seats[1]} />);
+    expect(loser.getByText("−$20")).toBeOnTheScreen();
+    expect(loser.getByText("CALLED")).toBeOnTheScreen();
   });
 
-  test("prints the zeroes §7 did not apply", async () => {
-    const view = await render(<ResultCard seat={snapshotFixture().seats[1]} />);
+  test("caps an all-in seat, and says how far its chips reached", async () => {
+    const seat = seatFixture({
+      name: "Alex",
+      allIn: true,
+      tag: "all-in",
+      capped: "Can only win the main pot",
+    });
+    const view = await render(<ResultCard seat={seat} />);
 
-    // `Mult +0` and `Rack +0` are facts about the word, not things to hide from the seat.
-    expect(view.getByText("Base 10 · Mult +0 · Rack +0")).toBeOnTheScreen();
+    // The cap on the avatar keeps the seat's place, and the tag is on the plate.
+    expect(view.getByText("1ST · ALL-IN")).toBeOnTheScreen();
+    expect(view.getByText("ALL-IN")).toBeOnTheScreen();
+    expect(view.getByText("Can only win the main pot")).toBeOnTheScreen();
+  });
+
+  test("caps the avatar with the seat's place, except where the seat has none", async () => {
+    const second = await render(<ResultCard seat={snapshotFixture().seats[1]} />);
+    expect(second.getByText("2ND")).toBeOnTheScreen();
+
+    const folded = seatFixture({ name: "Jay", folded: true, place: 0, tag: "folded" });
+    const out = await render(<ResultCard seat={folded} />);
+    expect(out.getByText("FOLD")).toBeOnTheScreen();
+    expect(out.queryByText("0TH")).toBeNull();
+
+    // §26: nothing was revealed, so a fold-out's winner placed nowhere.
+    const walked = await render(<ResultCard seat={foldOutSnapshot.seats[0]} />);
+    expect(walked.queryByText("1ST")).toBeNull();
   });
 
   test("prints §11's reason for a seat with no word, and draws no tiles", async () => {
@@ -124,7 +115,6 @@ describe("<ResultCard />", () => {
 
     // No window ever opened for this seat, so there is no §11 reason behind the empty slot.
     expect(view.getByText("NO WORD")).toBeOnTheScreen();
-    expect(view.getByText("Base 0 · Mult +0 · Rack +0")).toBeOnTheScreen();
     expect(
       view.queryByTestId(`result-card-${seat.playerId}-tiles`, { includeHiddenElements: true }),
     ).toBeNull();
@@ -135,7 +125,7 @@ describe("<ResultCard />", () => {
     const view = await render(<ResultCard seat={seat} />);
 
     const card = view.getByLabelText(
-      "Ellis, ENVIRO, 17 points, base 12, mult +5, rack +0, takes the pot",
+      "Ellis, ENVIRO, 17 points, base 12, mult +5, rack +0, 1st place, net +$60, in $20, best word, takes the pot",
     );
 
     expect(card).toBeOnTheScreen();
@@ -183,7 +173,6 @@ describe("<ResultCard />", () => {
     const seat = longWordSnapshot.seats[0];
     const view = await render(<ResultCard seat={seat} />);
 
-    expect(view.getByText("MARKETS")).toBeOnTheScreen();
     expect(
       view.getAllByTestId(new RegExp(`^result-card-${seat.playerId}-tile-\\d+$`), {
         includeHiddenElements: true,
@@ -196,10 +185,9 @@ describe("<ResultCard />", () => {
     const view = await render(<WinnerOnTheClock seat={seat} />);
 
     // The beat moves styles and never content: with the screen's clock handed in, everything the
-    // settled card says is still on the card — the word, the score, §7's numbers, every tile.
-    expect(view.getByText("ENVIRO")).toBeOnTheScreen();
-    expect(view.getByText("17")).toBeOnTheScreen();
-    expect(view.getByText("Base 12 · Mult +5 · Rack +0")).toBeOnTheScreen();
+    // settled card says is still on the card — the net, the score, the stake, every tile.
+    expect(view.getByText("+$60")).toBeOnTheScreen();
+    expect(view.getByText("17 PTS · IN $20")).toBeOnTheScreen();
     expect(
       view.getAllByTestId(new RegExp(`^result-card-${seat.playerId}-tile-\\d+$`), {
         includeHiddenElements: true,
