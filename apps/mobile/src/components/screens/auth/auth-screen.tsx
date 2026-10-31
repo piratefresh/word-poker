@@ -18,12 +18,14 @@ import {
   GoldButton,
   Pill,
   PillRow,
+  SocialPill,
   SuggestionChips,
 } from "./auth-shell";
 import { EMAIL_VERIFIED_CALLBACK } from "@/constants/links";
 import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, signInWithGameCenter } from "@/auth/client/game-center";
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
+import { APPLE_FOOTER_LINK, signInWithSocial, SOCIAL_PROVIDERS, type SocialProvider } from "@/auth/client/social-sign-in";
 import { handleCandidates, MAX_HANDLE_LENGTH } from "@/auth/handle";
 import { pendingHistory } from "@/lib/history/history-store";
 import { syncHistory } from "@/lib/history/history-sync";
@@ -159,7 +161,8 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   };
 
-  const continueWithGameCenter = async () => {
+  /** Game Center, Google or Apple: each leaves the form behind, so it shares one guarded path. */
+  const continueWith = async (signIn: () => Promise<{ ok: true } | { ok: false; message: string }>) => {
     if (pending) return;
     setPending(true);
     setError(null);
@@ -168,7 +171,7 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
         setError(UNSAVED_HANDS);
         return;
       }
-      const result = await signInWithGameCenter({ adoptGuestProgress: !!guestId });
+      const result = await signIn();
       if (!result.ok) setError(result.message);
     } catch {
       setError(NETWORK_ERROR);
@@ -186,6 +189,8 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     guestTapped = false;
     router.replace("/");
   }, [guestId]);
+
+  const continueWithSocial = (provider: SocialProvider) => continueWith(() => signInWithSocial(provider, referralHeaders()));
 
   const playAsGuest = async () => {
     if (pending) return;
@@ -219,12 +224,31 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
           {/* A friend opening an invite link has no account: an anonymous session seats them
               (STO-581), and the guard then lands the table the link named. */}
           {mode === "sign-in" && (
-            <PillRow>
-              {GAME_CENTER_AVAILABLE && <Pill label="GAME CENTER" lastLogin={lastLogin === "game-center"} onPress={continueWithGameCenter} />}
-              <Pill label="PLAY AS GUEST" onPress={playAsGuest} />
-            </PillRow>
+            <>
+              {SOCIAL_PROVIDERS.length > 0 && (
+                <PillRow>
+                  {SOCIAL_PROVIDERS.map((provider) => (
+                    <SocialPill key={provider} lastLogin={lastLogin === provider} onPress={() => continueWithSocial(provider)} provider={provider} />
+                  ))}
+                </PillRow>
+              )}
+              <PillRow>
+                <Pill label="PLAY AS GUEST" onPress={playAsGuest} />
+              </PillRow>
+            </>
           )}
           <FooterLine cta={copy.footerCta} onPress={() => router.push(copy.footerHref)} text={copy.footer} />
+          {/* The way back for accounts with no button here: launch restore stays off after a sign-out or guest play. */}
+          {mode === "sign-in" && GAME_CENTER_AVAILABLE && (
+            <FooterLine
+              cta="USE GAME CENTER"
+              onPress={() => continueWith(() => signInWithGameCenter({ adoptGuestProgress: !!guestId }))}
+              text="Game Center player?"
+            />
+          )}
+          {mode === "sign-in" && APPLE_FOOTER_LINK && (
+            <FooterLine cta="USE APPLE" onPress={() => continueWithSocial("apple")} text="Signed up with Apple?" />
+          )}
         </>
       }
       greeting={copy.greeting}

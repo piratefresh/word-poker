@@ -28,7 +28,7 @@ export function isPlaceholderEmail(email: string | null | undefined): boolean {
 }
 
 export const PLATFORM_AUTH_INTENTS = {
-  "game-center": ["sign-in", "link"],
+  "game-center": ["sign-in", "link", "reauth"],
   "play-games": ["restore", "associate"],
 } as const;
 

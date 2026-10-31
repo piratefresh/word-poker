@@ -168,6 +168,7 @@ export function RootLayout() {
                 {/* Outside the guards: the emailed reset link may land while a stale
                     session is still on the device, and the reset has to win. */}
                 <Stack.Screen name="reset-password" />
+                <Stack.Screen name="delete-account" />
               </Stack>
               {restoring && !session ? (
                 <View accessibilityLabel="Signing in with Game Center" style={styles.restoring}>

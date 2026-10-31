@@ -2,8 +2,8 @@
  * revenuecat.ts — the thin client for RevenueCat's Developer API v2 (STO-346).
  *
  * RevenueCat ships no Node SDK, and the in-app SDK cannot add or remove currency, so the server
- * speaks the REST API itself. Only the three calls the Wallet needs live here: read a balance,
- * adjust it, and read which products grant how many coins.
+ * speaks the REST API itself. Only the calls the Wallet needs live here: read a balance, adjust
+ * it, read which products grant how many coins, and delete a customer with their account.
  *
  * Errors carry an HTTP status and RevenueCat's error `type`, never a response body: a caller logs
  * them and stores a short code, so nothing RevenueCat says reaches a player or the database.
@@ -62,6 +62,8 @@ export interface RevenueCatClient {
   adjustCoins(userId: string, amount: number, idempotencyKey: string): Promise<number>;
   /** Every store product that grants `COIN`, with the amount it grants. */
   listCoinGrants(): Promise<CoinGrant[]>;
+  /** Queues the customer's deletion; one RevenueCat has never seen is already gone. */
+  deleteCustomer(userId: string): Promise<void>;
 }
 
 export interface RevenueCatClientOptions {
@@ -72,7 +74,7 @@ export interface RevenueCatClientOptions {
 }
 
 interface RequestInit {
-  readonly method?: "GET" | "POST";
+  readonly method?: "GET" | "POST" | "DELETE";
   readonly body?: unknown;
   readonly idempotencyKey?: string;
 }
@@ -247,6 +249,14 @@ export function createRevenueCatClient(options: RevenueCatClientOptions): Revenu
       }
 
       return [...byStoreId].map(([storeProductId, coins]) => ({ storeProductId, coins }));
+    },
+
+    async deleteCustomer(userId) {
+      try {
+        await send(customerPath(userId), { method: "DELETE" });
+      } catch (error) {
+        if (!(error instanceof RevenueCatError) || error.status !== 404) throw error;
+      }
     },
   };
 }

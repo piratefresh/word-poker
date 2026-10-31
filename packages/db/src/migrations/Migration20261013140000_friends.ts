@@ -2,7 +2,6 @@ import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20261013140000_friends extends Migration {
   override async up(): Promise<void> {
-    // ponytail: rows outlive a deleted account; add an FK or deletion hook when account deletion ships.
     this.addSql(`create table friends (
       user_a text not null, user_b text not null,
       status text not null check (status in ('pending', 'accepted')),

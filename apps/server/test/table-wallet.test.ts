@@ -42,7 +42,7 @@ function memoryStore() {
 }
 
 function client(adjust: RevenueCatClient["adjustCoins"]): RevenueCatClient {
-  return { adjustCoins: adjust, getCoinBalance: async () => 0, listCoinGrants: async () => [] };
+  return { adjustCoins: adjust, getCoinBalance: async () => 0, listCoinGrants: async () => [], deleteCustomer: async () => {} };
 }
 
 describe("table wallet (balances §4, §5)", () => {
