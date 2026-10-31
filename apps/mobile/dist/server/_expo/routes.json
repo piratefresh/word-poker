@@ -1,0 +1,271 @@
+{
+  "apiRoutes": [
+    {
+      "file": "_expo/functions/api/quests+api.js",
+      "page": "/api/quests",
+      "namedRegex": "^/api/quests(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/wallet+api.js",
+      "page": "/api/wallet",
+      "namedRegex": "^/api/wallet(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/friends+api.js",
+      "page": "/api/friends",
+      "namedRegex": "^/api/friends(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/auth-failed+api.js",
+      "page": "/api/auth-failed",
+      "namedRegex": "^/api/auth\\-failed(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/history/hands+api.js",
+      "page": "/api/history/hands",
+      "namedRegex": "^/api/history/hands(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/store-catalog+api.js",
+      "page": "/api/store-catalog",
+      "namedRegex": "^/api/store\\-catalog(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/results-rating+api.js",
+      "page": "/api/results-rating",
+      "namedRegex": "^/api/results\\-rating(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/friends/presence+api.js",
+      "page": "/api/friends/presence",
+      "namedRegex": "^/api/friends/presence(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/friends/push-token+api.js",
+      "page": "/api/friends/push-token",
+      "namedRegex": "^/api/friends/push\\-token(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/revenuecat-webhook+api.js",
+      "page": "/api/revenuecat-webhook",
+      "namedRegex": "^/api/revenuecat\\-webhook(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "_expo/functions/api/auth/reset-password/[token]+api.js",
+      "page": "/api/auth/reset-password/[token]",
+      "namedRegex": "^/api/auth/reset\\-password/(?<token>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "token": "token"
+      }
+    },
+    {
+      "file": "_expo/functions/api/friends/[userId]+api.js",
+      "page": "/api/friends/[userId]",
+      "namedRegex": "^/api/friends/(?<userId>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "userId": "userId"
+      }
+    },
+    {
+      "file": "_expo/functions/api/history/hands/[id]+api.js",
+      "page": "/api/history/hands/[id]",
+      "namedRegex": "^/api/history/hands/(?<id>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "id": "id"
+      }
+    },
+    {
+      "file": "_expo/functions/api/auth/[...all]+api.js",
+      "page": "/api/auth/[...all]",
+      "namedRegex": "^/api/auth(?:/(?<all>.+?))?(?:/)?$",
+      "routeKeys": {
+        "all": "all"
+      }
+    }
+  ],
+  "htmlRoutes": [
+    {
+      "file": "./(tabs)/history/index.tsx",
+      "page": "/(tabs)/history/index",
+      "namedRegex": "^(?:/\\(tabs\\))?/history(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./(tabs)/index.tsx",
+      "page": "/(tabs)/index",
+      "namedRegex": "^(?:/\\(tabs\\))?(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./store.tsx",
+      "page": "/store",
+      "namedRegex": "^/store(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./quests.tsx",
+      "page": "/quests",
+      "namedRegex": "^/quests(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./online.tsx",
+      "page": "/online",
+      "namedRegex": "^/online(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./(tabs)/friends.tsx",
+      "page": "/(tabs)/friends",
+      "namedRegex": "^(?:/\\(tabs\\))?/friends(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./(tabs)/explore.tsx",
+      "page": "/(tabs)/explore",
+      "namedRegex": "^(?:/\\(tabs\\))?/explore(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./sign-up.tsx",
+      "page": "/sign-up",
+      "namedRegex": "^/sign\\-up(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./sign-in.tsx",
+      "page": "/sign-in",
+      "namedRegex": "^/sign\\-in(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./offline.tsx",
+      "page": "/offline",
+      "namedRegex": "^/offline(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "expo-router/build/views/Sitemap.js",
+      "page": "/_sitemap",
+      "namedRegex": "^/_sitemap(?:/)?$",
+      "routeKeys": {},
+      "generated": true
+    },
+    {
+      "file": "./tutorial.tsx",
+      "page": "/tutorial",
+      "namedRegex": "^/tutorial(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./dev-pots.tsx",
+      "page": "/dev-pots",
+      "namedRegex": "^/dev\\-pots(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./dev-chips.tsx",
+      "page": "/dev-chips",
+      "namedRegex": "^/dev\\-chips(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./dev-ledger.tsx",
+      "page": "/dev-ledger",
+      "namedRegex": "^/dev\\-ledger(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./dev-word-demo.tsx",
+      "page": "/dev-word-demo",
+      "namedRegex": "^/dev\\-word\\-demo(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./dev-challenge.tsx",
+      "page": "/dev-challenge",
+      "namedRegex": "^/dev\\-challenge(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./reset-password.tsx",
+      "page": "/reset-password",
+      "namedRegex": "^/reset\\-password(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./delete-account.tsx",
+      "page": "/delete-account",
+      "namedRegex": "^/delete\\-account(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./forgot-password.tsx",
+      "page": "/forgot-password",
+      "namedRegex": "^/forgot\\-password(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./dev-tabletop-kit.tsx",
+      "page": "/dev-tabletop-kit",
+      "namedRegex": "^/dev\\-tabletop\\-kit(?:/)?$",
+      "routeKeys": {}
+    },
+    {
+      "file": "./(tabs)/history/[sessionId]/[handId].tsx",
+      "page": "/(tabs)/history/[sessionId]/[handId]",
+      "namedRegex": "^(?:/\\(tabs\\))?/history/(?<sessionId>[^/]+?)/(?<handId>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "sessionId": "sessionId",
+        "handId": "handId"
+      }
+    },
+    {
+      "file": "./online/[roomId].tsx",
+      "page": "/online/[roomId]",
+      "namedRegex": "^/online/(?<roomId>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "roomId": "roomId"
+      }
+    },
+    {
+      "file": "./friend/[code].tsx",
+      "page": "/friend/[code]",
+      "namedRegex": "^/friend/(?<code>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "code": "code"
+      }
+    },
+    {
+      "file": "./(tabs)/history/[sessionId].tsx",
+      "page": "/(tabs)/history/[sessionId]",
+      "namedRegex": "^(?:/\\(tabs\\))?/history/(?<sessionId>[^/]+?)(?:/)?$",
+      "routeKeys": {
+        "sessionId": "sessionId"
+      }
+    }
+  ],
+  "notFoundRoutes": [
+    {
+      "file": "expo-router/build/views/Unmatched.js",
+      "page": "/+not-found",
+      "namedRegex": "^(?:/(?<notfound>.+?))?(?:/)?$",
+      "routeKeys": {
+        "notfound": "not-found"
+      },
+      "generated": true
+    }
+  ],
+  "redirects": [],
+  "rewrites": []
+}
