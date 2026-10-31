@@ -38,7 +38,15 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
-import { colors, fonts, resultsEntrance, spacing } from "@/constants/theme";
+import {
+  fonts,
+  fontSize,
+  ledger,
+  nightLobby,
+  radius,
+  resultsEntrance,
+  spacing,
+} from "@/constants/theme";
 import { formatAmount } from "@/lib/ui/format";
 import { beatProgress } from "./use-results-entrance";
 
@@ -61,9 +69,13 @@ export interface ResultsPotProps {
   readonly amount: number;
   /** The entrance's shared clock: the count and its lift read two beats of it. */
   readonly clock: SharedValue<number>;
+  /** `POT`, or which pot this plate is when the hand built several. */
+  readonly label: string;
+  /** Who it went to, on a plate the headline does not already name. */
+  readonly to: string | null;
 }
 
-export function ResultsPot({ amount, clock }: ResultsPotProps): ReactElement {
+export function ResultsPot({ amount, clock, label, to }: ResultsPotProps): ReactElement {
   // Read once, on the JS thread: this is the string both layers start from.
   const settled = formatAmount(amount);
 
@@ -100,22 +112,32 @@ export function ResultsPot({ amount, clock }: ResultsPotProps): ReactElement {
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={styles.box}
+      style={styles.plate}
     >
-      {/* The box: invisible, in the flow, and the exact final amount. */}
-      <Text allowFontScaling style={[styles.pot, styles.reserve]} testID="results-pot-reserve">
-        {settled}
+      <Text allowFontScaling style={styles.label}>
+        {label}
       </Text>
+      <View style={styles.box}>
+        {/* The box: invisible, in the flow, and the exact final amount. */}
+        <Text allowFontScaling style={[styles.pot, styles.reserve]} testID="results-pot-reserve">
+          {settled}
+        </Text>
 
-      {/* The number itself: filled over the box above, so the two line up. */}
-      <PotValue
-        animatedProps={countUp}
-        editable={false}
-        style={[styles.pot, styles.layer, lift]}
-        testID="results-pot"
-        underlineColorAndroid="transparent"
-        value={settled}
-      />
+        {/* The number itself: filled over the box above, so the two line up. */}
+        <PotValue
+          animatedProps={countUp}
+          editable={false}
+          style={[styles.pot, styles.layer, lift]}
+          testID="results-pot"
+          underlineColorAndroid="transparent"
+          value={settled}
+        />
+      </View>
+      {to === null ? null : (
+        <Text allowFontScaling numberOfLines={1} style={styles.label}>
+          {to}
+        </Text>
+      )}
     </View>
   );
 }
@@ -126,20 +148,29 @@ export function ResultsPot({ amount, clock }: ResultsPotProps): ReactElement {
  * the count-up from jittering as the digits change.
  */
 const potType: TextStyle = {
-  color: colors.gold,
-  fontFamily: fonts.serifBold,
-  fontSize: 40,
+  color: ledger.ink,
+  fontFamily: fonts.arcade,
+  fontSize: 30,
   fontVariant: ["tabular-nums"],
-  letterSpacing: -0.6,
-  lineHeight: 48,
+  lineHeight: 36,
   textAlign: "center",
 };
 
 const styles = StyleSheet.create({
-  box: {
+  plate: {
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: spacing.md,
+    backgroundColor: nightLobby.cream.face,
+    borderRadius: radius.md,
+    minWidth: 84,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  box: { alignItems: "center", justifyContent: "center" },
+  label: {
+    color: ledger.inkSoft,
+    fontFamily: fonts.ui,
+    fontSize: fontSize.micro,
+    letterSpacing: 1,
   },
   layer: {
     // Over the box the reserve draws, not beside it: a filled input draws its text where the

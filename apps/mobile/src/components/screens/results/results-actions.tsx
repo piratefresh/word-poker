@@ -49,6 +49,15 @@ export function ResultsActions({ clock, ready, replay, onDeal, onExit }: Results
 
   return (
     <Animated.View style={[styles.row, enter]}>
+      <Host colorScheme="dark" matchContents seedColor={colors.gold} style={styles.host}>
+        <Button
+          label="Main menu"
+          onPress={onExit}
+          testID="results-main-menu"
+          variant="outlined"
+        />
+      </Host>
+
       <Pressable
         accessibilityLabel={replay ? `Play another hand, ${replay.requested} of ${replay.total} players want to play again` : "Deal another hand"}
         accessibilityRole="button"
@@ -73,15 +82,6 @@ export function ResultsActions({ clock, ready, replay, onDeal, onExit }: Results
           <Text style={styles.primaryLabel}>{replay ? "PLAY ANOTHER" : "DEAL ANOTHER"}{replay ? ` ${replay.requested}/${replay.total}` : ""}</Text>
         </LinearGradient>
       </Pressable>
-
-      <Host colorScheme="dark" matchContents seedColor={colors.gold} style={styles.host}>
-        <Button
-          label="Main menu"
-          onPress={onExit}
-          testID="results-main-menu"
-          variant="outlined"
-        />
-      </Host>
     </Animated.View>
   );
 }

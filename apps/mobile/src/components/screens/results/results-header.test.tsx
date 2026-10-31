@@ -8,10 +8,8 @@
  */
 
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 
-import { colors } from "@/constants/theme";
 import { formatAmount } from "@/lib/ui/format";
 
 import { snapshotFixture } from "./results-fixtures";
@@ -40,8 +38,8 @@ const HIDDEN = { includeHiddenElements: true } as const;
 
 const SNAPSHOT = snapshotFixture();
 
-async function renderHeadline() {
-  return render(<ResultsHeadlineView clock={settledClock()} snapshot={SNAPSHOT} />);
+async function renderHeadline(snapshot = SNAPSHOT) {
+  return render(<ResultsHeadlineView clock={settledClock()} snapshot={snapshot} />);
 }
 
 test("the bar stamps the hand it was handed, and follows it", async () => {
@@ -87,24 +85,27 @@ test("the headline is one node, and its label carries the pot", async () => {
   expect(screen.queryByDisplayValue(formatAmount(SNAPSHOT.pot))).toBeNull();
 });
 
-test("the sentence's emphasis is its one gold span", async () => {
+test("the sentence reads as one line, lead and emphasis together", async () => {
   const { headline } = SNAPSHOT;
 
   await renderHeadline();
 
-  // The sentence is the bright cream one: the lead is its own text, not a second span.
-  const sentence = screen.getByText(`${headline.lead} ${headline.emphasis}`, HIDDEN);
-  expect(sentence).toHaveStyle({ color: colors.textBright });
+  expect(screen.getByText(`${headline.lead} ${headline.emphasis}`, HIDDEN)).toBeTruthy();
+});
 
-  // And the one gold run inside it is the emphasis: the lead is drawn in the sentence's own
-  // colour, and nothing else in the paragraph is gold.
-  const goldSpans = sentence
-    .queryAll((node) => StyleSheet.flatten(node.props.style)?.color === colors.gold)
-    .map((span) =>
-      span.children.filter((child): child is string => typeof child === "string").join(""),
-    );
+test("a hand with several pots gets a plate each, and says who took them", async () => {
+  const pots = [
+    { label: "MAIN POT", amount: 90, to: "TO ALEX" },
+    { label: "SIDE POT", amount: 140, to: "TO YOU" },
+  ];
+  await renderHeadline(snapshotFixture({ pot: 230, pots }));
 
-  expect(goldSpans).toEqual([headline.emphasis]);
+  for (const pot of pots) {
+    expect(screen.getByText(pot.label, HIDDEN)).toBeTruthy();
+    expect(screen.getByText(pot.to, HIDDEN)).toBeTruthy();
+  }
+  expect(screen.getByText("2 pots · $230", HIDDEN)).toBeTruthy();
+  expect(screen.getByLabelText("2 pots · $230, main pot $90 to alex, side pot $140 to you")).toBeTruthy();
 });
 
 const POT_CASES: [string, number][] = [
@@ -113,7 +114,7 @@ const POT_CASES: [string, number][] = [
 ];
 
 test.each(POT_CASES)("the pot prints %s once it has settled", async (_name, amount) => {
-  await render(<ResultsPot amount={amount} clock={settledClock()} />);
+  await render(<ResultsPot amount={amount} clock={settledClock()} label="POT" to={null} />);
 
   const settled = formatAmount(amount);
 
@@ -132,7 +133,7 @@ test.each(POT_CASES)("the pot prints %s once it has settled", async (_name, amou
 });
 
 test("the count-up writes its one number under both keys", async () => {
-  await render(<ResultsPot amount={80} clock={settledClock()} />);
+  await render(<ResultsPot amount={80} clock={settledClock()} label="POT" to={null} />);
 
   // Both keys carry the same string, because they are one number for two renderers: native paints
   // the input's `text` slot, and the web build's DOM input holds `value`. Dropping either one

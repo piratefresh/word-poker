@@ -14,7 +14,7 @@ import {
 
 import { testDictionary } from "@/test-support/dictionary-fixtures";
 
-import { buildResultsSnapshot } from "./results-snapshot";
+import { buildResultsSnapshot, buildSettledSnapshot } from "./results-snapshot";
 import type { ResultsSeat } from "./results-types";
 
 const SEED = 7;
@@ -101,6 +101,11 @@ function playToFoldOut(dictionary: Dictionary, survivor: string): OfflineState {
   }
 
   return state;
+}
+
+/** A revealed seat, for the hands written out by hand. */
+function standing(playerId: string, seat: number, place: number, score: number, word: string) {
+  return { playerId, seat, place, score, word, reason: null, played: null, decidedBy: "final-score" as const };
 }
 
 describe("buildResultsSnapshot", () => {
@@ -246,6 +251,119 @@ describe("buildResultsSnapshot", () => {
     );
     expect(cards.every((seat) => seat.isYou === false)).toBe(true);
     expect(cards.every((seat) => seat.initials.length > 0)).toBe(true);
+  });
+
+  test("reads each seat's net and stake off the settlement, and sits you at index 0", () => {
+    const state = playOutHand(testDictionary(["ZZ"]));
+    const snapshot = buildResultsSnapshot({ state, players: playersOf(state) });
+
+    expect(snapshot?.seats.reduce((sum, seat) => sum + seat.net, 0)).toBe(0);
+    for (const seat of snapshot?.seats ?? []) {
+      const delta = state.result?.payout.stackDeltas.find((d) => d.playerId === seat.playerId);
+      expect(seat.net).toBe((delta?.end ?? 0) - (delta?.start ?? 0));
+      expect(seat.committed).toBe(state.seats.find((s) => s.id === seat.playerId)?.committedHand);
+    }
+    expect(snapshot?.seats.find((seat) => seat.isYou)?.seatIndex).toBe(0);
+    expect(snapshot?.seats.map((seat) => seat.seatIndex).sort()).toEqual([0, 1, 2, 3]);
+    expect(snapshot?.pots).toHaveLength(1);
+    expect(snapshot?.pots[0]).toMatchObject({ label: "POT", to: null });
+  });
+
+  /** STO-960's worked example: Alex all-in for $30 with the best word; Bree and Cam in for $100. */
+  const sidePotHand = (hero: string) =>
+    buildSettledSnapshot(
+      {
+        hand: 1,
+        seed: null,
+        pot: 230,
+        pots: [
+          { amount: 90, eligible: ["alex", "bree", "cam"], winners: ["alex"] },
+          { amount: 140, eligible: ["bree", "cam"], winners: ["bree"] },
+        ],
+        stackDeltas: [
+          { playerId: "alex", start: 30, end: 90 },
+          { playerId: "bree", start: 100, end: 140 },
+          { playerId: "cam", start: 100, end: 0 },
+        ],
+        seats: [
+          { playerId: "alex", committed: 30, allIn: true },
+          { playerId: "bree", committed: 100, allIn: false },
+          { playerId: "cam", committed: 100, allIn: false },
+        ],
+        winner: "alex",
+        table: { players: 3, folded: 0 },
+        foldedPlayerIds: [],
+        standings: [
+          standing("alex", 0, 1, 24, "DOZEN"),
+          standing("bree", 1, 2, 15, "TONED"),
+          standing("cam", 2, 3, 14, "ANODE"),
+        ],
+      },
+      ["alex", "bree", "cam"].map((id) => ({
+        id,
+        name: `${id.charAt(0).toUpperCase()}${id.slice(1)}`,
+        initials: id.slice(0, 2).toUpperCase(),
+        stack: 0,
+        color: "#e6b450",
+        status: "waiting" as const,
+        ...(id === hero ? { isHero: true } : {}),
+      })),
+    );
+
+  test("gives a side-pot hand a plate per pot, and credits the seats each pot paid", () => {
+    const snapshot = sidePotHand("bree");
+
+    expect(snapshot.headline).toMatchObject({ lead: "2 pots ·", emphasis: "$230" });
+    expect(snapshot.pots).toEqual([
+      { label: "MAIN POT", amount: 90, to: "TO ALEX" },
+      { label: "SIDE POT", amount: 140, to: "TO YOU" },
+    ]);
+    expect(snapshot.seats.map((seat) => seat.net)).toEqual([60, 40, -100]);
+    // Second on the ladder, but the side pot was Bree's.
+    expect(snapshot.seats[1]).toMatchObject({ takesPot: true, tag: "called" });
+    expect(snapshot.seats[2]).toMatchObject({ takesPot: false, tag: "called" });
+  });
+
+  test("tells the capped seat how far its chips reached, in its own voice", () => {
+    expect(sidePotHand("bree").seats[0]).toMatchObject({
+      tag: "best-word",
+      allIn: true,
+      capped: "Can only win the main pot",
+    });
+    expect(sidePotHand("alex").seats[0]?.capped).toBe("You can only win the main pot");
+    expect(sidePotHand("alex").seats[1]?.capped).toBeNull();
+  });
+
+  test("treats chips nobody called as coming back, not as a side pot", () => {
+    const snapshot = buildSettledSnapshot(
+      {
+        hand: 1,
+        seed: null,
+        pot: 160,
+        pots: [
+          { amount: 60, eligible: ["a", "b"], winners: ["b"] },
+          { amount: 100, eligible: ["a"], winners: ["a"] },
+        ],
+        stackDeltas: [
+          { playerId: "a", start: 500, end: 470 },
+          { playerId: "b", start: 30, end: 60 },
+        ],
+        seats: [
+          { playerId: "a", committed: 130, allIn: false },
+          { playerId: "b", committed: 30, allIn: true },
+        ],
+        winner: "b",
+        table: { players: 2, folded: 0 },
+        foldedPlayerIds: [],
+        standings: [standing("b", 1, 1, 9, "CAT"), standing("a", 0, 2, 5, "DOG")],
+      },
+      [],
+    );
+
+    expect(snapshot.pots).toHaveLength(1);
+    expect(snapshot.headline.lead).toBe("b takes");
+    expect(snapshot.seats.find((seat) => seat.playerId === "a")?.committed).toBe(30);
+    expect(snapshot.seats.find((seat) => seat.playerId === "b")?.capped).toBeNull();
   });
 
   test("has no snapshot while no hand has paid out", () => {

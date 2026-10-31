@@ -80,6 +80,19 @@ describe("<ResultsScreen />", () => {
     expect(view.queryByText("$240", { includeHiddenElements: true })).toBeNull();
   });
 
+  test("seats every player at the table, however few were dealt in", async () => {
+    const [ellis, mira, guest] = snapshotFixture().seats;
+    const headsUp = [ellis, { ...guest, seatIndex: 0 }];
+    const threeHanded = [ellis, mira, guest];
+
+    for (const seats of [headsUp, threeHanded, snapshotFixture().seats]) {
+      const { view } = await renderResults(snapshotFixture({ seats }));
+      for (const seat of seats) {
+        expect(view.getByTestId(`result-card-${seat.playerId}`)).toBeOnTheScreen();
+      }
+    }
+  });
+
   test("runs the entrance off one clock, started once", async () => {
     /** The sequence's own clock, told apart from the tiles' own flips and lifts. */
     const clockStarts = () =>

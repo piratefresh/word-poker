@@ -11,10 +11,67 @@
  * state.
  */
 
-import type { ResultsHeadline, ResultsSeat, ResultsSnapshot, ResultsTable } from "./results-types";
+import type { PlayerId } from "@wordpoker/contracts";
+
+import { formatAmount } from "@/lib/ui/format";
+
+import type {
+  ResultsHeadline,
+  ResultsPotPlate,
+  ResultsSeat,
+  ResultsSeatTag,
+  ResultsSnapshot,
+  ResultsTable,
+} from "./results-types";
 
 /** What the headline is built from: who the pots paid, and whether there was a reveal at all. */
-type CopyInput = Pick<ResultsSnapshot, "seats" | "revealed"> & { table?: ResultsTable };
+type CopyInput = Pick<ResultsSnapshot, "seats" | "revealed"> & {
+  table?: ResultsTable;
+  pots?: readonly ResultsPotPlate[];
+};
+
+/** What a card's read tag prints. */
+export const SEAT_TAG_COPY: Record<ResultsSeatTag, string> = {
+  "best-word": "BEST WORD",
+  called: "CALLED",
+  "all-in": "ALL-IN",
+  folded: "FOLDED",
+};
+
+/** `+$500`, `−$240`, `$0`: the true minus sign, since it sits beside other figures on the card. */
+export function formatNet(net: number): string {
+  return `${net > 0 ? "+" : net < 0 ? "−" : ""}${formatAmount(Math.abs(net))}`;
+}
+
+/** `1ST`, `2ND`, `3RD`, `4TH`: §21's place, as the avatar's cap prints it. */
+export function placeCopy(place: number): string {
+  return `${place}${["TH", "ST", "ND", "RD"][place] ?? "TH"}`;
+}
+
+/** One plate per contested pot, main pot first; a lone pot is the plain `POT` the headline names. */
+export function potPlates(
+  pots: readonly { readonly amount: number; readonly winners: readonly PlayerId[] }[],
+  seats: readonly Pick<ResultsSeat, "playerId" | "name" | "isYou">[],
+): readonly ResultsPotPlate[] {
+  return pots.map((pot, index) => ({
+    label: index === 0 ? "MAIN POT" : pots.length > 2 ? `SIDE POT ${index}` : "SIDE POT",
+    amount: pot.amount,
+    to: `TO ${upper(
+      joinNames(
+        pot.winners.map((id) => {
+          const seat = seats.find((candidate) => candidate.playerId === id);
+          return seat?.isYou ? "you" : (seat?.name ?? id);
+        }),
+      ),
+    )}`,
+  }));
+}
+
+/** The line under an all-in seat's tag: how far its chips reached (§25). */
+export function cappedCopy(isYou: boolean, canWin: number, pots: number): string {
+  const reach = canWin === 1 ? "the main pot" : `${canWin} of ${pots} pots`;
+  return `${isYou ? "You can" : "Can"} only win ${reach}`;
+}
 
 /**
  * The headline's three pieces: `Ellis takes` + `the pot`, and the line under the pot.
@@ -23,14 +80,20 @@ type CopyInput = Pick<ResultsSnapshot, "seats" | "revealed"> & { table?: Results
  * common, whether the pot was won on a word, split between two equal words, or walked into
  * because everybody else folded.
  */
-export function resultsHeadline({ seats, revealed }: CopyInput): ResultsHeadline {
+export function resultsHeadline({ seats, revealed, pots = [] }: CopyInput): ResultsHeadline {
   const winners = winnersOf(seats);
+
+  if (pots.length > 1) {
+    // The plates say who took what, so the headline only counts them.
+    const total = pots.reduce((sum, pot) => sum + pot.amount, 0);
+    return { lead: `${pots.length} pots ·`, emphasis: formatAmount(total), subline: "" };
+  }
 
   if (!revealed) {
     // §26's fold-out: nothing was revealed and no word was asked for, so the subline says
     // why the winner took the pot instead of naming a word nobody played.
     return {
-      lead: `${winners[0]?.name ?? ""} takes`,
+      lead: takes(winners[0]),
       emphasis: "the pot",
       subline: `${upper(winners[0]?.name ?? "")} · WON, EVERYONE ELSE FOLDED`,
     };
@@ -51,7 +114,7 @@ export function resultsHeadline({ seats, revealed }: CopyInput): ResultsHeadline
   if (winner === undefined) return { lead: "", emphasis: "the pot", subline: "" };
 
   return {
-    lead: `${winner.name} takes`,
+    lead: takes(winner),
     emphasis: "the pot",
     subline:
       winner.word === null
@@ -76,6 +139,11 @@ export function resultsSummary({ table, seats }: CopyInput): string {
 /** The seats the hand's pots paid — §21's first place, or the one seat a fold-out left (§26). */
 function winnersOf(seats: readonly ResultsSeat[]): readonly ResultsSeat[] {
   return seats.filter((seat) => seat.takesPot);
+}
+
+/** `Ellis takes`, or `You take`: the online roster names the hero `You`, and that has to agree. */
+function takes(seat: ResultsSeat | undefined): string {
+  return seat?.isYou ? "You take" : `${seat?.name ?? ""} takes`;
 }
 
 /** `Ellis`, `Ellis and Mira`, `Ellis, Mira and Jay` — a list read out loud names its last item. */

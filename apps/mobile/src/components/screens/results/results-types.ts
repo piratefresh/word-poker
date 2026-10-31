@@ -52,6 +52,29 @@ export interface ResultsSeat {
   readonly reason: WordRejectionReason | null;
   /** What §21's ladder decided this seat's place by, or `null` for the fold-out's one card. */
   readonly decidedBy: ShowdownDecider | null;
+  /** Where the seat sits: 0 is you at the bottom, then clockwise from your left. */
+  readonly seatIndex: number;
+  /** What the hand did to the seat's Table Stack (§25): profit after what it put in. */
+  readonly net: number;
+  /** What the seat put at risk: its commitment, less any chips nobody called. */
+  readonly committed: number;
+  readonly allIn: boolean;
+  /** The seat's read tag, or `null` for a fold-out's winner, who showed nothing. */
+  readonly tag: ResultsSeatTag | null;
+  /** `Can only win the main pot`, for an all-in seat capped out of a later pot (§25). */
+  readonly capped: string | null;
+}
+
+/** What a seat's card calls its hand. BLUFF joins these with the bet trail (STO-960). */
+export type ResultsSeatTag = "best-word" | "called" | "all-in" | "folded";
+
+/** One pot's plate in the middle of the table. */
+export interface ResultsPotPlate {
+  /** `POT` alone, or `MAIN POT` / `SIDE POT` when the hand built more than one (§25). */
+  readonly label: string;
+  readonly amount: number;
+  /** `TO BREE` / `TO YOU`; `null` on the lone plate, which the headline already names. */
+  readonly to: string | null;
 }
 
 /** The headline's pieces: the two spans of the sentence, and the line under the pot. */
@@ -86,6 +109,8 @@ export interface ResultsSnapshot {
   readonly seed: number | null;
   /** Every chip the hand's pots hold: what the pot counts 0 up to, and settles on exactly. */
   readonly pot: number;
+  /** The contested pots, main pot first: one plate unless a seat was capped by an all-in. */
+  readonly pots: readonly ResultsPotPlate[];
   /**
    * Whether the hand reached §20's reveal. A fold-out (§26) has no reveal at all: it is one
    * winner followed by the folded seats, and the copy says so.

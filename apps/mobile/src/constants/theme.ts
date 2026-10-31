@@ -204,6 +204,24 @@ export const nightLobby = {
   practiceChip: { gradient: ["#ffffff", "#8e9bb2"] },
 } as const;
 
+/** STO-960's results table: the felt in its wooden room, and the seat plates on it. */
+export const resultsTable = {
+  room: "#2a1a12",
+  felt: ["#2b8660", "#135238"] as const,
+  stitch: "rgba(232,220,192,0.45)",
+  plate: "#0e231a",
+  plateEdge: "#2d3f36",
+  meta: "#b9c6e4",
+  gain: "#8fe3b0",
+  loss: "#ffa89c",
+  tag: {
+    "best-word": { background: "#ffd877", ink: ledger.ink },
+    called: { background: "#fbefd6", ink: ledger.ink },
+    "all-in": { background: "#e6893e", ink: ledger.ink },
+    folded: { background: "#3a4a42", ink: "#c9d2c6" },
+  },
+} as const;
+
 /* ── gradients (expo-linear-gradient: {...gradients.felt}) ───────── */
 
 export const gradients = {

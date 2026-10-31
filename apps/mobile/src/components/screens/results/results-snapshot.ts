@@ -16,13 +16,20 @@
  * room has already run `playedWord` on the server; the offline adapter runs it here.
  */
 
-import type { PlayerId, ShowdownDecider, Tile, WordRejectionReason } from "@wordpoker/contracts";
+import type {
+  PlayerId,
+  PotResult,
+  ShowdownDecider,
+  StackDelta,
+  Tile,
+  WordRejectionReason,
+} from "@wordpoker/contracts";
 import { handSeed, playedWord, type OfflineState, type PlayedWord } from "@wordpoker/game-rules";
 
 import type { GamePlayer } from "@/components/screens/game/game-types";
 import { colors } from "@/constants/theme";
 
-import { resultsHeadline, resultsSummary } from "./results-copy";
+import { cappedCopy, potPlates, resultsHeadline, resultsSummary } from "./results-copy";
 import type { ResultsSeat, ResultsSnapshot } from "./results-types";
 
 /** One seat's place on §21's ladder, with the word it revealed and what that was worth. */
@@ -46,11 +53,24 @@ export interface SettledHand {
   /** The hand's replay seed, or `null` where the table keeps it secret (online). */
   readonly seed: number | null;
   readonly pot: number;
+  /** §25's layers, main pot first. */
+  readonly pots: readonly Pick<PotResult, "amount" | "eligible" | "winners">[];
+  /** §25's Table Stacks, before and after: what every seat's net is read from. */
+  readonly stackDeltas: readonly StackDelta[];
+  /** The seats dealt into the hand, in table order: how the results lay them out. */
+  readonly seats: readonly SettledSeat[];
   readonly winner: PlayerId;
   readonly table: { readonly players: number; readonly folded: number };
   readonly foldedPlayerIds: readonly PlayerId[];
   /** The ladder, best first; empty for a fold-out (§26), which has no reveal. */
   readonly standings: readonly SettledStanding[];
+}
+
+/** One seat dealt into a hand, and what it committed to it. */
+export interface SettledSeat {
+  readonly playerId: PlayerId;
+  readonly committed: number;
+  readonly allIn: boolean;
 }
 
 /** What the offline mapper reads: the settled engine state, and the seats as the felt draws them. */
@@ -81,6 +101,11 @@ export function buildResultsSnapshot({
       seed: handSeed(state),
       // The pot is the pots' own arithmetic (§25): the layers the hand built, added up.
       pot: result.payout.pots.reduce((total, pot) => total + pot.amount, 0),
+      pots: result.payout.pots,
+      stackDeltas: result.payout.stackDeltas,
+      seats: state.seats
+        .filter((seat) => !seat.sittingOut)
+        .map((seat) => ({ playerId: seat.id, committed: seat.committedHand, allIn: seat.allIn })),
       winner: result.winner,
       foldedPlayerIds: state.seats.filter((seat) => seat.folded).map((seat) => seat.id),
       table: {
@@ -108,15 +133,20 @@ export function buildSettledSnapshot(
   players: readonly (GamePlayer | null)[],
 ): ResultsSnapshot {
   const revealed = settled.standings.length > 0;
+  // A layer only one seat could win is chips nobody called coming back, not a pot (§25).
+  const contested = settled.pots.filter((pot) => pot.eligible.length > 1);
+  const chips = seatChips(settled, contested, players);
   const seats = revealed
-    ? settled.standings.map((standing) => seatResult(standing, players))
-    : [foldOutResult(settled.winner, players)];
+    ? settled.standings.map((standing) => seatResult(standing, contested, chips, players))
+    : [foldOutResult(settled.winner, chips, players)];
   for (const playerId of settled.foldedPlayerIds) {
     seats.push({
-      ...foldOutResult(playerId, players),
+      ...foldOutResult(playerId, chips, players),
       folded: true,
       place: 0,
       takesPot: false,
+      tag: "folded",
+      capped: null,
     });
   }
 
@@ -124,6 +154,10 @@ export function buildSettledSnapshot(
     hand: settled.hand,
     seed: settled.seed,
     pot: settled.pot,
+    pots:
+      contested.length > 1
+        ? potPlates(contested, seats)
+        : [{ label: "POT", amount: settled.pot, to: null }],
     revealed,
     table: settled.table,
     seats,
@@ -136,18 +170,57 @@ export function buildSettledSnapshot(
   };
 }
 
+type SeatChips = Pick<ResultsSeat, "seatIndex" | "net" | "committed" | "allIn" | "capped">;
+
+/** A lookup of each seat's money and place at the table, off the hand's settlement. */
+function seatChips(
+  settled: SettledHand,
+  contested: SettledHand["pots"],
+  players: readonly (GamePlayer | null)[],
+): (playerId: PlayerId) => SeatChips {
+  const order = settled.seats.map((seat) => seat.playerId);
+  const heroAt = order.findIndex((id) => players.some((p) => p?.id === id && p.isHero === true));
+  // Nobody can lose more than the second-deepest seat matched: the excess went straight back.
+  const matched = settled.seats.map((seat) => seat.committed).sort((a, b) => b - a)[1] ?? 0;
+
+  return (playerId) => {
+    const seat = settled.seats.find((candidate) => candidate.playerId === playerId);
+    const delta = settled.stackDeltas.find((candidate) => candidate.playerId === playerId);
+    const canWin = contested.filter((pot) => pot.eligible.includes(playerId)).length;
+    const allIn = seat?.allIn ?? false;
+    const isYou = order.indexOf(playerId) === heroAt;
+
+    return {
+      seatIndex: (order.indexOf(playerId) - Math.max(heroAt, 0) + order.length) % order.length,
+      net: delta === undefined ? 0 : delta.end - delta.start,
+      committed: Math.min(seat?.committed ?? 0, matched),
+      allIn,
+      capped:
+        allIn && canWin > 0 && canWin < contested.length
+          ? cappedCopy(isYou, canWin, contested.length)
+          : null,
+    };
+  };
+}
+
 /** One revealed seat: §21's place, plus what its word was worth (§7) and the tiles it played. */
 function seatResult(
   standing: SettledStanding,
+  contested: SettledHand["pots"],
+  chips: (playerId: PlayerId) => SeatChips,
   players: readonly (GamePlayer | null)[],
 ): ResultsSeat {
   const word = standing.played;
   const tiles: readonly Tile[] = word?.tiles ?? [];
+  const seatChipsOf = chips(standing.playerId);
+  const bestWord = standing.place === 1 && standing.word !== null;
 
   return {
     playerId: standing.playerId,
     folded: false,
     ...identity(players, standing.playerId, standing.seat),
+    ...seatChipsOf,
+    tag: bestWord ? "best-word" : seatChipsOf.allIn ? "all-in" : "called",
     word: standing.word,
     tiles,
     base: word?.base ?? 0,
@@ -155,8 +228,10 @@ function seatResult(
     rack: word?.rack ?? 0,
     total: word?.total ?? standing.score,
     place: standing.place,
-    // The top place is what the pot paid: a split pot is several seats sharing it (§21.3, §25).
-    takesPot: standing.place === 1,
+    // The top place took a pot, and a split is several seats sharing it (§21.3); a seat lower down
+    // can still take a side pot the top place was capped out of (§25).
+    takesPot:
+      standing.place === 1 || contested.some((pot) => pot.winners.includes(standing.playerId)),
     reason: standing.reason,
     decidedBy: standing.decidedBy,
   };
@@ -166,11 +241,17 @@ function seatResult(
  * §26's fold-out: one seat left un-folded took every pot with no reveal at all, so its card
  * carries no word and no score — the hand ended before either was asked for.
  */
-function foldOutResult(winner: PlayerId, players: readonly (GamePlayer | null)[]): ResultsSeat {
+function foldOutResult(
+  winner: PlayerId,
+  chips: (playerId: PlayerId) => SeatChips,
+  players: readonly (GamePlayer | null)[],
+): ResultsSeat {
   return {
     playerId: winner,
     folded: false,
     ...identity(players, winner, -1),
+    ...chips(winner),
+    tag: null,
     word: null,
     tiles: [],
     base: 0,

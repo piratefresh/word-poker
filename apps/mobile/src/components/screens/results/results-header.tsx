@@ -5,8 +5,7 @@
  * with it (STO-379 decision 4): one 30pt control, sitting inside the safe-area inset so the
  * screen's modal does not draw a title under the status bar. `HAND #N · RESULTS` is centred by an
  * equal spacer on the other side rather than by absolute positioning, so the stamp stays on the
- * screen's centre line however tall the inset is, and the hairline under the bar is the same
- * `colors.border` every other ruled edge in the app is drawn with.
+ * screen's centre line however tall the inset is.
  */
 
 import type { ReactElement } from "react";
@@ -20,6 +19,7 @@ import {
   fonts,
   fontSize,
   layout,
+  ledger,
   opacity,
   radius,
   spacing,
@@ -91,10 +91,9 @@ function BackChevron(): ReactElement {
 const styles = StyleSheet.create({
   bar: {
     alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: border.hairline,
     flexDirection: "row",
-    paddingBottom: spacing.md,
+    justifyContent: "space-between",
+    paddingBottom: spacing.sm,
     paddingHorizontal: spacing.gutter,
     gap: spacing.sm,
   },
@@ -111,9 +110,9 @@ const styles = StyleSheet.create({
   backPressed: { opacity: opacity.pressed },
   spacer: { width: CONTROL },
   stamp: {
-    color: colors.gold,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.micro,
-    letterSpacing: 2,
+    color: ledger.onFelt,
+    fontFamily: fonts.arcade,
+    fontSize: fontSize.small,
+    letterSpacing: 1,
   },
 });

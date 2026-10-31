@@ -222,6 +222,9 @@ interface ResultView {
   standings: readonly ResultStandingView[];
   /** Every chip the paid pots held (§25). */
   pot: number;
+  /** §25's layers, main pot first, and what the hand did to every Table Stack. */
+  pots: readonly { amount: number; eligible: readonly PlayerId[]; winners: readonly PlayerId[] }[];
+  stackDeltas: readonly { playerId: PlayerId; start: number; end: number }[];
 }
 
 /** The broadcast schema, decoded into a plain snapshot so a React render sees a fresh value. */
@@ -624,6 +627,11 @@ export function useOnlineGame({
         // The room's seed derives every hand it deals next, so it never leaves the server.
         seed: null,
         pot: view.result.pot,
+        pots: view.result.pots,
+        stackDeltas: view.result.stackDeltas,
+        seats: engineOrder(view.seats)
+          .filter((seat) => !seat.sittingOut)
+          .map((seat) => ({ playerId: seat.playerId, committed: seat.committedHand, allIn: seat.allIn })),
         winner: view.result.winner,
         foldedPlayerIds: view.seats.filter((seat) => seat.folded).map((seat) => seat.playerId),
         table: {
@@ -894,6 +902,16 @@ function decodeRoom(state: unknown, previous?: RoomView | null): RoomView | null
               (total, pot) => total + numberOf(isRecord(pot) ? pot.amount : 0),
               0,
             ),
+            pots: iterate(result.pots).filter(isRecord).map((pot) => ({
+              amount: numberOf(pot.amount),
+              eligible: iterate(pot.eligible).map(stringOf),
+              winners: iterate(pot.winners).map(stringOf),
+            })),
+            stackDeltas: iterate(result.stackDeltas).filter(isRecord).map((delta) => ({
+              playerId: stringOf(delta.playerId),
+              start: numberOf(delta.start),
+              end: numberOf(delta.end),
+            })),
           }
         : null,
     wild: isRecord(table.powerUps) && table.powerUps.deal === "choose3",

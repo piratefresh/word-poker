@@ -96,23 +96,19 @@ tags: [web, online, cross-platform]
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 60000
-- assertVisible: "SCOREBOARD"
 - assertVisible: "2 PLAYERS · 0 FOLDS · 2 WORDS PLAYED"
 - assertVisible:
-    id: ".*takes the pot, \\$20 pot, .*JET · 15 PTS"
+    id: ".*the pot, \\$20 pot, .*JET · 15 PTS"
 - assertVisible:
     id: "result-card-.*"
-    index: 0
     containsDescendants:
-      - text: "JET"
-      - text: "15"
-      - text: ".*\\(you\\)"
+      - text: "15 PTS · IN .*"
+      - text: "BEST WORD"
 - assertVisible:
     id: "result-card-.*"
-    index: 1
     containsDescendants:
-      - text: "ETA"
-      - text: "8"
+      - text: "8 PTS · IN .*"
+      - text: "CALLED"
 - assertNotVisible: "The window closed"
 - takeScreenshot: cross-platform-web-results
 - tapOn:

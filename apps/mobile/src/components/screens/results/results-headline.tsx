@@ -1,10 +1,9 @@
 /**
- * results-headline.tsx — the sentence the hand ends on, and the pot under it.
+ * results-headline.tsx — the sentence the hand ends on, and the pot plates under it.
  *
  * The three pieces arrive built (§1): the view never joins a sentence of its own, it puts the lead
- * and the emphasis on one line and leaves the emphasis in the one gold italic run the design gives
- * it (STO-379 decision 12). The pot is `ResultsPot`, which counts itself up on its own beat of the
- * same clock.
+ * and the emphasis on one line (STO-379 decision 12). Each plate is a `ResultsPot`, which counts
+ * itself up on its own beat of the same clock.
  *
  * The block is a single accessibility node: a reader hears `Ellis takes the pot, $80 pot, …` once,
  * from the container, and the four texts inside it — the count-up's two layers included — are
@@ -24,6 +23,7 @@ import {
   colors,
   fonts,
   fontSize,
+  palette,
   resultsEntrance,
   spacing,
 } from "@/constants/theme";
@@ -45,7 +45,13 @@ export function ResultsHeadlineView({
   clock,
 }: ResultsHeadlineProps): ReactElement {
   const { emphasis, lead, subline } = snapshot.headline;
-  const label = `${lead} ${emphasis}, ${formatAmount(snapshot.pot)} pot, ${subline}`;
+  const pots = snapshot.pots
+    .map((pot) => `${pot.label} ${formatAmount(pot.amount)} ${pot.to ?? ""}`.trim().toLowerCase())
+    .join(", ");
+  const label =
+    snapshot.pots.length > 1
+      ? `${lead} ${emphasis}, ${pots}`
+      : `${lead} ${emphasis}, ${formatAmount(snapshot.pot)} pot, ${subline}`;
 
   // The eyebrow and the sentence enter as one block: they are one thought, and two rises would
   // read as two lines arriving at different times.
@@ -76,18 +82,27 @@ export function ResultsHeadlineView({
       >
         <Animated.View style={enter}>
           <Text allowFontScaling style={styles.sentence}>
-            {`${lead} `}
-            <Text allowFontScaling style={styles.emphasis}>
-              {emphasis}
-            </Text>
+            {`${lead} ${emphasis}`}
           </Text>
         </Animated.View>
 
-        <ResultsPot amount={snapshot.pot} clock={clock} />
+        <View style={styles.plates}>
+          {snapshot.pots.map((pot) => (
+            <ResultsPot
+              amount={pot.amount}
+              clock={clock}
+              key={pot.label}
+              label={pot.label}
+              to={pot.to}
+            />
+          ))}
+        </View>
 
-        <Text allowFontScaling style={styles.subline}>
-          {subline}
-        </Text>
+        {subline === "" ? null : (
+          <Text allowFontScaling style={styles.subline}>
+            {subline}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -95,35 +110,22 @@ export function ResultsHeadlineView({
 
 const styles = StyleSheet.create({
   block: { alignItems: "center" },
-  content: { alignItems: "center" },
-  // The sentence's one gold run: the same colour as the pot, in the italic serif.
-  emphasis: {
-    color: colors.gold,
-    fontFamily: fonts.serifBoldItalic,
-  },
-  eyebrow: {
-    color: colors.gold,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.micro,
-    letterSpacing: 2.4,
-    textAlign: "center",
-  },
+  content: { alignItems: "center", gap: spacing.xs },
+  plates: { flexDirection: "row", gap: spacing.sm },
   sentence: {
-    color: colors.textBright,
-    fontFamily: fonts.serifBold,
-    fontSize: 28,
-    letterSpacing: -0.6,
-    lineHeight: 32,
-    marginTop: spacing.sm,
+    color: palette.cream100,
+    fontFamily: fonts.arcade,
+    fontSize: fontSize.title,
+    letterSpacing: 0.6,
     textAlign: "center",
+    textTransform: "uppercase",
   },
   // Already uppercase: the copy is the only thing that decides its case.
   subline: {
     color: colors.textDim,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.micro,
-    letterSpacing: 1.4,
-    marginTop: spacing.xxs,
+    fontFamily: fonts.ui,
+    fontSize: fontSize.caption,
+    letterSpacing: 1,
     textAlign: "center",
   },
 });

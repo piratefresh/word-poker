@@ -55,6 +55,12 @@ export function seatFixture(overrides: Partial<ResultsSeat> & { name: string }):
     takesPot: false,
     reason: null,
     decidedBy: "final-score",
+    seatIndex: 0,
+    net: 0,
+    committed: 0,
+    allIn: false,
+    tag: "called",
+    capped: null,
     ...overrides,
   };
 }
@@ -75,15 +81,18 @@ export function snapshotFixture(overrides: Partial<ResultsSnapshot> = {}): Resul
   const seats = overrides.seats ?? defaultSeats();
   const table = overrides.table ?? { players: 4, folded: 1 };
   const revealed = overrides.revealed ?? true;
+  const pot = overrides.pot ?? POT;
+  const pots = overrides.pots ?? [{ label: "POT", amount: pot, to: null }];
 
   return {
     hand: overrides.hand ?? HAND,
     seed: overrides.seed ?? SEED,
-    pot: overrides.pot ?? POT,
+    pot,
+    pots,
     revealed,
     table,
     seats,
-    headline: overrides.headline ?? resultsHeadline({ seats, revealed }),
+    headline: overrides.headline ?? resultsHeadline({ seats, revealed, pots }),
     summary: overrides.summary ?? resultsSummary({ seats, revealed, table }),
   };
 }
@@ -104,6 +113,8 @@ export const foldOutSnapshot: ResultsSnapshot = snapshotFixture({
       name: "Ellis",
       color: colors.players[3],
       takesPot: true,
+      decidedBy: null,
+      tag: null,
     }),
   ],
 });
@@ -251,6 +262,10 @@ function defaultSeats(): ResultsSeat[] {
       rack: 0,
       total: 17,
       takesPot: true,
+      seatIndex: 1,
+      net: 60,
+      committed: 20,
+      tag: "best-word",
     }),
     seatFixture({
       name: "Mira Quill",
@@ -262,6 +277,9 @@ function defaultSeats(): ResultsSeat[] {
       rack: 0,
       total: 10,
       place: 2,
+      seatIndex: 2,
+      net: -20,
+      committed: 20,
     }),
     seatFixture({
       name: "Guest",
@@ -274,12 +292,17 @@ function defaultSeats(): ResultsSeat[] {
       rack: 0,
       total: 8,
       place: 3,
+      net: -20,
+      committed: 20,
     }),
     seatFixture({
       name: "Jax Rook",
       color: colors.players[5],
       place: 4,
       reason: "timer-expired",
+      seatIndex: 3,
+      net: -20,
+      committed: 20,
     }),
   ];
 }
