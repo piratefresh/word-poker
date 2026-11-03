@@ -15,7 +15,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
  * only delivers to the account owner's own address.) Override with
  * `RESEND_FROM_EMAIL`.
  */
-const DEFAULT_FROM = "Word Poker <hello@email.wordpoker.app>";
+const DEFAULT_FROM = "Word Poker <hello@wordpoker.app>";
 
 /** Matches `emailAndPassword.resetPasswordTokenExpiresIn`. */
 const RESET_LINK_LIFETIME = "30 minutes";
