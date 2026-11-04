@@ -212,7 +212,9 @@ Every hand opens with two forced bets, posted before any tile is dealt:
 The offline table, which has no tiers, plays 10 / 20 whatever its starting stack. Every seat
 starts on the stack the player picks in the offline tray — 500, 1,000, 2,500 or 5,000 practice
 chips, 1,000 by default — and New game deals the same stack again (ADR 0002's session; the
-blinds are ADR 0004's).
+blinds are ADR 0004's). By default every hand deals every seat that stack again, so no seat ever
+busts; the tray's KEEP CHIPS carries each seat's stack from hand to hand instead, and a seat that
+runs out sits the rest of the session out.
 
 - The small blind is posted by the first seat clockwise from the dealer button, the big blind
   by the next.

@@ -219,6 +219,7 @@ export const resultsTable = {
     called: { background: "#fbefd6", ink: ledger.ink },
     "all-in": { background: "#e6893e", ink: ledger.ink },
     folded: { background: "#3a4a42", ink: "#c9d2c6" },
+    busted: { background: "#3a4a42", ink: "#c9d2c6" },
   },
 } as const;
 

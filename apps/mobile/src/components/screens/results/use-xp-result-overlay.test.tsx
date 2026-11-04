@@ -65,3 +65,25 @@ test("signed out: the overlay opens with no report", async () => {
   expect(result.current.hero).not.toBeNull();
   expect(result.current.report).toBeNull();
 });
+
+test("holds the results from the very first render of a lost showdown, before its report lands", () => {
+  // The report is filled in by an effect, so the first render has no hero yet. The table must
+  // still hold its results that render: a results Modal swapped for the overlay's one render
+  // later leaves iOS presenting neither.
+  const renders: { hero: boolean; holding: boolean }[] = [];
+  function Probe() {
+    const xp = useXpResultOverlay(loss(1), 0, extra);
+    renders.push({ hero: xp.hero !== null, holding: xp.holding });
+    return null;
+  }
+  return renderHook(Probe).then(() => {
+    expect(renders[0]).toEqual({ hero: false, holding: true });
+    expect(renders.at(-1)).toEqual({ hero: true, holding: true });
+  });
+});
+
+test("does not hold the results for a hand the overlay is not for", async () => {
+  const won = snapshotFixture({ seats: [seatFixture({ name: "You", isYou: true, takesPot: true })] });
+  const { result } = await renderHook(() => useXpResultOverlay(won, 0, extra));
+  expect(result.current.holding).toBe(false);
+});

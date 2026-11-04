@@ -11,13 +11,16 @@ import type { JSX, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
   AccessibilityInfo,
+  Modal,
   Platform,
   Pressable,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
-
+import { KeyboardStickyView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useScreenScale } from "@/components/screens/game/screen-scale";
 import { DraftPlate } from "./draft-line";
@@ -137,8 +140,10 @@ export interface WordBuilderScope {
   readonly shuffle: () => void;
   readonly pickTile?: (tile: TileData) => void;
   readonly swapFlip: SwapFlip | null;
-  /** The blank tapped for its letter picker while not yet in the word. */
+  /** The blank whose letter is being typed on the keyboard, in the word or not yet. */
   readonly pickingBlank: string | null;
+  /** Puts the keyboard away; `unplay` also takes the blank back out of the word. */
+  readonly closeBlank: (unplay: boolean) => void;
 }
 
 const Scope = createContext<WordBuilderScope | null>(null);
@@ -219,8 +224,9 @@ export function WordBuilder({
       const inWord = playedIds.has(entry.tile.id);
       // A choice tile has no face of its own to play: it enters the word only by a letter named.
       if (!inWord && face === undefined && "alternativeLetter" in entry.tile) return;
-      // Neither has a blank: a tap opens its A–Z picker, and the letter picked plays it (§44).
-      if (!inWord && face === undefined && "blank" in entry.tile) {
+      // Neither has a blank: a tap opens the keyboard, and the letter typed plays it (§44). In
+      // the word, the tap opens it again so the letter can change; ⌫ there takes the blank out.
+      if (face === undefined && "blank" in entry.tile) {
         const id = entry.tile.id;
         setPickingBlank((open) => (open === id ? null : id));
         return;
@@ -281,6 +287,16 @@ export function WordBuilder({
     [arrange, strip, playedIds],
   );
 
+  const closeBlank = useCallback(
+    (unplay: boolean) => {
+      if (unplay && pickingBlank !== null && playedIds.has(pickingBlank)) {
+        onDraft(plays.filter((candidate) => candidate.tileId !== pickingBlank));
+      }
+      setPickingBlank(null);
+    },
+    [onDraft, pickingBlank, playedIds, plays],
+  );
+
   const scope: WordBuilderScope = {
     strip,
     held,
@@ -296,6 +312,7 @@ export function WordBuilder({
     pickTile: onPickTile,
     swapFlip,
     pickingBlank,
+    closeBlank,
   };
 
   return <Scope.Provider value={scope}>{children}</Scope.Provider>;
@@ -411,39 +428,132 @@ export function WordHand({
 }
 
 /**
- * A blank (§44) names the letter it plays: tapping it opens an A–Z row above the tray, and the
- * letter picked plays it. The row stays while the word holds the blank, so the letter can change
- * until the word is confirmed. The pick lives in the draft's `chosenFace`, the same place a choice
- * tile's face does.
+ * A blank (§44) names the letter it plays on the device's own keyboard (STO-1031): a tap on the
+ * blank raises it, dark and with autocorrect off, and a bar pinned on top of it shows the word as
+ * it will read with the blank in it and what that scores. The first A–Z typed names the blank,
+ * plays it and puts the keyboard away. Return or ✕ close it as it stands — a blank not yet named
+ * stays in the rack — and ⌫ takes a named blank back out of the word. The board does not move:
+ * the keyboard covers the bottom of the screen for the moment it is up. The pick lives in the
+ * draft's `chosenFace`, the same place a choice tile's face does.
  */
 function BlankPicker(): JSX.Element | null {
-  const { strip, held, live, toggle, pickingBlank } = useWordBuilderScope();
-  const entry = strip.find(
-    ({ tile }) => "blank" in tile && (held.has(tile.id) || tile.id === pickingBlank),
-  );
+  const { strip, live, pickingBlank } = useWordBuilderScope();
+  const entry = strip.find(({ tile }) => tile.id === pickingBlank && "blank" in tile);
   if (entry === undefined || !live) return null;
-
-  const chosen = held.get(entry.tile.id);
-  return (
-    <View style={styles.blankPicker} testID="word-builder-blank-picker">
-      {LETTERS.map((letter) => (
-        <Pressable
-          accessibilityLabel={`Play the blank as ${letter}`}
-          accessibilityRole="button"
-          accessibilityState={{ selected: chosen === letter }}
-          key={letter}
-          onPress={() => toggle(entry, letter)}
-          style={[styles.chip, chosen === letter && styles.chipChosen]}
-          testID={`word-builder-blank-${letter}`}
-        >
-          <Text style={styles.chipFace}>{letter}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
+  return <BlankKeyboard entry={entry} />;
 }
 
-const LETTERS = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index));
+function BlankKeyboard({ entry }: { entry: StripEntry }): JSX.Element {
+  const { strip, held, toggle, closeBlank, draft } = useWordBuilderScope();
+  const insets = useSafeAreaInsets();
+  const chosen = held.get(entry.tile.id);
+  // The word in strip order, with the blank in its place: its letter, or "?" until it has one.
+  const letters = strip.flatMap(({ tile }) => {
+    if (tile.id === entry.tile.id) return [{ id: tile.id, letter: chosen ?? "?", blank: true }];
+    if (!held.has(tile.id)) return [];
+    return [{ id: tile.id, letter: held.get(tile.id) ?? tile.letter, blank: false }];
+  });
+  const score = chosen === undefined || draft.reason !== null ? null : (draft.score?.total ?? null);
+
+  const type = (text: string) => {
+    const letter = text.match(/[a-z]/i)?.[0]?.toUpperCase();
+    if (letter !== undefined) toggle(entry, letter);
+  };
+
+  return (
+    <Modal
+      animationType="none"
+      navigationBarTranslucent
+      onRequestClose={() => closeBlank(false)}
+      statusBarTranslucent
+      transparent
+      visible
+    >
+      <Pressable
+        accessibilityLabel="Close the letter picker"
+        onPress={() => closeBlank(false)}
+        style={styles.blankScrim}
+      />
+      <KeyboardStickyView
+        offset={{ closed: 0, opened: insets.bottom }}
+        style={styles.blankSticky}
+      >
+        <View
+          style={[
+            styles.blankBar,
+            {
+              // The home indicator's room while no keyboard is up; the offset tucks it under one.
+              paddingBottom: insets.bottom + 6,
+              paddingLeft: Math.max(insets.left, 12),
+              paddingRight: Math.max(insets.right, 12),
+            },
+          ]}
+          testID="word-builder-blank-picker"
+        >
+          <Pressable
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+            onPress={() => closeBlank(false)}
+            style={styles.blankClose}
+            testID="word-builder-blank-close"
+          >
+            <Text style={styles.blankCloseText}>✕</Text>
+          </Pressable>
+          <View style={styles.blankMiddle}>
+            <Text style={styles.blankCaption}>TYPE A LETTER</Text>
+            <View
+              accessible
+              accessibilityLabel={`${letters.map(({ letter }) => letter).join("")}${score === null ? "" : `, ${score} points`}`}
+              style={styles.blankWord}
+            >
+              <View style={styles.blankTiles}>
+                {letters.map(({ id, letter, blank }) => (
+                  <View
+                    key={id}
+                    style={[
+                      styles.blankTile,
+                      blank && (chosen === undefined ? styles.blankTileOpen : styles.blankTileNamed),
+                    ]}
+                  >
+                    <Text
+                      style={[styles.blankTileText, blank && styles.blankTileTextOpen]}
+                    >
+                      {letter}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              {score === null ? null : <Text style={styles.blankScore}>= {score}</Text>}
+            </View>
+          </View>
+          <View style={styles.blankSpacer} />
+        </View>
+        {/* Out of sight: it only raises the keyboard and reads what is typed on it. */}
+        <TextInput
+          accessibilityLabel="Type the blank's letter"
+          autoCapitalize="characters"
+          autoComplete="off"
+          autoCorrect={false}
+          autoFocus
+          caretHidden
+          keyboardAppearance="dark"
+          onChangeText={type}
+          onKeyPress={({ nativeEvent }) => {
+            if (nativeEvent.key === "Backspace") closeBlank(true);
+            else if (nativeEvent.key === "Escape") closeBlank(false);
+          }}
+          onSubmitEditing={() => closeBlank(false)}
+          returnKeyType="done"
+          spellCheck={false}
+          style={styles.blankInput}
+          submitBehavior="blurAndSubmit"
+          testID="word-builder-blank-input"
+          value=""
+        />
+      </KeyboardStickyView>
+    </Modal>
+  );
+}
 
 /** The tiles a seat can play: its private tiles and the whole board (§7). */
 const WORD_PLACES = PRIVATE_TILES_PER_PLAYER + COMMUNITY_TILE_COUNT;

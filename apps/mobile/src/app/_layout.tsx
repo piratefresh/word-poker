@@ -26,6 +26,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, restoreWithGameCenter } from "@/auth/client/game-center";
@@ -150,6 +151,7 @@ export function RootLayout() {
   return (
     <DeepLinks session={!!session} account={account}>
       <GestureHandlerRootView style={styles.root}>
+        <KeyboardProvider>
         <ThemeProvider value={DarkTheme}>
           <QuestsProvider>
             <HistoryProvider>
@@ -186,6 +188,7 @@ export function RootLayout() {
             </HistoryProvider>
           </QuestsProvider>
         </ThemeProvider>
+        </KeyboardProvider>
       </GestureHandlerRootView>
     </DeepLinks>
   );

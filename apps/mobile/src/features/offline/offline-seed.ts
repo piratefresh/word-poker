@@ -64,6 +64,14 @@ export function pinnedPowerUps(param: string | string[] | undefined): PowerUpDea
 }
 
 /**
+ * Whether the tray asked for stacks to carry between hands (`/offline?carry=1`); absent, every
+ * hand deals the starting chips again. A repeated param takes the first, as `pinnedSeed` does.
+ */
+export function pinnedCarry(param: string | string[] | undefined): boolean {
+  return (Array.isArray(param) ? param[0] : param)?.trim() === "1";
+}
+
+/**
  * The starting chips a URL asks for (`/offline?chips=2500`), or `undefined` for the table's own
  * 1,000. The tray's STARTING CHIPS picker sets it; anything that is not a positive whole number
  * is not a pick. A repeated param takes the first, as `pinnedSeed` does.

@@ -70,3 +70,8 @@ jest.mock("react-native-purchases", () => {
 
 // The XP overlay's bar is a Rive view, native-only and decoration: tests read the numbers around it.
 jest.mock("@/components/screens/results/xp-bar", () => ({ XpBar: () => null }));
+
+// The keyboard controller is a native module; its shipped mock stands in for it under Node.
+jest.mock("react-native-keyboard-controller", () =>
+  require("react-native-keyboard-controller/jest"),
+);

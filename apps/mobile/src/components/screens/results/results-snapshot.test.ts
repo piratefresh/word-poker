@@ -293,6 +293,7 @@ describe("buildResultsSnapshot", () => {
         winner: "alex",
         table: { players: 3, folded: 0 },
         foldedPlayerIds: [],
+        bustedPlayerIds: [],
         standings: [
           standing("alex", 0, 1, 24, "DOZEN"),
           standing("bree", 1, 2, 15, "TONED"),
@@ -355,6 +356,7 @@ describe("buildResultsSnapshot", () => {
         winner: "b",
         table: { players: 2, folded: 0 },
         foldedPlayerIds: [],
+        bustedPlayerIds: [],
         standings: [standing("b", 1, 1, 9, "CAT"), standing("a", 0, 2, 5, "DOG")],
       },
       [],
@@ -364,6 +366,39 @@ describe("buildResultsSnapshot", () => {
     expect(snapshot.headline.lead).toBe("b takes");
     expect(snapshot.seats.find((seat) => seat.playerId === "a")?.committed).toBe(30);
     expect(snapshot.seats.find((seat) => seat.playerId === "b")?.capped).toBeNull();
+  });
+
+  test("keeps a busted seat's card, in its place at the table", () => {
+    const snapshot = buildSettledSnapshot(
+      {
+        hand: 3,
+        seed: null,
+        pot: 60,
+        pots: [{ amount: 60, eligible: ["a", "c"], winners: ["a"] }],
+        stackDeltas: [
+          { playerId: "a", start: 100, end: 130 },
+          { playerId: "c", start: 100, end: 70 },
+        ],
+        seats: [
+          { playerId: "a", committed: 30, allIn: false },
+          { playerId: "b", committed: 0, allIn: false },
+          { playerId: "c", committed: 30, allIn: false },
+        ],
+        winner: "a",
+        table: { players: 3, folded: 0 },
+        foldedPlayerIds: [],
+        bustedPlayerIds: ["b"],
+        standings: [standing("a", 0, 1, 9, "CAT"), standing("c", 2, 2, 5, "DOG")],
+      },
+      [],
+    );
+
+    expect(snapshot.seats.map((seat) => [seat.playerId, seat.seatIndex])).toEqual([
+      ["a", 0],
+      ["c", 2],
+      ["b", 1],
+    ]);
+    expect(snapshot.seats[2]).toMatchObject({ folded: true, tag: "busted", takesPot: false, net: 0 });
   });
 
   test("has no snapshot while no hand has paid out", () => {

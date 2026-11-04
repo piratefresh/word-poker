@@ -23,7 +23,7 @@ export interface ResultsSeat {
   readonly color: string;
   /** Whether this seat is the local player's — the italic `(you)` the card prints. */
   readonly isYou: boolean;
-  /** Folded seats appear after the showdown standings, without a word or score. */
+  /** Folded and busted seats appear after the showdown standings, without a word or score. */
   readonly folded: boolean;
   /**
    * The word the seat's tiles spelled, uppercase, or `null` when it confirmed none (§11).
@@ -66,7 +66,7 @@ export interface ResultsSeat {
 }
 
 /** What a seat's card calls its hand. BLUFF joins these with the bet trail (STO-960). */
-export type ResultsSeatTag = "best-word" | "called" | "all-in" | "folded";
+export type ResultsSeatTag = "best-word" | "called" | "all-in" | "folded" | "busted";
 
 /** One pot's plate in the middle of the table. */
 export interface ResultsPotPlate {

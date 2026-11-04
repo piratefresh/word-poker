@@ -802,7 +802,7 @@ function DragTile({
 
 /**
  * One tile in the strip: the tile itself, and — under a choice tile — the two faces that name
- * which letter §10 plays it for. A tap plays the tile or takes it back; the drag lives on the
+ * which letter §10 plays it for; under a blank, a "Change" caption. A tap plays the tile or takes it back; the drag lives on the
  * `SortableItem` around this, so the press is only ever a play.
  */
 function TileContent({
@@ -826,8 +826,9 @@ function TileContent({
   const tileWidth = scaleTileMetrics(size, scale).width;
   // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
   // held choice tile says the face the word is playing and not only the pair it prints.
+  const blank = "blank" in tile;
   const playing =
-    choice !== null && held && chosenFace !== undefined
+    (choice !== null || blank) && held && chosenFace !== undefined
       ? `, playing ${chosenFace}`
       : "";
   const powered = isSwappedTileId(tile.id);
@@ -837,6 +838,8 @@ function TileContent({
     const mark = face === tile && powered ? ", from your power" : "";
     const spoken = `${getTileAccessibilityLabel(face)}${mark}${playing}`;
     if (pick === "target") return `${spoken}, tap to swap it`;
+    // A blank's tap raises the keyboard for its letter rather than playing or taking it back.
+    if (blank) return `${spoken}, tap to ${held ? "change" : "type"} its letter`;
     return held
       ? `${spoken}, in your word, tap to take it back`
       : `${spoken}, tap to play it`;
@@ -914,6 +917,15 @@ function TileContent({
           )}
         </>
       )}
+      {/* A blank says its letter can change: a tap raises the keyboard for it. */}
+      {blank && !picking ? (
+        <Text
+          numberOfLines={1}
+          style={[styles.faceCaption, { width: tileWidth }]}
+        >
+          Change
+        </Text>
+      ) : null}
     </View>
   );
 }

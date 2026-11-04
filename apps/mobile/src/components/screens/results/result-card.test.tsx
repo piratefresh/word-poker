@@ -169,6 +169,21 @@ describe("<ResultCard />", () => {
     expect(within(view.getByTestId(prefix, hidden)).queryByText("A", hidden)).toBeNull();
   });
 
+  test("draws a blank as the letter the seat named it, not its ? (§44)", async () => {
+    const played = snapshotFixture().seats[0];
+    const seat: ResultsSeat = {
+      ...played,
+      word: "Q" + (played.word ?? "").slice(1),
+      tiles: [{ id: "power-0", letter: "?", points: 0, blank: true }, ...played.tiles.slice(1)],
+    };
+    const view = await render(<ResultCard seat={seat} />);
+    const hidden = { includeHiddenElements: true };
+    const tile = within(view.getByTestId(`result-card-${seat.playerId}-tile-0`, hidden));
+
+    expect(tile.getByText("Q", hidden)).toBeOnTheScreen();
+    expect(tile.queryByText("?", hidden)).toBeNull();
+  });
+
   test("draws §12's longest word, seven letters out of seven tiles", async () => {
     const seat = longWordSnapshot.seats[0];
     const view = await render(<ResultCard seat={seat} />);

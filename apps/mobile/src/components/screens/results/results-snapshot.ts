@@ -57,16 +57,18 @@ export interface SettledHand {
   readonly pots: readonly Pick<PotResult, "amount" | "eligible" | "winners">[];
   /** §25's Table Stacks, before and after: what every seat's net is read from. */
   readonly stackDeltas: readonly StackDelta[];
-  /** The seats dealt into the hand, in table order: how the results lay them out. */
+  /** Every seat at the table, in table order — busted ones too: how the results lay them out. */
   readonly seats: readonly SettledSeat[];
   readonly winner: PlayerId;
   readonly table: { readonly players: number; readonly folded: number };
   readonly foldedPlayerIds: readonly PlayerId[];
+  /** Seats with no chips left, sitting the session out (ADR 0002): at the table, not in the hand. */
+  readonly bustedPlayerIds: readonly PlayerId[];
   /** The ladder, best first; empty for a fold-out (§26), which has no reveal. */
   readonly standings: readonly SettledStanding[];
 }
 
-/** One seat dealt into a hand, and what it committed to it. */
+/** One seat at the table, and what it committed to the hand. */
 export interface SettledSeat {
   readonly playerId: PlayerId;
   readonly committed: number;
@@ -103,11 +105,14 @@ export function buildResultsSnapshot({
       pot: result.payout.pots.reduce((total, pot) => total + pot.amount, 0),
       pots: result.payout.pots,
       stackDeltas: result.payout.stackDeltas,
-      seats: state.seats
-        .filter((seat) => !seat.sittingOut)
-        .map((seat) => ({ playerId: seat.id, committed: seat.committedHand, allIn: seat.allIn })),
+      seats: state.seats.map((seat) => ({
+        playerId: seat.id,
+        committed: seat.committedHand,
+        allIn: seat.allIn,
+      })),
       winner: result.winner,
       foldedPlayerIds: state.seats.filter((seat) => seat.folded).map((seat) => seat.id),
+      bustedPlayerIds: state.seats.filter((seat) => seat.sittingOut).map((seat) => seat.id),
       table: {
         players: state.seats.length,
         folded: state.seats.filter((seat) => seat.folded).length,
@@ -146,6 +151,17 @@ export function buildSettledSnapshot(
       place: 0,
       takesPot: false,
       tag: "folded",
+      capped: null,
+    });
+  }
+  // A busted seat still sits at the felt under its BUSTED pill, so it keeps its card here too.
+  for (const playerId of settled.bustedPlayerIds) {
+    seats.push({
+      ...foldOutResult(playerId, chips, players),
+      folded: true,
+      place: 0,
+      takesPot: false,
+      tag: "busted",
       capped: null,
     });
   }

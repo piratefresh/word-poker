@@ -249,7 +249,7 @@ export function OnlineFelt({
       </WordBuilder>
     );
 
-  const showingResults = waiting === null && results !== null && !celebratingWin && xp.hero === null;
+  const showingResults = waiting === null && results !== null && !celebratingWin && !xp.holding;
 
   return (
     <View style={styles.root}>

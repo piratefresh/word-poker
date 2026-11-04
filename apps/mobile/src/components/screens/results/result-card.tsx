@@ -112,7 +112,10 @@ export function ResultCard({
 
   // A fold-out has no ladder (§26): its winner has no `decidedBy`, and so no place to print.
   const placed = !seat.folded && seat.decidedBy !== null ? placeCopy(seat.place) : null;
-  const cap = seat.folded
+  const busted = seat.tag === "busted";
+  const cap = busted
+    ? "OUT"
+    : seat.folded
     ? "FOLD"
     : [placed, seat.allIn ? "ALL-IN" : null].filter((part) => part !== null).join(" · ");
 
@@ -125,7 +128,7 @@ export function ResultCard({
   const label = [
     seat.isYou ? `${seat.name} (you)` : seat.name,
     ...(seat.folded
-      ? ["folded"]
+      ? [busted ? "busted" : "folded"]
       : [
           seat.word ?? "no word",
           `${seat.total} points`,
@@ -296,6 +299,8 @@ function ResultTile({
     <Animated.View style={[builderStyles.entry, enter]}>
       <Tile
         animation="none"
+        // A blank (§44) prints the letter the word named it, as it does in the rack.
+        chosenFace={"blank" in tile ? face : undefined}
         // §44: a tile a power handed the seat shows the table its ⚡, and nothing it replaced.
         powered={isSwappedTileId(tile.id)}
         scale={TILE_SCALE_ON_PLATE}

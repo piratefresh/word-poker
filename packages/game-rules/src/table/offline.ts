@@ -202,6 +202,8 @@ export interface OfflineState {
   sessionOver: boolean;
   /** The table's betting settings for the whole session. */
   stakes: Stakes;
+  /** The stack every seat is dealt each next hand at, when the table restacks; else absent. */
+  restack?: number;
   /**
    * §19's opt-in for the draft a seat never confirmed: when set, the window closes by
    * confirming that draft for the seat. The rules' preferred default is the player must
@@ -260,6 +262,11 @@ export interface StartHandOptions {
    * table's starting stack, which is what hand 1 does; later hands carry every seat's.
    */
   stacks?: readonly { playerId: PlayerId; stack: number }[];
+  /**
+   * Deal every later hand at the starting stack again instead of carrying each seat's Table
+   * Stack: the offline table's practice chips, which never run out. Absent carries the stacks.
+   */
+  restack?: boolean;
   /** The seat holding the dealer button. Absent means seat 0, the first hand's button. */
   dealerSeat?: number;
   turnDurationMs?: number;
@@ -308,6 +315,7 @@ export function startHand({
   wordBuilding,
   stakes,
   stacks,
+  restack,
   dealerSeat,
   turnDurationMs: requestedTurnDurationMs,
   powerUps,
@@ -379,6 +387,7 @@ export function startHand({
     betting,
     sessionOver: false,
     stakes: tableStakes,
+    ...(restack === true ? { restack: startingStack } : {}),
     autoSubmitDrafts: wordBuilding?.autoSubmitDrafts ?? false,
     wordWindow: null,
     wordChecks: freshWordChecks(seats),
@@ -1149,7 +1158,8 @@ function nextPhase(phase: RoundPhase): RoundPhase {
  * same table settings, dictionary included, because a table does not change its rules between
  * hands.
  *
- * Every seat carries its Table Stack into the new hand and the dealer button steps one seat
+ * Every seat carries its Table Stack into the new hand — or, at a table that restacks, sits down
+ * at the starting stack again — and the dealer button steps one seat
  * clockwise — `startHand` moves it on again from a seat that is no longer dealt in, so it lands
  * on the next seat that plays, the blinds riding on it (§5). When fewer than two seats can still
  * pay a hand, no hand is dealt: the state is returned with `sessionOver` set, which is the
@@ -1160,7 +1170,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     throw new OfflineActionError("the session is over: no seat can be dealt another hand");
   }
 
-  const stacks = state.seats.map((seat) => ({ playerId: seat.id, stack: seat.stack }));
+  const stacks = state.seats.map((seat) => ({ playerId: seat.id, stack: state.restack ?? seat.stack }));
   if (stacks.filter(({ stack }) => stack > 0).length < 2) {
     return { ...state, sessionOver: true };
   }
@@ -1173,7 +1183,12 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     nowMs,
     dictionary: state.dictionary,
     wordBuilding: { autoSubmitDrafts: state.autoSubmitDrafts },
-    stakes: { smallBlind: state.stakes.smallBlind, bigBlind: state.stakes.bigBlind },
+    stakes: {
+      smallBlind: state.stakes.smallBlind,
+      bigBlind: state.stakes.bigBlind,
+      ...(state.restack === undefined ? {} : { startingStack: state.restack }),
+    },
+    ...(state.restack === undefined ? {} : { restack: true }),
     turnDurationMs: state.turnDurationMs,
     ...(state.powers === undefined ? {} : { powerUps: { deal: "choose3" } }),
   });

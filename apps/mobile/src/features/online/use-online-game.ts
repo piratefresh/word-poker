@@ -629,11 +629,14 @@ export function useOnlineGame({
         pot: view.result.pot,
         pots: view.result.pots,
         stackDeltas: view.result.stackDeltas,
-        seats: engineOrder(view.seats)
-          .filter((seat) => !seat.sittingOut)
-          .map((seat) => ({ playerId: seat.playerId, committed: seat.committedHand, allIn: seat.allIn })),
+        seats: engineOrder(view.seats).map((seat) => ({
+          playerId: seat.playerId,
+          committed: seat.committedHand,
+          allIn: seat.allIn,
+        })),
         winner: view.result.winner,
         foldedPlayerIds: view.seats.filter((seat) => seat.folded).map((seat) => seat.playerId),
+        bustedPlayerIds: view.seats.filter((seat) => seat.sittingOut).map((seat) => seat.playerId),
         table: {
           players: view.seats.filter((seat) => !seat.sittingOut).length,
           folded: view.seats.filter((seat) => seat.folded).length,
