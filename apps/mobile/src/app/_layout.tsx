@@ -86,6 +86,11 @@ const RESTORE_COVER_MS = 15_000;
 
 export function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
+  // Better Auth puts a signed-out session back to pending on every refetch (each return to the
+  // foreground). Only the first check may hold the UI: unmounting the Stack on a later one remounts
+  // it at sign-in, which throws away the route a link just opened (the emailed reset link).
+  const [sessionChecked, setSessionChecked] = useState(false);
+  if (!isPending && !sessionChecked) setSessionChecked(true);
   // Purchases credit the signed-in player's Wallet, so RevenueCat follows the session (STO-346).
   useRevenueCatIdentity(session?.user.id);
   const account = !!session && !session.user.isAnonymous;
@@ -124,7 +129,7 @@ export function RootLayout() {
   // Until it settles a plain cover hides the sign-in screen, so a returning player never sees it
   // flash; the cover is a view, not the native splash, so Apple's sheet can still present over it.
   // Capped, in case GameKit never answers.
-  const signedOut = !E2E_AUTH_BYPASS && !isPending && !session && fontsLoaded;
+  const signedOut = !E2E_AUTH_BYPASS && sessionChecked && !session && fontsLoaded;
   const [restoring, setRestoring] = useState(GAME_CENTER_AVAILABLE && !E2E_AUTH_BYPASS);
   useEffect(() => {
     if (!signedOut) return;
@@ -140,7 +145,7 @@ export function RootLayout() {
   // Keep the splash screen up until the first session check and the fonts resolve, so
   // a signed-in user never sees the sign-in screen flash on a cold load. An E2E build's
   // session check can only fail — nothing is listening — so it does not wait on one.
-  if ((isPending && !E2E_AUTH_BYPASS) || !fontsLoaded) return null;
+  if ((!sessionChecked && !E2E_AUTH_BYPASS) || !fontsLoaded) return null;
 
   return (
     <DeepLinks session={!!session} account={account}>
