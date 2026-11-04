@@ -85,6 +85,8 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
       }
       p.sub { margin: 12px 0 0; font-size: 15px; line-height: 22px; color: ${brand.dim}; }
       label { display: block; margin: 24px 0 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: ${brand.gold}; }
+      .label-row { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 8px; }
+      .label-row label { margin: 0; }
       input {
         width: 100%;
         padding: 13px 14px;
@@ -113,6 +115,16 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
         cursor: pointer;
       }
       button:disabled { opacity: 0.5; cursor: default; }
+      button.toggle {
+        display: inline;
+        width: auto;
+        margin: 0;
+        padding: 0;
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: ${brand.gold};
+        background: none;
+      }
       .hint { margin: 20px 0 0; font-size: 13px; line-height: 19px; color: ${brand.faint}; }
       .msg { margin: 20px 0 0; font-size: 14px; line-height: 20px; min-height: 20px; }
       .msg.error { color: ${brand.danger}; }
@@ -190,12 +202,18 @@ export function webResetPasswordPage(token: string): Response {
       `
         <p class="eyebrow">Word Poker</p>
         <h1>Choose a new password.</h1>
-        <p class="sub">Set a new password for your account. This link works once and expires after an hour.</p>
+        <p class="sub">Set a new password for your account. This link works once and expires after 30 minutes.</p>
         <form id="form" novalidate>
-          <label for="password">New password</label>
+          <div class="label-row">
+            <label for="password">New password</label>
+            <button class="toggle" type="button" data-for="password" aria-label="Show password">SHOW</button>
+          </div>
           <input id="password" name="password" type="password" autocomplete="new-password"
             minlength="${MIN_PASSWORD_LENGTH}" required />
-          <label for="confirm">Confirm password</label>
+          <div class="label-row">
+            <label for="confirm">Confirm password</label>
+            <button class="toggle" type="button" data-for="confirm" aria-label="Show password">SHOW</button>
+          </div>
           <input id="confirm" name="confirm" type="password" autocomplete="new-password"
             minlength="${MIN_PASSWORD_LENGTH}" required />
           <button id="submit" type="submit">Reset password</button>
@@ -212,6 +230,17 @@ export function webResetPasswordPage(token: string): Response {
           msg.textContent = text;
           msg.className = "msg " + kind;
         }
+
+        // SHOW / HIDE on each field's label row, like the app's password fields.
+        document.querySelectorAll("button.toggle").forEach(function (toggle) {
+          toggle.addEventListener("click", function () {
+            var input = document.getElementById(toggle.getAttribute("data-for"));
+            var reveal = input.type === "password";
+            input.type = reveal ? "text" : "password";
+            toggle.textContent = reveal ? "HIDE" : "SHOW";
+            toggle.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+          });
+        });
 
         form.addEventListener("submit", async function (event) {
           event.preventDefault();
