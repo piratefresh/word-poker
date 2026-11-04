@@ -104,10 +104,10 @@ describe("sign in", () => {
     await render(<SignInScreen />);
     expect(screen.getByLabelText("Password").props.secureTextEntry).toBe(true);
 
-    await fireEvent.press(screen.getByText("SHOW"));
+    await fireEvent.press(screen.getByLabelText("Show password"));
 
     expect(screen.getByLabelText("Password").props.secureTextEntry).toBe(false);
-    expect(screen.getByText("HIDE")).toBeTruthy();
+    expect(screen.getByLabelText("Hide password")).toBeTruthy();
   });
 
   it("offers the street pills only on sign in", async () => {

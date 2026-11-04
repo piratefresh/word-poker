@@ -2,17 +2,15 @@ import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
+import { SymbolView } from "expo-symbols";
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type TextInputProps,
-  type TextStyle,
 } from "react-native";
 import Animated, {
   Easing,
@@ -29,6 +27,7 @@ import Svg, { Path } from "react-native-svg";
 import "./autofill-fix";
 
 import { STREETS } from "@/components/screens/home/street-art";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { fonts, layout, tileMaterial } from "@/constants/theme";
 
 /** The menu card's paper: its own warm palette, not the felt's. */
@@ -36,11 +35,8 @@ const paper = {
   ink: "#3a2210",
   body: "#7a5634",
   faint: "#a8967e",
-  fieldFill: "#fffdf6",
-  fieldBorder: "#dcc196",
   gradient: ["#fff6e2", "#f0dbb2"] as const,
   error: "#a8281e",
-  errorBorder: "#c2352b",
   link: "#a8641c",
 };
 
@@ -199,51 +195,53 @@ export function AuthShell({
 
 export type FieldProps = TextInputProps & {
   label: string;
-  /** Shown under the field after a submit; turns its border red. */
+  /** Shown under the field after a submit; turns its frame red. */
   error?: string;
   /** Standing help under the field, until an error replaces it. */
   hint?: string;
-  /** A password: masked, with a SHOW / HIDE toggle on the label's row. */
+  /** A password: masked, with a show / hide eye at the end (unless `end` is given). */
   secret?: boolean;
+  /** An `inline-start` addon's contents: an icon, `InputGroupText` or an `InputGroupButton`. */
+  start?: ReactNode;
+  /** An `inline-end` addon's contents. */
+  end?: ReactNode;
   /** Sits under the error: the handle's suggestion chips. */
   children?: ReactNode;
 };
 
-export function Field({ label, error, hint, secret = false, children, onBlur, onFocus, ...input }: FieldProps) {
-  const [focused, setFocused] = useState(false);
+/** A labelled `InputGroup`: label, the framed control with its addons, then error or hint. */
+export function Field({ label, error, hint, secret = false, start, end, children, editable, ...input }: FieldProps) {
   const [shown, setShown] = useState(false);
+
+  const trailing =
+    end ??
+    (secret ? (
+      <InputGroupButton label={shown ? "Hide password" : "Show password"} onPress={() => setShown(!shown)} size="icon-sm">
+        <SymbolView
+          name={
+            shown
+              ? { ios: "eye.slash", android: "visibility_off", web: "visibility_off" }
+              : { ios: "eye", android: "visibility", web: "visibility" }
+          }
+          size={20}
+          tintColor={paper.body}
+        />
+      </InputGroupButton>
+    ) : null);
 
   return (
     <View style={styles.field}>
-      <View style={styles.labelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
-        {secret ? (
-          <Text
-            accessibilityLabel={shown ? "Hide password" : "Show password"}
-            accessibilityRole="button"
-            onPress={() => setShown(!shown)}
-            style={styles.toggle}
-          >
-            {shown ? "HIDE" : "SHOW"}
-          </Text>
-        ) : null}
-      </View>
-      <TextInput
-        accessibilityHint={error}
-        accessibilityLabel={label}
-        onBlur={(event) => {
-          setFocused(false);
-          onBlur?.(event);
-        }}
-        onFocus={(event) => {
-          setFocused(true);
-          onFocus?.(event);
-        }}
-        placeholderTextColor={paper.faint}
-        secureTextEntry={secret && !shown}
-        style={[styles.input, focused && styles.inputFocused, !!error && styles.inputError]}
-        {...input}
-      />
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <InputGroup disabled={editable === false} invalid={!!error}>
+        {start ? <InputGroupAddon>{start}</InputGroupAddon> : null}
+        <InputGroupInput
+          accessibilityHint={error}
+          accessibilityLabel={label}
+          secureTextEntry={secret && !shown}
+          {...input}
+        />
+        {trailing ? <InputGroupAddon align="inline-end">{trailing}</InputGroupAddon> : null}
+      </InputGroup>
       {error ? (
         <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>
       ) : hint ? (
@@ -481,47 +479,12 @@ const styles = StyleSheet.create({
   field: {
     gap: 6,
   },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
   fieldLabel: {
     color: paper.body,
     fontFamily: fonts.rubikSemiBold,
     fontSize: 12,
     letterSpacing: 0.96,
     textTransform: "uppercase",
-  },
-  toggle: {
-    color: paper.link,
-    fontFamily: fonts.rubikSemiBold,
-    fontSize: 12,
-    letterSpacing: 0.96,
-  },
-  input: {
-    backgroundColor: paper.fieldFill,
-    borderColor: paper.fieldBorder,
-    borderRadius: 10,
-    borderWidth: 2,
-    color: paper.ink,
-    fontFamily: fonts.rubikMedium,
-    fontSize: 16,
-    height: 48,
-    paddingHorizontal: 14,
-    /**
-     * RN's style types only allow solid/dotted/dashed, but web needs `none` to
-     * drop the blue UA focus ring, and RN Web hands the value straight to CSS.
-     */
-    ...Platform.select({
-      web: { outlineStyle: "none" } as unknown as TextStyle,
-    }),
-  },
-  /** The copper frame carries focus, so the browser's own ring is off. */
-  inputFocused: {
-    borderColor: tileMaterial.slab,
-  },
-  inputError: {
-    borderColor: paper.errorBorder,
   },
   error: {
     color: paper.error,

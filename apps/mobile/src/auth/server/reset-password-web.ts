@@ -85,16 +85,25 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
       }
       p.sub { margin: 12px 0 0; font-size: 15px; line-height: 22px; color: ${brand.dim}; }
       label { display: block; margin: 24px 0 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: ${brand.gold}; }
-      input {
-        width: 100%;
-        padding: 13px 14px;
-        font-size: 15px;
-        color: ${brand.cream};
+      /* The bordered frame is a row: the input, then the eye, each with its own room. */
+      .pw {
+        display: flex;
+        align-items: stretch;
         background: rgba(0,0,0,0.25);
         border: 1px solid ${brand.border};
         border-radius: 8px;
       }
-      input:focus { outline: none; border-color: ${brand.gold}; }
+      .pw:focus-within { border-color: ${brand.gold}; box-shadow: 0 0 0 3px rgba(212,175,55,0.25); }
+      .pw input {
+        flex: 1;
+        min-width: 0;
+        padding: 13px 0 13px 14px;
+        font-size: 15px;
+        color: ${brand.cream};
+        background: none;
+        border: none;
+      }
+      .pw input:focus { outline: none; }
       button, a.btn {
         display: block;
         width: 100%;
@@ -113,6 +122,20 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
         cursor: pointer;
       }
       button:disabled { opacity: 0.5; cursor: default; }
+      button.eye {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: auto;
+        margin: 0;
+        padding: 0 12px;
+        color: ${brand.dim};
+        background: none;
+      }
+      button.eye:hover, button.eye:focus-visible { color: ${brand.gold}; }
+      button.eye svg { width: 20px; height: 20px; }
+      button.eye .off, button.eye[aria-pressed="true"] .on { display: none; }
+      button.eye[aria-pressed="true"] .off { display: block; }
       .hint { margin: 20px 0 0; font-size: 13px; line-height: 19px; color: ${brand.faint}; }
       .msg { margin: 20px 0 0; font-size: 14px; line-height: 20px; min-height: 20px; }
       .msg.error { color: ${brand.danger}; }
@@ -178,6 +201,16 @@ export function oauthFailedPage(error: string | null, back: string): Response {
   );
 }
 
+const SVG_ATTRS =
+  'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+
+/** The show / hide eye that sits inside a password input; the page script flips it. */
+const eyeButton = (inputId: string): string =>
+  `<button class="eye" type="button" data-for="${inputId}" aria-label="Show password" aria-pressed="false">` +
+  `<svg class="on" ${SVG_ATTRS}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>` +
+  `<svg class="off" ${SVG_ATTRS}><path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.2 3.2M6.6 6.6A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M2 2l20 20"/></svg>` +
+  `</button>`;
+
 /**
  * Reset the password from a desktop browser, against the same Better Auth POST
  * endpoint the app uses. The token is validated (and consumed) server-side on
@@ -190,14 +223,20 @@ export function webResetPasswordPage(token: string): Response {
       `
         <p class="eyebrow">Word Poker</p>
         <h1>Choose a new password.</h1>
-        <p class="sub">Set a new password for your account. This link works once and expires after an hour.</p>
+        <p class="sub">Set a new password for your account. This link works once and expires after 30 minutes.</p>
         <form id="form" novalidate>
           <label for="password">New password</label>
-          <input id="password" name="password" type="password" autocomplete="new-password"
-            minlength="${MIN_PASSWORD_LENGTH}" required />
+          <div class="pw" role="group">
+            <input id="password" name="password" type="password" autocomplete="new-password"
+              minlength="${MIN_PASSWORD_LENGTH}" required />
+            ${eyeButton("password")}
+          </div>
           <label for="confirm">Confirm password</label>
-          <input id="confirm" name="confirm" type="password" autocomplete="new-password"
-            minlength="${MIN_PASSWORD_LENGTH}" required />
+          <div class="pw" role="group">
+            <input id="confirm" name="confirm" type="password" autocomplete="new-password"
+              minlength="${MIN_PASSWORD_LENGTH}" required />
+            ${eyeButton("confirm")}
+          </div>
           <button id="submit" type="submit">Reset password</button>
         </form>
         <p class="msg" id="msg" role="status" aria-live="polite"></p>
@@ -212,6 +251,17 @@ export function webResetPasswordPage(token: string): Response {
           msg.textContent = text;
           msg.className = "msg " + kind;
         }
+
+        // The eye inside each field shows / hides it, like the app's password fields.
+        document.querySelectorAll("button.eye").forEach(function (eye) {
+          eye.addEventListener("click", function () {
+            var input = document.getElementById(eye.getAttribute("data-for"));
+            var reveal = input.type === "password";
+            input.type = reveal ? "text" : "password";
+            eye.setAttribute("aria-pressed", String(reveal));
+            eye.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+          });
+        });
 
         form.addEventListener("submit", async function (event) {
           event.preventDefault();
