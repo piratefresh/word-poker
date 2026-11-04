@@ -157,6 +157,7 @@ export function RootLayout() {
                 <Stack.Protected guard={authed}>
                   <Stack.Screen name="(tabs)" options={{ orientation: 'portrait' }} />
                   <Stack.Screen name="tutorial" />
+                  <Stack.Screen name="story" />
                   <Stack.Screen name="offline" />
                   <Stack.Screen name="online" />
                   <Stack.Screen name="friend/[code]" />
