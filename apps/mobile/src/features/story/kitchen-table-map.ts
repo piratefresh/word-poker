@@ -7,9 +7,21 @@
  * react-native-svg, so the app ships a 2x JPEG rendered from it:
  *   chrome --headless --force-device-scale-factor=2 --window-size=390,1760 --screenshot …
  *
- * Progress is the stars each cleared node earned. Saving it is STO-973's; until then the screen
- * starts empty, or from `previewProgress` in development.
+ * Progress is the stars each played node earned: the chapter run's save (`story-progress.ts`),
+ * whose rules (`nodeState`, thresholds) are game-rules' `chapter-run.ts`, or `previewProgress` in
+ * development.
  */
+
+import {
+  EMPTY_STORY_PROGRESS,
+  chapterRecord,
+  nodeState as runNodeState,
+  storyChapter,
+  storyNode,
+  type StoryProgress,
+} from "@wordpoker/game-rules";
+
+const CHAPTER = storyChapter("kitchen-table");
 
 export const MAP_WIDTH = 390;
 export const MAP_HEIGHT = 1760;
@@ -48,11 +60,13 @@ export const KITCHEN_TABLE = {
   number: 1,
   title: "Kitchen Table",
   boss: "The Professor",
-  /** The boss hand's word score to beat. STO-973 moves this into the chapter config. */
-  threshold: 15,
+  /** The boss hand's word score to beat. */
+  threshold: CHAPTER.threshold,
   maxStars: 15,
   nextChapter: "The Local",
   badge: "Professor Badge",
+  /** The coach's hint after two boss losses in a row. */
+  bossHint: "He folds when the bar’s full. Push him.",
   nodes: [
     { id: "first-hand", kind: "hand", title: "First Hand", glyph: "1", ...at(0.5, 0.885), friend: { id: "ellis", dx: 80 }, challengeId: "first-hand" },
     { id: "chips-on-the-table", kind: "hand", title: "Chips on the Table", glyph: "2", ...at(0.28, 0.72), friend: { id: "jay", dx: 80 } },
@@ -70,12 +84,10 @@ export type ChapterProgress = Partial<Record<MapNodeId, number>>;
 
 const HANDS = KITCHEN_TABLE.nodes.filter((node) => node.kind === "hand");
 
-/** Hands open one after another; the bonus and the boss both open once the third hand is cleared. */
+/** The chapter run's rule: hands one after another, then the bonus and the boss together. */
 export function nodeState(node: MapNode, progress: ChapterProgress): MapNodeState {
-  if (progress[node.id] !== undefined) return "completed";
-  if (node.kind !== "hand") return handsCleared(progress) === HANDS.length ? "available" : "locked";
-  const index = HANDS.indexOf(node);
-  return index === 0 || progress[HANDS[index - 1]!.id] !== undefined ? "available" : "locked";
+  const save: StoryProgress = { chapters: { [CHAPTER.id]: { ...chapterRecord(EMPTY_STORY_PROGRESS, CHAPTER.id), stars: progress } } };
+  return runNodeState(save, CHAPTER, storyNode(CHAPTER, node.id));
 }
 
 function handsCleared(progress: ChapterProgress): number {

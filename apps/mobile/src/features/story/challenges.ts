@@ -1,13 +1,14 @@
 /**
  * challenges.ts — Chapter 1 "Kitchen Table" lessons, as data (STO-860 prototype).
  *
- * A challenge is an authored hand (`fixedDeal`) at a table of the offline cast, a goal, and the
- * word scores its stars sit at. The table is the ordinary offline one — heuristic bots, the real
- * engine — so a challenge is played through `challengeSession`, the same `OfflineSession` seam
- * the tutorial uses. Progress keys on `id@version`, so a re-authored deal bumps `version`.
+ * A challenge is an authored hand (`fixedDeal`) at a table of the offline cast and a goal; the
+ * stars it earns are the chapter run's (`STORY_CHAPTERS` in game-rules). The table is the ordinary
+ * offline one — heuristic bots, the real engine — so every map node is played through
+ * `storySession`, the same `OfflineSession` seam the tutorial uses. `version` bumps with a
+ * re-authored deal.
  */
 
-import type { RoundPhase } from "@wordpoker/contracts";
+import type { PowerUpId, RoundPhase } from "@wordpoker/contracts";
 import {
   DEFAULT_STAKES,
   fixedDeal,
@@ -18,6 +19,7 @@ import {
 } from "@wordpoker/game-rules";
 
 import { randomSeed } from "@/features/offline/offline-seed";
+import type { MapNode } from "@/features/story/kitchen-table-map";
 import { nextCpuMove, type OfflineSession } from "@/features/offline/use-offline-game";
 
 export interface Challenge {
@@ -28,8 +30,6 @@ export interface Challenge {
   players: readonly string[];
   deal: FixedDealSpec;
   goal: string;
-  /** The hero's word score that earns one, two and three stars. */
-  stars: readonly [number, number, number];
   coach: Partial<Record<RoundPhase, string>>;
 }
 
@@ -42,7 +42,6 @@ export const CHALLENGES: readonly Challenge[] = [
     // No seven-letter word here: the Full Rack Bonus is Word Wizard's lesson.
     deal: { hands: { 0: ["B", "O"] }, board: ["A", "T", "S", "K", "N"] },
     goal: "Spell a word from your two tiles and the board.",
-    stars: [1, 10, 14],
     coach: {
       preflop: "B and O are yours alone. Call to see the board.",
       flop: "Three tiles are shared. Can you see BOAT?",
@@ -58,7 +57,6 @@ export const CHALLENGES: readonly Challenge[] = [
     players: ["hero", "ellis", "jay"],
     deal: { hands: { 0: ["P", "L"] }, board: ["A", "N", "E:2", "T", "TS"] },
     goal: "Use all seven tiles for the Full Rack Bonus.",
-    stars: [8, 13, 25],
     coach: {
       preflop: "Seven tiles in one word earns +10. Keep that in mind.",
       flop: "The E is a Double Letter: it counts twice.",
@@ -73,23 +71,48 @@ export function challengeById(id: string | undefined): Challenge | undefined {
   return CHALLENGES.find((challenge) => challenge.id === id);
 }
 
-/** Stars a word score earns: 0–3. */
-export function starsFor(challenge: Challenge, score: number): number {
-  return challenge.stars.filter((threshold) => score >= threshold).length;
+/** What a map node deals: its seats, and the authored hand where it has one. */
+export interface StoryTable {
+  players: readonly string[];
+  deal?: FixedDealSpec;
 }
 
-/** The offline table, dealt from the challenge's spec; unnamed seats come from a fresh seed. */
-export function challengeSession(challenge: Challenge, dictionary: Dictionary): OfflineSession {
+/**
+ * The offline table for one story hand. A seat holding drafted powers opens the hand on a Power
+ * Draw of exactly those, and keeps one for the hand; with none drafted the hand is Classic.
+ */
+export function storySession(
+  table: StoryTable,
+  dictionary: Dictionary,
+  powers: readonly PowerUpId[] = [],
+): OfflineSession {
   return {
     now: Date.now,
     held: false,
     open: (nowMs) => {
       const seed = randomSeed();
-      const players = [...challenge.players];
-      const deal = fixedDeal({ seed, playerCount: players.length, spec: challenge.deal });
-      return startHand({ seed, players, nowMs, dictionary, stakes: DEFAULT_STAKES, deal });
+      const players = [...table.players];
+      const deal = table.deal === undefined ? undefined : fixedDeal({ seed, playerCount: players.length, spec: table.deal });
+      return startHand({
+        seed,
+        players,
+        nowMs,
+        dictionary,
+        stakes: DEFAULT_STAKES,
+        ...(deal === undefined ? {} : { deal }),
+        ...(powers.length === 0 ? {} : { powerUps: { deal: "choose3", offers: { [players[0]!]: powers } } }),
+      });
     },
     reduce,
     nextMove: nextCpuMove,
   };
+}
+
+/** Who sits at a map node, and the authored hand where it has one. */
+export function storyTable(node: MapNode): StoryTable {
+  const challenge = challengeById(node.challengeId);
+  if (challenge !== undefined) return { players: challenge.players, deal: challenge.deal };
+  // The Professor's own play style and tell are STO-974; until then he is the heuristic bot.
+  if (node.kind === "boss") return { players: ["hero", "professor"] };
+  return { players: ["hero", node.friend?.id ?? "mira"] };
 }

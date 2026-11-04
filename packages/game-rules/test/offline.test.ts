@@ -768,6 +768,24 @@ describe("reduce — §44's Power Draw", () => {
     assert.ok(!("powers" in classic), "a Classic hand has no powers field at all");
   });
 
+  it("draws only the seats story mode names, offered exactly their drafted powers", () => {
+    const state = wildHand({ powerUps: { deal: "choose3", offers: { hero: ["blank_tile", "random_wild"] } } });
+
+    assert.deepEqual(
+      drawOf(state).slots.map((slot) => slot.playerId),
+      ["hero"],
+    );
+    assert.deepEqual(offersOf(state, "hero"), ["blank_tile", "random_wild"]);
+    assert.equal(drawOf(state).status, "open");
+  });
+
+  it("plays a story hand with nothing drafted as if it had no draw", () => {
+    const state = wildHand({ powerUps: { deal: "choose3", offers: {} } });
+
+    assert.equal(drawOf(state).status, "closed");
+    assert.equal(state.toActIndex, dealHand().toActIndex);
+  });
+
   it("deals the same tiles and posts the same blinds with power-ups on or off", () => {
     for (let seed = 0; seed < 200; seed += 1) {
       const off = dealHand({ seed });

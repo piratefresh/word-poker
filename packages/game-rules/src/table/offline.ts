@@ -274,8 +274,11 @@ export interface StartHandOptions {
    * The table's power-up deal mode (§40, §44). Absent or `off` is Classic: no draw and no
    * `powers` on the state. `choose3` opens the Power Draw on every deal for every seat dealt in
    * including CPU and all-in seats.
+   *
+   * `offers` makes it story mode's draw (STO-973): only the seats it names draw, each offered
+   * exactly the powers listed (its drafted ones), and every other seat holds nothing.
    */
-  powerUps?: { deal: PowerUpDealMode };
+  powerUps?: { deal: PowerUpDealMode; offers?: Readonly<Record<PlayerId, readonly PowerUpId[]>> };
   /**
    * An authored hand (`fixedDeal`, STO-860) to play instead of the seed's deal. Story-mode
    * lessons only; online tables never pass one.
@@ -396,7 +399,7 @@ export function startHand({
   };
 
   if (powerUps?.deal === "choose3") {
-    return openPowerDraw(state, nowMs);
+    return openPowerDraw(state, nowMs, powerUps.offers);
   }
 
   // Nobody left to act means the whole table is all in on the posts alone: the streets below
@@ -411,10 +414,19 @@ export function startHand({
  * `firstToAct`, and `endsAtMs` is the draw's clock until then. A table where nobody draws
  * records an empty, closed draw and plays on as if it had none.
  */
-function openPowerDraw(state: OfflineState, nowMs: number): OfflineState {
+function openPowerDraw(
+  state: OfflineState,
+  nowMs: number,
+  authored?: Readonly<Record<PlayerId, readonly PowerUpId[]>>,
+): OfflineState {
   const drawing: DrawSeat[] = [];
   state.seats.forEach((seat, index) => {
-    if (!seat.sittingOut) drawing.push({ seat: index, playerId: seat.id });
+    if (seat.sittingOut) return;
+    if (authored === undefined) drawing.push({ seat: index, playerId: seat.id });
+    else {
+      const offers = authored[seat.id];
+      if (offers !== undefined && offers.length > 0) drawing.push({ seat: index, playerId: seat.id, offers });
+    }
   });
 
   const draw: PowerDraw =
