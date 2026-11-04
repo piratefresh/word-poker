@@ -148,7 +148,8 @@ describe("<PowerUsePrompt />", () => {
       />,
     );
 
-    expect(screen.getByText("Tap one of your tiles to swap it")).toBeTruthy();
+    expect(screen.getByText("TAP A TILE TO SWAP")).toBeTruthy();
+    expect(screen.getByText("WILD TILE")).toBeTruthy();
     expect(announce).toHaveBeenCalledWith("Choose one of your tiles to swap");
     // The felt takes the tap that names a tile, so the scrim lets it through; CANCEL backs out.
     expect(screen.getByTestId("power-scrim")).toHaveProp("pointerEvents", "none");
@@ -168,8 +169,28 @@ describe("<PowerUsePrompt />", () => {
     );
 
     expect(screen.getByText("Discard A for a random vowel?")).toBeTruthy();
+    expect(screen.getByText("YOUR A (1) GOES · A RANDOM VOWEL COMES IN")).toBeTruthy();
     await fireEvent.press(screen.getByTestId("power-confirm"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  test("Spotlight asks in its own words, choosing and confirming", async () => {
+    const picking = await render(
+      <PowerUsePrompt onCancel={jest.fn()} onConfirm={jest.fn()} power="spotlight" targeting={{ stage: "picking" }} />,
+    );
+    expect(picking.getByText("TAP A TABLE TILE")).toBeTruthy();
+    expect(picking.getByText("SPOTLIGHT")).toBeTruthy();
+
+    const confirming = await render(
+      <PowerUsePrompt
+        onCancel={jest.fn()}
+        onConfirm={jest.fn()}
+        power="spotlight"
+        targeting={{ stage: "confirming", tile: TILE_QK }}
+      />,
+    );
+    expect(confirming.getByText("Spotlight the Q/K? It scores double for everyone.")).toBeTruthy();
+    expect(confirming.getByText("THE Q/K (10/5) SCORES DOUBLE · FOR EVERYONE")).toBeTruthy();
   });
 
   test("names both faces of a choice tile", async () => {

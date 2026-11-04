@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
-import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { type ReactNode, useEffect, useState } from "react";
+import { AccessibilityInfo, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { POWER_UPS, type PowerUpId, type Tile as TileData } from "@wordpoker/contracts";
 
 import { useCompactControls, useScreenScale } from "@/components/screens/game/screen-scale";
 import { GameButton } from "@/components/ui/game-button";
-import { colors, fonts, glow, palette, radius, spacing } from "@/constants/theme";
+import { styles as wordBuilderStyles } from "@/components/word-builder/styles";
+import { colors, fonts, glow, ledger, palette, radius, spacing } from "@/constants/theme";
 import type { PowerView } from "@/features/table/power-view";
 import { webTestID } from "@/lib/ui/web-id";
 
@@ -92,10 +94,14 @@ export function PowerHeldChip({
   );
 }
 
+/** The confirm sheet's power card: wide enough that its rule reads at a glance. */
+const CONFIRM_CARD_WIDTH = 150;
+
 /**
- * The felt's side of using a power: while the hero chooses, the felt stays clear and a hint says what to do;
- * once a tile is chosen, the felt asks to confirm the swap in the catalog's words — "Discard A
- * for a random letter?". Tapping the dimmed felt, or CANCEL, backs out.
+ * The felt's side of using a power: while the hero chooses, the felt stays clear and a felt-green
+ * bar above the rack says what to do; once a tile is chosen, a felt-green sheet asks to confirm the
+ * swap in the catalog's words — "Discard A for a random letter?" — with a caption spelling out the
+ * trade. Tapping the dimmed felt, CANCEL, or the bar's ✕ backs out.
  *
  * Drawn in `GameScreen`'s `overFelt`, so the rack below stays in reach: the tiles are what the
  * hero is choosing from.
@@ -118,6 +124,8 @@ export function PowerUsePrompt({
         ? `Spotlight the ${tileLetters(targeting.tile)}? It scores double for everyone.`
         : `Discard ${tileLetters(targeting.tile)} for ${POWER_UPS[power].receives}?`
       : null;
+  const caption =
+    power !== null && targeting.stage === "confirming" ? tradeCaption(power, targeting.tile) : null;
   const stage = power === null ? "idle" : targeting.stage;
   // A swap hands back a plain tile, so a 2x/3x tile loses its bonus (§44).
   const bonusLost = !spotlight && targeting.stage === "confirming" && targeting.tile.multiplier !== undefined;
@@ -151,19 +159,31 @@ export function PowerUsePrompt({
       />
       {question === null ? (
         <View pointerEvents="box-none" style={styles.hintRow}>
-          <View style={styles.panel}>
-            <Text style={styles.hint}>{spotlight ? "Tap a table tile to spotlight it" : "Tap one of your tiles to swap it"}</Text>
-            <GameButton compact label="CANCEL" onPress={onCancel} testID="power-cancel" />
-          </View>
+          <FeltSheet radius={16} style={styles.hintBar}>
+            <View style={styles.hintText}>
+              <Text style={styles.hintTitle}>{spotlight ? "TAP A TABLE TILE" : "TAP A TILE TO SWAP"}</Text>
+              <Text style={styles.caption}>{POWER_UPS[power].title.toUpperCase()}</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
+              onPress={onCancel}
+              style={wordBuilderStyles.blankClose}
+              testID="power-cancel"
+            >
+              <Text style={wordBuilderStyles.blankCloseText}>✕</Text>
+            </Pressable>
+          </FeltSheet>
         </View>
       ) : (
         <View pointerEvents="box-none" style={styles.center}>
-          <View style={[styles.panel, styles.confirmPanel]} testID="power-confirm-sheet">
-            <PowerCard id={power} width={88} />
+          <FeltSheet radius={18} style={styles.confirmPanel} testID="power-confirm-sheet">
+            <PowerCard id={power} width={CONFIRM_CARD_WIDTH} />
             <Text style={styles.question}>{question}</Text>
+            {caption === null ? null : <Text style={[styles.caption, styles.tradeCaption]}>{caption}</Text>}
             {bonusLost ? <Text style={styles.warning}>This tile&apos;s bonus will be lost</Text> : null}
             <View style={styles.actions}>
-              <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" />
+              <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" variant="wood" />
               <GameButton
                 label={spotlight ? "SPOTLIGHT" : "SWAP"}
                 onPress={onConfirm}
@@ -172,16 +192,57 @@ export function PowerUsePrompt({
                 variant="gold"
               />
             </View>
-          </View>
+          </FeltSheet>
         </View>
       )}
     </Animated.View>
   );
 }
 
+/**
+ * The table's sheet for a power: deep felt green, the phase pill's, inside a 2pt orange edge. The
+ * gradient fills the sheet rather than clipping it, so iOS keeps the drop shadow.
+ */
+function FeltSheet({
+  radius: corner,
+  style,
+  testID,
+  children,
+}: {
+  radius: number;
+  style: StyleProp<ViewStyle>;
+  testID?: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={[styles.sheet, { borderRadius: corner }, style]} testID={testID}>
+      <LinearGradient
+        colors={[ledger.modeTile, ledger.modeTileEdge]}
+        pointerEvents="none"
+        style={[FILL, { borderRadius: corner - 2 }]}
+      />
+      {children}
+    </View>
+  );
+}
+
 /** The letters a tile prints, as the confirm names it: "A", or a choice tile's "A/E" (§10). */
 function tileLetters(tile: TileData): string {
   return "alternativeLetter" in tile ? `${tile.letter}/${tile.alternativeLetter}` : tile.letter;
+}
+
+/** The points a tile prints, both faces for a choice tile: "4", or "10/5". */
+function tilePoints(tile: TileData): string {
+  return "alternativeLetter" in tile ? `${tile.points}/${tile.alternativePoints}` : `${tile.points}`;
+}
+
+/** The confirm's small print, spelling out the trade: "YOUR P (4) GOES · THE BLANK SCORES 0". */
+function tradeCaption(power: PowerUpId, tile: TileData): string {
+  const named = `${tileLetters(tile)} (${tilePoints(tile)})`;
+  const { family, receives } = POWER_UPS[power];
+  if (family === "spotlight") return `THE ${named} SCORES DOUBLE · FOR EVERYONE`;
+  if (family === "blankTile") return `YOUR ${named} GOES · THE BLANK SCORES 0`;
+  return `YOUR ${named} GOES · ${receives.toUpperCase()} COMES IN`;
 }
 
 /**
@@ -226,7 +287,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   layer: { ...FILL, zIndex: 20 },
-  scrim: { ...FILL, backgroundColor: "rgba(2,12,9,0.58)" },
+  scrim: { ...FILL, backgroundColor: "rgba(0,0,0,0.45)" },
   // Choosing, the felt stays lit so the tiles are easy to read.
   scrimClear: { backgroundColor: "transparent" },
   hintRow: {
@@ -242,26 +303,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.md,
   },
-  panel: {
+  sheet: {
     alignItems: "center",
-    backgroundColor: palette.felt800,
-    borderColor: colors.goldDeep,
-    borderRadius: radius.card,
-    borderWidth: 1,
+    borderColor: ledger.goldEdge,
+    borderWidth: 2,
+    ...glow("#000", 14),
+  },
+  hintBar: {
+    alignSelf: "stretch",
     flexDirection: "row",
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
+    minHeight: 54,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
     paddingVertical: spacing.sm,
   },
-  confirmPanel: { flexDirection: "column", maxWidth: 300 },
+  hintText: { flex: 1, gap: 2 },
+  hintTitle: { color: ledger.onFelt, fontFamily: fonts.arcade, fontSize: 15, letterSpacing: 0.45 },
+  confirmPanel: {
+    gap: spacing.md,
+    maxWidth: 320,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: 18,
+    width: "100%",
+  },
   hint: { color: colors.textBright, flexShrink: 1, fontFamily: fonts.sansMedium, fontSize: 13 },
   question: {
-    color: colors.textBright,
-    fontFamily: fonts.sansBold,
-    fontSize: 15,
+    color: ledger.onFelt,
+    fontFamily: fonts.arcade,
+    fontSize: 19,
+    letterSpacing: 0.4,
     textAlign: "center",
   },
-  warning: { color: colors.goldHi, fontFamily: fonts.sansMedium, fontSize: 13, textAlign: "center" },
+  caption: {
+    color: "rgba(243,230,196,0.6)",
+    fontFamily: fonts.rubikSemiBold,
+    fontSize: 9,
+    letterSpacing: 1.1,
+  },
+  // Tucked up under the question, as the design sets it.
+  tradeCaption: { marginTop: -spacing.sm, textAlign: "center" },
+  warning: { color: ledger.goldText, fontFamily: fonts.sansMedium, fontSize: 13, textAlign: "center" },
   actions: { alignSelf: "stretch", flexDirection: "row", gap: spacing.sm },
   action: { flex: 1 },
 });
