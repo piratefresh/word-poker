@@ -87,7 +87,12 @@ export function Pot({
   const chipsBesidePot =
     tabletop && (beside || Math.min(window.width, window.height) < layout.wideShortSide);
   const scaled = usePotStyles(scale, chipsBesidePot);
-  const bowl = tabletop ? (
+  // Landscape reads the blinds to the right of the chips. A portrait felt sets them small under
+  // the plates: beside them, a phone's split pot runs off the felt.
+  const blindsBeside = chipsBesidePot && beside;
+  const plates = pots.length > 0 ? pots : [{ amount, eligible: [] as string[] }];
+  // A split pot gives the chip stack's room to its plates, so the layers sit centred on the felt.
+  const bowl = tabletop && plates.length === 1 ? (
     <View
       style={[
         styles.bowl,
@@ -98,7 +103,6 @@ export function Pot({
       <PotBowl amount={amount} scale={scale * (chipsBesidePot ? SIDE_BOWL_SCALE : 1)} />
     </View>
   ) : null;
-  const plates = pots.length > 0 ? pots : [{ amount, eligible: [] as string[] }];
   const headline = plates[0]?.amount ?? amount;
   const plaque = (
     <View
@@ -149,7 +153,9 @@ export function Pot({
     </View>
   );
   const plateRow = (
-    <View style={[styles.plateRow, { gap: 10 * scale }]}>
+    // Up to three plates always share one row: Yoga can round a wrapping row's gaps past its own
+    // width and drop the last plate to a second line.
+    <View style={[styles.plateRow, { gap: 10 * scale, flexWrap: plates.length > 3 ? "wrap" : "nowrap" }]}>
       {plates.map((pot, index) => {
         const label = potLabel(index, plates.length);
         const plateId = index === 0 ? "pot-plate-main" : `side-pot-${index - 1}`;
@@ -183,7 +189,8 @@ export function Pot({
                 {pot.amount.toLocaleString()}
               </Text>
             </View>
-            {winners.length > 0 ? (
+            {/* One pot is everyone's to win: the discs only tell a split's layers apart. */}
+            {plates.length > 1 && winners.length > 0 ? (
               <View style={[styles.discRow, { gap: 3 * scale, marginTop: 4 * scale }]}>
                 {winners.map((seat) => (
                   <View
@@ -203,10 +210,9 @@ export function Pot({
       })}
     </View>
   );
-  // Under the plate on a portrait felt; landscape reads it to the right of the chips instead.
   const blindsLine = blinds ? (
     <Text
-      style={[styles.plateBlinds, { fontSize: (chipsBesidePot ? 17 : 9) * scale }, !chipsBesidePot && { marginTop: 4 * scale }]}
+      style={[styles.plateBlinds, { fontSize: (blindsBeside ? 17 : 10) * scale }, !blindsBeside && { marginTop: 4 * scale }]}
       numberOfLines={1}
       testID="felt-blinds"
     >
@@ -220,18 +226,18 @@ export function Pot({
           <View style={[styles.sideBySide, { gap: 4 * scale }]}>
             {plateRow}
             {bowl}
-            {blindsLine}
+            {blindsBeside ? blindsLine : null}
           </View>
         ) : (
           <>
             {bowl}
-            <View style={{ marginTop: -STACK_OVERLAP * scale }}>{plateRow}</View>
+            <View style={bowl && { marginTop: -STACK_OVERLAP * scale }}>{plateRow}</View>
           </>
         )
       ) : (
         plaque
       )}
-      {tabletop && !chipsBesidePot ? blindsLine : null}
+      {tabletop && !blindsBeside ? blindsLine : null}
     </View>
   );
 }
@@ -246,7 +252,7 @@ const styles = StyleSheet.create({
   potLabel: { color: colors.textDim, fontFamily: fonts.mono },
   /** §30's Blinds, quiet under the pot: table information, not a headline. */
   blindsAmount: { color: "#fff", fontFamily: fonts.mono },
-  plateRow: { alignItems: "flex-start", flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
+  plateRow: { alignItems: "flex-start", flexDirection: "row", justifyContent: "center" },
   plateColumn: { alignItems: "center" },
   plate: {
     alignItems: "center",
