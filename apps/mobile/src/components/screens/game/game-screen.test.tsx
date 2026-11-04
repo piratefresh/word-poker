@@ -146,6 +146,21 @@ test("keeps a seat's tap under the HUD", async () => {
   );
 });
 
+test("names a seat's bet chip on tap, without pressing the seat", async () => {
+  const onSeatPress = jest.fn();
+  const view = await renderScreen({ onSeatPress });
+  const seat = FOUR_PLAYER_FLOP_FIXTURE.players.find((p) => p?.bet && !p.isHero)!;
+  const chip = view.getByTestId(`seat-bet-${seat.id}`);
+
+  expect(view.queryByTestId(`seat-bet-${seat.id}-tip`)).toBeNull();
+  await fireEvent.press(chip);
+  expect(view.getByText(`${seat.name}'s bet this round`)).toBeOnTheScreen();
+  expect(onSeatPress).not.toHaveBeenCalled();
+
+  await fireEvent.press(chip);
+  expect(view.queryByTestId(`seat-bet-${seat.id}-tip`)).toBeNull();
+});
+
 const CHROME_BUTTONS: [
   string,
   keyof Pick<GameScreenProps, "onBack" | "onHelp">,

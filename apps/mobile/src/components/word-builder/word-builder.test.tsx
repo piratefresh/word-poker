@@ -552,6 +552,8 @@ describe("<WordBuilder /> and a held power (§44)", () => {
     const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
     const { view, onDraft } = await renderBuilder({ privateTiles: [blank, PRIVATE_TILES[1]!] });
     expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
+    // Until it has a letter, the blank asks for one.
+    expect(view.getByText("Type")).toBeOnTheScreen();
 
     await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
     expect(onDraft).not.toHaveBeenCalled();
@@ -580,8 +582,9 @@ describe("<WordBuilder /> and a held power (§44)", () => {
       privateTiles: [blank, PRIVATE_TILES[1]!],
       plays: [{ tileId: "power-0", chosenFace: "Q" }],
     });
-    // A named blank does not hold the keyboard up on its own.
+    // A named blank does not hold the keyboard up on its own, and offers to change its letter.
     expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
+    expect(view.getByText("Change")).toBeOnTheScreen();
 
     await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
     expect(onDraft).not.toHaveBeenCalled();

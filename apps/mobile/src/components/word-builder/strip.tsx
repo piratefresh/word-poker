@@ -802,7 +802,7 @@ function DragTile({
 
 /**
  * One tile in the strip: the tile itself, and — under a choice tile — the two faces that name
- * which letter §10 plays it for; under a blank, a "Change" caption. A tap plays the tile or takes it back; the drag lives on the
+ * which letter §10 plays it for; under a blank, a "Type" or "Change" caption. A tap plays the tile or takes it back; the drag lives on the
  * `SortableItem` around this, so the press is only ever a play.
  */
 function TileContent({
@@ -827,6 +827,8 @@ function TileContent({
   // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
   // held choice tile says the face the word is playing and not only the pair it prints.
   const blank = "blank" in tile;
+  // A blank with no letter yet waits on a tap, so it breathes like a tile a power is waiting on.
+  const unnamed = blank && !(held && chosenFace !== undefined);
   const playing =
     (choice !== null || blank) && held && chosenFace !== undefined
       ? `, playing ${chosenFace}`
@@ -862,7 +864,7 @@ function TileContent({
 
   return (
     <View style={styles.entry}>
-      <PickPulse active={pick === "target"}>
+      <PickPulse active={pick === "target" || (unnamed && !picking)}>
         {flip === null ? (
           <Tile
             {...tileProps}
@@ -917,13 +919,13 @@ function TileContent({
           )}
         </>
       )}
-      {/* A blank says its letter can change: a tap raises the keyboard for it. */}
+      {/* A blank says a tap raises the keyboard for it: to type its letter, or to change it. */}
       {blank && !picking ? (
         <Text
           numberOfLines={1}
           style={[styles.faceCaption, { width: tileWidth }]}
         >
-          Change
+          {unnamed ? "Type" : "Change"}
         </Text>
       ) : null}
     </View>
@@ -931,8 +933,8 @@ function TileContent({
 }
 
 /**
- * A private tile the seat may choose for its power (§44): it breathes, with a gold ring, so the
- * rack says which tiles the tap is waiting on. Under reduced motion the ring holds still.
+ * A private tile the seat may choose for its power (§44), or a blank with no letter yet: it
+ * breathes, with a gold ring, so the rack says which tiles the tap is waiting on. Under reduced motion the ring holds still.
  */
 function PickPulse({
   active,

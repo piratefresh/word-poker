@@ -134,6 +134,17 @@ describe("<ResultCard />", () => {
     expect(view.queryByLabelText(getTileAccessibilityLabel(seat.tiles[2]))).toBeNull();
   });
 
+  test("hangs a tile's 2× under it rather than over its face", async () => {
+    const seat = snapshotFixture().seats[0];
+    const view = await render(<ResultCard seat={seat} />);
+
+    const marks = view.getAllByTestId(/-multiplier$/, { includeHiddenElements: true });
+    expect(marks.map((mark) => mark.props.testID)).toEqual([
+      `result-card-${seat.playerId}-tile-2-multiplier`,
+    ]);
+    expect(view.getByText("2×", { includeHiddenElements: true })).toBeTruthy();
+  });
+
   test("marks a tile a power handed the seat with its ⚡, and no other tile (§44)", async () => {
     const played = snapshotFixture().seats[0];
     const seat: ResultsSeat = {

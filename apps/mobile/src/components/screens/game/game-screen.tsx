@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -251,6 +251,25 @@ function GameScreenBody({
     y: number;
     width: number;
   } | null>(null);
+  // Where the slider's absolute box measures from, in window coordinates. Android's window
+  // origin and `useWindowDimensions` don't line up with the content view (edge-to-edge bars,
+  // cutouts, landscape padding), so the raise button's window position is converted against this.
+  const sliderOriginRef = useRef<View>(null);
+  const [sliderOrigin, setSliderOrigin] = useState({ x: 0, y: height });
+  const measureSliderOrigin = useCallback(
+    () =>
+      sliderOriginRef.current?.measureInWindow((x, y) =>
+        setSliderOrigin((was) => (was.x === x && was.y === y ? was : { x, y })),
+      ),
+    [],
+  );
+  const onRaiseAnchor = useCallback(
+    (anchor: { x: number; y: number; width: number }) => {
+      setRaiseAnchor(anchor);
+      measureSliderOrigin();
+    },
+    [measureSliderOrigin],
+  );
   const setRaiseOpen = useCallback(
     (open: boolean) => setRaiseOpenFor(open ? game.id : null),
     [game.id],
@@ -398,7 +417,7 @@ function GameScreenBody({
               : { name: actingSeat?.name, view: actingSeat ? view : undefined }
           }
           onAllIn={onAllIn}
-          onRaiseAnchor={setRaiseAnchor}
+          onRaiseAnchor={onRaiseAnchor}
           onRaiseOpenChange={setRaiseOpen}
           raiseOpen={raiseOpen}
           onCheckOrCall={onCheckOrCall}
@@ -451,7 +470,7 @@ function GameScreenBody({
         {/* Under the content layer, so it lights the betting row's band and stops where the word
           builder ends rather than washing over the tiles. */}
         {!landscape && rackHeight != null && heroActing ? (
-          <TurnGlow height={Math.min(340, controlsHeight - rackHeight)} />
+          <TurnGlow height={Math.min(340, controlsHeight - rackHeight)} strength={1.6} />
         ) : null}
         {/* On its side the row is one band at the foot: the glow rises from the screen's bottom
           edge behind it, the rail and the betting buttons both. */}
@@ -515,8 +534,9 @@ function GameScreenBody({
                   />
                   {heroSideAccessory == null ? null : (
                     <HeroSeatAccessory
-                      avatarSize={seatMetrics(chromeWidth, true, labelScale).avatar}
-                      gap={8 * scale}
+                      avatarSize={heroSeat.avatar}
+                      // Clear of the bet chip tucked on the avatar's lower-left (`betChipOffset`).
+                      gap={8 * scale + heroSeat.chip - 4 * heroSeat.scale}
                       heroSeatIndex={game.players.findIndex(
                         (player) => player?.isHero,
                       )}
@@ -612,20 +632,28 @@ function GameScreenBody({
             </View>
           )}
           {/* The wager slider floats over the table, not beside it: it never resizes the felt, and comes after the controls so it paints and hit-tests above them. */}
+          {/* A zero-size probe at the absolute box's bottom-left: its window position is the origin the slider's `left`/`bottom` count from. */}
+          <View
+            ref={sliderOriginRef}
+            collapsable={false}
+            onLayout={measureSliderOrigin}
+            pointerEvents="none"
+            style={styles.sliderOrigin}
+          />
           {waiting ? null : (
             <View
               pointerEvents="box-none"
               style={{
                 // The tube stands on the raise button, centred over it; the pills hang to its right.
                 bottom: raiseAnchor
-                  ? window.height - raiseAnchor.y + 16
+                  ? sliderOrigin.y - raiseAnchor.y + 16
                   : bottomInset + controlsHeight,
                 left: raiseAnchor
                   ? Math.min(
                       raiseAnchor.x + raiseAnchor.width / 2 - 18,
                       window.width - 8 - RAISE_PILL_REACH,
-                    )
-                  : window.width - 24 - RAISE_PILL_REACH,
+                    ) - sliderOrigin.x
+                  : window.width - 24 - RAISE_PILL_REACH - sliderOrigin.x,
                 position: "absolute",
               }}
             >
@@ -684,8 +712,11 @@ function GameScreenBody({
  * The warm band behind the action row while the hero acts. Decoration only — the live buttons
  * say whose turn it is — so it takes no touches and holds still under reduced motion.
  */
-function TurnGlow({ height }: { height: number }) {
+function TurnGlow({ height, strength = 1 }: { height: number; strength?: number }) {
   const reduceMotion = useReducedMotion();
+  // `strength` scales the light's opacity: portrait's band sits under more of the screen, so it
+  // burns hotter to read as lit rather than tinted.
+  const pulse = useMemo(() => turnGlowPulse(strength), [strength]);
   // The mock's edge light is drawn for a 340px glow; a shorter box keeps its proportions, so the
   // hot edge doesn't swallow it.
   const line = Math.max(1, (3 * height) / 340);
@@ -700,7 +731,7 @@ function TurnGlow({ height }: { height: number }) {
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          reduceMotion ? { opacity: 0.3 } : TURN_GLOW_PULSE,
+          reduceMotion ? { opacity: 0.3 * strength } : pulse,
         ]}
       >
         {/* SVG for the mask: the top fades out, so the glow has no edge where it stops. */}
@@ -830,16 +861,18 @@ function HeroSeatAccessory({
 const RAISE_PILL_REACH = 109;
 
 // Outside StyleSheet.create: the web build validates its keys and rejects Reanimated's CSS animation.
-const TURN_GLOW_PULSE = {
-  animationDuration: "1.6s",
-  animationIterationCount: "infinite",
-  animationName: {
-    "0%": { opacity: 0.25 },
-    "50%": { opacity: 0.35 },
-    "100%": { opacity: 0.25 },
-  },
-  animationTimingFunction: "ease-in-out",
-} as const;
+function turnGlowPulse(strength: number) {
+  return {
+    animationDuration: "1.6s",
+    animationIterationCount: "infinite",
+    animationName: {
+      "0%": { opacity: 0.25 * strength },
+      "50%": { opacity: 0.35 * strength },
+      "100%": { opacity: 0.25 * strength },
+    },
+    animationTimingFunction: "ease-in-out",
+  } as const;
+}
 
 const styles = StyleSheet.create({
   besideBoard: { alignItems: "center", left: 0, marginTop: 4, position: "absolute", right: 0, top: "100%" },
@@ -884,4 +917,5 @@ const styles = StyleSheet.create({
   // Above the targeting scrim so the same card still toggles and cancels while choosing.
   heroSideAccessoryLayer: { zIndex: 21 },
   heroSideAccessory: { position: "absolute" },
+  sliderOrigin: { bottom: 0, height: 0, left: 0, position: "absolute", width: 0 },
 });
