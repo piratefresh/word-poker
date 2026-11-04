@@ -826,8 +826,9 @@ function TileContent({
   const tileWidth = scaleTileMetrics(size, scale).width;
   // §39: a tile read aloud gives both faces of a choice tile and which one is played, so a
   // held choice tile says the face the word is playing and not only the pair it prints.
+  const blank = "blank" in tile;
   const playing =
-    choice !== null && held && chosenFace !== undefined
+    (choice !== null || blank) && held && chosenFace !== undefined
       ? `, playing ${chosenFace}`
       : "";
   const powered = isSwappedTileId(tile.id);
@@ -837,6 +838,8 @@ function TileContent({
     const mark = face === tile && powered ? ", from your power" : "";
     const spoken = `${getTileAccessibilityLabel(face)}${mark}${playing}`;
     if (pick === "target") return `${spoken}, tap to swap it`;
+    // A blank's tap raises the keyboard for its letter rather than playing or taking it back.
+    if (blank) return `${spoken}, tap to ${held ? "change" : "type"} its letter`;
     return held
       ? `${spoken}, in your word, tap to take it back`
       : `${spoken}, tap to play it`;

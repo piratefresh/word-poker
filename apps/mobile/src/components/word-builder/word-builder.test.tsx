@@ -20,6 +20,9 @@ import { WordShuffleButton } from "./shuffle-button";
 
 // The suite's reanimated mock has no `useReducedMotion` — the library ships it as a TODO —
 // and the word tile reads it, so the one hook is layered on here.
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
+);
 jest.mock("react-native-reanimated", () => ({
   ...jest.requireActual<Record<string, unknown>>(
     "react-native-reanimated/mock",
@@ -544,31 +547,48 @@ describe("<WordBuilder /> and a held power (§44)", () => {
     expect(view.queryByTestId("word-builder-tile-power-0-powered", { includeHiddenElements: true })).toBeNull();
   });
 
-  test("a blank in the word opens an A–Z picker, and the pick plays the blank as that letter", async () => {
-    const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
-    const { view, onDraft } = await renderBuilder({ privateTiles: [blank, PRIVATE_TILES[1]!] });
-    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
-
-    const inWord = await renderBuilder({
-      privateTiles: [blank, PRIVATE_TILES[1]!],
-      plays: [{ tileId: "power-0" }],
-    });
-    expect(inWord.view.getByTestId("word-builder-blank-picker")).toBeTruthy();
-    await fireEvent.press(inWord.view.getByTestId("word-builder-blank-Q"));
-    expect(inWord.onDraft).toHaveBeenCalledWith([{ tileId: "power-0", chosenFace: "Q" }]);
-    expect(onDraft).not.toHaveBeenCalled();
-  });
-
-  test("tapping a blank not yet in the word opens the picker, and only the pick plays it", async () => {
+  test("tapping a blank not yet in the word raises the keyboard, and only a typed letter plays it", async () => {
     // A faceless blank is a draft the adapters refuse, so the tap must not report one.
     const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
     const { view, onDraft } = await renderBuilder({ privateTiles: [blank, PRIVATE_TILES[1]!] });
+    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
 
     await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
     expect(onDraft).not.toHaveBeenCalled();
     expect(view.getByTestId("word-builder-blank-picker")).toBeTruthy();
 
-    await fireEvent.press(view.getByTestId("word-builder-blank-Q"));
+    await fireEvent.changeText(view.getByTestId("word-builder-blank-input"), "1");
+    expect(onDraft).not.toHaveBeenCalled();
+    await fireEvent.changeText(view.getByTestId("word-builder-blank-input"), "q");
     expect(onDraft).toHaveBeenCalledWith([{ tileId: "power-0", chosenFace: "Q" }]);
+    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
+  });
+
+  test("return on an unnamed blank closes the keyboard and leaves it in the rack", async () => {
+    const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
+    const { view, onDraft } = await renderBuilder({ privateTiles: [blank, PRIVATE_TILES[1]!] });
+
+    await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
+    await fireEvent(view.getByTestId("word-builder-blank-input"), "submitEditing");
+    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  test("a named blank reopens the keyboard on a tap, and backspace takes it out of the word", async () => {
+    const blank: Tile = { id: "power-0", letter: "?", points: 0, blank: true };
+    const { view, onDraft } = await renderBuilder({
+      privateTiles: [blank, PRIVATE_TILES[1]!],
+      plays: [{ tileId: "power-0", chosenFace: "Q" }],
+    });
+    // A named blank does not hold the keyboard up on its own.
+    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
+
+    await fireEvent.press(view.getByTestId("word-builder-tile-power-0"));
+    expect(onDraft).not.toHaveBeenCalled();
+    await fireEvent(view.getByTestId("word-builder-blank-input"), "keyPress", {
+      nativeEvent: { key: "Backspace" },
+    });
+    expect(onDraft).toHaveBeenCalledWith([]);
+    expect(view.queryByTestId("word-builder-blank-picker")).toBeNull();
   });
 });

@@ -285,14 +285,63 @@ export const styles = StyleSheet.create({
   // The letter the word plays the tile as.
   chipChosen: { backgroundColor: "#8a5fd0" },
   chipSpent: { opacity: opacity.disabled },
-  // The blank's A–Z row, wrapped above the tray.
-  blankPicker: {
+  // The blank's letter bar, pinned on top of the native keyboard (STO-1031): the ✕, the word as
+  // it will read with the blank in it, and what it scores. The board stays put behind a scrim.
+  blankScrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(6,10,24,0.35)" },
+  blankSticky: { bottom: 0, left: 0, position: "absolute", right: 0 },
+  blankBar: {
+    alignItems: "center",
+    backgroundColor: "#0f1736",
+    borderTopColor: "#e0974a",
+    borderTopWidth: 2,
+    columnGap: spacing.md,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    justifyContent: "center",
-    paddingBottom: spacing.xs,
+    minHeight: 58,
+    paddingVertical: spacing.xs,
   },
+  blankClose: {
+    alignItems: "center",
+    backgroundColor: "#7a3a1a",
+    borderColor: "#e0974a",
+    borderRadius: 18,
+    borderWidth: 3,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  blankCloseText: { color: "#f7e7b5", fontFamily: fonts.arcade, fontSize: 13 },
+  blankMiddle: { alignItems: "center", flex: 1, rowGap: 4 },
+  blankCaption: {
+    color: "#9aa6cf",
+    fontFamily: fonts.rubikSemiBold,
+    fontSize: 8.5,
+    letterSpacing: 1,
+  },
+  blankWord: { alignItems: "center", columnGap: spacing.sm, flexDirection: "row" },
+  blankTiles: { columnGap: 4, flexDirection: "row" },
+  blankTile: {
+    alignItems: "center",
+    backgroundColor: "#f0dbb2",
+    borderRadius: 5,
+    height: 28,
+    justifyContent: "center",
+    width: 24,
+  },
+  // The blank itself: dashed while it has no letter, the seat's dark tile once it does.
+  blankTileOpen: {
+    backgroundColor: "rgba(8,12,28,0.7)",
+    borderColor: "#f2c75a",
+    borderStyle: "dashed",
+    borderWidth: 2,
+  },
+  blankTileNamed: { backgroundColor: "#1c1917", borderColor: "#f2c75a", borderWidth: 2 },
+  blankTileText: { color: "#2b1c10", fontFamily: fonts.arcade, fontSize: 16 },
+  blankTileTextOpen: { color: "#f7d77a" },
+  blankScore: { color: "#f7d77a", fontFamily: fonts.arcade, fontSize: 14 },
+  // Balances the ✕ so the word sits in the bar's middle.
+  blankSpacer: { width: 36 },
+  // Focused but out of sight: it only summons the keyboard and reads its keys.
+  blankInput: { height: 1, opacity: 0, position: "absolute", width: 1 },
   chipFace: {
     color: "#d9c9ff",
     fontFamily: fonts.arcade,
