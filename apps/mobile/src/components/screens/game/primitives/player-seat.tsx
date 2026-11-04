@@ -250,6 +250,7 @@ export function PlayerSeat({
     );
   }
   const active = seat.status === "your-turn";
+  const wideStatus = seat.isHero && !beside && seat.powerTag !== undefined;
   const winner = seat.status === "winner";
   const lit = active || winner;
   // The hero and opponents share the HUD's turn fill while they are acting.
@@ -335,7 +336,10 @@ export function PlayerSeat({
             <Text style={[styles.playerName, scaled.playerName]}>{formatCoins(seat.stack)}</Text>
           </View>
           {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
-          <View style={[styles.statusRow, scaled.statusRow]}>
+          <View
+            pointerEvents={wideStatus ? "box-none" : undefined}
+            style={[styles.statusRow, scaled.statusRow, wideStatus && styles.statusRowWide]}
+          >
             <View
               style={[
                 styles.statusPill,
@@ -521,6 +525,10 @@ const styles = StyleSheet.create({
   statusTextLit: { color: colors.onGold },
   // Above the rack's lip (zIndex 3), so the pill overlaps the rack's bottom rail.
   statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%", zIndex: 4, elevation: 4 },
+  // The hero sits alone at the foot of the felt, so its status and power tags may stand wider
+  // than the nameplate: squeezed into the column, a power tag shrank YOUR TURN past reading. An
+  // explicit width, not a maxWidth: Yoga measures a content-sized row against its parent's width.
+  statusRowWide: { justifyContent: "center", maxWidth: undefined, width: "170%" },
   actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
