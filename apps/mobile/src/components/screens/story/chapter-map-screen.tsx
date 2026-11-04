@@ -4,7 +4,7 @@
  * doorway, and the badge shelf drawn over the art from `kitchen-table-map.ts`.
  *
  * The map is laid out in the art's 390-wide frame and scaled to the screen as one layer, so node
- * positions stay the spec's numbers. The pieces drawn on it live in `./components`.
+ * positions stay the spec's numbers. The pieces drawn on it live in `./components/chapter-map`.
  */
 
 import { Image } from "expo-image";
@@ -25,14 +25,14 @@ import {
   type MapNode,
 } from "@/features/story/kitchen-table-map";
 
-import { BadgeShelf } from "./components/badge-shelf";
-import { ChapterMapHeader } from "./components/chapter-map-header";
-import { ink } from "./components/chapter-map-ink";
-import { CoachBubble } from "./components/coach-bubble";
-import { MapFriends } from "./components/map-friends";
-import { MapNodeButton } from "./components/map-node-button";
-import { NextChapterDoor } from "./components/next-chapter-door";
-import { PathTile } from "./components/path-tile";
+import { BadgeShelf } from "./components/chapter-map/badge-shelf";
+import { ChapterMapHeader } from "./components/chapter-map/chapter-map-header";
+import { ink } from "./components/chapter-map/chapter-map-ink";
+import { CoachBubble } from "./components/chapter-map/coach-bubble";
+import { MapFriends } from "./components/chapter-map/map-friends";
+import { MapNodeButton } from "./components/chapter-map/map-node-button";
+import { NextChapterDoor } from "./components/chapter-map/next-chapter-door";
+import { PathTile } from "./components/chapter-map/path-tile";
 
 const MAP_ART = require("@/assets/images/story/kitchen-table-map.jpg");
 

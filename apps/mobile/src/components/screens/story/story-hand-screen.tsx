@@ -5,7 +5,7 @@ import { palette, type } from "@/constants/theme";
 import type { MapNode } from "@/features/story/kitchen-table-map";
 import { useDictionary } from "@/features/table/use-dictionary";
 
-import { StoryTable } from "./components/story-table";
+import { StoryTable } from "./components/story-hand/story-table";
 
 /**
  * One story hand (STO-973): the offline table at a map node, opened on a Power Draw of the run's
