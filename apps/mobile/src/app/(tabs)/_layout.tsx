@@ -9,6 +9,7 @@ import {
   HOME_NAV_SHORT_HEIGHT,
   HOME_NAV_SHORT_SCALE,
   HomeNavRack,
+  homeNavBottomInset,
   type HomeNavDestination,
 } from "@/components/screens/home/home-nav-rack";
 import { LedgerStage } from "@/components/screens/history/ledger/ledger-stage";
@@ -49,7 +50,7 @@ const AppTabsNavRack = ({ state, descriptors, navigation }: Omit<TabLayoutProps,
 const TabScenes: NonNullable<ComponentProps<typeof Tabs>["layout"]> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   const k = useWindowDimensions().height < HOME_NAV_SHORT_HEIGHT ? HOME_NAV_SHORT_SCALE : 1;
-  const sceneBottom = HOME_NAV_RACK_HEIGHT * k + insets.bottom - HOME_NAV_RACK_OVERLAP;
+  const sceneBottom = HOME_NAV_RACK_HEIGHT * k + homeNavBottomInset(insets.bottom) - HOME_NAV_RACK_OVERLAP;
   const active = state.routes[state.index].name;
   const home = state.routes.find((route) => route.name === "index");
   const history = state.routes.find((route) => route.name === "history");

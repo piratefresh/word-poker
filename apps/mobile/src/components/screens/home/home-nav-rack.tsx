@@ -12,9 +12,11 @@ import { fonts } from "@/constants/theme";
 import { coinStoreEnabled } from "@/lib/wallet/coin-store";
 import { webTestID } from "@/lib/ui/web-id";
 
-const CHIP = 60;
-export const HOME_NAV_RACK_HEIGHT = 100;
-export const HOME_NAV_RACK_OVERLAP = 42;
+const CHIP = 48;
+export const HOME_NAV_RACK_HEIGHT = 80;
+// Labels may sit inside most of the home-indicator inset; keep only a sliver of it.
+export const homeNavBottomInset = (bottom: number) => Math.round(bottom / 3);
+export const HOME_NAV_RACK_OVERLAP = 14;
 export const HOME_NAV_SHORT_HEIGHT = 700;
 export const HOME_NAV_SHORT_SCALE = 0.8;
 const CREAM = "#f7e7b5";
@@ -49,9 +51,9 @@ function Chip({ tone, color, suit, selected = false, k = 1 }: {
 }) {
   const size = CHIP * k;
   const reduced = useReduceMotion();
-  const lift = useSharedValue(selected ? -14 : 0);
+  const lift = useSharedValue(selected ? -6 : 0);
   useEffect(() => {
-    lift.value = withTiming(selected ? -14 : 0, { duration: reduced ? 0 : 500, easing: Easing.bezier(.3, 1.4, .5, 1) });
+    lift.value = withTiming(selected ? -6 : 0, { duration: reduced ? 0 : 500, easing: Easing.bezier(.3, 1.4, .5, 1) });
   }, [selected, reduced, lift]);
   const motion = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value }] }));
   return (
@@ -63,7 +65,7 @@ function Chip({ tone, color, suit, selected = false, k = 1 }: {
           <Circle cx={30} cy={30} r={24} fill="none" stroke={CREAM} strokeWidth={9} strokeDasharray={[9.42, 9.42]} />
         </Svg>
       )}
-      <View style={[styles.suitDisc, { backgroundColor: color, transform: [{ scale: k }] }]}>
+      <View style={[styles.suitDisc, { backgroundColor: color, left: size / 2 - 14.5, top: size / 2 - 14.5, transform: [{ scale: size / 60 }] }]}>
         <Svg width={28} height={28} viewBox="0 0 28 28">
           <SvgText x={14} y={22} fontSize={24} fill={CREAM} textAnchor="middle">{suit}</SvgText>
         </Svg>
@@ -78,7 +80,7 @@ export function HomeNavRack({ active = null, friendsBadge, onNavigate, onLongPre
   const k = useWindowDimensions().height < HOME_NAV_SHORT_HEIGHT ? HOME_NAV_SHORT_SCALE : 1;
 
   return (
-    <View style={[styles.rack, { height: HOME_NAV_RACK_HEIGHT * k + insets.bottom }]} testID="home-nav-rack">
+    <View style={[styles.rack, { height: HOME_NAV_RACK_HEIGHT * k + homeNavBottomInset(insets.bottom) }]} testID="home-nav-rack">
       <LinearGradient colors={["#b77a42", "#82451e", "#6a3619"]} locations={[0, 0.28, 1]} style={[StyleSheet.absoluteFill, styles.tray]} />
       <View style={styles.tabs}>
         {ORDER.map((destination) => {
@@ -114,16 +116,16 @@ export function HomeNavRack({ active = null, friendsBadge, onNavigate, onLongPre
 
 const styles = StyleSheet.create({
   rack: { position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 },
-  tray: { top: 42, borderTopLeftRadius: 14, borderTopRightRadius: 14, borderTopWidth: 2, borderColor: "#d6a56a" },
+  tray: { top: 0, borderTopLeftRadius: 14, borderTopRightRadius: 14, borderTopWidth: 2, borderColor: "#d6a56a" },
   tabs: { position: "absolute", top: 0, left: 16, right: 16, flexDirection: "row" },
-  tab: { flex: 1, alignItems: "center", paddingTop: 6, minHeight: 84 },
-  labelShort: { fontSize: 11, marginTop: 4 },
+  tab: { flex: 1, alignItems: "center", paddingTop: 8 },
+  labelShort: { fontSize: 11, marginTop: 3 },
   pressed: { transform: [{ translateY: 4 }], opacity: 0.8 },
   chip: { width: CHIP, height: CHIP },
-  suitDisc: { position: "absolute", width: 29, height: 29, left: 15.5, top: 15.5, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  label: { fontFamily: fonts.arcade, fontSize: 13, color: "#2a1206", marginTop: 10 },
+  suitDisc: { position: "absolute", width: 29, height: 29, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  label: { fontFamily: fonts.arcade, fontSize: 12, color: "#2a1206", marginTop: 4 },
   selectedLabel: { color: "#ffe6a6" },
   disabledLabel: { color: "#4b301e" },
-  badge: { position: "absolute", top: 0, right: 6, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 10, backgroundColor: "#f4c75d", borderWidth: 1, borderColor: "#704015", alignItems: "center", justifyContent: "center" },
+  badge: { position: "absolute", top: 2, right: 10, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 10, backgroundColor: "#f4c75d", borderWidth: 1, borderColor: "#704015", alignItems: "center", justifyContent: "center" },
   badgeText: { fontFamily: fonts.arcade, fontSize: 12, color: "#302315" },
 });
