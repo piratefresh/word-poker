@@ -287,7 +287,7 @@ test("DEAL defaults to the normal offline route on 1,000 practice chips, and say
   expect(view.getByTestId("offline-chips-1000").props.accessibilityState.checked).toBe(true);
   expect(view.getByLabelText("1,000 practice chips")).toBeTruthy();
   expect(view.getByLabelText("Deal. Free practice game, your coins are not used.")).toBeTruthy();
-  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 1,000 practice chips. Your coins stay in your wallet.");
+  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 1,000 practice chips every hand. Your coins stay in your wallet.");
   await fireEvent.press(view.getByTestId("offline-deal"));
   await act(async () => jest.runAllTimers());
   expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { chips: 1_000 } });
@@ -301,7 +301,7 @@ test("STARTING CHIPS deals the picked stack and remembers it", async () => {
   await fireEvent.press(view.getByLabelText("2,500 practice chips"));
   expect(view.getByTestId("offline-chips-2500").props.accessibilityState.checked).toBe(true);
   expect(view.getByTestId("offline-chips-1000").props.accessibilityState.checked).toBe(false);
-  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 2,500 practice chips. Your coins stay in your wallet.");
+  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 2,500 practice chips every hand. Your coins stay in your wallet.");
   expect(mockDisk.get("offline-starting-chips")).toBe("2500");
 
   await fireEvent.press(view.getByTestId("offline-close"));
@@ -310,6 +310,22 @@ test("STARTING CHIPS deals the picked stack and remembers it", async () => {
   await fireEvent.press(view.getByTestId("offline-deal"));
   await act(async () => jest.runAllTimers());
   expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { chips: 2_500 } });
+  jest.useRealTimers();
+});
+
+test("KEEP CHIPS deals a table whose stacks carry, and remembers it", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+  await fireEvent.press(view.getByTestId("home-slab-offline"));
+  expect(view.getByTestId("offline-chips-reset").props.accessibilityState.checked).toBe(true);
+  await fireEvent.press(view.getByLabelText("Keep chips between hands"));
+  expect(view.getByTestId("offline-chips-carry").props.accessibilityState.checked).toBe(true);
+  expect(view.getByTestId("offline-deal-note")).toHaveTextContent("Everyone gets 1,000 practice chips. Your coins stay in your wallet.");
+  expect(mockDisk.get("offline-chips-between-hands")).toBe("carry");
+
+  await fireEvent.press(view.getByTestId("offline-deal"));
+  await act(async () => jest.runAllTimers());
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/offline", params: { chips: 1_000, carry: "1" } });
   jest.useRealTimers();
 });
 

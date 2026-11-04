@@ -40,7 +40,7 @@ import {
   spacing,
   type,
 } from "@/constants/theme";
-import { pinnedPowerUps, pinnedSeed, pinnedStartingChips, pinnedTurnMs, randomSeed } from "@/features/offline/offline-seed";
+import { pinnedCarry, pinnedPowerUps, pinnedSeed, pinnedStartingChips, pinnedTurnMs, randomSeed } from "@/features/offline/offline-seed";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
@@ -112,7 +112,7 @@ function OfflineTable({
 }) {
   const { data: authSession } = authClient.useSession();
   const history = useHistory();
-  const params = useLocalSearchParams<{ seed?: string; powers?: string; turn?: string; chips?: string }>();
+  const params = useLocalSearchParams<{ seed?: string; powers?: string; turn?: string; chips?: string; carry?: string }>();
   // Once, on the way in: the session plays the seed this table was set with, and only the
   // URL can name a different one.
   const [seed] = useState(() => pinnedSeed(params.seed) ?? randomSeed());
@@ -122,6 +122,8 @@ function OfflineTable({
   // The tray's STARTING CHIPS (`?chips=2500`): every seat sits down with it, and a new session
   // deals it again.
   const [startingStack] = useState(() => pinnedStartingChips(params.chips) ?? DEFAULT_STAKES.startingStack);
+  // And whether the stacks carry between hands (`?carry=1`), or every hand deals that stack again.
+  const [carryStacks] = useState(() => pinnedCarry(params.carry));
   const {
     game,
     words,
@@ -150,6 +152,7 @@ function OfflineTable({
     turnDurationMs: turnDurationMs ?? pinnedTurnMs(params.turn),
     powerUps,
     startingStack,
+    carryStacks,
     history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
   });
   const payout = game.phase === "payout";

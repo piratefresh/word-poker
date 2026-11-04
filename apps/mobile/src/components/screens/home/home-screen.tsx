@@ -338,7 +338,9 @@ export function HomeScreen() {
         <OfflineTray
           variants={OFFLINE_VARIANTS}
           onClose={closeOffline}
-          onDeal={(variant, chips) => go({ pathname: "/offline", params: { ...variant.params, chips } })}
+          onDeal={(variant, chips, carry) =>
+            go({ pathname: "/offline", params: { ...variant.params, chips, ...(carry ? { carry: "1" } : {}) } })
+          }
           maxHeight={Math.max(180, box.height - headerTop - headerHeight - 88)}
         />
       ) : null}

@@ -8,16 +8,17 @@ import { formatCoins } from "@/lib/ui/format";
 import { webTestID } from "@/lib/ui/web-id";
 
 import { ModeVariants, type ModeVariant } from "./mode-variants";
-import { StartingChips, startingChipsOf } from "./starting-chips";
+import { carryChipsOf, StartingChips, startingChipsOf } from "./starting-chips";
 import { TrayFrame } from "./tray-frame";
 
 const MODE_KEY = "offline-mode";
 const CHIPS_KEY = "offline-starting-chips";
+const CARRY_KEY = "offline-chips-between-hands";
 
 /** Lives inside the Home scene, leaving the header and native tab rack interactive. */
 export function OfflineTray<V extends ModeVariant>({ variants, onDeal, onClose, maxHeight }: {
   variants: readonly [V, ...V[]];
-  onDeal: (variant: V, startingChips: number) => void;
+  onDeal: (variant: V, startingChips: number, carry: boolean) => void;
   onClose: () => void;
   maxHeight: number;
 }) {
@@ -25,6 +26,7 @@ export function OfflineTray<V extends ModeVariant>({ variants, onDeal, onClose, 
     variants.find((variant) => variant.key === readItem(MODE_KEY)) ?? variants[0],
   );
   const [chips, setChips] = useState(() => startingChipsOf(readItem(CHIPS_KEY)));
+  const [carry, setCarry] = useState(() => carryChipsOf(readItem(CARRY_KEY)));
 
   return (
     <TrayFrame id="offline" title="OFFLINE" subline="Free practice chips · your coins are never at stake" closeLabel="Close offline modes" onClose={onClose} maxHeight={maxHeight}>
@@ -35,14 +37,17 @@ export function OfflineTray<V extends ModeVariant>({ variants, onDeal, onClose, 
       <StartingChips selected={chips} onSelect={(next) => {
         setChips(next);
         writeItem(CHIPS_KEY, String(next));
+      }} carry={carry} onCarry={(next) => {
+        setCarry(next);
+        writeItem(CARRY_KEY, next ? "carry" : "reset");
       }} />
-      <Pressable accessibilityRole="button" accessibilityLabel="Deal. Free practice game, your coins are not used." onPress={() => onDeal(selected, chips)} testID="offline-deal" id={webTestID("offline-deal")} style={({ pressed }) => [styles.deal, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Deal. Free practice game, your coins are not used." onPress={() => onDeal(selected, chips, carry)} testID="offline-deal" id={webTestID("offline-deal")} style={({ pressed }) => [styles.deal, pressed && styles.pressed]}>
         <LinearGradient colors={["#ffd877", "#e6a73e"]} style={styles.dealFace}>
           <Text style={styles.dealText}>DEAL</Text>
           <View style={styles.free}><Text style={styles.freeText}>FREE</Text></View>
         </LinearGradient>
       </Pressable>
-      <Text style={styles.note} testID="offline-deal-note">{`Everyone gets ${formatCoins(chips)} practice chips. Your coins stay in your wallet.`}</Text>
+      <Text style={styles.note} testID="offline-deal-note">{`Everyone gets ${formatCoins(chips)} practice chips${carry ? "" : " every hand"}. Your coins stay in your wallet.`}</Text>
     </TrayFrame>
   );
 }

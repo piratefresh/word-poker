@@ -647,6 +647,27 @@ describe("reduce — session end and rollover", () => {
     assert.throws(() => reduce(ended, { type: "deal" }, NOW + 1), OfflineActionError);
   });
 
+  it("deals every seat the starting stack again at a table that restacks, busted seats too", () => {
+    const state = play(dealHand({ restack: true, stakes: { startingStack: 2_500 } }), [
+      { type: "allIn", playerId: "mira" },
+      { type: "call", playerId: "hero" },
+      { type: "call", playerId: "ellis" },
+      { type: "call", playerId: "jay" },
+    ]);
+    const payout = payOut(state);
+    assert.equal(payout.seats.filter((seat) => seat.stack > 0).length, 1);
+
+    const next = reduce(payout, { type: "deal" }, NOW);
+
+    assert.equal(next.sessionOver, false);
+    assert.equal(next.restack, 2_500);
+    assert.deepEqual(next.seats.map((seat) => seat.sittingOut), [false, false, false, false]);
+    assert.deepEqual(
+      next.seats.map((seat) => seat.stack + seat.committedHand),
+      [2_500, 2_500, 2_500, 2_500],
+    );
+  });
+
   it("replays the run from the first seed, stacks and payout included", () => {
     const payout = payOut(playToWindow(dealHand()));
     const once = reduce(payout, { type: "deal" }, NOW);
