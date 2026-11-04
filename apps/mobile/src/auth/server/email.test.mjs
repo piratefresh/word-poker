@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { passwordResetEmail, verifyEmailEmail } from "./email.ts";
 
-test("uses the app deep link for the primary reset action", () => {
+test("the reset button is the http link; the deep link is secondary", () => {
   const browserUrl =
     "http://localhost:8081/api/auth/reset-password/test-token" +
     "?callbackURL=wordpoker%3A%2F%2Freset-password";
@@ -17,11 +17,13 @@ test("uses the app deep link for the primary reset action", () => {
 
   assert.match(
     email.html,
-    /href="wordpoker:\/\/reset-password\?token=test-token"[^>]*>Choose a new password<\/a>/,
+    new RegExp(
+      `href="${browserUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>Choose a new password</a>`,
+    ),
   );
   assert.match(
     email.html,
-    new RegExp(`href="${browserUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`),
+    /href="wordpoker:\/\/reset-password\?token=test-token"[^>]*>Open it in the app<\/a>/,
   );
 });
 

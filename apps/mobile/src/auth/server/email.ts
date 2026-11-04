@@ -90,7 +90,11 @@ export function passwordResetEmail({
   deepLink,
 }: {
   name: string;
-  /** http(s) callback URL — the only kind of link every mail client follows. */
+  /**
+   * http(s) callback URL — the only kind of link every mail client follows, so
+   * it is the button. Its route opens the app on a phone and serves a web form
+   * on a desktop.
+   */
   buttonUrl: string;
   /** `wordpoker://reset-password?token=…`, the app's own entry point. */
   deepLink: string;
@@ -131,13 +135,12 @@ export function passwordResetEmail({
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;">
                   <tr>
                     <td style="background:${brand.gold};border-radius:4px;">
-                      <a href="${appHref}" style="display:inline-block;padding:14px 28px;font-family:${sans};font-size:14px;font-weight:700;letter-spacing:0.5px;color:${brand.onGold};text-decoration:none;">Choose a new password</a>
+                      <a href="${browserHref}" style="display:inline-block;padding:14px 28px;font-family:${sans};font-size:14px;font-weight:700;letter-spacing:0.5px;color:${brand.onGold};text-decoration:none;">Choose a new password</a>
                     </td>
                   </tr>
                 </table>
                 <p style="margin:24px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">The link is good for ${RESET_LINK_LIFETIME} and can only be used once. If it wasn't you, ignore this email — your password stays as it is.</p>
-                <p style="margin:20px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">On a computer? <a href="${browserHref}" style="color:${brand.gold};text-decoration:none;">Continue in your browser</a>.</p>
-                <p style="margin:8px 0 0;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:18px;word-break:break-all;color:${brand.faint};">${appHref}</p>
+                <p style="margin:20px 0 0;font-family:${sans};font-size:13px;line-height:19px;color:${brand.dim};">On the phone with Word Poker installed? <a href="${appHref}" style="color:${brand.gold};text-decoration:none;">Open it in the app</a>.</p>
               </td>
             </tr>
           </table>
