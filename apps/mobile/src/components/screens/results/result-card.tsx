@@ -296,6 +296,8 @@ function ResultTile({
     <Animated.View style={[builderStyles.entry, enter]}>
       <Tile
         animation="none"
+        // A blank (§44) prints the letter the word named it, as it does in the rack.
+        chosenFace={"blank" in tile ? face : undefined}
         // §44: a tile a power handed the seat shows the table its ⚡, and nothing it replaced.
         powered={isSwappedTileId(tile.id)}
         scale={TILE_SCALE_ON_PLATE}

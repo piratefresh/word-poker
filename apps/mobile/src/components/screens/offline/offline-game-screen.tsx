@@ -1,4 +1,3 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -26,7 +25,6 @@ import { useXpResultOverlay } from "@/components/screens/results/use-xp-result-o
 import { XpResultOverlay } from "@/components/screens/results/xp-result-overlay";
 import { CoachProvider, useCoachTour } from "@/components/ui/coach";
 import { GameButton } from "@/components/ui/game-button";
-import { NightLobbyButton } from "@/components/screens/lobby/night-lobby-button";
 import {
   WordBuilder,
   WordCheckButton,
@@ -37,7 +35,6 @@ import {
   border,
   colors,
   fonts,
-  nightLobby,
   palette,
   radius,
   spacing,
@@ -47,8 +44,6 @@ import { pinnedPowerUps, pinnedSeed, pinnedStartingChips, pinnedTurnMs, randomSe
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
-import { formatCoins } from "@/lib/ui/format";
-import { useBalanceView } from "@/lib/wallet/use-balance-view";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -124,8 +119,8 @@ function OfflineTable({
   // The table's power-up mode rides the URL too (`?powers=wild`), and is the table's for the whole
   // session: read once, on the way in, like the seed.
   const [powerUps] = useState(() => pinnedPowerUps(params.powers));
-  // The tray's STARTING CHIPS (`?chips=2500`): every seat sits down with it, and New game and the
-  // out-of-chips refill deal it again.
+  // The tray's STARTING CHIPS (`?chips=2500`): every seat sits down with it, and a new session
+  // deals it again.
   const [startingStack] = useState(() => pinnedStartingChips(params.chips) ?? DEFAULT_STAKES.startingStack);
   const {
     game,
@@ -158,7 +153,6 @@ function OfflineTable({
     history: history.ownerId ? { ownerId: history.ownerId, capture: history.capture } : undefined,
   });
   const payout = game.phase === "payout";
-  const heroBusted = sessionOver && (game.players.find((player) => player?.isHero)?.stack ?? 0) <= 0;
   const { active: celebratingWin, complete: finishWinCelebration } =
     useSimpleWinCelebration(results);
   // §44's held power, from the chip to the confirm: the rack waits for a tile while choosing.
@@ -284,12 +278,10 @@ function OfflineTable({
       {/*
         The hand's payoff, presented over the felt: every hand that pays out ends here, and
         from here the results' own primary is the only deal on the table (STO-379 decision 4).
-        The session's last hand ends the same way; its deal just starts a new session, fresh
-        stacks and a fresh seed (ADR 0002).
+        The session's last hand ends the same way — a busted hero included — and its deal just
+        starts a new session, fresh stacks and a fresh seed (ADR 0002): that is the free refill.
       */}
-      {heroBusted && xp.hero === null ? (
-        <OutOfPracticeChips onLeave={leaveTable} onRefill={restart} refill={startingStack} />
-      ) : payout && results !== null && !celebratingWin && xp.hero === null ? (
+      {payout && results !== null && !celebratingWin && !xp.holding ? (
         <ResultsScreen
           onDeal={sessionOver ? restart : deal}
           onExit={leaveTable}
@@ -308,38 +300,6 @@ function OfflineTable({
         </Modal>
       ) : null}
     </WordBuilder>
-  );
-}
-
-/**
- * The busted hero's way back (design 1a, C3): a free refill of the tray's STARTING CHIPS — a new
- * session with fresh stacks and a fresh seed (ADR 0002) — or out of the table. It names the
- * Wallet's live coins as untouched, since a bot game never spends them; a guest, or a Wallet that
- * has not answered, gets the same line without the figure.
- */
-function OutOfPracticeChips({ refill, onRefill, onLeave }: { refill: number; onRefill: () => void; onLeave: () => void }) {
-  const { data: authSession } = authClient.useSession();
-  const balance = useBalanceView();
-  const coins = authSession?.user.isAnonymous !== true && balance.state === "ready" ? `Your ${formatCoins(balance.amount)} coins` : "Your coins";
-  return (
-    <Modal supportedOrientations={MODAL_ORIENTATIONS} animationType="fade" onRequestClose={onLeave} transparent visible>
-      <ScrollView contentContainerStyle={styles.overlayBackdrop}>
-        <View
-          accessibilityLabel="Out of practice chips. Your coins were not used."
-          style={styles.practiceSheet}
-          testID="out-of-practice-chips"
-        >
-          <LinearGradient colors={nightLobby.panel.navy} style={StyleSheet.absoluteFill} />
-          <Text style={styles.practiceEyebrow}>PRACTICE GAME</Text>
-          <Text style={styles.practiceTitle}>OUT OF PRACTICE CHIPS</Text>
-          <Text style={styles.practiceBody} testID="out-of-practice-chips-body">
-            {`The bots got this one. ${coins} weren't touched: games against bots never use them.`}
-          </Text>
-          <NightLobbyButton label={`REFILL ${formatCoins(refill)} CHIPS · FREE`} onPress={onRefill} testID="free-refill-button" />
-          <NightLobbyButton label="LEAVE TABLE" onPress={onLeave} testID="out-of-practice-chips-leave" tone="outline" />
-        </View>
-      </ScrollView>
-    </Modal>
   );
 }
 
@@ -370,21 +330,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     width: "100%",
   },
-  // Design 1a's sheet: the night navy with the 2px amber top edge.
-  practiceSheet: {
-    alignItems: "stretch",
-    borderRadius: radius.card,
-    borderTopColor: "#e0974a",
-    borderTopWidth: 2,
-    gap: spacing.sm,
-    maxWidth: 340,
-    overflow: "hidden",
-    padding: spacing.lg,
-    width: "100%",
-  },
-  practiceEyebrow: { color: nightLobby.text.label, fontFamily: fonts.rubikSemiBold, fontSize: 12, letterSpacing: 1.4, textAlign: "center" },
-  practiceTitle: { color: nightLobby.gold.light, fontFamily: fonts.arcade, fontSize: 24, textAlign: "center" },
-  practiceBody: { color: nightLobby.text.cream, fontFamily: fonts.rubikMedium, fontSize: 14, lineHeight: 20, marginBottom: spacing.xs, textAlign: "center" },
   overlaySeat: {
     color: colors.textBright,
     fontFamily: fonts.mono,
