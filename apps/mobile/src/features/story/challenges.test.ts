@@ -1,6 +1,10 @@
-import { createDictionary, evaluateBestWord, fixedDeal } from "@wordpoker/game-rules";
+import { createDictionary, evaluateBestWord, fixedDeal, nodeStars, nodeThreshold, storyChapter, storyNode } from "@wordpoker/game-rules";
 
-import { CHALLENGES, starsFor, type Challenge } from "./challenges";
+import { CHALLENGES, type Challenge } from "./challenges";
+
+const KITCHEN = storyChapter("kitchen-table");
+const starsFor = (challenge: Challenge, score: number) =>
+  nodeStars(nodeThreshold(KITCHEN, storyNode(KITCHEN, challenge.id)), { won: true, score });
 
 // The shipped list itself (jest can't take `loadDictionary`'s lazy import): the stars are only
 // honest against the words the table will actually accept.
@@ -12,12 +16,12 @@ function bestWord(challenge: Challenge) {
 }
 
 test.each(CHALLENGES.map((challenge) => [challenge.id, challenge] as const))(
-  "%s: the top star is the best word the hero's seven tiles can build",
+  "%s: the best word the hero's seven tiles can build, and only about that, earns 3★",
   (_, challenge) => {
-    const best = bestWord(challenge);
-    expect(best?.score).toBe(challenge.stars[2]);
-    expect(starsFor(challenge, best?.score ?? 0)).toBe(3);
-    expect(starsFor(challenge, 0)).toBe(0);
+    const best = bestWord(challenge)?.score ?? 0;
+    expect(starsFor(challenge, best)).toBe(3);
+    // 3★ is within reach of the lesson's word, not of any word: a third short of it is not 3★.
+    expect(starsFor(challenge, Math.floor(best * 0.75))).toBeLessThan(3);
   },
 );
 

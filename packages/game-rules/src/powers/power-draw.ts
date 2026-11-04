@@ -55,6 +55,8 @@ export interface PowerDraw {
 export interface DrawSeat {
   readonly seat: number;
   readonly playerId: PlayerId;
+  /** Authored offers in place of the seat's random ones: story mode's drafted powers (STO-973). */
+  readonly offers?: readonly PowerUpId[];
 }
 
 /**
@@ -99,10 +101,10 @@ export function openDraw(drawing: readonly DrawSeat[], dealSeed: number, nowMs: 
   return {
     status: "open",
     endsAtMs: nowMs + POWER_DRAW_MS,
-    slots: drawing.map(({ seat, playerId }) => ({
+    slots: drawing.map(({ seat, playerId, offers }) => ({
       seat,
       playerId,
-      offers: drawOffers(dealSeed, seat),
+      offers: offers ?? drawOffers(dealSeed, seat),
       picked: null,
     })),
   };

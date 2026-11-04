@@ -24,6 +24,7 @@ keeps its number for life: new material is appended as a new number, never slott
 | [Accessibility](rules/accessibility.md) | 39 | Text-to-speech, visual settings, audio and motion settings |
 | [Formats: Rooms, Tournaments & Cash Games](rules/formats.md) | 40–42 | Room variations, tournaments, cash-game stakes |
 | [Power-Ups](rules/power-ups.md) | 44 | The Power Draw, the held power, activation windows, the v1 powers, swapping a tile, visibility |
+| [Story Mode](rules/story-mode.md) | 46 | The chapter run: chapters and nodes, thresholds and stars, the boss retry, the power draft |
 
 ## Reading the Product Spec
 

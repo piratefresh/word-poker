@@ -163,6 +163,7 @@ export function RootLayout() {
                   <Stack.Screen name="(tabs)" options={{ orientation: 'portrait' }} />
                   <Stack.Screen name="tutorial" />
                   <Stack.Screen name="story" />
+                  <Stack.Screen name="story-hand" />
                   <Stack.Screen name="offline" />
                   <Stack.Screen name="online" />
                   <Stack.Screen name="friend/[code]" />
