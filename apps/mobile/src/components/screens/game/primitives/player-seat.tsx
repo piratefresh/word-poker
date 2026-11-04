@@ -127,7 +127,7 @@ function seatStyles(m: SeatMetrics) {
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
     },
-    statusRow: { marginTop: m.pillGap },
+    statusRow: { marginTop: m.pillGap, rowGap: m.pillGap },
     statusText: {
       fontSize: m.statusSize,
       letterSpacing: m.statusTracking,
@@ -338,7 +338,7 @@ export function PlayerSeat({
           {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View
             pointerEvents={wideStatus ? "box-none" : undefined}
-            style={[styles.statusRow, scaled.statusRow, wideStatus && styles.statusRowWide]}
+            style={[styles.statusRow, scaled.statusRow, wideStatus ? styles.statusRowWide : styles.statusRowFit]}
           >
             <View
               style={[
@@ -524,11 +524,15 @@ const styles = StyleSheet.create({
   statusText: { color: "#fff8e9", fontFamily: fonts.arcade },
   statusTextLit: { color: colors.onGold },
   // Above the rack's lip (zIndex 3), so the pill overlaps the rack's bottom rail.
-  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%", zIndex: 4, elevation: 4 },
+  statusRow: { alignItems: "center", flexDirection: "row", zIndex: 4, elevation: 4 },
+  // A seat's own column: a power tag that won't fit beside the action wraps under it, centred,
+  // rather than squeezing both (`adjustsFontSizeToFit` shrank THINKING… past reading).
+  statusRowFit: { flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" },
   // The hero sits alone at the foot of the felt, so its status and power tags may stand wider
   // than the nameplate: squeezed into the column, a power tag shrank YOUR TURN past reading. An
   // explicit width, not a maxWidth: Yoga measures a content-sized row against its parent's width.
-  statusRowWide: { justifyContent: "center", maxWidth: undefined, width: "170%" },
+  // It must never carry `statusRowFit`'s cap: a `maxWidth: undefined` does not lift it on iOS.
+  statusRowWide: { justifyContent: "center", width: "170%" },
   actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
