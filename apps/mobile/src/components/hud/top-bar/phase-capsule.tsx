@@ -22,6 +22,9 @@ const RIGHT = require("../../../../assets/images/ui/v2/phase-capsule-right.png")
 
 /** The end slices are cropped to their curve: a cap is this share of the capsule's height wide. */
 const CAP_RATIO = 0.8;
+/** The end slices' own width over height (702×587, 825×571). */
+const LEFT_ASPECT = 702 / 587;
+const RIGHT_ASPECT = 825 / 571;
 const PHASE_SIZE = 15;
 const CLOCK_SIZE = {
   fontSize: 17,
@@ -71,26 +74,31 @@ export function PhaseCapsule({
       style={{ height, minWidth: stacked ? STACKED_MIN_WIDTH : undefined, paddingHorizontal: cap * 0.7 }}
       testID={testID}
     >
-      <Image
-        accessible={false}
-        contentFit="cover"
-        contentPosition="left"
-        source={LEFT}
-        style={[art, { left: 0, width: cap }]}
-      />
+      {/* Each cap is clipped by its own box rather than by expo-image's `contentPosition`, which
+          on iOS can go stale when the capsule resizes (the clock's width changes) and leave the
+          right cap undrawn. */}
+      <View style={[art, styles.clip, { left: 0, width: cap }]}>
+        <Image
+          accessible={false}
+          contentFit="fill"
+          source={LEFT}
+          style={[art, { left: 0, width: height * LEFT_ASPECT }]}
+        />
+      </View>
       <Image
         accessible={false}
         contentFit="fill"
         source={MIDDLE}
         style={[art, { left: cap, right: cap }]}
       />
-      <Image
-        accessible={false}
-        contentFit="cover"
-        contentPosition="right"
-        source={RIGHT}
-        style={[art, { right: 0, width: cap }]}
-      />
+      <View style={[art, styles.clip, { right: 0, width: cap }]}>
+        <Image
+          accessible={false}
+          contentFit="fill"
+          source={RIGHT}
+          style={[art, { right: 0, width: height * RIGHT_ASPECT }]}
+        />
+      </View>
       {/* The felt-green inlay: the wood's dark interior is hard to read gold on. */}
       <View
         style={[styles.inlay, { borderRadius: height, inset: height * (stacked ? STACKED_RAIL : RAIL) }]}
@@ -157,6 +165,7 @@ export function PhaseCapsule({
 }
 
 const styles = StyleSheet.create({
+  clip: { overflow: "hidden" },
   inlay: {
     backgroundColor: "#1E5A33",
     borderColor: "#123A21",

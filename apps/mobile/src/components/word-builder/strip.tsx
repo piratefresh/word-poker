@@ -802,7 +802,7 @@ function DragTile({
 
 /**
  * One tile in the strip: the tile itself, and — under a choice tile — the two faces that name
- * which letter §10 plays it for. A tap plays the tile or takes it back; the drag lives on the
+ * which letter §10 plays it for; under a blank, a "Change" caption. A tap plays the tile or takes it back; the drag lives on the
  * `SortableItem` around this, so the press is only ever a play.
  */
 function TileContent({
@@ -917,6 +917,15 @@ function TileContent({
           )}
         </>
       )}
+      {/* A blank says its letter can change: a tap raises the keyboard for it. */}
+      {blank && !picking ? (
+        <Text
+          numberOfLines={1}
+          style={[styles.faceCaption, { width: tileWidth }]}
+        >
+          Change
+        </Text>
+      ) : null}
     </View>
   );
 }
