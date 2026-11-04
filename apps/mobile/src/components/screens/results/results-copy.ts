@@ -36,6 +36,7 @@ export const SEAT_TAG_COPY: Record<ResultsSeatTag, string> = {
   called: "CALLED",
   "all-in": "ALL-IN",
   folded: "FOLDED",
+  busted: "BUSTED",
 };
 
 /** `+$500`, `−$240`, `$0`: the true minus sign, since it sits beside other figures on the card. */
