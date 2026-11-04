@@ -125,12 +125,12 @@ afterEach(() => {
   else process.env.EXPO_PUBLIC_COIN_STORE = saved;
 });
 
-test("shows the four mode slabs", async () => {
+test("shows the five mode slabs", async () => {
   const view = await render(<HomeScreen />);
   expect(view.getByTestId("street-logo")).toBeTruthy();
   expect(view.queryByTestId("tile-logo")).toBeNull();
 
-  for (const label of ["Play Online", "Play a Friend", "Tutorial", "Offline"]) {
+  for (const label of ["Play Online", "Play a Friend", "Story", "Tutorial", "Offline"]) {
     expect(view.getByLabelText(label)).toBeTruthy();
   }
 });
@@ -155,6 +155,16 @@ test("walks through the door, then opens the mode", async () => {
 
   await act(async () => jest.runAllTimers());
   expect(router.push).toHaveBeenCalledWith("/online");
+  jest.useRealTimers();
+});
+
+test("the Story slab opens the chapter map", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+
+  await fireEvent.press(view.getByTestId("home-slab-story"));
+  await act(async () => jest.runAllTimers());
+  expect(router.push).toHaveBeenCalledWith("/story");
   jest.useRealTimers();
 });
 

@@ -1,5 +1,5 @@
-# The street menu on a device (STO-597): the four mode slabs — Play Online, Play a Friend,
-# Tutorial, Offline — sit on the wall left of the door, and the Offline slab opens its two
+# The street menu on a device (STO-597): the five mode slabs — Play Online, Play a Friend,
+# Story, Tutorial, Offline — sit on the wall left of the door, and the Offline slab opens its two
 # choices, Normal and Wild Power.
 #
 #   maestro test --platform ios .maestro/native/home-menu.yaml        # from apps/mobile
@@ -23,6 +23,7 @@ tags:
 # Every mode slab is on the screen.
 - assertVisible: "Play Online"
 - assertVisible: "Play a Friend"
+- assertVisible: "Story"
 - assertVisible: "Tutorial"
 - assertVisible: "Offline"
 - takeScreenshot: home-menu
