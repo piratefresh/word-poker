@@ -93,7 +93,7 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
         border: 1px solid ${brand.border};
         border-radius: 8px;
       }
-      .pw:focus-within { border-color: ${brand.gold}; }
+      .pw:focus-within { border-color: ${brand.gold}; box-shadow: 0 0 0 3px rgba(212,175,55,0.25); }
       .pw input {
         flex: 1;
         min-width: 0;
@@ -226,13 +226,13 @@ export function webResetPasswordPage(token: string): Response {
         <p class="sub">Set a new password for your account. This link works once and expires after 30 minutes.</p>
         <form id="form" novalidate>
           <label for="password">New password</label>
-          <div class="pw">
+          <div class="pw" role="group">
             <input id="password" name="password" type="password" autocomplete="new-password"
               minlength="${MIN_PASSWORD_LENGTH}" required />
             ${eyeButton("password")}
           </div>
           <label for="confirm">Confirm password</label>
-          <div class="pw">
+          <div class="pw" role="group">
             <input id="confirm" name="confirm" type="password" autocomplete="new-password"
               minlength="${MIN_PASSWORD_LENGTH}" required />
             ${eyeButton("confirm")}

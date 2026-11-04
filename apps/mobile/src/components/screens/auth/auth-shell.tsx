@@ -5,15 +5,12 @@ import { StatusBar } from "expo-status-bar";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type TextInputProps,
-  type TextStyle,
 } from "react-native";
 import Animated, {
   Easing,
@@ -30,6 +27,7 @@ import Svg, { Path } from "react-native-svg";
 import "./autofill-fix";
 
 import { STREETS } from "@/components/screens/home/street-art";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { fonts, layout, tileMaterial } from "@/constants/theme";
 
 /** The menu card's paper: its own warm palette, not the felt's. */
@@ -37,11 +35,8 @@ const paper = {
   ink: "#3a2210",
   body: "#7a5634",
   faint: "#a8967e",
-  fieldFill: "#fffdf6",
-  fieldBorder: "#dcc196",
   gradient: ["#fff6e2", "#f0dbb2"] as const,
   error: "#a8281e",
-  errorBorder: "#c2352b",
   link: "#a8641c",
 };
 
@@ -200,44 +195,28 @@ export function AuthShell({
 
 export type FieldProps = TextInputProps & {
   label: string;
-  /** Shown under the field after a submit; turns its border red. */
+  /** Shown under the field after a submit; turns its frame red. */
   error?: string;
   /** Standing help under the field, until an error replaces it. */
   hint?: string;
-  /** A password: masked, with a show / hide eye in the `end` slot (unless `end` is given). */
+  /** A password: masked, with a show / hide eye at the end (unless `end` is given). */
   secret?: boolean;
-  /** Inside the frame, before the text: usually a `FieldAddon`. */
+  /** An `inline-start` addon's contents: an icon, `InputGroupText` or an `InputGroupButton`. */
   start?: ReactNode;
-  /** Inside the frame, after the text: usually a `FieldAddon`. */
+  /** An `inline-end` addon's contents. */
   end?: ReactNode;
   /** Sits under the error: the handle's suggestion chips. */
   children?: ReactNode;
 };
 
-/**
- * The field's frame is a row — `start`, the text, `end` — so an addon takes its
- * own room and the text stops where it begins (no overlay, no padding guesses).
- */
-export function Field({
-  label,
-  error,
-  hint,
-  secret = false,
-  start,
-  end,
-  children,
-  onBlur,
-  onFocus,
-  style,
-  ...input
-}: FieldProps) {
-  const [focused, setFocused] = useState(false);
+/** A labelled `InputGroup`: label, the framed control with its addons, then error or hint. */
+export function Field({ label, error, hint, secret = false, start, end, children, editable, ...input }: FieldProps) {
   const [shown, setShown] = useState(false);
 
   const trailing =
     end ??
     (secret ? (
-      <FieldAddon label={shown ? "Hide password" : "Show password"} onPress={() => setShown(!shown)}>
+      <InputGroupButton label={shown ? "Hide password" : "Show password"} onPress={() => setShown(!shown)} size="icon-sm">
         <SymbolView
           name={
             shown
@@ -247,32 +226,22 @@ export function Field({
           size={20}
           tintColor={paper.body}
         />
-      </FieldAddon>
+      </InputGroupButton>
     ) : null);
 
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={[styles.fieldFrame, focused && styles.fieldFrameFocused, !!error && styles.fieldFrameError]}>
-        {start}
-        <TextInput
+      <InputGroup disabled={editable === false} invalid={!!error}>
+        {start ? <InputGroupAddon>{start}</InputGroupAddon> : null}
+        <InputGroupInput
           accessibilityHint={error}
           accessibilityLabel={label}
-          onBlur={(event) => {
-            setFocused(false);
-            onBlur?.(event);
-          }}
-          onFocus={(event) => {
-            setFocused(true);
-            onFocus?.(event);
-          }}
-          placeholderTextColor={paper.faint}
           secureTextEntry={secret && !shown}
-          style={[styles.input, !!start && styles.inputAfterAddon, !!trailing && styles.inputBeforeAddon, style]}
           {...input}
         />
-        {trailing}
-      </View>
+        {trailing ? <InputGroupAddon align="inline-end">{trailing}</InputGroupAddon> : null}
+      </InputGroup>
       {error ? (
         <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>
       ) : hint ? (
@@ -280,26 +249,6 @@ export function Field({
       ) : null}
       {children}
     </View>
-  );
-}
-
-/** One thing in a field's `start` / `end` slot: an icon, or a button when it has `onPress`. */
-export function FieldAddon({
-  children,
-  label,
-  onPress,
-}: {
-  children: ReactNode;
-  /** The button's accessibility label; only read when `onPress` is set. */
-  label?: string;
-  onPress?: () => void;
-}) {
-  if (!onPress) return <View style={styles.addon}>{children}</View>;
-
-  return (
-    <Pressable accessibilityLabel={label} accessibilityRole="button" hitSlop={4} onPress={onPress} style={styles.addon}>
-      {children}
-    </Pressable>
   );
 }
 
@@ -536,51 +485,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.96,
     textTransform: "uppercase",
-  },
-  /** The bordered box; the text and any addons sit in it as a row. */
-  fieldFrame: {
-    alignItems: "center",
-    backgroundColor: paper.fieldFill,
-    borderColor: paper.fieldBorder,
-    borderRadius: 10,
-    borderWidth: 2,
-    flexDirection: "row",
-    height: 48,
-  },
-  /** The copper frame carries focus, so the browser's own ring is off. */
-  fieldFrameFocused: {
-    borderColor: tileMaterial.slab,
-  },
-  fieldFrameError: {
-    borderColor: paper.errorBorder,
-  },
-  input: {
-    alignSelf: "stretch",
-    color: paper.ink,
-    flex: 1,
-    fontFamily: fonts.rubikMedium,
-    fontSize: 16,
-    paddingHorizontal: 14,
-    /**
-     * RN's style types only allow solid/dotted/dashed, but web needs `none` to
-     * drop the blue UA focus ring, and RN Web hands the value straight to CSS.
-     */
-    ...Platform.select({
-      web: { outlineStyle: "none" } as unknown as TextStyle,
-    }),
-  },
-  /** An addon brings its own side padding, so the text gives up its own there. */
-  inputAfterAddon: {
-    paddingLeft: 0,
-  },
-  inputBeforeAddon: {
-    paddingRight: 0,
-  },
-  addon: {
-    alignItems: "center",
-    alignSelf: "stretch",
-    justifyContent: "center",
-    paddingHorizontal: 12,
   },
   error: {
     color: paper.error,
