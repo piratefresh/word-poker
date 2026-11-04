@@ -1,6 +1,14 @@
 import { Image } from "expo-image";
-import { useMemo, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState, type ReactNode } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native";
 
 import { RackTileBack } from "@/components/game";
 import { ChipSprite } from "@/components/chip/chip-sprite";
@@ -33,6 +41,9 @@ import {
 // Relative, not `@/assets`: Jest maps `@/` to `src/` only.
 const RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-3-tight.png");
 const TABLETOP_RACK_ART = require("../../../../../assets/images/ui/v2/opponent-rack-5.png");
+
+/** The bet chip's bubble, wide enough for "Mira's bet this round" on one line. */
+const BET_TIP_WIDTH = 132;
 
 const STATUS_LABEL: Record<PlayerStatus, string> = {
   waiting: "WAITING",
@@ -127,7 +138,7 @@ function seatStyles(m: SeatMetrics) {
       paddingHorizontal: m.pillPadX,
       paddingVertical: m.pillPadY,
     },
-    statusRow: { marginTop: m.pillGap },
+    statusRow: { marginTop: m.pillGap, rowGap: m.pillGap },
     statusText: {
       fontSize: m.statusSize,
       letterSpacing: m.statusTracking,
@@ -338,7 +349,7 @@ export function PlayerSeat({
           {rack ? <RackLayers m={metrics} tabletop={tabletop} /> : null}
           <View
             pointerEvents={wideStatus ? "box-none" : undefined}
-            style={[styles.statusRow, scaled.statusRow, wideStatus && styles.statusRowWide]}
+            style={[styles.statusRow, scaled.statusRow, wideStatus ? styles.statusRowWide : styles.statusRowFit]}
           >
             <View
               style={[
@@ -378,21 +389,15 @@ export function PlayerSeat({
         </>,
       )}
       {seat.bet ? (
-        <View
-          style={[
-            styles.betChip,
-            scaled.betChip,
-            betChipOffset(anchor, metrics, seatCount),
-          ]}
+        <BetChip
+          amount={seat.bet}
+          metrics={metrics}
+          name={seat.isHero ? "Your" : `${seat.name}'s`}
+          practice={practice}
+          style={[styles.betChip, scaled.betChip, betChipOffset(anchor, metrics, seatCount)]}
           testID={`seat-bet-${seat.id}`}
-        >
-          <View style={StyleSheet.absoluteFill}>
-            <ChipSprite tone={chipToneForAmount(seat.bet)} size={metrics.chip} />
-          </View>
-          <Text style={[styles.betChipText, scaled.betChipText]}>
-            {seat.bet}
-          </Text>
-        </View>
+          textStyle={[styles.betChipText, scaled.betChipText]}
+        />
       ) : null}
     </>
   );
@@ -416,6 +421,65 @@ export function PlayerSeat({
       testID={testID}
     >
       {content}
+    </Pressable>
+  );
+}
+
+/**
+ * A seat's bet this round as a chip. A tap (or, on the web, a hover) names it in a small
+ * bubble under the chip, so a player new to the felt can tell what the number is.
+ */
+function BetChip({
+  amount,
+  metrics,
+  name,
+  practice,
+  style,
+  testID,
+  textStyle,
+}: {
+  amount: number;
+  metrics: SeatMetrics;
+  /** Whose bet, possessive: "Your" or "Jay's". */
+  name: string;
+  practice: boolean;
+  style: StyleProp<ViewStyle>;
+  testID: string;
+  textStyle: StyleProp<TextStyle>;
+}) {
+  const [open, setOpen] = useState(false);
+  const unit = practice ? "practice chips" : "chips";
+  return (
+    <Pressable
+      accessibilityHint="Shows what this chip is"
+      accessibilityLabel={`${name} bet this round, ${formatCoins(amount)} ${unit}`}
+      accessibilityRole="button"
+      hitSlop={layout.hitSlop}
+      onHoverIn={() => setOpen(true)}
+      onHoverOut={() => setOpen(false)}
+      onPress={() => setOpen((was) => !was)}
+      style={[style, open && styles.betChipOpen]}
+      testID={testID}
+    >
+      <View style={StyleSheet.absoluteFill}>
+        <ChipSprite tone={chipToneForAmount(amount)} size={metrics.chip} />
+      </View>
+      <Text style={textStyle}>{amount}</Text>
+      {open ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.betTip,
+            { left: (metrics.chip - BET_TIP_WIDTH) / 2, top: metrics.chip + 4 * metrics.scale },
+          ]}
+          testID={`${testID}-tip`}
+        >
+          <Text style={styles.betTipTitle}>{name} bet this round</Text>
+          <Text style={styles.betTipBody}>
+            {formatCoins(amount)} {unit}
+          </Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -524,11 +588,15 @@ const styles = StyleSheet.create({
   statusText: { color: "#fff8e9", fontFamily: fonts.arcade },
   statusTextLit: { color: colors.onGold },
   // Above the rack's lip (zIndex 3), so the pill overlaps the rack's bottom rail.
-  statusRow: { alignItems: "center", flexDirection: "row", maxWidth: "100%", zIndex: 4, elevation: 4 },
+  statusRow: { alignItems: "center", flexDirection: "row", zIndex: 4, elevation: 4 },
+  // A seat's own column: a power tag that won't fit beside the action wraps under it, centred,
+  // rather than squeezing both (`adjustsFontSizeToFit` shrank THINKING… past reading).
+  statusRowFit: { flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" },
   // The hero sits alone at the foot of the felt, so its status and power tags may stand wider
   // than the nameplate: squeezed into the column, a power tag shrank YOUR TURN past reading. An
   // explicit width, not a maxWidth: Yoga measures a content-sized row against its parent's width.
-  statusRowWide: { justifyContent: "center", maxWidth: undefined, width: "170%" },
+  // It must never carry `statusRowFit`'s cap: a `maxWidth: undefined` does not lift it on iOS.
+  statusRowWide: { justifyContent: "center", width: "170%" },
   actionPill: { flexShrink: 1, minWidth: 0 },
   // The power's tag in the Power Draw's own gold, so it reads as a power and not a bet.
   powerTag: { backgroundColor: "rgba(20,8,4,0.7)", borderColor: palette.gold400 },
@@ -556,6 +624,21 @@ const styles = StyleSheet.create({
     position: "absolute",
     ...elevation.tile,
   },
+  betChipOpen: { zIndex: 10 },
+  betTip: {
+    alignItems: "center",
+    backgroundColor: "rgba(20, 8, 4, 0.94)",
+    borderColor: colors.goldHi,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    position: "absolute",
+    width: BET_TIP_WIDTH,
+    ...elevation.tile,
+  },
+  betTipTitle: { color: "#fff8dc", fontFamily: fonts.sansBlack, fontSize: 10, textAlign: "center" },
+  betTipBody: { color: colors.goldHi, fontFamily: fonts.mono, fontSize: 10, textAlign: "center" },
   betChipText: {
     color: "#fff8dc",
     fontFamily: fonts.sansBlack,

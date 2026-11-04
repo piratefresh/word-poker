@@ -227,8 +227,10 @@ export function seatMetrics(tableWidth: number, tabletop = false, labelScale = 1
 
 /**
  * Where a seat's bet chip sits, in the seat's own box (its top is the avatar's top edge; its
- * left is the column's left, or the avatar's for a seat whose labels are on its right). The chip
- * stands centred above the avatar, clear of the labels and the felt's pot.
+ * left is the column's left, or the avatar's for a seat whose labels are on its right). Beside
+ * the labels the chip stands centred above the avatar. Under them (portrait) the space above the
+ * avatar belongs to the header, so the chip tucks against the avatar's lower-left edge instead —
+ * opposite the role badge, its bottom level with the avatar's, clear of the nameplate.
  */
 export function betChipOffset(
   anchor: Pick<SeatAnchor, "angle">,
@@ -240,7 +242,10 @@ export function betChipOffset(
   const centred = (m.avatar - m.chip) / 2;
   if (direction === "left") return { left: m.width + m.besideGap + centred, top };
   if (direction === "right") return { left: centred, top };
-  return { left: (m.width - m.chip) / 2, top };
+  return {
+    left: (m.width - m.avatar) / 2 - m.chip + 4 * m.scale,
+    top: m.avatar - m.chip,
+  };
 }
 
 /**

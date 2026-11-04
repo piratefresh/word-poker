@@ -142,7 +142,11 @@ export function RaiseSlider({
             style={[styles.pill, { bottom: ys[i] - 14 }, preset.selected && styles.pillSelected]}
             testID={`wager-preset-${preset.id}`}
           >
-            <Text style={[styles.pillText, preset.selected && styles.pillTextSelected]}>
+            {/* Capped: the screen-edge clamp counts on the pills fitting RAISE_PILL_REACH. */}
+            <Text
+              maxFontSizeMultiplier={PILL_FONT_SCALE_MAX}
+              style={[styles.pillText, preset.selected && styles.pillTextSelected]}
+            >
               {preset.label}
             </Text>
           </Pressable>
@@ -153,6 +157,7 @@ export function RaiseSlider({
 }
 
 const KNOB = 26;
+const PILL_FONT_SCALE_MAX = 1.15;
 const POT_PRESETS = [
   { id: "half-pot", label: "½ POT", name: "Half pot", multiplier: 0.5 },
   { id: "pot", label: "POT", name: "Pot", multiplier: 1 },

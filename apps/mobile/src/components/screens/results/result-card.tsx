@@ -26,7 +26,12 @@ import Animated, {
 
 import { isSwappedTileId } from "@wordpoker/game-rules";
 
-import { Tile } from "@/components/game/word-tile";
+import {
+  getTileAccessibilityLabel,
+  MULTIPLIER_FILL,
+  MULTIPLIER_LABEL,
+  Tile,
+} from "@/components/game/word-tile";
 import { styles as builderStyles } from "@/components/word-builder/styles";
 import {
   border,
@@ -40,6 +45,7 @@ import {
   resultsEntrance,
   resultsTable,
   spacing,
+  tileMaterial,
 } from "@/constants/theme";
 import { WORD_REJECTION_COPY } from "@/features/table/word-rejection-copy";
 import { formatAmount } from "@/lib/ui/format";
@@ -295,9 +301,13 @@ function ResultTile({
           multiplier: choice.multiplier,
         };
 
+  // At the plate's scale the tile's own corner pill would cover the whole face, so the plate
+  // hangs the 2× / 3× under the tile instead, and the tile reads its multiplier aloud as before.
+  const multiplier = shown.multiplier;
   return (
     <Animated.View style={[builderStyles.entry, enter]}>
       <Tile
+        accessibilityLabel={getTileAccessibilityLabel(shown)}
         animation="none"
         // A blank (§44) prints the letter the word named it, as it does in the rack.
         chosenFace={"blank" in tile ? face : undefined}
@@ -307,8 +317,18 @@ function ResultTile({
         side="front"
         size="small"
         testID={testID}
-        tile={shown}
+        tile={{ ...shown, multiplier: undefined }}
       />
+      {multiplier === undefined ? null : (
+        <View
+          style={[styles.tileMultiplier, { backgroundColor: MULTIPLIER_FILL[multiplier] }]}
+          testID={`${testID}-multiplier`}
+        >
+          <Text maxFontSizeMultiplier={1.2} style={styles.tileMultiplierText}>
+            {MULTIPLIER_LABEL[multiplier]}
+          </Text>
+        </View>
+      )}
       {choice === null ? null : (
         <View style={[builderStyles.faces, styles.tileFaces]}>
           {[choice.letter, choice.alternativeLetter].map((letter) => (
@@ -335,7 +355,8 @@ function ResultTile({
 const AVATAR = layout.minTouch;
 
 const styles = StyleSheet.create({
-  stacked: { alignItems: "center", gap: spacing.xs },
+  // The gap clears the place cap that hangs off the avatar's bottom edge.
+  stacked: { alignItems: "center", gap: spacing.md },
   beside: { alignItems: "center", flexDirection: "row", gap: spacing.sm },
   besideReversed: { flexDirection: "row-reverse" },
 
@@ -355,20 +376,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.arcade,
     fontSize: fontSize.bodyLg,
   },
-  // The cap sits on the avatar's top edge and runs wider than it, so it is out of the flow.
+  // The cap sits on the avatar's bottom edge and runs wider than it, so it is out of the flow.
   cap: {
     backgroundColor: palette.felt800,
     borderColor: palette.cream100,
     borderRadius: radius.pill,
     borderWidth: border.hairline,
+    bottom: -spacing.sm,
     paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
     position: "absolute",
-    top: -spacing.xs,
   },
   capText: {
     color: palette.cream100,
     fontFamily: fonts.ui,
-    fontSize: fontSize.micro,
+    fontSize: fontSize.caption,
     letterSpacing: 0.6,
   },
 
@@ -426,6 +448,19 @@ const styles = StyleSheet.create({
   tileFaces: { borderRadius: 4, borderWidth: 1, marginTop: 1 },
   tileChip: { height: 12, width: 9.5 },
   tileChipFace: { fontSize: 7 },
+  tileMultiplier: {
+    borderColor: tileMaterial.multiplier.ink,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    marginTop: 1,
+    paddingHorizontal: 3,
+  },
+  tileMultiplierText: {
+    color: tileMaterial.multiplier.ink,
+    fontFamily: fonts.arcade,
+    fontSize: 8,
+    lineHeight: 10,
+  },
   reason: {
     color: resultsTable.meta,
     fontFamily: fonts.uiMedium,

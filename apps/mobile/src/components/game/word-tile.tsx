@@ -168,11 +168,11 @@ const TILE_FONT = fonts.arcade;
 const FLIP_EASING = Easing.bezier(...motionEasing.flip);
 const DEAL_EASING = Easing.bezier(...motionEasing.deal);
 const FLIP_PERSPECTIVE = 900;
-const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
+export const MULTIPLIER_LABEL: Record<LetterMultiplier, string> = {
   "double-letter": "2×",
   "triple-letter": "3×",
 };
-const MULTIPLIER_FILL: Record<LetterMultiplier, string> = {
+export const MULTIPLIER_FILL: Record<LetterMultiplier, string> = {
   "double-letter": tileMaterial.multiplier.double,
   "triple-letter": tileMaterial.multiplier.triple,
 };
