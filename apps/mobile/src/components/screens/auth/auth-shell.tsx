@@ -2,6 +2,7 @@ import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
+import { SymbolView } from "expo-symbols";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Platform,
@@ -203,7 +204,7 @@ export type FieldProps = TextInputProps & {
   error?: string;
   /** Standing help under the field, until an error replaces it. */
   hint?: string;
-  /** A password: masked, with a SHOW / HIDE toggle on the label's row. */
+  /** A password: masked, with an eye inside the field that shows / hides it. */
   secret?: boolean;
   /** Sits under the error: the handle's suggestion chips. */
   children?: ReactNode;
@@ -215,35 +216,49 @@ export function Field({ label, error, hint, secret = false, children, onBlur, on
 
   return (
     <View style={styles.field}>
-      <View style={styles.labelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View>
+        <TextInput
+          accessibilityHint={error}
+          accessibilityLabel={label}
+          onBlur={(event) => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
+          onFocus={(event) => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
+          placeholderTextColor={paper.faint}
+          secureTextEntry={secret && !shown}
+          style={[
+            styles.input,
+            secret && styles.inputWithEye,
+            focused && styles.inputFocused,
+            !!error && styles.inputError,
+          ]}
+          {...input}
+        />
         {secret ? (
-          <Text
+          <Pressable
             accessibilityLabel={shown ? "Hide password" : "Show password"}
             accessibilityRole="button"
+            hitSlop={8}
             onPress={() => setShown(!shown)}
-            style={styles.toggle}
+            style={styles.eye}
           >
-            {shown ? "HIDE" : "SHOW"}
-          </Text>
+            <SymbolView
+              name={
+                shown
+                  ? { ios: "eye.slash", android: "visibility_off", web: "visibility_off" }
+                  : { ios: "eye", android: "visibility", web: "visibility" }
+              }
+              size={20}
+              tintColor={paper.body}
+            />
+          </Pressable>
         ) : null}
       </View>
-      <TextInput
-        accessibilityHint={error}
-        accessibilityLabel={label}
-        onBlur={(event) => {
-          setFocused(false);
-          onBlur?.(event);
-        }}
-        onFocus={(event) => {
-          setFocused(true);
-          onFocus?.(event);
-        }}
-        placeholderTextColor={paper.faint}
-        secureTextEntry={secret && !shown}
-        style={[styles.input, focused && styles.inputFocused, !!error && styles.inputError]}
-        {...input}
-      />
       {error ? (
         <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>
       ) : hint ? (
@@ -481,10 +496,6 @@ const styles = StyleSheet.create({
   field: {
     gap: 6,
   },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
   fieldLabel: {
     color: paper.body,
     fontFamily: fonts.rubikSemiBold,
@@ -492,11 +503,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.96,
     textTransform: "uppercase",
   },
-  toggle: {
-    color: paper.link,
-    fontFamily: fonts.rubikSemiBold,
-    fontSize: 12,
-    letterSpacing: 0.96,
+  /** The eye sits inside the field's right edge; the text stops short of it. */
+  inputWithEye: {
+    paddingRight: 44,
+  },
+  eye: {
+    alignItems: "center",
+    bottom: 0,
+    justifyContent: "center",
+    position: "absolute",
+    right: 4,
+    top: 0,
+    width: 40,
   },
   input: {
     backgroundColor: paper.fieldFill,
