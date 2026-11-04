@@ -116,16 +116,18 @@ const SLABS: readonly Slab[] = [
     href: { pathname: "/online", params: { create: "1" } },
     online: true,
   },
+  // Chapter 1's map (STO-861); each node there plays its own hand.
+  { key: "story", label: "Story", letter: "S", width: 183, tilt: -0.8, href: "/story" },
   {
     key: "tutorial",
     label: "Tutorial",
     letter: "T",
     tag: "+100",
     width: 176,
-    tilt: -0.8,
+    tilt: 0.8,
     href: "/tutorial",
   },
-  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: 0.8 },
+  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: -0.8 },
 ];
 const SLAB_MAX_WIDTH = Math.max(...SLABS.map((slab) => slab.width));
 
