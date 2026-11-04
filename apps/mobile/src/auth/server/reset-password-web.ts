@@ -85,18 +85,25 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
       }
       p.sub { margin: 12px 0 0; font-size: 15px; line-height: 22px; color: ${brand.dim}; }
       label { display: block; margin: 24px 0 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: ${brand.gold}; }
-      .pw { position: relative; }
-      .pw input { padding-right: 48px; }
-      input {
-        width: 100%;
-        padding: 13px 14px;
-        font-size: 15px;
-        color: ${brand.cream};
+      /* The bordered frame is a row: the input, then the eye, each with its own room. */
+      .pw {
+        display: flex;
+        align-items: stretch;
         background: rgba(0,0,0,0.25);
         border: 1px solid ${brand.border};
         border-radius: 8px;
       }
-      input:focus { outline: none; border-color: ${brand.gold}; }
+      .pw:focus-within { border-color: ${brand.gold}; }
+      .pw input {
+        flex: 1;
+        min-width: 0;
+        padding: 13px 0 13px 14px;
+        font-size: 15px;
+        color: ${brand.cream};
+        background: none;
+        border: none;
+      }
+      .pw input:focus { outline: none; }
       button, a.btn {
         display: block;
         width: 100%;
@@ -116,16 +123,12 @@ const pageShell = (title: string, main: string, script = ""): string => `<!docty
       }
       button:disabled { opacity: 0.5; cursor: default; }
       button.eye {
-        position: absolute;
-        top: 0;
-        right: 4px;
-        bottom: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 40px;
+        width: auto;
         margin: 0;
-        padding: 0;
+        padding: 0 12px;
         color: ${brand.dim};
         background: none;
       }

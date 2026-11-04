@@ -204,20 +204,57 @@ export type FieldProps = TextInputProps & {
   error?: string;
   /** Standing help under the field, until an error replaces it. */
   hint?: string;
-  /** A password: masked, with an eye inside the field that shows / hides it. */
+  /** A password: masked, with a show / hide eye in the `end` slot (unless `end` is given). */
   secret?: boolean;
+  /** Inside the frame, before the text: usually a `FieldAddon`. */
+  start?: ReactNode;
+  /** Inside the frame, after the text: usually a `FieldAddon`. */
+  end?: ReactNode;
   /** Sits under the error: the handle's suggestion chips. */
   children?: ReactNode;
 };
 
-export function Field({ label, error, hint, secret = false, children, onBlur, onFocus, ...input }: FieldProps) {
+/**
+ * The field's frame is a row — `start`, the text, `end` — so an addon takes its
+ * own room and the text stops where it begins (no overlay, no padding guesses).
+ */
+export function Field({
+  label,
+  error,
+  hint,
+  secret = false,
+  start,
+  end,
+  children,
+  onBlur,
+  onFocus,
+  style,
+  ...input
+}: FieldProps) {
   const [focused, setFocused] = useState(false);
   const [shown, setShown] = useState(false);
+
+  const trailing =
+    end ??
+    (secret ? (
+      <FieldAddon label={shown ? "Hide password" : "Show password"} onPress={() => setShown(!shown)}>
+        <SymbolView
+          name={
+            shown
+              ? { ios: "eye.slash", android: "visibility_off", web: "visibility_off" }
+              : { ios: "eye", android: "visibility", web: "visibility" }
+          }
+          size={20}
+          tintColor={paper.body}
+        />
+      </FieldAddon>
+    ) : null);
 
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View>
+      <View style={[styles.fieldFrame, focused && styles.fieldFrameFocused, !!error && styles.fieldFrameError]}>
+        {start}
         <TextInput
           accessibilityHint={error}
           accessibilityLabel={label}
@@ -231,33 +268,10 @@ export function Field({ label, error, hint, secret = false, children, onBlur, on
           }}
           placeholderTextColor={paper.faint}
           secureTextEntry={secret && !shown}
-          style={[
-            styles.input,
-            secret && styles.inputWithEye,
-            focused && styles.inputFocused,
-            !!error && styles.inputError,
-          ]}
+          style={[styles.input, !!start && styles.inputAfterAddon, !!trailing && styles.inputBeforeAddon, style]}
           {...input}
         />
-        {secret ? (
-          <Pressable
-            accessibilityLabel={shown ? "Hide password" : "Show password"}
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => setShown(!shown)}
-            style={styles.eye}
-          >
-            <SymbolView
-              name={
-                shown
-                  ? { ios: "eye.slash", android: "visibility_off", web: "visibility_off" }
-                  : { ios: "eye", android: "visibility", web: "visibility" }
-              }
-              size={20}
-              tintColor={paper.body}
-            />
-          </Pressable>
-        ) : null}
+        {trailing}
       </View>
       {error ? (
         <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>
@@ -266,6 +280,26 @@ export function Field({ label, error, hint, secret = false, children, onBlur, on
       ) : null}
       {children}
     </View>
+  );
+}
+
+/** One thing in a field's `start` / `end` slot: an icon, or a button when it has `onPress`. */
+export function FieldAddon({
+  children,
+  label,
+  onPress,
+}: {
+  children: ReactNode;
+  /** The button's accessibility label; only read when `onPress` is set. */
+  label?: string;
+  onPress?: () => void;
+}) {
+  if (!onPress) return <View style={styles.addon}>{children}</View>;
+
+  return (
+    <Pressable accessibilityLabel={label} accessibilityRole="button" hitSlop={4} onPress={onPress} style={styles.addon}>
+      {children}
+    </Pressable>
   );
 }
 
@@ -503,28 +537,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.96,
     textTransform: "uppercase",
   },
-  /** The eye sits inside the field's right edge; the text stops short of it. */
-  inputWithEye: {
-    paddingRight: 44,
-  },
-  eye: {
+  /** The bordered box; the text and any addons sit in it as a row. */
+  fieldFrame: {
     alignItems: "center",
-    bottom: 0,
-    justifyContent: "center",
-    position: "absolute",
-    right: 4,
-    top: 0,
-    width: 40,
-  },
-  input: {
     backgroundColor: paper.fieldFill,
     borderColor: paper.fieldBorder,
     borderRadius: 10,
     borderWidth: 2,
+    flexDirection: "row",
+    height: 48,
+  },
+  /** The copper frame carries focus, so the browser's own ring is off. */
+  fieldFrameFocused: {
+    borderColor: tileMaterial.slab,
+  },
+  fieldFrameError: {
+    borderColor: paper.errorBorder,
+  },
+  input: {
+    alignSelf: "stretch",
     color: paper.ink,
+    flex: 1,
     fontFamily: fonts.rubikMedium,
     fontSize: 16,
-    height: 48,
     paddingHorizontal: 14,
     /**
      * RN's style types only allow solid/dotted/dashed, but web needs `none` to
@@ -534,12 +569,18 @@ const styles = StyleSheet.create({
       web: { outlineStyle: "none" } as unknown as TextStyle,
     }),
   },
-  /** The copper frame carries focus, so the browser's own ring is off. */
-  inputFocused: {
-    borderColor: tileMaterial.slab,
+  /** An addon brings its own side padding, so the text gives up its own there. */
+  inputAfterAddon: {
+    paddingLeft: 0,
   },
-  inputError: {
-    borderColor: paper.errorBorder,
+  inputBeforeAddon: {
+    paddingRight: 0,
+  },
+  addon: {
+    alignItems: "center",
+    alignSelf: "stretch",
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
   error: {
     color: paper.error,
