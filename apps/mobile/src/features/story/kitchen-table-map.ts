@@ -98,8 +98,6 @@ export const KITCHEN_TABLE = {
   maxStars: 15,
   nextChapter: "The Local",
   badge: "Professor Badge",
-  /** The coach's hint after two boss losses in a row. */
-  bossHint: "He folds when the bar’s full. Push him.",
   nodes: [
     { id: "first-hand", kind: "hand", title: "First Hand", glyph: "1", ...at(0.5, 0.885), friend: { id: "ellis", dx: 80 }, challengeId: "first-hand", room: "porch", opponent: "Ellis", opener: "Pull up a chair. Spell a word with your two tiles and the board. Best word takes the pot." },
     { id: "chips-on-the-table", kind: "hand", title: "Chips on the Table", glyph: "2", ...at(0.28, 0.72), friend: { id: "jay", dx: 80 }, room: "living-room", opponent: "Jay", opener: "Chips on the table. Let’s see what you bet." },

@@ -35,6 +35,8 @@ export interface StoryVerdictProps {
   built: BuiltWord | null;
   /** What a power from the draft is for: `Hand 2`. */
   into: string;
+  /** The coach's hint about the boss's tell, shown after two boss losses in a row. */
+  hint: string | null;
   onReplay: () => void;
   onLeave: () => void;
 }
@@ -56,12 +58,12 @@ export function StoryVerdict(props: StoryVerdictProps): ReactElement {
   const { node, verdict, hero, winner, teach, onReplay, onLeave } = props;
   const won = hero?.takesPot ?? false;
   if (!won) {
-    return <StoryReveal hero={hero} hint={verdict.coachHint ? KITCHEN_TABLE.bossHint : undefined} node={node} onLeave={onLeave} onReplay={onReplay} teach={teach} winner={winner} />;
+    return <StoryReveal hero={hero} hint={verdict.coachHint ? (props.hint ?? undefined) : undefined} node={node} onLeave={onLeave} onReplay={onReplay} teach={teach} winner={winner} />;
   }
   return <StoryResult {...props} />;
 }
 
-function StoryResult({ chapterId, node, verdict, hero, built, into, onReplay, onLeave }: StoryVerdictProps): ReactElement {
+function StoryResult({ chapterId, node, verdict, hero, built, into, hint, onReplay, onLeave }: StoryVerdictProps): ReactElement {
   // The draft waits in the save, so it survives leaving here; taking one settles it and goes back.
   const { draft } = verdict;
   const filled = useFilledStars(verdict.replayBoss ? 0 : verdict.stars);
@@ -93,7 +95,7 @@ function StoryResult({ chapterId, node, verdict, hero, built, into, onReplay, on
             </Text>
           )}
           {folded ? <Text style={styles.folded}>{`${node.opponent} folded`}</Text> : null}
-          {verdict.coachHint ? <Text style={styles.hint}>{KITCHEN_TABLE.bossHint}</Text> : null}
+          {verdict.coachHint && hint !== null ? <Text style={styles.hint}>{hint}</Text> : null}
           <View style={styles.rule} />
           {draft !== null ? (
             <StoryDraft chapterId={chapterId} into={into} offers={draft} onSettled={onLeave} />

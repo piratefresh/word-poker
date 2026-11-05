@@ -70,6 +70,7 @@ import { evaluateWord, spellSubmission } from "../words/building";
 import { commitChips } from "../money/chips";
 import { dealHand } from "../tiles/deal";
 import type { Dictionary } from "../words/dictionary";
+import type { BossId } from "../bot/boss";
 import {
   BettingRejectionError,
   OfflineActionError,
@@ -233,6 +234,8 @@ export interface OfflineState {
    * has no such field at all, so its state is exactly what it was before power-ups existed.
    */
   powers?: HandPowers;
+  /** Story mode's boss seats (STO-974): each plays its boss's style. Absent at every other table. */
+  bosses?: Readonly<Record<PlayerId, BossId>>;
 }
 
 /** What `startHand` needs: a seed, the seats, the caller's clock reading, and the table's rules. */
@@ -289,6 +292,8 @@ export interface StartHandOptions {
    * lessons only; online tables never pass one.
    */
   deal?: ReturnType<typeof dealHand>;
+  /** Seats that play as story bosses (STO-974), carried into every later hand. */
+  bosses?: Readonly<Record<PlayerId, BossId>>;
 }
 
 function freshWordChecks(
@@ -329,6 +334,7 @@ export function startHand({
   wordWindowMs,
   powerUps,
   deal,
+  bosses,
 }: StartHandOptions): OfflineState {
   const turnDurationMs = requestedTurnDurationMs ?? OFFLINE_TURN_MS;
   if (!Number.isFinite(turnDurationMs) || turnDurationMs <= 0) {
@@ -403,6 +409,7 @@ export function startHand({
     wordChecks: freshWordChecks(seats),
     dictionary,
     result: null,
+    ...(bosses === undefined ? {} : { bosses }),
   };
 
   if (powerUps?.deal === "choose3") {
@@ -1211,6 +1218,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     turnDurationMs: state.turnDurationMs,
     wordWindowMs: state.wordWindowMs,
     ...(state.powers === undefined ? {} : { powerUps: { deal: "choose3" } }),
+    ...(state.bosses === undefined ? {} : { bosses: state.bosses }),
   });
 
   return { ...fresh, hand: state.hand + 1 };

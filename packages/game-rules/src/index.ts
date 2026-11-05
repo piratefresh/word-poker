@@ -40,7 +40,9 @@ export {
   showdownDrawValue,
 } from "./money/showdown";
 export type { RankShowdownOptions, ShowdownEntry } from "./money/showdown";
-export { decideOfflineMove, chooseOfflineWord } from "./bot/bot";
+export { decideBotWord, decideOfflineMove, chooseOfflineWord } from "./bot/bot";
+export { BOSS_IDS, BOSS_TELL, PRESSURE_FULL, bossStyle, bossTells, isBossId } from "./bot/boss";
+export type { BossId, BossStyle, BossTell, TellKind } from "./bot/boss";
 export type { ChooseWordOptions } from "./bot/bot";
 export { bestWordToTeach, evaluateBestWord, topWords } from "./bot/bot-word";
 export { RIVER_REVIEW_WORDS, riverReview } from "./words/river-review";

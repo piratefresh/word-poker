@@ -1,11 +1,13 @@
 /** Offline betting policy: fair observations, stable personalities, and seeded decisions. */
-import type { OfflineAction, PlayerId } from "@wordpoker/contracts";
+import type { OfflineAction, PlayerId, WordSubmission } from "@wordpoker/contracts";
 
 import { bettingBounds } from "../money/betting";
 import { observeBot } from "./bot-observation";
 import { decideBotBet } from "./bot-policy";
 import { OfflineActionError } from "../core/errors";
-import type { OfflineState } from "../table/offline";
+import { availableTiles, type OfflineState } from "../table/offline";
+import { bossStyle, bossWord } from "./boss";
+import { chooseOfflineWord } from "./bot-word";
 
 export { chooseOfflineWord } from "./bot-word";
 export type { ChooseWordOptions } from "./bot-word";
@@ -29,4 +31,13 @@ export function decideOfflineMove(state: OfflineState, botId: PlayerId): Offline
   const bounds = bettingBounds(state.seats, betting, toAct, state.stakes.bigBlind);
   if (bounds === null) throw new OfflineActionError(`${botId} cannot act at ${state.phase}`);
   return decideBotBet(observeBot(state, toAct, betting), bounds);
+}
+
+/** The word a CPU seat confirms in §19's window: the best score, or a boss's own taste (STO-974). */
+export function decideBotWord(state: OfflineState, seat: number): WordSubmission | null {
+  const options = { available: availableTiles(state, seat), dictionary: state.dictionary };
+  const id = state.seats[seat]?.id;
+  const boss = id === undefined ? undefined : state.bosses?.[id];
+  if (boss === undefined) return chooseOfflineWord(options);
+  return bossWord(options, bossStyle(boss, state.seed))?.submission ?? null;
 }

@@ -1275,7 +1275,7 @@ describe("useOfflineGame — a session's own seats", () => {
     );
     expect(jay.result.current.game.players.map((player) => player?.name)).toEqual(["Guest", "Jay"]);
     const boss = await renderHook(() =>
-      useOfflineGame({ seed: SEED, dictionary, session: storySession({ players: ["hero", "professor"] }, dictionary) }),
+      useOfflineGame({ seed: SEED, dictionary, session: storySession({ players: ["hero", "professor"], bosses: { professor: "professor" } }, dictionary) }),
     );
     expect(boss.result.current.game.players[1]?.name).toBe("The Professor");
   });

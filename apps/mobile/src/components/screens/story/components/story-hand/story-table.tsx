@@ -20,6 +20,7 @@ import { GameScreen } from "@/components/screens/game/game-screen";
 import { WordBuilder, WordCheckButton, WordHand, WordShuffleButton } from "@/components/word-builder";
 import { randomSeed } from "@/features/offline/offline-seed";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
+import { BOSS_COPY, bossCoachLine } from "@/features/story/bosses";
 import { challengeById, storySession, storyTable } from "@/features/story/challenges";
 import { bestUnusedTile, storyCoachLine } from "@/features/story/story-coach";
 import { FRIENDS, KITCHEN_TABLE, type Expression, type FriendId, type MapNode } from "@/features/story/kitchen-table-map";
@@ -29,6 +30,7 @@ import { StoryMeter } from "./story-meter";
 import { StoryRoom } from "./story-room";
 import { StorySpeech } from "./story-speech";
 import { StoryVerdict, type BuiltWord } from "./story-verdict";
+import { BossTell } from "./boss-tell";
 
 const CHAPTER = storyChapter("kitchen-table");
 
@@ -53,7 +55,8 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const [powersHeld] = useState(() => chapterRecord(storyProgress(), CHAPTER.id).powers);
   const session = useMemo(() => storySession(storyTable(node), dictionary, powersHeld), [node, dictionary, powersHeld]);
   const offline = useOfflineGame({ seed: 0, dictionary, session });
-  const { game, words, results, powers } = offline;
+  const { game, words, results, powers, bossTells } = offline;
+  const tell = bossTells[0];
   const power = usePowerTargeting({ held: powers?.held, onUse: offline.usePower });
   const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
@@ -97,10 +100,13 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     // handTiles is rebuilt each render from the same dealt tiles.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [builtPlays, builtScore, builtWord, results]);
-  const coachLine = verdict?.coachHint
-    ? KITCHEN_TABLE.bossHint
+  // A boss hand opens on the coach's pointer at the tell; a second loss in a row earns the hint.
+  const bossLine = tell === undefined || game.phase !== "preflop" ? "" : bossCoachLine(tell.style, tell.boss === "dealer");
+  const hint = tell === undefined ? null : BOSS_COPY[tell.style].hint;
+  const coachLine = verdict?.coachHint && hint !== null
+    ? hint
     : storyCoachLine({
-        street: challenge?.coach[game.phase] ?? "",
+        street: challenge?.coach[game.phase] ?? bossLine,
         word: words?.word ?? "",
         score: words?.score?.total ?? null,
         valid: dictionary.isWord(words?.word ?? ""),
@@ -179,6 +185,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
               {game.phase === "payout" ? null : (
                 <View pointerEvents="none" style={styles.coach}>
                   <StorySpeech line={coachLine} />
+                  {tell === undefined ? null : <BossTell tell={tell} />}
                 </View>
               )}
               {powers === null ? null : (
@@ -212,6 +219,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           teach={teach}
           verdict={verdict}
           winner={winner}
+          hint={hint}
           onReplay={replay}
           onLeave={onLeave}
         />
