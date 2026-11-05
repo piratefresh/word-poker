@@ -110,7 +110,7 @@ export interface RecordedHand {
 
 /**
  * Records a hand at an open node. Stars keep their best; a boss hand counts only when won at
- * the threshold, and is otherwise dealt again. A hand node opens a draft.
+ * the threshold, and is otherwise dealt again. A hand node won opens a draft.
  *
  * @param seed Seeds the draft's offers.
  * @throws {RangeError} For an unknown chapter or node, or a node still locked.
@@ -161,7 +161,8 @@ export function recordHand(
     };
   }
 
-  const offers = node.kind === "hand" ? draftOffers(chapter, record.powers, seed) : [];
+  // A power is the reward for a hand won: a lost hand is dealt again, not paid.
+  const offers = node.kind === "hand" && outcome.won ? draftOffers(chapter, record.powers, seed) : [];
   const draft = offers.length > 0 ? offers : null;
   return {
     progress: withRecord(progress, chapterId, { ...record, ...keepBest(), draft: draft ?? record.draft }),

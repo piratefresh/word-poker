@@ -15,7 +15,7 @@ import {
   type HandOutcome,
   type StoryProgress,
 } from "../src/story/chapter-run";
-import { STORY_CHAPTERS, STORY_RULES, storyChapter, storyNode } from "../src/story/chapters";
+import { STORY_CHAPTERS, STORY_RULES, nodeStarGoals, storyChapter, storyNode } from "../src/story/chapters";
 
 const KITCHEN = storyChapter("kitchen-table");
 const WIN = (score: number): HandOutcome => ({ won: true, score });
@@ -44,6 +44,13 @@ describe("story config", () => {
       assert.equal(chapter.nodes.length * 3, chapter.loadout === undefined ? 15 : 3, chapter.id);
       assert.equal(chapter.nodes.at(-1)?.kind, "boss", `${chapter.id} ends on its boss`);
     }
+  });
+});
+
+describe("nodeStarGoals", () => {
+  it("reads First Hand's ★★ and ★★★ scores off the chapter", () => {
+    const chapter = storyChapter("kitchen-table");
+    assert.deepEqual(nodeStarGoals(chapter, storyNode(chapter, "first-hand")), { two: 11, three: 14 });
   });
 });
 
@@ -141,11 +148,12 @@ describe("recordHand — the boss", () => {
 });
 
 describe("the power draft", () => {
-  it("offers after a hand, never after the bonus or the boss", () => {
+  it("offers after a hand won, never after a hand lost, the bonus or the boss", () => {
     const afterHand = play(EMPTY_STORY_PROGRESS, "first-hand", WIN(1));
     assert.ok(afterHand.draft !== null);
     assert.deepEqual(chapterRecord(afterHand.progress, "kitchen-table").draft, afterHand.draft);
 
+    assert.equal(play(EMPTY_STORY_PROGRESS, "first-hand", { won: false, score: 9 }).draft, null, "a lost hand pays no power");
     assert.equal(play(throughHands(), "bonus", WIN(1)).draft, null);
     assert.equal(play(throughHands(), "professor", WIN(30)).draft, null);
   });

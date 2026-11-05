@@ -135,7 +135,7 @@ export {
   xpToReach,
 } from "./xp";
 export type { LevelStanding } from "./xp";
-export { STORY_CHAPTERS, STORY_RULES, nodeThreshold, storyChapter, storyNode } from "./story/chapters";
+export { STORY_CHAPTERS, STORY_RULES, nodeStarGoals, nodeThreshold, storyChapter, storyNode } from "./story/chapters";
 export type { StoryChapter, StoryNode, StoryNodeKind } from "./story/chapters";
 export {
   EMPTY_STORY_PROGRESS,
