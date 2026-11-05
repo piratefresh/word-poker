@@ -207,7 +207,7 @@ export function PowerUsePrompt({
               </View>
             ) : null}
             <View style={styles.actions}>
-              <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" variant="wood" />
+              <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" variant="dark" />
               <GameButton
                 label={CONFIRM_LABEL[family ?? "swapTile"]}
                 onPress={onConfirm}
