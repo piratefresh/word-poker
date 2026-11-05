@@ -278,6 +278,26 @@ manually from `apps/mobile` with `eas workflow:run .eas/workflows/e2e-ios.yml`, 
 label to a pull request. EAS Workflows and its Maestro job require an Expo plan that includes
 those services.
 
+### Coin packs in development (RevenueCat Test Store)
+
+A simulator, an emulator and a sideloaded build can't buy real App Store or Play products, so the
+store shows RevenueCat's "no products" error there. Development builds can use RevenueCat's Test
+Store instead; the web build keeps its Web Billing (Stripe sandbox) key.
+
+1. In the RevenueCat dashboard, open **Apps and providers → Test configuration** and create a Test
+   Store. Copy its API key.
+2. Create Test Store products with the identifiers `coins_small`, `coins_medium` and `coins_large`
+   (the catalog only knows `COIN_PACK_IDS`). Add them to the current coin Offering, and to the `COIN`
+   virtual currency grants with the same amounts as the real products, or the store hides them.
+3. Set `EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY` in `apps/mobile/.env` and restart Metro.
+
+Under `__DEV__` that key replaces the Apple and Google keys (`src/lib/wallet/revenuecat.ts`); a
+purchase opens RevenueCat's dialog, which can succeed, fail or cancel. Test Store purchases are
+sandbox data. Never use the key outside a development build: the SDK crashes a release build on
+purpose when it is configured with a Test Store key, and that includes TestFlight and the Play
+testing tracks. So an Android *test* build needs either a development build or real Play products
+on the internal testing track with a license tester.
+
 ### Online device smoke
 
 apps/mobile/.maestro/native/online-hand.yaml runs the same seed 409 hand with a signed-in development build and a ROOM_ID deep link. Online joins require a real Better Auth session; the offline E2E auth bypass cannot authenticate a table. The device needs reachable Expo auth and Colyseus servers, a seeded E2E user, WORDPOKER_DETERMINISTIC_SEED=1, and a separate smoke-opponent.ts process. The flow signs in when needed. Run it from apps/mobile with the room id printed by the opponent:

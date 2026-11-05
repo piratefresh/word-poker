@@ -36,17 +36,25 @@ export function CoinPackGrid({
   buying: string | null;
   onSelect: (row: CoinPackRow) => void;
 }) {
+  // Two to a row, always: an odd last pack keeps its column width beside an empty half.
+  const pairs = Array.from({ length: Math.ceil(rows.length / 2) }, (_, i) => rows.slice(i * 2, i * 2 + 2));
+
   return (
     <View style={styles.grid}>
-      {rows.map((row, index) => (
-        <PackCard
-          buying={buying === row.productId}
-          disabled={disabled}
-          index={index}
-          key={row.productId}
-          onPress={() => onSelect(row)}
-          row={row}
-        />
+      {pairs.map((pair, rowIndex) => (
+        <View key={pair[0].productId} style={styles.row}>
+          {pair.map((row, column) => (
+            <PackCard
+              buying={buying === row.productId}
+              disabled={disabled}
+              index={rowIndex * 2 + column}
+              key={row.productId}
+              onPress={() => onSelect(row)}
+              row={row}
+            />
+          ))}
+          {pair.length === 1 ? <View style={styles.cell} /> : null}
+        </View>
       ))}
     </View>
   );
@@ -92,8 +100,9 @@ function PackCard({ row, index, disabled, buying, onPress }: { row: CoinPackRow;
 }
 
 const styles = StyleSheet.create({
-  grid: { columnGap: 12, flexDirection: "row", flexWrap: "wrap", paddingTop: 6, rowGap: 12 },
-  cell: { flexBasis: "47%", flexGrow: 1 },
+  grid: { gap: 12, paddingTop: 6 },
+  row: { flexDirection: "row", gap: 12 },
+  cell: { flex: 1 },
   card: {
     alignItems: "center",
     backgroundColor: STORE.card,
