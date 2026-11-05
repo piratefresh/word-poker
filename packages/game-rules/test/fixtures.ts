@@ -4,12 +4,12 @@
  * The engine judges every confirmed word against a dictionary (offline.ts), so a test that
  * walks a hand to its payout has to hand it one. `createDictionary` is the shipped
  * constructor, so the judging path under test is the real one; only the word list shrinks,
- * from 141,962 entries to what a test can read in its source.
+ * from the full vocabulary to what a test can read in its source.
  */
 
 import { DICTIONARIES, createDictionary, type Dictionary } from "../src/words/dictionary";
 
-/** Words the rules' own fixtures use — real entries of the shipped en_US-large list (§8). */
+/** Words used by rule fixtures, independently of the shipped vocabulary. */
 export const TEST_WORDS = ["AA", "QI", "STRONG", "MONSTER"] as const;
 
 /**

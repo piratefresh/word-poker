@@ -53,4 +53,15 @@ describe("joinCoinPacks", () => {
 
     expect(rows.map((row) => row.badge)).toEqual([undefined, "Best Value"]);
   });
+
+  test("gives each pack its bonus over the smallest pack's coins per unit of price", () => {
+    const { rows } = joinCoinPacks(
+      [pkg("coins_large", 9.99), pkg("coins_small", 0.99), pkg("coins_medium", 4.99)],
+      CATALOG,
+      {},
+    );
+
+    // 2,000 / 0.99 is the base; 12,000 / 4.99 is 19% more, 30,000 / 9.99 is 49% more.
+    expect(rows.map((row) => row.bonusPercent)).toEqual([0, 19, 49]);
+  });
 });

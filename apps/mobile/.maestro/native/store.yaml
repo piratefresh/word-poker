@@ -1,0 +1,16 @@
+appId: com.wordpoker.wordpoker
+name: Store loads the real wallet (native)
+tags: [native, store]
+---
+- runFlow: _ensure-session.yaml
+- tapOn:
+    id: "home-credits"
+# The balance by its text: @expo/ui's SwiftUI Text does not expose its testID on iOS.
+- extendedWaitUntil:
+    visible: "[0-9,]+ COINS"
+    timeout: 30000
+- assertNotVisible:
+    id: "wallet-error"
+- tapOn:
+    id: "store-back"
+- assertVisible: "Offline"

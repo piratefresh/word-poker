@@ -30,17 +30,12 @@ tags:
 - evalScript: "${output.email = typeof TEST_USER_EMAIL === 'undefined' ? 'e2e@wordpoker.dev' : TEST_USER_EMAIL}"
 - openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-in"
 
-# The app hides everything until the first session check resolves, so give it a
-# beat before deciding which screen we're on.
-- waitForAnimationToEnd:
-    timeout: 5000
-
-# A session left by a previous run is dropped through the avatar menu first.
+# Wait for either destination before deciding whether this profile needs signing out.
+# Waiting only for Home added a 20-second timeout to every fresh-profile sign-in.
 - extendedWaitUntil:
-    visible:
-      id: "home-account-menu"
-    timeout: 20000
-    optional: true
+    visible: "Offline|TAKE YOUR SEAT"
+    timeout: 60000
+# A session left by a previous run is dropped through the avatar menu first.
 - runFlow:
     when:
       visible:
@@ -55,12 +50,8 @@ tags:
           timeout: 30000
 
 # The sign-in form. The email input is matched by its placeholder text, but the
-# password input cannot be: on the web, text matching folds case, so "Password"
-# matches both the placeholder and the PASSWORD label above it — and the label
-# comes first in the tree, so the tap lands on it and the typing goes nowhere.
-# `css:` reaches the input itself (offline-hand.yaml warns css never settles on
-# the felt page; this auth page is plain react-native-web and it works), and
-# `below:` the email label pins it should the page ever grow another one.
+# password input uses its accessible ID: text matching also sees the PASSWORD caption.
+# Maestro's CSS lookup can stall here, so use the native/web accessibility name.
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
     timeout: 30000
@@ -68,10 +59,8 @@ tags:
     text: "you@mail.com or HANDLE"
 - inputText: ${output.email}
 - tapOn:
-    css: input[type=password]
-    below:
-      text: "EMAIL OR HANDLE"
-- inputText: wordpoker-e2e
+    id: "Password"
+- inputText: "${typeof TEST_USER_PASSWORD === 'undefined' ? 'wordpoker-e2e' : TEST_USER_PASSWORD}"
 - tapOn:
     text: "TAKE YOUR SEAT"
 
@@ -87,3 +76,6 @@ tags:
     text: ${output.email}
 - tapOn:
     text: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Account settings"
+    timeout: 10000

@@ -8,7 +8,7 @@
  * platform through `GET /api/wallet`, so a purchase only has to finish and the server says the rest.
  */
 
-import { Platform } from "react-native";
+import { LogBox, Platform } from "react-native";
 import Purchases, { PURCHASES_ERROR_CODE, type PurchasesError, type PurchasesPackage } from "react-native-purchases";
 
 import {
@@ -20,6 +20,10 @@ import {
 } from "./coin-offering";
 
 export { StoreUnavailableError } from "./coin-offering";
+
+// Without App Store products (a simulator, no StoreKit config) the SDK logs this as a console
+// error, and its development LogBox banner covers CALL and the tab bar.
+LogBox.ignoreLogs([/\[RevenueCat\].*(Error fetching offerings|There is an issue with your configuration)/]);
 
 /** The platform's public SDK key. Written out literally: Expo inlines only literal names. */
 function apiKey(): string | undefined {

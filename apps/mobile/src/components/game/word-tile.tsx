@@ -42,6 +42,7 @@ import {
   tileMaterial,
 } from "@/constants/theme";
 import { ShadowBox } from "@/components/ui/shadow-box";
+import { useTileSetMaterial } from "@/lib/tile-sets/tile-set-paint";
 import { webTestID } from "@/lib/ui/web-id";
 
 /**
@@ -274,7 +275,10 @@ export function Tile({
   const unchosen = second !== null && played === null;
   /** A seat's own letters: the dark, gold-ringed face. The ledger's gold fill keeps its own paint. */
   const mine = ownership === "private" && fill === "ivory";
-  const ink = mine ? tileMaterial.private.ink : tileMaterial.ink;
+  /** Every other ivory tile wears the player's tile set (STO-1045); the default set is plain ivory. */
+  const set = useTileSetMaterial();
+  const painted = !mine && fill === "ivory";
+  const ink = mine ? tileMaterial.private.ink : painted ? set.ink : tileMaterial.ink;
   const reduceMotion = useReducedMotion();
   const target = side === "front" ? 1 : 0;
   const rotation = useSharedValue(target);
@@ -488,7 +492,7 @@ export function Tile({
   });
   // The slab is the tile's body, so it turns with the face: ivory under the front, crimson under
   // the back. It flips colour as the tile goes edge-on, which is when neither face can be seen.
-  const frontSlab = mine ? tileMaterial.private.slab : tileMaterial.slab;
+  const frontSlab = mine ? tileMaterial.private.slab : painted ? set.slab : tileMaterial.slab;
   const slabMotion = useAnimatedStyle(() => {
     const front = rotation.get() > 0.5;
     return {
@@ -638,7 +642,7 @@ export function Tile({
                 ? ledger.goldButton
                 : mine
                   ? tileMaterial.private.gradient
-                  : gradients.tile.colors
+                  : set.gradient
             }
             style={styles.faceFill}
           >

@@ -16,26 +16,17 @@
 # Online, the hero's player id is its session id, which the flow cannot know: the nameplate's tag
 # and the result card's ⚡ are matched by test-id pattern (Maestro ids are regular expressions).
 # The opponent checks the other half — what the table hears — and the runner fails on its log.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Online Wild hand - pick, use Wild Tile, build FE and read results
 tags:
   - web
   - online
   - powers
 ---
-- openLink: http://localhost:8081/online
+- runFlow: sign-in.yaml
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 
-- extendedWaitUntil:
-    visible: "TAKE YOUR SEAT"
-    timeout: 15000
-    optional: true
-- runFlow:
-    when:
-      visible: "TAKE YOUR SEAT"
-    file: sign-in.yaml
-- openLink: http://localhost:8081/online
-
-- openLink: http://localhost:8081/online/${ROOM_ID}
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online/${ROOM_ID}"
 - extendedWaitUntil:
     visible:
       id: "poker-table"
@@ -121,10 +112,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PAYOUT"
+        text: "PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|SUBMIT WORD|PAYOUT"
+          visible: "YOUR TURN|SUBMIT WORD|PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
           timeout: 70000
           optional: true
       - runFlow:
@@ -135,6 +126,7 @@ tags:
                 id: "action-check-call"
             - waitForAnimationToEnd
 
+- runFlow: _show-results.yaml
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 30000

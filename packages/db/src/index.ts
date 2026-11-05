@@ -45,6 +45,7 @@ export {
   type QuestProgressMap,
   type QuestProgressRecord,
 } from "./quests";
+export { equippedTileSet, setEquippedTileSet, tileSetPurchases } from "./tile-sets";
 export { adoptGuestHistory, countPlayedHands } from "./guest";
 export { eraseAccountData } from "./account-erasure";
 export {

@@ -71,6 +71,19 @@ export {
   type WalletEventKind,
   type WalletResponse,
 } from "./coins";
+export {
+  DEFAULT_TILE_SET,
+  TILE_SET_IDS,
+  TILE_SET_PRICES,
+  TILE_SET_REFUSALS,
+  isTileSetId,
+  isTileSetRequest,
+  isTileSetsResponse,
+  type TileSetId,
+  type TileSetRefusal,
+  type TileSetRequest,
+  type TileSetsResponse,
+} from "./tile-sets";
 export { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "./dictionaries";
 export {
   MAX_HERO_SCORE,

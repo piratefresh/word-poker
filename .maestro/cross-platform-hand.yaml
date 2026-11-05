@@ -33,7 +33,7 @@ tags: [web, online, cross-platform]
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 180000
 - evalScript: ${output.street = 0}
 - repeat:

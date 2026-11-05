@@ -61,7 +61,7 @@ tags:
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 30000
 
 # Maestro's settle limit is best-effort; the runner also bounds the whole process.
@@ -79,7 +79,7 @@ tags:
           retryTapIfNoChange: false
 
 - extendedWaitUntil:
-    visible: "RIVER"
+    visible: "RIVER( [1-5]/5)?"
     timeout: 40000
 - extendedWaitUntil:
     visible: "YOUR TURN"
@@ -138,7 +138,7 @@ tags:
     visible: "HAND #1 · RESULTS"
     timeout: 30000
 - assertVisible:
-    text: "SCOREBOARD"
+    text: "[0-9]+ PLAYERS? · [0-9]+ FOLDS? · [0-9]+ WORDS? PLAYED"
 - assertVisible:
     text: ".*ILK.*"
 - assertNotVisible:

@@ -1,0 +1,18 @@
+# A radio tile is checked. Maestro reads `checked` on Android; on iOS the state is only in the
+# element's value ("radio button, checked").
+appId: com.wordpoker.wordpoker
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: ${CHECKED_ID}
+          checked: true
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: ${CHECKED_ID}
+          text: "radio button, checked"

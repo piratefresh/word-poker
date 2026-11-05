@@ -39,7 +39,7 @@ tags:
 # the old table's timer running; its eventual payout modal can cover the actual test hand.
 - openLink: wordpoker://offline?seed=7578&turn=300000
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 90000
 - back
 - extendedWaitUntil:

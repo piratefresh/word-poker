@@ -20,27 +20,17 @@
 # in step with `testID` (`webTestID` in src/lib/web-id.ts), which is what Maestro's web hierarchy
 # reads first — and an element with no test id answers to its accessibility label. Device
 # selectors are in apps/mobile/.maestro/native/online-hand.yaml.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Online hand - join, call the blind, build ILK and read results
 tags:
   - web
   - online
 ---
-- openLink: http://localhost:8081/online
-
-# Sign in when a fresh profile is bounced to the guard.
-- extendedWaitUntil:
-    visible: "TAKE YOUR SEAT"
-    timeout: 15000
-    optional: true
-- runFlow:
-    when:
-      visible: "TAKE YOUR SEAT"
-    file: sign-in.yaml
-- openLink: http://localhost:8081/online
+- runFlow: sign-in.yaml
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 
 # Join the exact fresh room created by the opponent, avoiding a stale table with the same name.
-- openLink: http://localhost:8081/online/${ROOM_ID}
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online/${ROOM_ID}"
 - extendedWaitUntil:
     visible:
       id: "poker-table"
@@ -53,7 +43,7 @@ tags:
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 30000
 
 # The button calls its small blind, then the big blind checks. Later the opponent checks and the
@@ -61,10 +51,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "RIVER"
+        text: "RIVER( [1-5]/5)?"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER"
+          visible: "YOUR TURN|RIVER( [1-5]/5)?"
           timeout: 40000
           optional: true
       - runFlow:
@@ -79,7 +69,7 @@ tags:
 # choose L and K explicitly on the S/L and Q/K choice tiles. The tiles and the face carry the strip's test ids,
 # the same ids a device flow taps.
 - extendedWaitUntil:
-    visible: "COMMUNITY · 5/5"
+    visible: "RIVER( [1-5]/5)?|FINAL STAGE"
     timeout: 20000
 - tapOn:
     id: "word-builder-tile-I-2"
@@ -95,10 +85,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PAYOUT"
+        text: "PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|SUBMIT WORD|PAYOUT"
+          visible: "YOUR TURN|SUBMIT WORD|PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
           timeout: 70000
       - runFlow:
           when:
@@ -107,11 +97,12 @@ tags:
             - tapOn:
                 id: "action-check-call"
             - waitForAnimationToEnd
+- runFlow: _show-results.yaml
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 30000
 - assertVisible:
-    text: "SCOREBOARD"
+    text: "[0-9]+ PLAYERS? · [0-9]+ FOLDS? · [0-9]+ WORDS? PLAYED"
 - assertVisible:
     text: ".*ILK.*"
 - assertNotVisible:

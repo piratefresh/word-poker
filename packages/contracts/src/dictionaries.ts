@@ -4,7 +4,7 @@
  * The id is wire vocabulary — a table is dealt against a list, and an evaluation result
  * that did not name the list it was checked against could not be compared with another.
  * The list's words and its displayed label belong to the engine (`@wordpoker/game-rules`),
- * which keeps the ~1.4 MB artifact out of every consumer that only needs to say *which*
+ * which keeps the word-list artifact out of every consumer that only needs to say *which*
  * vocabulary a table is playing.
  */
 

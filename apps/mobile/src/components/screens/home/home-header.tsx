@@ -1,6 +1,8 @@
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 
 import { authClient } from "@/auth/client/auth-client";
 import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
@@ -14,10 +16,32 @@ import { levelForXp } from "@wordpoker/game-rules";
 import { AccountMenu } from "./account-menu";
 import { AccountSettings } from "./account-settings";
 
+/** Where the top bar sits in a scene of `height` (the street, or a tab drawn over it like the store). */
+export function homeHeaderTop(insetTop: number, height: number): number {
+  return Math.max(insetTop + spacing.sm, height >= 700 ? 54 : 20);
+}
+
+/** A short scale bump whenever the balance moves (STO-1045); none on the first read. */
+function useCoinBump(coins: number | null) {
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(1);
+  const last = useRef(coins);
+
+  useEffect(() => {
+    const before = last.current;
+    last.current = coins;
+    if (reduceMotion || before == null || coins == null || before === coins) return;
+    scale.set(withSequence(withTiming(1.12, { duration: 120 }), withTiming(1, { duration: 160 })));
+  }, [coins, reduceMotion, scale]);
+
+  return useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+}
+
 /** The street menu's top bar (STO-597): a gold avatar on the left, level and coin pills on the right. */
 export function HomeHeader({ width }: { width: number }) {
   const { data: session } = authClient.useSession();
   const { coins, state } = useQuests();
+  const bump = useCoinBump(coins);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const name = session?.user.isAnonymous
@@ -44,7 +68,11 @@ export function HomeHeader({ width }: { width: number }) {
       <View style={styles.header} testID="home-header">
         <AccountMenu name={name} onSettings={() => setSettingsOpen(true)} onSignOut={signOut}>
           <View accessibilityLabel={`Avatar for ${name}`} accessibilityRole="image" accessible style={styles.avatar}>
-            <Text style={styles.initial}>{name.charAt(0).toUpperCase()}</Text>
+            {session?.user.image ? (
+              <Image contentFit="cover" source={{ uri: session.user.image }} style={StyleSheet.absoluteFill} />
+            ) : (
+              <Text style={styles.initial}>{name.charAt(0).toUpperCase()}</Text>
+            )}
           </View>
         </AccountMenu>
         <View style={styles.stats}>
@@ -61,6 +89,7 @@ export function HomeHeader({ width }: { width: number }) {
               <Text style={styles.pillText}>{`LV ${standing.level}`}</Text>
             </Pressable>
           ) : null}
+          <Animated.View style={[styles.coinPill, bump]}>
           <Pressable
             accessibilityLabel={coins == null ? "Wallet unavailable" : `Wallet, ${formatCoins(coins)} coins`}
             accessibilityRole={coinStoreEnabled() ? "button" : "text"}
@@ -72,6 +101,7 @@ export function HomeHeader({ width }: { width: number }) {
             <View style={styles.coin} />
             <Text style={styles.pillText}>{coins == null ? "—" : formatCoins(coins)}</Text>
           </Pressable>
+          </Animated.View>
         </View>
       </View>
       {signOutError ? <Text accessibilityRole="alert" style={styles.error}>Couldn’t sign out. Try again from the account menu.</Text> : null}
@@ -94,9 +124,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#8f5f22",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   initial: { color: "#3a2410", fontFamily: fonts.arcade, fontSize: 22 },
   stats: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexShrink: 1, marginLeft: spacing.sm },
+  coinPill: { flexShrink: 1 },
   pill: {
     flexDirection: "row",
     alignItems: "center",

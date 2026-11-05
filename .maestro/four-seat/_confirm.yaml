@@ -1,6 +1,6 @@
 # Subflow: lock the drafted word in with the row's check once §19's window opens. The builder
 # locks on confirm, so a repeat tap before the window opens, or after, does nothing twice.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat - confirm the word
 ---
 - assertVisible:

@@ -1,0 +1,31 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Story map opens its first challenge
+tags: [web, story]
+---
+- runFlow: sign-in.yaml
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/story"
+- extendedWaitUntil:
+    visible:
+      id: "story-map"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "First Hand, (play|completed, .* stars)"
+    direction: DOWN
+- assertVisible:
+    id: "First Hand, (play|completed, .* stars)"
+- tapOn:
+    id: "First Hand, (play|completed, .* stars)"
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 90000
+- assertVisible:
+    id: "story-coach"
+- assertVisible: "FIRST HAND.*"
+- tapOn:
+    id: "hud-leave-button"
+- extendedWaitUntil:
+    visible:
+      id: "story-map"
+    timeout: 30000

@@ -1,0 +1,22 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Friends load and refresh
+tags: [web, friends]
+---
+- runFlow: sign-in.yaml
+- tapOn:
+    id: "tab-friends"
+- extendedWaitUntil:
+    visible: "YOUR CODE: .*"
+    timeout: 30000
+- tapOn:
+    id: "friends-refresh"
+- extendedWaitUntil:
+    visible:
+      id: "friends-refresh"
+    timeout: 30000
+- assertVisible: "YOUR CODE: .*"
+- tapOn:
+    id: "friends-close"
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 10000

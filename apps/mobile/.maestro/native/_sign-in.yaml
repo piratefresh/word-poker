@@ -7,12 +7,19 @@ env:
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
     timeout: 180000
-- tapOn: "Email"
+# Tap the inputs by placeholder: on iOS the label text is a separate, untappable element.
+- tapOn: "you@mail.com or HANDLE"
 - inputText: ${TEST_USER_EMAIL}
-- tapOn: "Password"
+- tapOn: "Your password"
 - inputText: ${TEST_USER_PASSWORD}
 - hideKeyboard
-- tapOn: "Sign in"
+- tapOn: "TAKE YOUR SEAT"
 - extendedWaitUntil:
     visible: "Play Online"
     timeout: 60000
+# iOS offers to save the password over the menu after the first sign-in.
+- runFlow:
+    when:
+      visible: "Save Password?"
+    commands:
+      - tapOn: "Not Now"

@@ -1,5 +1,5 @@
 # Run against Expo web with the seeded E2E account.
-url: http://localhost:8081
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
 name: Home, Friends, and Game History bottom navigation
 tags:
   - web
@@ -26,7 +26,7 @@ tags:
     id: "tab-home"
 - assertVisible: "Offline"
 # Direct links must land inside the same tab bar.
-- openLink: http://localhost:8081/friends
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/friends"
 - extendedWaitUntil:
     visible:
       id: "friends-screen"
@@ -34,7 +34,7 @@ tags:
 - tapOn:
     id: "tab-home"
 - assertVisible: "Offline"
-- openLink: http://localhost:8081/history
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/history"
 - extendedWaitUntil:
     visible:
       id: "history-screen"

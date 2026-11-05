@@ -12,14 +12,14 @@
 # "CHOOSE ONE POWER" hint that shows once the cards take a tap (each a DOM id on the web, via
 # `webTestID`). The action row is reached by id, as in offline-hand.yaml. Sign-in composes the
 # same way that flow does.
-url: http://localhost:8081/offline?seed=178&powers=wild
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=178&powers=wild"
 name: Offline Wild hand — pick a power, play the hand
 tags:
   - web
   - offline
   - powers
 ---
-- openLink: http://localhost:8081/offline?seed=178&powers=wild
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=178&powers=wild"
 
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
@@ -29,7 +29,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline?seed=178&powers=wild
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=178&powers=wild"
 
 # The draw opens once the dictionary has loaded and the hand is dealt. The draw's clock is 10 s
 # (POWER_DRAW_MS) and a web step here takes about half a second, so the flow taps the first card as
@@ -86,10 +86,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PAYOUT"
+        text: "PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|PAYOUT"
+          visible: "YOUR TURN|PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
           timeout: 70000
           optional: true
       - runFlow:
@@ -100,6 +100,7 @@ tags:
                 id: "action-check-call"
             - waitForAnimationToEnd
 
+- runFlow: _show-results.yaml
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 10000

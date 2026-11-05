@@ -1,0 +1,17 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Store loads the real wallet
+tags: [web, store]
+---
+- runFlow: sign-in.yaml
+- tapOn:
+    id: "Wallet, [0-9,]+ coins"
+- extendedWaitUntil:
+    visible:
+      id: "wallet-coins"
+    timeout: 30000
+- assertNotVisible:
+    id: "wallet-error"
+- assertVisible: "[0-9,]+ COINS"
+- tapOn:
+    id: "store-back"
+- assertVisible: "Offline"

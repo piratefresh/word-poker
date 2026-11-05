@@ -14,14 +14,14 @@
 # via `webTestID` for the chip; the prompt's buttons are GameButtons, which carry theirs). The
 # strip's tiles are `word-builder-tile-<id>`, and a powered tile's ⚡ is `<tile test id>-powered`.
 # Sign-in composes as the other offline flows do.
-url: http://localhost:8081/offline?seed=178&powers=wild
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=178&powers=wild"
 name: Offline Wild hand — use the held power, build with the new tile
 tags:
   - web
   - offline
   - powers
 ---
-- openLink: http://localhost:8081/offline?seed=178&powers=wild
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=178&powers=wild"
 
 - extendedWaitUntil:
     visible: "TAKE YOUR SEAT"
@@ -31,7 +31,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline?seed=178&powers=wild
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=178&powers=wild"
 
 # The draw's clock is 10 s: tap the card as soon as it is up (see offline-wild-hand.yaml).
 - extendedWaitUntil:
@@ -118,7 +118,8 @@ tags:
     id: "word-builder-tile-power-0"
     waitToSettleTimeoutMs: 0
 - assertVisible: "MO"
-- assertVisible: "5 pts"
+- assertVisible:
+    id: "MO, 5 points(, valid)?"
 
 # Using the power did not end the turn: the hero still owes the call.
 - assertVisible:
@@ -132,20 +133,21 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "PAYOUT"
+        text: "PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER|PAYOUT"
+          visible: "YOUR TURN|RIVER( [1-5]/5)?|PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
           timeout: 70000
           optional: true
       - runFlow:
           when:
-            visible: "YOUR TURN|RIVER"
+            visible: "YOUR TURN|RIVER( [1-5]/5)?"
           commands:
             - tapOn:
                 id: "action-check-call"
             - waitForAnimationToEnd
 
+- runFlow: _show-results.yaml
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 10000

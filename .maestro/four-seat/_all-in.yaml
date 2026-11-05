@@ -1,7 +1,7 @@
 # Subflow: shove on this seat's turn, through the all-in sheet's confirm. Each press is retried
 # against what it should make visible — the sheet after the button, the seat's turn gone after the
 # confirm — so a press that lands while the felt is still settling does not wedge the seat.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat - all in
 ---
 - extendedWaitUntil:

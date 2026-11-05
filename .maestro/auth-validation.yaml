@@ -1,0 +1,28 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Sign-in and password-reset validation
+tags: [web, auth]
+---
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-in"
+- extendedWaitUntil:
+    visible: "Offline|TAKE YOUR SEAT"
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: "home-account-menu"
+    commands:
+      - tapOn:
+          id: "home-account-menu"
+      - tapOn: "Sign out"
+- extendedWaitUntil:
+    visible: "TAKE YOUR SEAT"
+    timeout: 30000
+- tapOn: "TAKE YOUR SEAT"
+- assertVisible: "Enter your email or handle."
+- assertVisible: "Enter your password."
+- tapOn: "Forgot password?"
+- extendedWaitUntil:
+    visible: "Forgot your password?"
+    timeout: 10000
+- tapOn: "SEND RESET LINK"
+- assertVisible: "Enter your email."

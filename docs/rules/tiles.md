@@ -118,10 +118,15 @@ A submitted word must:
 - Appear in the configured dictionary
 - Be submitted before the reveal timer expires
 
-Supported dictionaries (Scrabble word lists):
-
-- TWL
-- SOWPODS
+The shipped dictionary is **Word Poker English (ESDB 60)**: American English,
+size 60, variant level 1 from ESDB (formerly SCOWL). Abbreviations and special
+categories (including Roman numerals and the hacker list) are excluded at export.
+Only entries written entirely in lowercase ASCII letters are retained before
+uppercasing, excluding proper names and acronyms; punctuation and accented forms
+are excluded. Ordinary words that also have a name or acronym spelling remain valid.
+The bundled list retains words of two or more letters; submissions still have the
+seven-letter limit above. See `packages/game-rules/data/README.md` for provenance
+and generation commands. This is not a tournament Scrabble dictionary.
 
 The dictionary used by a table or game mode must be displayed before joining.
 

@@ -31,7 +31,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { fonts, layout, tileMaterial } from "@/constants/theme";
 
 /** The menu card's paper: its own warm palette, not the felt's. */
-const paper = {
+export const paper = {
   ink: "#3a2210",
   body: "#7a5634",
   faint: "#a8967e",
@@ -195,6 +195,8 @@ export function AuthShell({
 
 export type FieldProps = TextInputProps & {
   label: string;
+  /** Sits at the far end of the label's line: the account sheet's "✓ SAVED". */
+  labelEnd?: ReactNode;
   /** Shown under the field after a submit; turns its frame red. */
   error?: string;
   /** Standing help under the field, until an error replaces it. */
@@ -210,7 +212,7 @@ export type FieldProps = TextInputProps & {
 };
 
 /** A labelled `InputGroup`: label, the framed control with its addons, then error or hint. */
-export function Field({ label, error, hint, secret = false, start, end, children, editable, ...input }: FieldProps) {
+export function Field({ label, labelEnd, error, hint, secret = false, start, end, children, editable, ...input }: FieldProps) {
   const [shown, setShown] = useState(false);
 
   const trailing =
@@ -231,7 +233,14 @@ export function Field({ label, error, hint, secret = false, start, end, children
 
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      {labelEnd ? (
+        <View style={styles.fieldLabelRow}>
+          <Text style={styles.fieldLabel}>{label}</Text>
+          {labelEnd}
+        </View>
+      ) : (
+        <Text style={styles.fieldLabel}>{label}</Text>
+      )}
       <InputGroup disabled={editable === false} invalid={!!error}>
         {start ? <InputGroupAddon>{start}</InputGroupAddon> : null}
         <InputGroupInput
@@ -478,6 +487,11 @@ const styles = StyleSheet.create({
   },
   field: {
     gap: 6,
+  },
+  fieldLabelRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   fieldLabel: {
     color: paper.body,

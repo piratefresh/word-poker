@@ -14,7 +14,10 @@ export const COIN_PACK_IDS = ["coins_small", "coins_medium", "coins_large"] as c
 
 export type CoinPackId = (typeof COIN_PACK_IDS)[number];
 
-/** What a wallet_event records; `quest`/`streak`/`level` pay the rewards in `quests.ts` (STO-525, STO-543). */
+/**
+ * What a wallet_event records; `quest`/`streak`/`level` pay the rewards in `quests.ts` (STO-525, STO-543),
+ * and `tile_set` is a store purchase paid in coins (`tile-sets.ts`, STO-1045).
+ */
 export const WALLET_EVENT_KINDS = [
   "welcome",
   "purchase",
@@ -26,6 +29,7 @@ export const WALLET_EVENT_KINDS = [
   "streak",
   "level",
   "referral",
+  "tile_set",
 ] as const;
 
 export type WalletEventKind = (typeof WALLET_EVENT_KINDS)[number];

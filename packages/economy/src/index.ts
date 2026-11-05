@@ -42,4 +42,12 @@ export {
   type ReferralStore,
   type RewardsDeps,
 } from "./rewards";
+export {
+  buyTileSet,
+  equipTileSet,
+  readTileSets,
+  type TileSetDeps,
+  type TileSetOutcome,
+  type TileSetStore,
+} from "./tile-sets";
 export { CURRENCY_EVENT_TYPE, parseCurrencyEvent, type ParsedWebhook } from "./webhook";

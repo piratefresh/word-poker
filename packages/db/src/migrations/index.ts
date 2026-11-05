@@ -21,8 +21,10 @@ import { Migration20261016120000_notifications } from "./Migration20261016120000
 import { Migration20261017120000_platform_auth } from "./Migration20261017120000_platform_auth";
 import { Migration20261029120000_table_wallet } from "./Migration20261029120000_table_wallet";
 import { Migration20261030120000_username } from "./Migration20261030120000_username";
+import { Migration20261105120000_tile_sets } from "./Migration20261105120000_tile_sets";
 export { Migration20261029120000_table_wallet } from "./Migration20261029120000_table_wallet";
 export { Migration20261030120000_username } from "./Migration20261030120000_username";
+export { Migration20261105120000_tile_sets } from "./Migration20261105120000_tile_sets";
 export { Migration20261017120000_platform_auth } from "./Migration20261017120000_platform_auth";
 export { Migration20261016120000_notifications } from "./Migration20261016120000_notifications";
 export { Migration20261015120000_presence } from "./Migration20261015120000_presence";
@@ -61,4 +63,5 @@ export const migrations: Constructor<Migration>[] = [
   Migration20261017120000_platform_auth,
   Migration20261029120000_table_wallet,
   Migration20261030120000_username,
+  Migration20261105120000_tile_sets,
 ];

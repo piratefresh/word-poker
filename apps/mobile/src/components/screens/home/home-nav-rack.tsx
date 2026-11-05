@@ -93,7 +93,7 @@ export function HomeNavRack({ active = null, friendsBadge, onNavigate, onLongPre
           return (
             <Pressable
               key={destination}
-              accessibilityRole={store ? "button" : "tab"}
+              accessibilityRole="tab"
               accessibilityLabel={store && disabled ? "Store, coming soon" : tab.label}
               accessibilityState={{ selected, disabled }}
               disabled={disabled}

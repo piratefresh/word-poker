@@ -42,7 +42,7 @@ import {
 } from "@/components/screens/home/components/menu-slab";
 import type { ModeVariant } from "@/components/screens/home/components/mode-variants";
 import { OfflineTray } from "@/components/screens/home/components/offline-tray";
-import { HomeHeader } from "@/components/screens/home/home-header";
+import { HomeHeader, homeHeaderTop } from "@/components/screens/home/home-header";
 import { artPoint, STREETS } from "@/components/screens/home/street-art";
 import { LEDGER_CLOSE_MS } from "@/components/screens/history/ledger/ledger-stage";
 import { StreetLogo } from "@/components/screens/home/street-logo";
@@ -237,7 +237,7 @@ export function HomeScreen() {
       height: nativeEvent.layout.height,
     });
 
-  const headerTop = Math.max(insets.top + spacing.sm, box.height >= 700 ? 54 : 20);
+  const headerTop = homeHeaderTop(insets.top, box.height);
 
   return (
     <View onLayout={onLayout} style={styles.root}>

@@ -1,0 +1,24 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Tutorial coach and first action
+tags: [web, tutorial]
+---
+- runFlow: sign-in.yaml
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/tutorial"
+- extendedWaitUntil:
+    visible: "Your seat"
+    timeout: 90000
+- tapOn:
+    id: "coach-next"
+- assertVisible: "Your tiles"
+- tapOn:
+    id: "coach-next"
+- extendedWaitUntil:
+    visible: "Call the blind"
+    timeout: 20000
+- assertNotVisible:
+    id: "coach-next"
+- tapOn:
+    id: "action-check-call"
+- extendedWaitUntil:
+    visible: "The flop"
+    timeout: 20000

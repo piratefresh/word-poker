@@ -1,0 +1,20 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Account settings open and cancel
+tags: [web, settings]
+---
+- runFlow: sign-in.yaml
+- tapOn:
+    id: "home-account-menu"
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Account settings"
+    timeout: 10000
+- assertVisible:
+    id: "account-display-name"
+- assertVisible:
+    id: "account-save"
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Account settings"
+    timeout: 10000
+- assertVisible: "Offline"

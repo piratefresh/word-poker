@@ -1,0 +1,14 @@
+# Payout can show XP or a simple win celebration before the scoreboard.
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+---
+- extendedWaitUntil:
+    visible:
+      id: "xp-result-continue|simple-win-continue|Back to the main menu"
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: "xp-result-continue|simple-win-continue"
+    commands:
+      - tapOn:
+          id: "xp-result-continue|simple-win-continue"

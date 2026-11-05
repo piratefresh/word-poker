@@ -1,5 +1,5 @@
 # Expo web, with a signed-in account. Ledger content is added in later stories.
-url: http://localhost:8081
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
 name: Ledger shell opens, reverses, and closes from the rack
 tags:
   - web

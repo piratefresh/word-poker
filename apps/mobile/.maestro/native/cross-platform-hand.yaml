@@ -33,7 +33,7 @@ tags: [native, online, cross-platform]
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 30000
 - evalScript: ${output.street = 0}
 - repeat:

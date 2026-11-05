@@ -4,12 +4,12 @@
 #
 #   pnpm --filter @wordpoker/mobile web
 #   maestro test --platform web --test-output-dir=.maestro/shots .maestro/felt-pots.yaml
-url: http://localhost:8081/dev-pots?n=1
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/dev-pots?n=1"
 name: Felt pots — one to four plates
 tags:
   - web
 ---
-- openLink: http://localhost:8081/dev-pots?n=1
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/dev-pots?n=1"
 - extendedWaitUntil:
     visible:
       id: "pot-plate-main"
@@ -21,7 +21,7 @@ tags:
     id: "side-pot-0"
 - takeScreenshot: pots-1
 
-- openLink: http://localhost:8081/dev-pots?n=2
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/dev-pots?n=2"
 - extendedWaitUntil:
     visible:
       id: "side-pot-0"
@@ -33,7 +33,7 @@ tags:
 - assertVisible: "SIDE POT"
 - takeScreenshot: pots-2
 
-- openLink: http://localhost:8081/dev-pots?n=3
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/dev-pots?n=3"
 - extendedWaitUntil:
     visible:
       id: "side-pot-1"
@@ -42,7 +42,7 @@ tags:
 - assertVisible: "SIDE 2"
 - takeScreenshot: pots-3
 
-- openLink: http://localhost:8081/dev-pots?n=4
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/dev-pots?n=4"
 - extendedWaitUntil:
     visible:
       id: "side-pot-2"

@@ -1,0 +1,31 @@
+appId: com.wordpoker.wordpoker
+name: Story map opens its first challenge (native)
+tags: [native, story]
+---
+- runFlow: _ensure-session.yaml
+- openLink: wordpoker://story
+- extendedWaitUntil:
+    visible:
+      id: "story-map"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "story-node-first-hand"
+    direction: DOWN
+- assertVisible:
+    id: "story-node-first-hand"
+- tapOn:
+    id: "story-node-first-hand"
+- extendedWaitUntil:
+    visible:
+      id: "poker-table"
+    timeout: 90000
+- assertVisible:
+    id: "story-coach"
+- assertVisible: "FIRST HAND.*"
+- tapOn:
+    id: "hud-leave-button"
+- extendedWaitUntil:
+    visible:
+      id: "story-map"
+    timeout: 30000

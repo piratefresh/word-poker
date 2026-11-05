@@ -11,11 +11,15 @@ import {
   isCoinCatalog,
   isQuestClaimResponse,
   isQuestStateResponse,
+  isTileSetsResponse,
   isWalletResponse,
   type CoinCatalog,
   type QuestClaimResponse,
   type QuestHandClaim,
   type QuestStateResponse,
+  type TileSetRefusal,
+  type TileSetRequest,
+  type TileSetsResponse,
   type WalletResponse,
 } from "@wordpoker/contracts";
 import { Platform } from "react-native";
@@ -130,4 +134,52 @@ export async function sendQuestHandClaim(claim: QuestHandClaim): Promise<QuestCl
   if (!isQuestClaimResponse(body)) throw new Error("The claim's result could not be read.");
 
   return body;
+}
+
+/** The signed-in player's tile sets (STO-1045). Rejects with `WalletAuthError` on a 401. */
+export async function fetchTileSets(): Promise<TileSetsResponse> {
+  const response = await fetch(`${apiBaseURL}/api/tile-sets`, await sessionInit());
+  if (response.status === 401) throw new WalletAuthError();
+  if (!response.ok) throw await failure(response);
+
+  const body: unknown = await response.json();
+  if (!isTileSetsResponse(body)) throw new Error("The store sent tile sets it could not read.");
+
+  return body;
+}
+
+/** How a buy or equip came out: the new state, or the server's reason for changing nothing. */
+export type TileSetResult =
+  | { readonly ok: true; readonly state: TileSetsResponse }
+  | { readonly ok: false; readonly reason: TileSetRefusal; readonly message: string };
+
+const REFUSAL_STATUS: Readonly<Record<number, TileSetRefusal>> = { 202: "pending", 402: "insufficient_coins", 409: "not_owned" };
+
+/**
+ * Buys or equips a set. A refusal the player can act on resolves; anything else (a 401, a 400, a
+ * failed Wallet) rejects.
+ */
+export async function sendTileSetRequest(request: TileSetRequest): Promise<TileSetResult> {
+  const init = await sessionInit();
+  const response = await fetch(`${apiBaseURL}/api/tile-sets`, {
+    ...init,
+    method: "POST",
+    headers: { ...init.headers, "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (response.status === 401) throw new WalletAuthError();
+
+  const refusal = REFUSAL_STATUS[response.status];
+  if (refusal) {
+    const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+    const message = typeof body?.error === "string" ? body.error : "The store changed nothing.";
+
+    return { ok: false, reason: refusal, message };
+  }
+  if (!response.ok) throw await failure(response);
+
+  const body: unknown = await response.json();
+  if (!isTileSetsResponse(body)) throw new Error("The store sent tile sets it could not read.");
+
+  return { ok: true, state: body };
 }

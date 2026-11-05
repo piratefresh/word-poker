@@ -45,6 +45,7 @@ import {
   type Destination,
 } from "@/lib/navigation/pending-destination";
 import { QuestsProvider } from "@/lib/quests/quests-provider";
+import { TileSetsProvider } from "@/lib/tile-sets/tile-sets-provider";
 import { E2E_AUTH_BYPASS } from "@/lib/testing/e2e";
 import { useRevenueCatIdentity } from "@/lib/wallet/use-revenuecat";
 
@@ -154,6 +155,7 @@ export function RootLayout() {
         <KeyboardProvider>
         <ThemeProvider value={DarkTheme}>
           <QuestsProvider>
+          <TileSetsProvider>
             <HistoryProvider>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Protected guard={showAuth}>
@@ -187,6 +189,7 @@ export function RootLayout() {
               <AnimatedSplashOverlay />
               <TableInviteBanner invite={presence.invite} onDismiss={presence.dismiss} />
             </HistoryProvider>
+          </TileSetsProvider>
           </QuestsProvider>
         </ThemeProvider>
         </KeyboardProvider>
