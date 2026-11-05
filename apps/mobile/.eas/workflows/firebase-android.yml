@@ -1,0 +1,27 @@
+name: Firebase App Distribution (Android)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build_android:
+    type: build
+    environment: production
+    params:
+      platform: android
+      profile: firebase
+
+  distribute_android:
+    needs: [build_android]
+    environment: production
+    steps:
+      - run: |
+          URL=$(npx eas-cli build:view ${{ needs.build_android.outputs.build_id }} --json \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).artifacts.buildUrl))')
+          curl -sL "$URL" -o app.apk
+          GOOGLE_APPLICATION_CREDENTIALS="$FIREBASE_SERVICE_ACCOUNT" npx firebase-tools appdistribution:distribute app.apk \
+            --app "$FIREBASE_ANDROID_APP_ID" \
+            --groups internal \
+            --release-notes "EAS build ${{ needs.build_android.outputs.build_id }}"
