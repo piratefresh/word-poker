@@ -7,19 +7,44 @@
  * name, weight or window cannot disagree between two places.
  */
 
-/** Every power a table can deal, in the order the catalog lists them. */
-export const POWER_UP_IDS = ["random_wild", "vowel_magnet", "blank_tile", "spotlight", "river_review"] as const;
+/** Every power in the catalog, in the order it lists them: the Wild pool, then story mode's own. */
+export const POWER_UP_IDS = [
+  "random_wild",
+  "vowel_magnet",
+  "blank_tile",
+  "spotlight",
+  "river_review",
+  "pickpocket",
+  "tile_lock",
+  "multiplier",
+  "high_value_tile",
+] as const;
 
 /** One power's stable id — what a command names and an event reports. */
 export type PowerUpId = (typeof POWER_UP_IDS)[number];
+
+/**
+ * What a Wild table's Power Draw deals from (§44). Story mode (STO-975) drafts from the whole
+ * catalog by chapter; the powers after these are story's alone, so a Wild room never deals them.
+ */
+export const WILD_POWER_UP_IDS = [
+  "random_wild",
+  "vowel_magnet",
+  "blank_tile",
+  "spotlight",
+  "river_review",
+] as const satisfies readonly PowerUpId[];
 
 /**
  * How a power acts, so the engine dispatches on the family rather than on each id. `swapTile`:
  * discard one private tile, receive a plain one (§44, Swapping a Tile). `blankTile` is a swap whose
  * new tile is a blank. `spotlight` targets a dealt community tile and doubles it for everyone.
  * `review` is never used: the seat that holds it is shown its best words once the hand pays out.
+ * Story mode's (§46): `pickpocket` trades one private tile for a random one of an opponent's,
+ * `tileLock` takes one dealt community tile away from one opponent, and `multiplier` doubles one
+ * of the seat's own private tiles.
  */
-export type PowerUpFamily = "swapTile" | "blankTile" | "spotlight" | "review";
+export type PowerUpFamily = "swapTile" | "blankTile" | "spotlight" | "review" | "pickpocket" | "tileLock" | "multiplier";
 
 /**
  * When a held power may be used. `ownTurnOrWordWindow`: on the seat's own betting turn before it
@@ -47,7 +72,7 @@ export interface PowerUpDefinition<Id extends PowerUpId = PowerUpId> {
   readonly weight: number;
   readonly window: PowerUpWindow;
   readonly family: PowerUpFamily;
-  /** Whether the power acts on another seat. No v1 power does; Chaos (§40) may allow them. */
+  /** Whether the power acts on another seat: its use names an opponent. Only story mode deals one. */
   readonly hostile: boolean;
 }
 
@@ -113,6 +138,54 @@ export const POWER_UPS: { readonly [Id in PowerUpId]: PowerUpDefinition<Id> } = 
     family: "review",
     hostile: false,
   },
+  pickpocket: {
+    id: "pickpocket",
+    title: "Pickpocket",
+    description: "Swap one of your tiles for a random one of an opponent's.",
+    receives: "one of their tiles",
+    tag: "PICKPOCKET",
+    icon: "pickpocket",
+    weight: 6,
+    window: "ownTurnOrWordWindow",
+    family: "pickpocket",
+    hostile: true,
+  },
+  tile_lock: {
+    id: "tile_lock",
+    title: "Tile Lock",
+    description: "Pick one table tile. One opponent can't use it this hand.",
+    receives: "a lock",
+    tag: "LOCK",
+    icon: "tile-lock",
+    weight: 6,
+    window: "ownTurnOrWordWindow",
+    family: "tileLock",
+    hostile: true,
+  },
+  multiplier: {
+    id: "multiplier",
+    title: "Multiplier",
+    description: "Pick one of your tiles. It scores double this hand.",
+    receives: "a double",
+    tag: "2X",
+    icon: "multiplier",
+    weight: 6,
+    window: "ownTurnOrWordWindow",
+    family: "multiplier",
+    hostile: false,
+  },
+  high_value_tile: {
+    id: "high_value_tile",
+    title: "High Value Tile",
+    description: "Swap one of your tiles for a random X, Z or Q.",
+    receives: "a random X, Z or Q",
+    tag: "HIGH",
+    icon: "high-value-tile",
+    weight: 6,
+    window: "ownTurnOrWordWindow",
+    family: "swapTile",
+    hostile: false,
+  },
 };
 
 /** Whether an untrusted value names a power in the catalog. */
@@ -120,8 +193,8 @@ export function isPowerUpId(value: unknown): value is PowerUpId {
   return (POWER_UP_IDS as readonly unknown[]).includes(value);
 }
 
-/** How many powers the Power Draw offers each seat (§44): every power in the catalog. */
-export const POWER_DRAW_OFFER_COUNT = POWER_UP_IDS.length;
+/** How many powers a Wild table's Power Draw offers each seat (§44): every power in its pool. */
+export const POWER_DRAW_OFFER_COUNT = WILD_POWER_UP_IDS.length;
 
 /** The Power Draw's shared clock (§44): a constant to tune after playtests. */
 export const POWER_DRAW_MS = 10_000;
@@ -159,8 +232,12 @@ export const POWER_REJECTION_REASONS = [
   "not-your-tile",
   /** Spotlight names a tile that is not a dealt community tile. */
   "not-a-table-tile",
-  /** Spotlight names a tile that already carries a 2x or 3x bonus. */
+  /** Spotlight or Multiplier names a tile that already carries a 2x or 3x bonus. */
   "already-bonus",
+  /** A hostile power names no opponent still in the hand: itself, a folded seat, or nobody. */
+  "not-an-opponent",
+  /** A hostile power names an opponent that has confirmed its word, whose tiles are locked. */
+  "target-confirmed",
 ] as const;
 
 /** Why a power action was refused. */

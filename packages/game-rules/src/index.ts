@@ -145,10 +145,12 @@ export {
   chapterStars,
   chapterUnlocked,
   draftOffers,
+  newPowers,
   nodeStars,
   nodeState,
   pickDraft,
   recordHand,
+  seePowers,
   setLoadout,
   skipDraft,
 } from "./story/chapter-run";

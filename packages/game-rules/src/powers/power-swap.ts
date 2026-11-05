@@ -2,7 +2,7 @@
  * power-swap.ts — §44's Swap a Private Tile family (`docs/rules/power-ups.md`): the tile a v1 power
  * hands a seat in place of the private tile it discards.
  *
- * Every v1 power is this family, and they differ only in which letters the new tile rolls from. The
+ * The swap powers are this family, and they differ only in which letters the new tile rolls from. The
  * module owns that and nothing else: which letter, and the plain tile it becomes. Whether the
  * seat may use its power right now — its turn, §19's window, a fold — and what the swap does to
  * the seat's rack and draft belong to the hand (`offline.ts`).
@@ -25,12 +25,16 @@ const ALPHABET = Object.keys(LETTER_VALUES) as Letter[];
 /** Vowel Magnet's letters, each equally likely. */
 const VOWELS: readonly Letter[] = ["A", "E", "I", "O", "U"];
 
+/** High Value Tile's letters (§46), each equally likely. */
+const HIGH_VALUE: readonly Letter[] = ["X", "Z", "Q"];
+
 /**
  * The letters each power draws from uniformly.
  */
 export const SWAP_LETTERS: Readonly<Partial<Record<PowerUpId, readonly Letter[]>>> = {
   random_wild: ALPHABET,
   vowel_magnet: VOWELS,
+  high_value_tile: HIGH_VALUE,
 };
 
 /** Where a seat's swap draws from: the seed the hand was dealt from, and the seat's index. */
@@ -68,7 +72,7 @@ export function swapTile(powerUpId: PowerUpId, source: SwapSource): LetterTile |
   return { id: swappedTileId(source.seat), letter, points: LETTER_VALUES[letter] };
 }
 
-/** Random Wild's and Vowel Magnet's letter: the first roll of the seat's letter stream. */
+/** A rolled swap's letter (Random Wild, Vowel Magnet, High Value Tile): the first roll of the seat's letter stream. */
 function rolledLetter(powerUpId: PowerUpId, { dealSeed, seat }: SwapSource): Letter {
   const letters = SWAP_LETTERS[powerUpId];
   if (letters === undefined) {

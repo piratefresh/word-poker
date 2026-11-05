@@ -11,6 +11,7 @@ import {
   POWER_REJECTION_REASONS,
   POWER_UP_IDS,
   POWER_UPS,
+  WILD_POWER_UP_IDS,
   isPowerUpDealMode,
   isPowerUpId,
   isPowerUpSettings,
@@ -24,9 +25,9 @@ describe("POWER_UPS", () => {
     }
   });
 
-  it("keeps the pool so far: Wild Tile, Vowel Magnet, Blank Tile, Spotlight and River Review", () => {
+  it("keeps the Wild pool: Wild Tile, Vowel Magnet, Blank Tile, Spotlight and River Review", () => {
     assert.deepStrictEqual(
-      POWER_UP_IDS.map((id) => {
+      WILD_POWER_UP_IDS.map((id) => {
         const { title, tag, weight, window, family, hostile } = POWER_UPS[id];
         return { id, title, tag, weight, window, family, hostile };
       }),
@@ -89,8 +90,21 @@ describe("POWER_UPS", () => {
     }
   });
 
-  it("offers every power in a Power Draw", () => {
-    assert.strictEqual(POWER_DRAW_OFFER_COUNT, POWER_UP_IDS.length);
+  it("adds story mode's own powers after the Wild pool, the two hostile ones naming an opponent", () => {
+    assert.deepStrictEqual(POWER_UP_IDS.slice(0, WILD_POWER_UP_IDS.length), [...WILD_POWER_UP_IDS]);
+    assert.deepStrictEqual(
+      POWER_UP_IDS.slice(WILD_POWER_UP_IDS.length).map((id) => [id, POWER_UPS[id].family, POWER_UPS[id].hostile]),
+      [
+        ["pickpocket", "pickpocket", true],
+        ["tile_lock", "tileLock", true],
+        ["multiplier", "multiplier", false],
+        ["high_value_tile", "swapTile", false],
+      ],
+    );
+  });
+
+  it("offers every Wild power in a Power Draw", () => {
+    assert.strictEqual(POWER_DRAW_OFFER_COUNT, WILD_POWER_UP_IDS.length);
   });
 });
 
@@ -111,6 +125,8 @@ describe("POWER_REJECTION_REASONS", () => {
       "not-your-tile",
       "not-a-table-tile",
       "already-bonus",
+      "not-an-opponent",
+      "target-confirmed",
     ]);
   });
 });

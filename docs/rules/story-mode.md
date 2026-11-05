@@ -47,6 +47,31 @@ offered exactly the drafted powers; it keeps one and uses it at most once that h
 says. A drafted power is not spent by use: it is offered again next hand. With nothing drafted
 the hand is Classic. Bots hold no powers.
 
+**Pools.** Each chapter's draft offers from its own pool, and the coach introduces each power the
+first time a draft shows it:
+
+| Chapter | Pool |
+| ------- | ---- |
+| Kitchen Table | Blank Tile, Wild Tile |
+| The Local | adds Vowel Magnet, Pickpocket |
+| The Back Room | adds Tile Lock |
+| The High Roller Lounge | Vowel Magnet out; adds Multiplier, High Value Tile |
+| The Dealer's Table | the same as The High Roller Lounge |
+
+**Story powers.** Four powers are story mode's alone; a Wild table never deals them. Each is used
+in §44's window, at most once a hand, like any other.
+
+- **Pickpocket** names one of the hero's private tiles and one opponent still in the hand. The
+  named tile goes to the opponent, and one of the opponent's private tiles, drawn at random (the
+  hero cannot see them), comes back in its place. Both tiles move as they are, bonus and all, and
+  leave their old owner's draft. Refused for an opponent that has confirmed its word.
+- **Tile Lock** names one face-up community tile and one opponent still in the hand: that opponent
+  cannot build from the tile for the rest of the hand, and it leaves its draft. Every other seat
+  keeps it. Not before the flop; refused for an opponent that has confirmed its word.
+- **Multiplier** names one of the hero's private tiles without a bonus: it scores double (a Double
+  Letter, §9) this hand.
+- **High Value Tile** is a swap (§44) whose new letter is X, Z or Q, each equally likely.
+
 **The final chapter** has no hands to draft from: the player picks up to 2 different powers from
 its pool before the boss hand.
 

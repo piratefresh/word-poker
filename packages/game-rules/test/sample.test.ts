@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { POWER_UP_IDS, POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
+import { WILD_POWER_UP_IDS, POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
 
 import { createRng, mixSeed, weightedSampleWithoutReplacement } from "../src/index";
 
@@ -27,7 +27,7 @@ describe("weightedSampleWithoutReplacement", () => {
 
   it("keeps the pinned Power Draw for seed 409's first seat", () => {
     const rng = createRng(mixSeed(409, 0, "offer"));
-    assert.deepEqual(weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, 3, rng), [
+    assert.deepEqual(weightedSampleWithoutReplacement(WILD_POWER_UP_IDS, weightOf, 3, rng), [
       "river_review",
       "spotlight",
       "random_wild",
@@ -45,14 +45,14 @@ describe("weightedSampleWithoutReplacement", () => {
   it("returns the whole pool, in a seeded order, when the count covers it", () => {
     const orders = new Set<string>();
     for (let seed = 0; seed < 200; seed += 1) {
-      const drawn = weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, POWER_UP_IDS.length, createRng(seed));
-      assert.deepEqual([...drawn].sort(), [...POWER_UP_IDS].sort());
+      const drawn = weightedSampleWithoutReplacement(WILD_POWER_UP_IDS, weightOf, WILD_POWER_UP_IDS.length, createRng(seed));
+      assert.deepEqual([...drawn].sort(), [...WILD_POWER_UP_IDS].sort());
       orders.add(drawn.join(","));
     }
     assert.ok(orders.size > 1, "the order is seeded, not fixed");
 
-    const more = weightedSampleWithoutReplacement(POWER_UP_IDS, weightOf, 5, createRng(1));
-    assert.equal(more.length, POWER_UP_IDS.length);
+    const more = weightedSampleWithoutReplacement(WILD_POWER_UP_IDS, weightOf, 5, createRng(1));
+    assert.equal(more.length, WILD_POWER_UP_IDS.length);
   });
 
   it("draws each item first in proportion to its weight", () => {
@@ -113,9 +113,9 @@ describe("weightedSampleWithoutReplacement", () => {
   });
 
   it("does not touch the pool it was given", () => {
-    const pool = [...POWER_UP_IDS];
+    const pool = [...WILD_POWER_UP_IDS];
     weightedSampleWithoutReplacement(pool, weightOf, 2, createRng(3));
-    assert.deepEqual(pool, [...POWER_UP_IDS]);
+    assert.deepEqual(pool, [...WILD_POWER_UP_IDS]);
   });
 
   it("refuses a count or a weight it cannot sample by", () => {

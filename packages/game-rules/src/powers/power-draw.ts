@@ -16,12 +16,13 @@
 import {
   POWER_DRAW_MS,
   POWER_DRAW_OFFER_COUNT,
-  POWER_UP_IDS,
   POWER_UPS,
+  WILD_POWER_UP_IDS,
   type BlankTile,
   type LetterTile,
   type PlayerId,
   type PowerUpId,
+  type Tile,
 } from "@wordpoker/contracts";
 
 import { OfflineActionError, PowerRejectionError } from "../core/errors";
@@ -72,12 +73,21 @@ export interface HeldPower {
    * discarded tile is never shown, so only its id is kept, for the owner's private result.
    */
   readonly swap?: { readonly discardedTileId: string; readonly tile: LetterTile | BlankTile };
+  /**
+   * What Pickpocket did once used (§46): the opponent robbed, the private tile it was handed, and
+   * the tile taken from it — a real dealt tile, so it keeps its own id and any bonus it carries.
+   */
+  readonly pickpocket?: { readonly targetId: PlayerId; readonly discardedTileId: string; readonly tile: Tile };
   /** What Spotlight did once used: the community tile it doubled, and what that tile prints. */
   readonly spotlight?: { readonly tileId: string; readonly letter: string };
+  /** What Tile Lock did once used (§46): the opponent locked out, and the community tile it lost. */
+  readonly lock?: { readonly targetId: PlayerId; readonly tileId: string; readonly letter: string };
+  /** What Multiplier did once used (§46): the private tile it doubled, and what that tile prints. */
+  readonly multiplier?: { readonly tileId: string; readonly letter: string };
 }
 
 /**
- * The powers one seat is offered: `POWER_DRAW_OFFER_COUNT` of the catalog, drawn by weight
+ * The powers one seat is offered: `POWER_DRAW_OFFER_COUNT` of the Wild pool, drawn by weight
  * without replacement from the seat's own stream. The same deal seed and seat always give the
  * same offers.
  *
@@ -86,7 +96,7 @@ export interface HeldPower {
  */
 export function drawOffers(dealSeed: number, seat: number): readonly PowerUpId[] {
   return weightedSampleWithoutReplacement(
-    POWER_UP_IDS,
+    WILD_POWER_UP_IDS,
     (id) => POWER_UPS[id].weight,
     POWER_DRAW_OFFER_COUNT,
     createRng(mixSeed(dealSeed, seat, "offer")),

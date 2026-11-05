@@ -2,14 +2,16 @@ import { useState, type ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { POWER_UPS, type PowerUpId } from "@wordpoker/contracts";
-import { STORY_RULES, chapterRecord, pickDraft } from "@wordpoker/game-rules";
+import { STORY_RULES, chapterRecord, newPowers, pickDraft, seePowers } from "@wordpoker/game-rules";
 
 import { PowerEmblem, powerCardLabel } from "@/components/powers";
 import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
+import { powerIntroLine } from "@/features/story/story-coach";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
 
 import { ink, lilita } from "../chapter-map/chapter-map-ink";
+import { StorySpeech } from "./story-speech";
 
 export interface StoryDraftProps {
   chapterId: string;
@@ -29,6 +31,8 @@ export function StoryDraft({ chapterId, offers, into, onSettled }: StoryDraftPro
   const [chosen, setChosen] = useState<PowerUpId>(offers[0]!);
   const [replacing, setReplacing] = useState<PowerUpId | null>(null);
   const [swapping, setSwapping] = useState(false);
+  // The powers this draft shows for the first time: the coach introduces them, once.
+  const [fresh] = useState(() => newPowers(storyProgress(), offers));
 
   const cards = swapping ? held : offers;
   const selected = swapping ? (replacing ?? held[0]!) : chosen;
@@ -39,13 +43,15 @@ export function StoryDraft({ chapterId, offers, into, onSettled }: StoryDraftPro
       setReplacing(held[0]!);
       return;
     }
-    saveStoryProgress(pickDraft(storyProgress(), chapterId, chosen, swapping ? (replacing ?? undefined) : undefined));
+    const picked = pickDraft(storyProgress(), chapterId, chosen, swapping ? (replacing ?? undefined) : undefined);
+    saveStoryProgress(seePowers(picked, offers));
     onSettled();
   };
   const choose = (id: PowerUpId) => (swapping ? setReplacing(id) : setChosen(id));
 
   return (
     <View style={styles.draft} testID="story-draft">
+      {swapping ? null : <StorySpeech line={powerIntroLine(fresh)} />}
       <Text style={styles.heading}>{swapping ? `Swap out which for ${POWER_UPS[chosen].title}?` : `Take a power into ${into}`}</Text>
       <View style={styles.cards}>
         {cards.map((id, index) => {
@@ -65,6 +71,7 @@ export function StoryDraft({ chapterId, offers, into, onSettled }: StoryDraftPro
                   <Text style={styles.checkMark}>✓</Text>
                 </View>
               ) : null}
+              {!swapping && fresh.includes(id) ? <Text style={styles.fresh}>NEW</Text> : null}
               <PowerEmblem icon={POWER_UPS[id].icon} size={64} />
               <Text style={styles.name}>{POWER_UPS[id].title.toUpperCase()}</Text>
               <Text style={styles.text}>{POWER_UPS[id].description}</Text>
@@ -85,6 +92,7 @@ const styles = StyleSheet.create({
   cardOn: { backgroundColor: "rgba(247,215,122,0.12)", borderColor: "#f7d77a" },
   check: { alignItems: "center", backgroundColor: "#f7d77a", borderRadius: 14, height: 28, justifyContent: "center", position: "absolute", right: -10, top: -10, width: 28, zIndex: 1 },
   checkMark: { color: "#4a2608", fontFamily: fonts.rubikSemiBold, fontSize: 16 },
+  fresh: { backgroundColor: "#f7d77a", borderRadius: 8, color: "#4a2608", fontFamily: fonts.rubikSemiBold, fontSize: 11, left: -8, letterSpacing: 1, overflow: "hidden", paddingHorizontal: 6, paddingVertical: 2, position: "absolute", top: -10, zIndex: 1 },
   name: { color: ink.cream, fontFamily: lilita, fontSize: 17, textAlign: "center" },
   text: { color: "#d6d0c2", fontFamily: fonts.rubikMedium, fontSize: 12.5, lineHeight: 17, textAlign: "center" },
 });

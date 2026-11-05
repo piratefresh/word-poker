@@ -6,10 +6,12 @@ import {
   chapterRecord,
   chapterStars,
   draftOffers,
+  newPowers,
   nodeStars,
   nodeState,
   pickDraft,
   recordHand,
+  seePowers,
   setLoadout,
   skipDraft,
   type HandOutcome,
@@ -211,3 +213,28 @@ function setPowers(progress: StoryProgress, powers: StoryProgress["chapters"][st
 function withDraft(progress: StoryProgress, chapterId: string, draft: StoryProgress["chapters"][string]["powers"]) {
   return { chapters: { ...progress.chapters, [chapterId]: { ...chapterRecord(progress, chapterId), draft } } };
 }
+
+describe("story power pools and introductions (STO-975)", () => {
+  it("adds powers chapter by chapter, trading Vowel Magnet for Multiplier and High Value Tile in Chapter 4", () => {
+    assert.deepEqual(
+      STORY_CHAPTERS.map((chapter) => [chapter.id, chapter.powerPool]),
+      [
+        ["kitchen-table", ["blank_tile", "random_wild"]],
+        ["the-local", ["blank_tile", "random_wild", "vowel_magnet", "pickpocket"]],
+        ["the-back-room", ["blank_tile", "random_wild", "vowel_magnet", "pickpocket", "tile_lock"]],
+        ["high-roller-lounge", ["blank_tile", "random_wild", "pickpocket", "tile_lock", "multiplier", "high_value_tile"]],
+        ["dealers-table", ["blank_tile", "random_wild", "pickpocket", "tile_lock", "multiplier", "high_value_tile"]],
+      ],
+    );
+  });
+
+  it("introduces each power once, and keeps the rest of the save", () => {
+    assert.deepEqual(newPowers(EMPTY_STORY_PROGRESS, ["pickpocket", "blank_tile"]), ["pickpocket", "blank_tile"]);
+    const seen = seePowers(EMPTY_STORY_PROGRESS, ["pickpocket"]);
+    assert.deepEqual(newPowers(seen, ["pickpocket", "blank_tile"]), ["blank_tile"]);
+    assert.equal(seePowers(seen, ["pickpocket"]), seen, "nothing new changes nothing");
+
+    const played = recordHand(seen, "kitchen-table", "first-hand", { won: true, score: 11 }, 1).progress;
+    assert.deepEqual(played.powersSeen, ["pickpocket"], "recording a hand keeps the introductions");
+  });
+});

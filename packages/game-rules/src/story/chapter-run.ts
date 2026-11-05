@@ -40,6 +40,11 @@ export interface ChapterRecord {
 
 export interface StoryProgress {
   readonly chapters: Readonly<Record<string, ChapterRecord>>;
+  /**
+   * Every power a draft or loadout has shown, so the coach introduces each one once (STO-975).
+   * Absent in a save from before it was kept, which reads as nothing shown yet.
+   */
+  readonly powersSeen?: readonly PowerUpId[];
 }
 
 export const EMPTY_STORY_PROGRESS: StoryProgress = { chapters: {} };
@@ -51,7 +56,19 @@ export function chapterRecord(progress: StoryProgress, chapterId: string): Chapt
 }
 
 function withRecord(progress: StoryProgress, chapterId: string, record: ChapterRecord): StoryProgress {
-  return { chapters: { ...progress.chapters, [chapterId]: record } };
+  return { ...progress, chapters: { ...progress.chapters, [chapterId]: record } };
+}
+
+/** The powers in `offers` the coach has not introduced yet, in their order. */
+export function newPowers(progress: StoryProgress, offers: readonly PowerUpId[]): PowerUpId[] {
+  const seen = progress.powersSeen ?? [];
+  return offers.filter((id) => !seen.includes(id));
+}
+
+/** Notes `shown` as introduced, so the coach does not introduce them again. */
+export function seePowers(progress: StoryProgress, shown: readonly PowerUpId[]): StoryProgress {
+  const fresh = newPowers(progress, shown);
+  return fresh.length === 0 ? progress : { ...progress, powersSeen: [...(progress.powersSeen ?? []), ...fresh] };
 }
 
 /** 0★ lost · 1★ won · 2★ won at the threshold · 3★ won beating it by the margin. */
