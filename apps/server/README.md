@@ -41,6 +41,14 @@ Disable `API_PROXY` on the test Expo instance so `/api/auth/*` runs the local co
 - `loadtest/example.ts`: scriptable client for `npm run loadtest`
 - `ecosystem.config.cjs`: pm2 configuration, used when deploying to Colyseus Cloud
 
+## Production env
+
+Colyseus Cloud serves both this server and the Expo API routes, and holds every production secret
+in its own `.env`; nothing else (EAS, GitHub) carries them. Account photos (STO-1050) need
+`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_AVATAR_BUCKET` and `R2_PUBLIC_URL`
+there; without all five, `/api/avatar` answers 503. `R2_PUBLIC_URL` is the bucket's r2.dev URL for
+now, which Cloudflare rate-limits: move it to a custom domain before launch.
+
 ## Scripts
 
 - `npm start`: run the server in watch mode (`tsx watch src/index.ts`)
