@@ -37,3 +37,11 @@ test("First Hand: Ellis's authored best word beats BOATS but not KNOBS, and uses
   expect(ellis.score).toBeGreaterThan(10);
   expect(ellis.score).toBeLessThan(bestWord(challenge)!.score);
 });
+
+test("a challenge's teach word is one of the hero's best", () => {
+  for (const challenge of CHALLENGES.filter((entry) => entry.teachWord !== undefined)) {
+    const deal = fixedDeal({ seed: 1, playerCount: challenge.players.length, spec: challenge.deal });
+    const top = topWords({ available: [...(deal.privateTiles[0] ?? []), ...deal.community], dictionary }, 12);
+    expect(top.filter((word) => word.score === top[0]!.score).map((word) => word.word)).toContain(challenge.teachWord);
+  }
+});

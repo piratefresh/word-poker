@@ -30,6 +30,8 @@ export interface Challenge {
   players: readonly string[];
   deal: FixedDealSpec;
   goal: string;
+  /** The word the loss card names among the best a hand held, when several tie: the one the lesson teaches. */
+  teachWord?: string;
   coach: Partial<Record<RoundPhase, string>>;
 }
 
@@ -44,6 +46,7 @@ export const CHALLENGES: readonly Challenge[] = [
     // Rack Bonus is Word Wizard's lesson (an E and R here would hand Ellis TANKERS for 25).
     deal: { hands: { 0: ["B", "O"], 1: ["L", "U"] }, board: ["A", "T", "S", "K", "N"] },
     goal: "Spell a word from your two tiles and the board.",
+    teachWord: "KNOBS",
     coach: {
       preflop: "B and O are yours alone. Call to see the board.",
       flop: "BOATS is 10, but rare letters pay more. A K is worth 5, so watch for one.",

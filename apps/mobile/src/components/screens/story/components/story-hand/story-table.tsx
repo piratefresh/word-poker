@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 
 import {
   chapterRecord,
-  evaluateBestWord,
+  topWords,
   nodeStarGoals,
   nodeStars,
   recordHand,
@@ -33,7 +33,7 @@ import { StoryVerdict } from "./story-verdict";
 
 const CHAPTER = storyChapter("kitchen-table");
 /** Where the coach's bubble starts down the felt: below the opponent's seat. */
-const COACH_TOP = 118;
+const COACH_TOP = 104;
 
 export interface StoryTableProps {
   node: MapNode;
@@ -92,14 +92,20 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const winner = results?.seats.find((seat) => seat.takesPot && !seat.isYou) ?? null;
   const teach = useMemo(() => {
     if (results === null) return null;
-    const best = evaluateBestWord({ available: handTiles, dictionary });
-    if (best === null) return null;
+    // Ties are common (BANKS, BONKS, KNOBS): the lesson's own word first, then the one that plays the most of the player's own tiles.
+    const top = topWords({ available: handTiles, dictionary }, 12);
+    const ceiling = top[0]?.score ?? 0;
+    const own = new Set(game.privateTiles.map((tile) => tile.id));
+    const held = (word: (typeof top)[number]) => word.submission.plays.filter((play) => own.has(play.tileId)).length;
+    const tied = top.filter((word) => word.score === ceiling);
+    const best = tied.find((word) => word.word === challenge?.teachWord) ?? tied.sort((a, b) => held(b) - held(a))[0];
+    if (best === undefined) return null;
     const rival = results.seats.find((seat) => !seat.isYou)?.total ?? 0;
     const beats = best.score > rival;
     return { word: best.word, score: best.score, beats, stars: beats ? nodeStars(goals.two, { won: true, score: best.score }) : 0 };
     // handTiles is rebuilt each render from the same settled hand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, dictionary, goals.two]);
+  }, [results, dictionary, goals.two, challenge?.teachWord]);
   const hands = KITCHEN_TABLE.nodes.filter((entry) => entry.kind === "hand");
   const following = hands[hands.indexOf(node) + 1];
   const into = following === undefined ? KITCHEN_TABLE.boss : `Hand ${hands.indexOf(following) + 1}`;
