@@ -1,6 +1,6 @@
 /** Stable seat styles: tendencies, never knowledge of another player's tiles. */
 export interface BotProfile {
-  readonly name: "cautious" | "aggressive" | "tricky";
+  readonly name: string;
   readonly aggression: number;
   readonly bluff: number;
   readonly slowPlay: number;

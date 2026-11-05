@@ -2,6 +2,7 @@ import type { RoundPhase, Tile } from "@wordpoker/contracts";
 
 import type { BettingRoundState, BettingSeatState } from "../money/betting";
 import type { Dictionary } from "../words/dictionary";
+import type { BossId } from "./boss";
 import type { OfflineState } from "../table/offline";
 
 /** The policy's entire knowledge. Hidden racks, future board and drafts cannot cross it. */
@@ -17,9 +18,13 @@ export interface BotObservation {
   readonly privateTiles: readonly Tile[];
   readonly board: readonly Tile[];
   readonly dictionary: Dictionary;
+  /** The seat's own identity as a story boss (STO-974): who it is, never what anyone else holds. */
+  readonly boss?: BossId;
 }
 
 export function observeBot(state: OfflineState, seat: number, round: BettingRoundState): BotObservation {
+  const id = state.seats[seat]?.id;
+  const boss = id === undefined ? undefined : state.bosses?.[id];
   return {
     seed: state.seed,
     hand: state.hand,
@@ -34,6 +39,7 @@ export function observeBot(state: OfflineState, seat: number, round: BettingRoun
     privateTiles: state.seats[seat]?.privateTiles ?? [],
     board: state.community.slice(0, state.revealed),
     dictionary: state.dictionary,
+    ...(boss === undefined ? {} : { boss }),
   };
 }
 

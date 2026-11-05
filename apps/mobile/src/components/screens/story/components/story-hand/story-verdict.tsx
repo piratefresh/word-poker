@@ -15,6 +15,8 @@ export interface StoryVerdictProps {
   node: MapNode;
   threshold: number;
   verdict: RecordedHand;
+  /** The coach's hint about the boss's tell, shown after two boss losses in a row. */
+  hint: string | null;
   word: string | null;
   score: number;
   onReplay: () => void;
@@ -22,7 +24,7 @@ export interface StoryVerdictProps {
 }
 
 /** The run's verdict on a settled hand: stars, the draft it opens, or a lost boss hand to deal again. */
-export function StoryVerdict({ chapterId, node, threshold, verdict, word, score, onReplay, onLeave }: StoryVerdictProps): ReactElement {
+export function StoryVerdict({ chapterId, node, threshold, verdict, hint, word, score, onReplay, onLeave }: StoryVerdictProps): ReactElement {
   // The draft waits in the save, so it survives leaving here; picking settles it.
   const [draft, setDraft] = useState(verdict.draft);
 
@@ -44,7 +46,7 @@ export function StoryVerdict({ chapterId, node, threshold, verdict, word, score,
               ? `Take the pot with ${threshold}+ points`
               : `★ win · ★★ ${threshold}+ · ★★★ ${Math.ceil(threshold * (1 + STORY_RULES.threeStarMargin))}+`}
           </Text>
-          {verdict.coachHint ? <Text style={styles.hint}>{KITCHEN_TABLE.bossHint}</Text> : null}
+          {verdict.coachHint && hint !== null ? <Text style={styles.hint}>{hint}</Text> : null}
 
           {draft !== null ? (
             <StoryDraft chapterId={chapterId} offers={draft} onSettled={() => setDraft(null)} />
