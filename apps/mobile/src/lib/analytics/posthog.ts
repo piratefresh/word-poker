@@ -12,6 +12,8 @@ if ((!projectToken || !host) && __DEV__ && process.env.NODE_ENV !== "test") {
 export const posthog = projectToken && host
   ? new PostHog(projectToken, {
       host,
+      // The SDK's file storage is native-only; in the browser it finds none and throws.
+      customStorage: Platform.OS === "web" && typeof window !== "undefined" ? window.localStorage : undefined,
       captureAppLifecycleEvents: true,
       errorTracking: {
         autocapture: {
