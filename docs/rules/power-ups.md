@@ -74,6 +74,9 @@ differs.
 
 Spotlight and River Review are not in this family; they have their own sections below.
 
+These five are the whole Wild pool: a Wild table never deals story mode's own powers (Pickpocket,
+Tile Lock, Multiplier, High Value Tile — [Story Mode](story-mode.md) §46).
+
 The tag is what the seat's nameplate prints when the power is used (see Visibility).
 
 ## Blank Tile

@@ -54,6 +54,7 @@ import type { GamePlayer, GameScreenState, LetterTileData } from "./game-types";
 import {
   BestWord,
   CommunityStrip,
+  type CommunityPickAim,
   PlayerRack,
   PlayerSeat,
   Pot,
@@ -109,8 +110,10 @@ export interface GameScreenProps {
   modal?: ReactNode;
   /** Clears the pot from the middle of the felt, so the Power Draw's cards have the room. */
   hidePot?: boolean;
-  /** Spotlight's aim: while set, a tap on a dealt community tile with no bonus picks it. */
+  /** A power's aim at the board: while set, a tap on a dealt community tile picks it. */
   onPickCommunityTile?: (tile: LetterTileData) => void;
+  /** Which power aims; absent is Spotlight, which skips tiles with a bonus. */
+  communityPickAim?: CommunityPickAim;
   /** A short, presentation-only celebration above the table after a showdown. */
   winOverlay?: ReactNode;
   onBack?: () => void;
@@ -187,6 +190,7 @@ function GameScreenBody({
   modal,
   winOverlay,
   onPickCommunityTile,
+  communityPickAim,
   onBack,
   onHelp,
   onBalancePress,
@@ -524,6 +528,7 @@ function GameScreenBody({
                 <>
                   <CommunityInTable
                     onPick={onPickCommunityTile}
+                    pickAim={communityPickAim}
                     // Landscape's board gives back the room the smaller avatars free: 1.1 of the tile.
                     scale={landscape ? scale * 1.1 : scale}
                     tiles={game.community}
@@ -796,11 +801,13 @@ function CommunityInTable({
   tiles,
   scale,
   onPick,
+  pickAim,
   beside,
 }: {
   tiles: GameScreenState["community"];
   scale: number;
   onPick?: (tile: LetterTileData) => void;
+  pickAim?: CommunityPickAim;
   /** Landscape's pots, hung under the board. */
   beside?: ReactNode;
 }) {
@@ -814,7 +821,7 @@ function CommunityInTable({
     >
       <CoachTarget id="community">
         <View>
-          <CommunityStrip inTable onPick={onPick} scale={scale} tiles={tiles} />
+          <CommunityStrip inTable onPick={onPick} pickAim={pickAim} scale={scale} tiles={tiles} />
           {beside ? (
             <View pointerEvents="none" style={styles.besideBoard}>
               {beside}

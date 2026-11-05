@@ -30,5 +30,8 @@ export type OfflineAction =
   | { type: "pickPower"; playerId: PlayerId; powerUpId: PowerUpId }
   /** The Power Draw's clock ran out: every seat that has not picked keeps its first offer. */
   | { type: "timeoutPowerDraw" }
-  /** A seat uses its held power; the swap family names the private tile it discards (§44). */
-  | { type: "usePowerUp"; playerId: PlayerId; powerUpId: PowerUpId; tileId: string };
+  /**
+   * A seat uses its held power on the tile it names (§44): the private tile a swap discards, the
+   * table tile Spotlight doubles. A hostile power (§46) also names the opponent it acts on.
+   */
+  | { type: "usePowerUp"; playerId: PlayerId; powerUpId: PowerUpId; tileId: string; targetId?: PlayerId };

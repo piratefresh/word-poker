@@ -41,7 +41,7 @@ import {
 } from "@/constants/theme";
 import { webTestID } from "@/lib/ui/web-id";
 
-export type GameButtonVariant = "gold" | "dark" | "danger" | "blue" | "green" | "wood";
+export type GameButtonVariant = "gold" | "dark" | "danger" | "blue" | "green";
 
 export interface GameButtonProps {
   /** The printed label. Omit it for an icon button and pass the icon as `children`. */
@@ -154,17 +154,6 @@ const MATERIALS: Record<GameButtonVariant, Material> = {
     bevel: "rgba(1,58,23,0.45)",
     inkShadow: "rgba(0,32,12,0.7)",
     accent: "#f5d547",
-  },
-  // The table's own secondary on felt: the brown ✕ buttons' wood face and orange edge, as a pill.
-  wood: {
-    gradient: ["#9a4a22", "#7a3a1a", "#5e2c12"],
-    lip: "#3a1b0b",
-    edge: "#e0974a",
-    ink: "#f7e7b5",
-    highlight: "rgba(255,220,180,0.25)",
-    sheen: "rgba(255,255,255,0.08)",
-    bevel: "rgba(58,27,11,0.5)",
-    inkShadow: "rgba(0,0,0,0.6)",
   },
 };
 

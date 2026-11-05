@@ -134,7 +134,8 @@ function action(value: unknown): value is RecordedHandAction {
     case "pickPower":
       return text(value.playerId) && isPowerUpId(value.powerUpId);
     case "usePowerUp":
-      return text(value.playerId) && isPowerUpId(value.powerUpId) && text(value.tileId);
+      return text(value.playerId) && isPowerUpId(value.powerUpId) && text(value.tileId) &&
+        (value.targetId === undefined || text(value.targetId));
     default:
       return false;
   }

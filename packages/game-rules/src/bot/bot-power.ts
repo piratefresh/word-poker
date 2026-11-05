@@ -26,6 +26,11 @@ export function chooseBotPower(state: OfflineState, botId: PlayerId): PowerUpId 
     blank_tile: 0.5,
     spotlight: 0,
     river_review: 0.5,
+    // Story mode's own powers (§46): bots hold none, and a Wild draw never offers one.
+    pickpocket: 0,
+    tile_lock: 0,
+    multiplier: 0,
+    high_value_tile: 0,
   };
   let roll = createRng(botDecisionSeed(view, "power-pick"))() *
     slot.offers.reduce((sum, offer) => sum + weights[offer], 0);
@@ -45,7 +50,9 @@ export function decideBotPowerUse(
   if (!canUsePower(state, botId, nowMs)) return null;
   const seat = state.seats.findIndex((candidate) => candidate.id === botId);
   const held = state.powers?.held[botId];
-  if (seat < 0 || held === undefined || POWER_UPS[held.id].family === "spotlight" || POWER_UPS[held.id].family === "review") return null;
+  // A bot only plays the swaps: the rest aim at the table or an opponent, or are never used.
+  const family = held === undefined ? undefined : POWER_UPS[held.id].family;
+  if (seat < 0 || held === undefined || (family !== "swapTile" && family !== "blankTile")) return null;
   const view = observeBot(state, seat, state.betting ?? { currentBet: 0, lastRaiseSize: 0 });
   if (view.privateTiles.length === 0) return null;
   const best = evaluateBestWord({ available: [...view.privateTiles, ...view.board], dictionary: view.dictionary });
