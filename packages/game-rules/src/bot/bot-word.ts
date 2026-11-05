@@ -68,3 +68,22 @@ export function evaluateBestWord(options: ChooseWordOptions): BotWord | null {
 export function chooseOfflineWord(options: ChooseWordOptions): WordSubmission | null {
   return evaluateBestWord(options)?.submission ?? null;
 }
+
+/**
+ * The best word to show a player what they missed. Words tie on score often (BANKS, BONKS and
+ * KNOBS all score 14 on one deal), so among the best the word that plays more of the player's own
+ * tiles comes first, then the longer word, then alphabetical order.
+ *
+ * @param own Ids of the player's own (private) tiles.
+ */
+export function bestWordToTeach({ available, dictionary }: ChooseWordOptions, own: ReadonlySet<string>): BotWord | null {
+  // Every word, not a short list: a tie can be longer than any fixed cut.
+  const words = topWords({ available, dictionary }, Number.MAX_SAFE_INTEGER);
+  const ceiling = words[0]?.score;
+  const held = (word: BotWord) => word.submission.plays.filter((play) => own.has(play.tileId)).length;
+  return (
+    words
+      .filter((word) => word.score === ceiling)
+      .sort((a, b) => held(b) - held(a) || b.word.length - a.word.length || (a.word < b.word ? -1 : 1))[0] ?? null
+  );
+}

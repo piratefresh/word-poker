@@ -37,9 +37,9 @@ threshold. Anything else records nothing and deals the boss hand again, with the
 kept. After 2 boss losses in a row the coach offers a hint about the boss's tell. The first win
 pays the chapter's coins and XP; later wins pay stars only.
 
-**The power draft.** After each hand (not the bonus or the boss), the run offers up to 3 powers
-from the chapter's pool that it does not already hold, drawn evenly. The player keeps one or
-skips. The run holds up to 3 drafted powers for the whole chapter; at 3, a new pick replaces a held
+**The power draft.** After each hand won (not a lost hand, the bonus or the boss), the run offers up to 3 powers
+from the chapter's pool that it does not already hold, drawn evenly. The player takes one: the draft is the
+hand's reward, so the screen asks for a pick (the engine still lets a draft be skipped). The run holds up to 3 drafted powers for the whole chapter; at 3, a new pick replaces a held
 one. The offers wait in the save until they are picked or skipped.
 
 **Powers in a hand.** A hand opens on §44's Power Draw, but only the hero draws, and it is

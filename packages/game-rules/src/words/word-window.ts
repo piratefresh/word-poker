@@ -106,7 +106,7 @@ export interface WindowTable {
  * that starts at `nowMs`. The caller decides who is in the hand — a folded seat has no word to
  * build and a sitting-out seat is not in the hand at all, while an all-in seat still builds one.
  */
-export function openWindow(inHand: readonly WindowSeat[], nowMs: number): OpenWindow {
+export function openWindow(inHand: readonly WindowSeat[], nowMs: number, windowMs: number = WORD_WINDOW_MS): OpenWindow {
   return {
     window: {
       status: "open",
@@ -117,7 +117,7 @@ export function openWindow(inHand: readonly WindowSeat[], nowMs: number): OpenWi
         draft: null,
       })),
     },
-    endsAtMs: nowMs + WORD_WINDOW_MS,
+    endsAtMs: nowMs + windowMs,
   };
 }
 

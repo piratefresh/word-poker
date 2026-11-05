@@ -324,7 +324,10 @@ export function WordBuilder({
  */
 export function WordHand({
   actions,
+  footer,
 }: {
+  /** A mode's own readout under the tiles, inside the tray (a story hand's score meter). */
+  footer?: ReactNode;
   /** The word's controls — shuffle and check — centred in a row under the slots. */
   actions?: ReactNode;
 }): JSX.Element {
@@ -417,6 +420,7 @@ export function WordHand({
         ) : (
           <>
             {strip_}
+            {footer}
             {actions == null ? null : (
               <View style={styles.trayActions}>{actions}</View>
             )}

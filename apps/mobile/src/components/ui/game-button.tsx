@@ -27,6 +27,7 @@ import {
   Text,
   View,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from "react-native";
 
@@ -70,6 +71,8 @@ export interface GameButtonProps {
   /** The face's horizontal padding at scale 1; a row of tight buttons passes less than the 12 default. */
   horizontalPadding?: number;
   style?: StyleProp<ViewStyle>;
+  /** Overrides on the label's lettering (a mode's own face and size); the colour stays the material's. */
+  labelStyle?: StyleProp<TextStyle>;
   testID?: string;
   accessibilityLabel?: string;
 }
@@ -177,6 +180,7 @@ export function GameButton({
   compact = false,
   horizontalPadding = 12,
   style,
+  labelStyle,
   testID,
   accessibilityLabel,
 }: GameButtonProps): ReactElement {
@@ -312,6 +316,7 @@ export function GameButton({
                       color: material.ink,
                       textShadowColor: material.inkShadow,
                     },
+                    labelStyle,
                   ]}
                 >
                   {label}

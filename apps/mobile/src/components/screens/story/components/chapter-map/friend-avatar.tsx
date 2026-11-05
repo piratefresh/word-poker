@@ -1,14 +1,21 @@
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 
-import { FRIENDS, type FriendId } from "@/features/story/kitchen-table-map";
+import { AvatarArt } from "@/components/ui/avatar-art";
+import { FRIENDS, type Expression, type FriendId } from "@/features/story/kitchen-table-map";
 
 import { ink, lilita } from "./chapter-map-ink";
 
-export function FriendAvatar({ friend, size, style }: { friend: FriendId; size: number; style?: ViewStyle }): ReactElement {
+/** A friend as a circle: their portrait in the expression asked for, or their initial where there is no art. */
+export function FriendAvatar({ friend, size, style, expression = "neutral" }: { friend: FriendId; size: number; style?: ViewStyle; expression?: Expression }): ReactElement {
+  const faces = FRIENDS[friend].faces;
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: FRIENDS[friend].color }, style]}>
-      <Text style={[styles.initial, { fontSize: size * 0.48 }]}>{FRIENDS[friend].name[0]}</Text>
+      {faces === undefined ? (
+        <Text style={[styles.initial, { fontSize: size * 0.48 }]}>{FRIENDS[friend].name[0]}</Text>
+      ) : (
+        <AvatarArt size={size - 6} source={faces[expression]} />
+      )}
     </View>
   );
 }

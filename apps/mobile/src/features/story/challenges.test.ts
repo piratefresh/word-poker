@@ -1,4 +1,4 @@
-import { createDictionary, evaluateBestWord, fixedDeal, nodeStars, nodeThreshold, storyChapter, storyNode } from "@wordpoker/game-rules";
+import { createDictionary, evaluateBestWord, topWords, fixedDeal, nodeStars, nodeThreshold, storyChapter, storyNode } from "@wordpoker/game-rules";
 
 import { CHALLENGES, type Challenge } from "./challenges";
 
@@ -27,4 +27,21 @@ test.each(CHALLENGES.map((challenge) => [challenge.id, challenge] as const))(
 
 test("First Hand holds no seven-letter word: the Full Rack Bonus is Word Wizard's", () => {
   expect(bestWord(CHALLENGES[0]!)?.word.length).toBeLessThan(7);
+});
+
+test("First Hand: Ellis's authored best word beats BOATS but not KNOBS, and uses no seven-letter rack", () => {
+  const challenge = CHALLENGES[0]!;
+  const deal = fixedDeal({ seed: 1, playerCount: challenge.players.length, spec: challenge.deal });
+  const ellis = topWords({ available: [...(deal.privateTiles[1] ?? []), ...deal.community], dictionary }, 1)[0]!;
+  expect(ellis.word.length).toBeLessThan(7);
+  expect(ellis.score).toBeGreaterThan(10);
+  expect(ellis.score).toBeLessThan(bestWord(challenge)!.score);
+});
+
+test("a challenge's teach word is one of the hero's best", () => {
+  for (const challenge of CHALLENGES.filter((entry) => entry.teachWord !== undefined)) {
+    const deal = fixedDeal({ seed: 1, playerCount: challenge.players.length, spec: challenge.deal });
+    const top = topWords({ available: [...(deal.privateTiles[0] ?? []), ...deal.community], dictionary }, 12);
+    expect(top.filter((word) => word.score === top[0]!.score).map((word) => word.word)).toContain(challenge.teachWord);
+  }
 });

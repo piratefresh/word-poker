@@ -44,7 +44,7 @@ export { decideBotWord, decideOfflineMove, chooseOfflineWord } from "./bot/bot";
 export { BOSS_IDS, BOSS_TELL, PRESSURE_FULL, bossStyle, bossTells, isBossId } from "./bot/boss";
 export type { BossId, BossStyle, BossTell, TellKind } from "./bot/boss";
 export type { ChooseWordOptions } from "./bot/bot";
-export { evaluateBestWord, topWords } from "./bot/bot-word";
+export { bestWordToTeach, evaluateBestWord, topWords } from "./bot/bot-word";
 export { RIVER_REVIEW_WORDS, riverReview } from "./words/river-review";
 export type { BotWord } from "./bot/bot-word";
 export {
@@ -137,7 +137,7 @@ export {
   xpToReach,
 } from "./xp";
 export type { LevelStanding } from "./xp";
-export { STORY_CHAPTERS, STORY_RULES, nodeThreshold, storyChapter, storyNode } from "./story/chapters";
+export { STORY_CHAPTERS, STORY_RULES, nodeStarGoals, nodeThreshold, storyChapter, storyNode } from "./story/chapters";
 export type { StoryChapter, StoryNode, StoryNodeKind } from "./story/chapters";
 export {
   EMPTY_STORY_PROGRESS,

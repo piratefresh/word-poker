@@ -90,7 +90,7 @@ export function MapNodeButton({ node, state, stars, onPress }: MapNodeButtonProp
         </Text>
         {node.kind === "bonus" ? <Text style={styles.bonusTag}>OPTIONAL · STARS ONLY</Text> : null}
         {available ? (
-          <LinearGradient colors={["#6fdc78", "#2e9a4a"]} style={styles.play}>
+          <LinearGradient colors={["#ffe27a", "#ffc83d", "#e8a42a"]} style={styles.play}>
             <Text style={styles.playText}>PLAY</Text>
           </LinearGradient>
         ) : null}
@@ -138,10 +138,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#d8f6c8",
+    borderColor: ink.parchment,
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0px 4px 0px #14502a, 0px 8px 12px rgba(0,0,0,0.4)",
+    boxShadow: `0px 4px 0px ${ink.goldDeep}, 0px 8px 12px rgba(0,0,0,0.4)`,
   },
-  playText: { fontFamily: lilita, fontSize: 17, letterSpacing: 1, color: "#ffffff", textShadowColor: "#14502a", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
+  playText: { fontFamily: lilita, fontSize: 17, letterSpacing: 1, color: "#4a2608", textShadowColor: "rgba(255,246,226,0.55)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 0 },
 });

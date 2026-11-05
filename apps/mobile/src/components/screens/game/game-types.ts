@@ -1,3 +1,5 @@
+import type { ImageSource } from "expo-image";
+
 import type { RoundPhase } from "@wordpoker/contracts";
 
 import type { TileData } from "@/components/game";
@@ -32,6 +34,8 @@ export interface GamePlayer {
   initials: string;
   stack: number;
   color: string;
+  /** A portrait drawn in the avatar in place of the initials (a story friend). */
+  face?: ImageSource | number;
   status: PlayerStatus;
   /** The markers this seat holds, in the order the felt prints them; absent when it holds none. */
   roles?: readonly PlayerRole[];

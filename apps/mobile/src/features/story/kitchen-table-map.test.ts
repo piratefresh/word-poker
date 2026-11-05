@@ -1,5 +1,9 @@
 import {
   KITCHEN_TABLE,
+  MAP_HEIGHT,
+  MAP_WIDTH,
+  ROOMS,
+  ROOM_ZOOM,
   chapterStars,
   coachFor,
   discSize,
@@ -60,4 +64,18 @@ test("the tile path never sits under a disc, and lights up as the player walks i
   expect(lit(0)).toBeGreaterThan(0);
   expect(lit(1)).toBeGreaterThan(lit(0));
   expect(lit(5)).toBe(pathTiles({}).length);
+});
+
+test("every node is played in a room of the map, and the first hand on the porch", () => {
+  for (const entry of KITCHEN_TABLE.nodes) expect(ROOMS[entry.room]).toBeDefined();
+  expect(node("first-hand").room).toBe("porch");
+  expect(node("word-wizard").room).toBe(node("bonus").room);
+  expect(node("professor").room).toBe("study");
+});
+
+test("each room's crop stays inside the map at the table's zoom", () => {
+  for (const origin of Object.values(ROOMS)) {
+    expect(origin.x + MAP_WIDTH / ROOM_ZOOM).toBeLessThanOrEqual(MAP_WIDTH);
+    expect(origin.y + 844 / ROOM_ZOOM).toBeLessThanOrEqual(MAP_HEIGHT);
+  }
 });

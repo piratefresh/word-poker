@@ -134,3 +134,9 @@ export function storyNode(chapter: StoryChapter, id: string): StoryNode {
 export function nodeThreshold(chapter: StoryChapter, node: StoryNode): number {
   return node.threshold ?? chapter.threshold;
 }
+
+/** The word scores a node's stars ask for: ★★ at `two`, ★★★ at `three` (★ is just winning the hand). */
+export function nodeStarGoals(chapter: StoryChapter, node: StoryNode): { readonly two: number; readonly three: number } {
+  const two = nodeThreshold(chapter, node);
+  return { two, three: Math.ceil(two * (1 + STORY_RULES.threeStarMargin)) };
+}

@@ -445,6 +445,14 @@ describe("reduce — the betting round", () => {
     assert.equal(next.endsAtMs, NOW + 10_000 + 5_000);
   });
 
+  it("holds §19's window open as long as the hand asks, and into the next hand", () => {
+    const longWindow = 10 * WORD_WINDOW_MS;
+    const state = playToWindow(dealHand({ wordWindowMs: longWindow }));
+    assert.equal(state.endsAtMs - NOW > WORD_WINDOW_MS, true);
+    const next = reduce(payOut(state), { type: "deal" }, NOW + 1);
+    assert.equal(next.wordWindowMs, longWindow);
+  });
+
   it("refuses an action from the wrong seat, with the machine's reason", () => {
     const state = dealHand();
 

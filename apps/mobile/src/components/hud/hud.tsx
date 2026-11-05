@@ -32,6 +32,8 @@ export interface HudProps {
   /** Spoken turn phrase, e.g. "Magnus to act". */
   turnPhrase?: string;
   balance: BalanceView;
+  /** A lesson table draws no balance or PRACTICE chip at all. */
+  hideBalance?: boolean;
   /**
    * Whether the header hangs the table's mode under the phase capsule. The screen decides it:
    * the tag takes a band under the header, and only the screen knows the room below it
@@ -85,6 +87,7 @@ export function Hud({
   stamp,
   turnPhrase,
   balance,
+  hideBalance,
   modeTag,
   toastQueue,
   onLeave,
@@ -105,6 +108,7 @@ export function Hud({
       <View pointerEvents="box-none" style={styles.chrome}>
         <HudTopBar
           balance={balance}
+          hideBalance={hideBalance}
           loopsEnabled={loopsEnabled}
           modeTag={modeTag}
           onBalancePress={onBalancePress}

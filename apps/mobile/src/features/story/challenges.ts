@@ -33,23 +33,28 @@ export interface Challenge {
   players: readonly string[];
   deal: FixedDealSpec;
   goal: string;
+  /** The word the loss card names among the best a hand held, when several tie: the one the lesson teaches. */
+  teachWord?: string;
   coach: Partial<Record<RoundPhase, string>>;
 }
 
 export const CHALLENGES: readonly Challenge[] = [
   {
     id: "first-hand",
-    version: 1,
+    version: 2,
     title: "First Hand",
     players: ["hero", "ellis"],
-    // No seven-letter word here: the Full Rack Bonus is Word Wizard's lesson.
-    deal: { hands: { 0: ["B", "O"] }, board: ["A", "T", "S", "K", "N"] },
+    // Both hands are authored: Ellis's best word is SLUNK for 12 (a BOATS for 10 loses to it) and
+    // KNOBS for 14 is always the hero's way past it. No seven-letter word for either seat: the Full
+    // Rack Bonus is Word Wizard's lesson (an E and R here would hand Ellis TANKERS for 25).
+    deal: { hands: { 0: ["B", "O"], 1: ["L", "U"] }, board: ["A", "T", "S", "K", "N"] },
     goal: "Spell a word from your two tiles and the board.",
+    teachWord: "KNOBS",
     coach: {
       preflop: "B and O are yours alone. Call to see the board.",
-      flop: "Three tiles are shared. Can you see BOAT?",
-      turn: "Another tile. Longer words score more.",
-      river: "All five are out. Build your best word before the clock runs down.",
+      flop: "BOATS is 10, but rare letters pay more. A K is worth 5, so watch for one.",
+      turn: "There's the K, worth 5. Your B and O can carry it far.",
+      river: "All five are out. Build your best word.",
       payout: "The best word takes the pot.",
     },
   },
@@ -82,6 +87,9 @@ export interface StoryTable {
   bosses?: Readonly<Record<string, BossId>>;
 }
 
+/** A story hand has no clock: a day is more betting turn, and word window, than anyone takes. */
+export const NO_CLOCK_MS = 24 * 60 * 60 * 1000;
+
 /**
  * The offline table for one story hand. A seat holding drafted powers opens the hand on a Power
  * Draw of exactly those, and keeps one for the hand; with none drafted the hand is Classic.
@@ -104,6 +112,8 @@ export function storySession(
         nowMs,
         dictionary,
         stakes: DEFAULT_STAKES,
+        turnDurationMs: NO_CLOCK_MS,
+        wordWindowMs: NO_CLOCK_MS,
         ...(deal === undefined ? {} : { deal }),
         ...(table.bosses === undefined ? {} : { bosses: table.bosses }),
         ...(powers.length === 0 ? {} : { powerUps: { deal: "choose3", offers: { [players[0]!]: powers } } }),

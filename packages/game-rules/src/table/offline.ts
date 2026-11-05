@@ -84,6 +84,7 @@ import { createRng } from "../core/rng";
 import { scoreWord } from "../words/scoring";
 import { DRAW_SEED_SALT, rankShowdown } from "../money/showdown";
 import * as wordWindow from "../words/word-window";
+import { WORD_WINDOW_MS } from "../words/word-window";
 import type { WindowSeat, WindowTable, WordSlot, WordWindow } from "../words/word-window";
 
 /**
@@ -184,6 +185,8 @@ export interface OfflineState {
   /** When the current turn's clock runs out, or when §19's window closes, on the caller's timeline. */
   endsAtMs: number;
   turnDurationMs: number;
+  /** How long §19's word window stays open once it opens; the rules' `WORD_WINDOW_MS` unless the hand asks for more. */
+  wordWindowMs: number;
   /**
    * The seat holding the dealer button: the blinds ride on it (§5), pre-flop order starts at the
    * first dealt-in seat clockwise from the big blind, later streets at the first dealt-in seat
@@ -273,6 +276,8 @@ export interface StartHandOptions {
   /** The seat holding the dealer button. Absent means seat 0, the first hand's button. */
   dealerSeat?: number;
   turnDurationMs?: number;
+  /** §19's window length for this hand; absent is `WORD_WINDOW_MS`. A lesson with no clock passes a very long one. */
+  wordWindowMs?: number;
   /**
    * The table's power-up deal mode (§40, §44). Absent or `off` is Classic: no draw and no
    * `powers` on the state. `choose3` opens the Power Draw on every deal for every seat dealt in
@@ -326,6 +331,7 @@ export function startHand({
   restack,
   dealerSeat,
   turnDurationMs: requestedTurnDurationMs,
+  wordWindowMs,
   powerUps,
   deal,
   bosses,
@@ -392,6 +398,7 @@ export function startHand({
     toActIndex,
     endsAtMs: nowMs + turnDurationMs,
     turnDurationMs,
+    wordWindowMs: wordWindowMs ?? WORD_WINDOW_MS,
     dealerSeat: button,
     betting,
     sessionOver: false,
@@ -880,7 +887,7 @@ function rollStreets(state: OfflineState, nowMs: number): OfflineState {
 
 /** §19's window opening on the whole table: one clock, one slot per seat still in the hand. */
 function openWordWindow(state: OfflineState, nowMs: number): OfflineState {
-  const { window, endsAtMs } = wordWindow.openWindow(inHandSeats(state), nowMs);
+  const { window, endsAtMs } = wordWindow.openWindow(inHandSeats(state), nowMs, state.wordWindowMs);
 
   return { ...state, toActIndex: null, betting: null, endsAtMs, wordWindow: window };
 }
@@ -1209,6 +1216,7 @@ function nextHand(state: OfflineState, nowMs: number): OfflineState {
     },
     ...(state.restack === undefined ? {} : { restack: true }),
     turnDurationMs: state.turnDurationMs,
+    wordWindowMs: state.wordWindowMs,
     ...(state.powers === undefined ? {} : { powerUps: { deal: "choose3" } }),
     ...(state.bosses === undefined ? {} : { bosses: state.bosses }),
   });

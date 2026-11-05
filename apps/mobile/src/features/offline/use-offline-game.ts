@@ -92,9 +92,9 @@ const ROSTER: readonly { id: PlayerId; name: string }[] = [
 
 type SeatNames = OfflineSession["names"];
 
-function seatName(state: OfflineState, index: number, names: SeatNames): string {
-  const id = state.seats[index]?.id ?? "";
-  return names?.[id] ?? ROSTER[index]?.name ?? id;
+/** A seat's printed name, by who sits there: a session seats its own players, so a seat's index says nothing. */
+function seatName(id: PlayerId, names: SeatNames): string {
+  return names?.[id] ?? ROSTER.find((player) => player.id === id)?.name ?? id;
 }
 
 /**
@@ -804,7 +804,7 @@ function powerViewOf(
       .filter((event) => event.handId === state.hand)
       .map((event) => ({
         ...event,
-        name: seatName(state, event.seat, names),
+        name: seatName(state.seats[event.seat]?.id ?? "", names),
         mine: state.seats[event.seat]?.id === HERO_ID,
       })),
   };
@@ -1080,7 +1080,7 @@ function perspectiveOf(
     phase: state.phase,
     seatCount: toSeatCount(state.seats.length),
     seats: state.seats.map((seat, index) => {
-      const name = seatName(state, index, names);
+      const name = seatName(seat.id, names);
       return {
         ...seat,
         place: index,
