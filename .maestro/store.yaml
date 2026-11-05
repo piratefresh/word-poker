@@ -1,10 +1,12 @@
 url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
-name: Store loads the real wallet
+name: Store tab loads the real wallet
 tags: [web, store]
 ---
+# STO-1045: the store is a tab, so the STORE chip opens it.
+# The HUD coin pill opens the same tab.
 - runFlow: sign-in.yaml
 - tapOn:
-    id: "Wallet, [0-9,]+ coins"
+    id: "tab-store"
 - extendedWaitUntil:
     visible:
       id: "wallet-coins"
@@ -12,6 +14,16 @@ tags: [web, store]
 - assertNotVisible:
     id: "wallet-error"
 - assertVisible: "[0-9,]+ COINS"
+- takeScreenshot: store-tab
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline"
+- tapOn:
+    id: "Wallet, [0-9,]+ coins"
+- extendedWaitUntil:
+    visible:
+      id: "wallet-coins"
+    timeout: 30000
 - tapOn:
     id: "store-back"
 - assertVisible: "Offline"

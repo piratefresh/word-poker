@@ -72,10 +72,13 @@ tags:
     id: "home-account-menu"
 - tapOn:
     text: "Settings"
-- assertVisible:
-    text: ${output.email}
-- tapOn:
-    text: "Cancel"
+# The email shows once the sheet has read the sign-in methods.
 - extendedWaitUntil:
-    notVisible: "Account settings"
+    visible: ${output.email}
+    timeout: 15000
+- tapOn:
+    id: "account-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "account-settings"
     timeout: 10000

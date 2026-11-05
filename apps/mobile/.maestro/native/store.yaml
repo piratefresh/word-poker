@@ -1,16 +1,30 @@
 appId: com.wordpoker.wordpoker
-name: Store loads the real wallet (native)
+name: Store tab loads the real wallet (native)
 tags: [native, store]
 ---
+# STO-1045: the store is a tab, so the STORE chip opens it and stays lit while it shows.
+# The HUD coin pill opens the same tab.
 - runFlow: _ensure-session.yaml
 - tapOn:
-    id: "home-credits"
+    id: "tab-store"
 # The balance by its text: @expo/ui's SwiftUI Text does not expose its testID on iOS.
 - extendedWaitUntil:
     visible: "[0-9,]+ COINS"
     timeout: 30000
+- assertVisible:
+    id: "tab-store"
+    selected: true
 - assertNotVisible:
     id: "wallet-error"
+- takeScreenshot: store-tab
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline"
+- tapOn:
+    id: "home-credits"
+- extendedWaitUntil:
+    visible: "[0-9,]+ COINS"
+    timeout: 30000
 - tapOn:
     id: "store-back"
 - assertVisible: "Offline"
