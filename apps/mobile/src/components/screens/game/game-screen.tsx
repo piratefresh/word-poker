@@ -152,6 +152,16 @@ export interface GameScreenProps {
    * drawn disabled until it lets them go. The mode's own controls in the row stay live.
    */
   actionsLocked?: boolean;
+  /**
+   * What stands behind the felt in place of the tabletop room: a story hand lays its table in the
+   * room of its map node.
+   */
+  backdrop?: ReactNode;
+  /**
+   * A lesson table (story hands): no clock anywhere, no PRACTICE tag, and FOLD and the wager drawn
+   * quiet beside the big CHECK/CALL. `stamp` is what the header's capsule says in place of the phase.
+   */
+  lesson?: { stamp: string };
 }
 
 export function GameScreen(props: GameScreenProps) {
@@ -191,6 +201,8 @@ function GameScreenBody({
   waiting,
   clockHeld = false,
   actionsLocked = false,
+  backdrop,
+  lesson,
 }: GameScreenProps) {
   const insets = useSafeAreaInsets();
   const hudHeight = useHudChromeHeight();
@@ -341,7 +353,7 @@ function GameScreenBody({
   }, [game.seatCount, landscape, heroSeat, contentWidth]);
 
   // Keep the mode under the capsule in portrait; the table reserves its clearance below.
-  const modeTag = hangsModeTag(balance, window);
+  const modeTag = lesson === undefined && hangsModeTag(balance, window);
 
   // The rail's foot: the controls' bottom, up past the choice chips' row that the strip keeps under
   // its tiles, down by the strip's own drop (`stripTight`) and the ledge below the tiles.
@@ -411,10 +423,11 @@ function GameScreenBody({
         <BettingControls
           amount={raiseAmount}
           locked={actionsLocked}
+          quiet={lesson !== undefined}
           waitingOn={
             rowIsHeros
               ? undefined
-              : { name: actingSeat?.name, view: actingSeat ? view : undefined }
+              : { name: actingSeat?.name, view: actingSeat && !lesson ? view : undefined }
           }
           onAllIn={onAllIn}
           onRaiseAnchor={onRaiseAnchor}
@@ -425,7 +438,7 @@ function GameScreenBody({
           onWager={commitWager ? () => commitWager(raiseAmount) : undefined}
           state={game.betting}
           submission={game.wordSubmission}
-          timer={view}
+          timer={lesson ? undefined : view}
         />
       )}
     </View>
@@ -439,7 +452,7 @@ function GameScreenBody({
     >
       {/* The backdrop's coin bowl and the pot bowl both play the table's turns. */}
       <CoinBowlGameContext.Provider value={game}>
-        <TableBackdrop />
+        {backdrop ?? <TableBackdrop />}
         {/* The mat starts under the HUD and its hanging mode tag, so the opponents sit on it. On
           its side it runs down to the foot of the word builder's rail, so the tiles and the table
           share the one mat; the hero's seat still straddles the table's own bottom edge. */}
@@ -574,8 +587,8 @@ function GameScreenBody({
                   // Free play (offline, tutorial) deals practice chips, never coins.
                   practice={balance.state === "free-play"}
                   tabletop
-                  timed={game.wordSubmission != null && !waiting}
-                  turnProgress={waiting ? undefined : view.elapsedFraction}
+                  timed={game.wordSubmission != null && !waiting && !lesson}
+                  turnProgress={waiting || lesson ? undefined : view.elapsedFraction}
                 />
               )}
               // The seats scale with the felt and, at up to four, sit inside the table — avatars
@@ -682,11 +695,14 @@ function GameScreenBody({
           onHelp={onHelp}
           onLeave={goBack}
           phase={game.phase}
+          hideBalance={lesson !== undefined}
           stamp={
-            waiting?.stamp ?? (game.wordSubmission ? "FINAL STAGE" : undefined)
+            waiting?.stamp ??
+            lesson?.stamp ??
+            (game.wordSubmission ? "FINAL STAGE" : undefined)
           }
           style={{ top: insets.top, elevation: 2, zIndex: 2 }}
-          turn={waiting ? null : view}
+          turn={waiting || lesson ? null : view}
           turnPhrase={
             game.wordSubmission
               ? "Word submission deadline"

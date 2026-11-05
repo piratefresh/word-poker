@@ -1,24 +1,39 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { chapterRecord, nodeThreshold, recordHand, storyChapter, storyNode, type Dictionary, type RecordedHand } from "@wordpoker/game-rules";
+import {
+  chapterRecord,
+  evaluateBestWord,
+  nodeStarGoals,
+  nodeStars,
+  recordHand,
+  storyChapter,
+  storyNode,
+  type Dictionary,
+  type RecordedHand,
+} from "@wordpoker/game-rules";
 
 import { PowerDrawReveal, PowerHeldChip, PowerUsePrompt, PowerUsedCard, swapFlipOf, usePowerTargeting } from "@/components/powers";
-import { FREE_PLAY } from "@/components/hud";
+import { FREE_PLAY, PHASE_LABEL } from "@/components/hud";
 import { GameScreen } from "@/components/screens/game/game-screen";
 import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
 import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { WordBuilder, WordCheckButton, WordHand, WordShuffleButton } from "@/components/word-builder";
-import { colors, fonts, radius, spacing } from "@/constants/theme";
 import { randomSeed } from "@/features/offline/offline-seed";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { challengeById, storySession, storyTable } from "@/features/story/challenges";
+import { bestUnusedTile, storyCoachLine } from "@/features/story/story-coach";
 import { KITCHEN_TABLE, type MapNode } from "@/features/story/kitchen-table-map";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
 
+import { StoryMeter } from "./story-meter";
+import { StoryRoom } from "./story-room";
+import { StorySpeech } from "./story-speech";
 import { StoryVerdict } from "./story-verdict";
 
 const CHAPTER = storyChapter("kitchen-table");
+/** Where the coach's bubble starts down the felt: below the opponent's seat. */
+const COACH_TOP = 118;
 
 export interface StoryTableProps {
   node: MapNode;
@@ -57,9 +72,37 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   };
 
   const challenge = challengeById(node.challengeId);
-  const threshold = nodeThreshold(CHAPTER, storyNode(CHAPTER, node.id));
-  const goal = node.kind === "boss" ? `Take the pot with ${threshold}+ points.` : (challenge?.goal ?? `Win the pot. ${threshold}+ points for ★★.`);
-  const coachLine = verdict?.coachHint ? KITCHEN_TABLE.bossHint : (challenge?.coach[game.phase] ?? "");
+  const goals = nodeStarGoals(CHAPTER, storyNode(CHAPTER, node.id));
+  // The coach reads the word on the rack; the authored line for the street is what it says before there is one.
+  const handTiles = [...game.privateTiles, ...game.community.filter((tile) => tile !== null)];
+  const wordIsReal = dictionary.isWord(words?.word ?? "");
+  const coachLine = verdict?.coachHint
+    ? KITCHEN_TABLE.bossHint
+    : storyCoachLine({
+        street: challenge?.coach[game.phase] ?? "",
+        word: words?.word ?? "",
+        score: words?.score?.total ?? null,
+        valid: dictionary.isWord(words?.word ?? ""),
+        goals,
+        unused: bestUnusedTile(handTiles, words?.plays ?? []),
+      });
+
+  // What the player's own tiles could have made, for the coach to name once the hand is lost.
+  const hero = results?.seats.find((seat) => seat.isYou) ?? null;
+  const winner = results?.seats.find((seat) => seat.takesPot && !seat.isYou) ?? null;
+  const teach = useMemo(() => {
+    if (results === null) return null;
+    const best = evaluateBestWord({ available: handTiles, dictionary });
+    if (best === null) return null;
+    const rival = results.seats.find((seat) => !seat.isYou)?.total ?? 0;
+    const beats = best.score > rival;
+    return { word: best.word, score: best.score, beats, stars: beats ? nodeStars(goals.two, { won: true, score: best.score }) : 0 };
+    // handTiles is rebuilt each render from the same settled hand.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, dictionary, goals.two]);
+  const hands = KITCHEN_TABLE.nodes.filter((entry) => entry.kind === "hand");
+  const following = hands[hands.indexOf(node) + 1];
+  const into = following === undefined ? KITCHEN_TABLE.boss : `Hand ${hands.indexOf(following) + 1}`;
 
   return (
     <WordBuilder
@@ -80,7 +123,9 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     >
       <View style={styles.table}>
         <GameScreen
+          backdrop={<StoryRoom room={node.room} />}
           balance={FREE_PLAY}
+          lesson={{ stamp: `${PHASE_LABEL[game.phase]} · ${node.title.toUpperCase()}` }}
           game={game}
           onPickCommunityTile={power.tablePick}
           heroSideAccessory={
@@ -103,10 +148,11 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           modal={powers === null ? null : <PowerDrawReveal draw={powers.draw} held={powers.held?.id ?? null} onPick={offline.pickPower} />}
           overFelt={
             <>
-              <View pointerEvents="none" style={styles.coach} testID="story-coach">
-                <Text style={styles.coachTitle}>{`${node.title.toUpperCase()} · ${goal}`}</Text>
-                {coachLine === "" ? null : <Text style={styles.coachLine}>{coachLine}</Text>}
-              </View>
+              {game.phase === "payout" ? null : (
+                <View pointerEvents="none" style={styles.coach}>
+                  <StorySpeech line={coachLine} />
+                </View>
+              )}
               {powers === null ? null : (
                 <>
                   <PowerUsePrompt onCancel={power.cancel} onConfirm={power.confirm} power={powers.held?.id ?? null} targeting={power.targeting} />
@@ -123,6 +169,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
                   <WordCheckButton />
                 </>
               }
+              footer={<StoryMeter goals={goals} score={wordIsReal ? (words?.score?.total ?? 0) : 0} />}
             />
           }
         />
@@ -131,10 +178,11 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
         <StoryVerdict
           chapterId={CHAPTER.id}
           node={node}
-          threshold={threshold}
+          hero={hero}
+          into={into}
+          teach={teach}
           verdict={verdict}
-          word={results.seats.find((seat) => seat.isYou)?.word ?? null}
-          score={results.seats.find((seat) => seat.isYou)?.total ?? 0}
+          winner={winner}
           onReplay={replay}
           onLeave={onLeave}
         />
@@ -145,15 +193,6 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
 
 const styles = StyleSheet.create({
   table: { flex: 1, overflow: "hidden" },
-  coach: {
-    backgroundColor: "rgba(2,12,9,0.78)",
-    borderRadius: radius.card,
-    left: spacing.md,
-    padding: spacing.sm,
-    position: "absolute",
-    right: spacing.md,
-    top: spacing.lg,
-  },
-  coachTitle: { color: colors.gold, fontFamily: fonts.mono, fontSize: 11, textAlign: "center" },
-  coachLine: { color: colors.textBright, fontFamily: fonts.mono, fontSize: 13, textAlign: "center" },
+  // Under the opponent's seat, clear of its avatar and its blind badges.
+  coach: { left: 24, position: "absolute", right: 24, top: COACH_TOP },
 });

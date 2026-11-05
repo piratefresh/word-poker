@@ -8,7 +8,7 @@
  */
 
 import { Image } from "expo-image";
-import { useMemo, useRef, type ReactElement } from "react";
+import { useMemo, useRef, useState, type ReactElement } from "react";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,6 +26,7 @@ import {
 } from "@/features/story/kitchen-table-map";
 
 import { BadgeShelf } from "./components/chapter-map/badge-shelf";
+import { BriefSheet } from "./components/chapter-map/brief-sheet";
 import { ChapterMapHeader } from "./components/chapter-map/chapter-map-header";
 import { ink } from "./components/chapter-map/chapter-map-ink";
 import { CoachBubble } from "./components/chapter-map/coach-bubble";
@@ -54,6 +55,8 @@ export function ChapterMapScreen({ progress, onPlay, onBack }: ChapterMapScreenP
   const coach = coachFor(progress);
   const tiles = useMemo(() => pathTiles(progress), [progress]);
   const won = bossBeaten(progress);
+  // PLAY opens the brief; DEAL on it is what starts the hand.
+  const [briefing, setBriefing] = useState<MapNode | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const focusY = Math.max(0, Math.min(MAP_HEIGHT * scale - height, coach.node.y * scale - height * FOCUS_FROM_TOP));
@@ -81,7 +84,7 @@ export function ChapterMapScreen({ progress, onPlay, onBack }: ChapterMapScreenP
             ))}
             <MapFriends coach={coach} />
             {KITCHEN_TABLE.nodes.map((node) => (
-              <MapNodeButton key={node.id} node={node} state={nodeState(node, progress)} stars={progress[node.id] ?? 0} onPress={onPlay} />
+              <MapNodeButton key={node.id} node={node} state={nodeState(node, progress)} stars={progress[node.id] ?? 0} onPress={setBriefing} />
             ))}
             <CoachBubble coach={coach} />
           </View>
@@ -90,6 +93,16 @@ export function ChapterMapScreen({ progress, onPlay, onBack }: ChapterMapScreenP
 
       <ChapterMapHeader stars={chapterStars(progress)} topInset={insets.top} onBack={onBack} />
       <BadgeShelf won={won} bottom={insets.bottom + 24} />
+      {briefing === null ? null : (
+        <BriefSheet
+          node={briefing}
+          onDeal={() => {
+            setBriefing(null);
+            onPlay(briefing);
+          }}
+          onDismiss={() => setBriefing(null)}
+        />
+      )}
     </View>
   );
 }

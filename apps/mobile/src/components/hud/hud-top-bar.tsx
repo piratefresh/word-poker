@@ -60,6 +60,8 @@ export interface HudTopBarProps {
   /** Words for the stamp in place of the phase's, for a table with no hand dealt yet. */
   stamp?: string;
   balance: BalanceView;
+  /** A lesson table draws no balance or PRACTICE chip. */
+  hideBalance?: boolean;
   /**
    * Whether this header hangs the table's mode under the capsule. Decided above the felt
    * (`hangsModeTag`, and the room that has to seat its row below it): the bar draws the tag
@@ -99,6 +101,7 @@ export function HudTopBar({
   stamp,
   turn,
   balance,
+  hideBalance = false,
   modeTag = false,
   onLeave,
   onHelp,
@@ -198,14 +201,14 @@ export function HudTopBar({
               <BackChevron />
             </WoodButton>
             <Animated.View pointerEvents="none" style={[styles.capsuleSlot, entrance]}>
-              {balance.state === "free-play" ? (
+              {balance.state === "free-play" && !hideBalance ? (
                 <View testID="hud-mode-tag" style={[styles.modeTag, { top: 34 + MODE_TAG_GAP }]}>
                   <BalanceChip balance={balance} testID="hud-balance" />
                 </View>
               ) : null}
               {capsule(true)}
             </Animated.View>
-            {balance.state === "free-play" ? null : (
+            {balance.state === "free-play" || hideBalance ? null : (
               <BalanceChip balance={balance} onPress={onBalancePress} testID="hud-balance" />
             )}
           </View>
@@ -248,7 +251,7 @@ export function HudTopBar({
         {/* A tag sits under the capsule, so that one balance is not in this group — the
             numbers that are readouts, and the one chip that is a control, are. */}
         <View style={[styles.corner, styles.trailing]}>
-          {modeTag ? null : (
+          {modeTag || hideBalance ? null : (
             <BalanceChip balance={balance} onPress={onBalancePress} testID="hud-balance" />
           )}
           <WoodButton label="How to play" onPress={onHelp} testID="hud-help-button">

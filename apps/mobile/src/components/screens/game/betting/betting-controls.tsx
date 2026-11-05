@@ -17,6 +17,7 @@ export function BettingControls({
   state,
   amount,
   locked,
+  quiet = false,
   waitingOn,
   submission,
   timer,
@@ -32,6 +33,8 @@ export function BettingControls({
   amount: number;
   /** The row's own actions and the slider are held disabled (`actionsLocked`). */
   locked: boolean;
+  /** A lesson: FOLD and the wager are drawn quiet beside the big CHECK/CALL. */
+  quiet?: boolean;
   submission?: GameScreenState["wordSubmission"];
   timer?: TurnTimerView;
   /**
@@ -102,7 +105,7 @@ export function BettingControls({
       ? { id: "action-wager", label: "CONFIRM", amount: formatCompactAmount(amount), variant: "gold" as const, disabled: !canWager, onPress: closing(onWager) }
       : raiseOpen
         ? { id: "action-raise", label: "CLOSE ▼", amount: undefined, variant: "dark" as const, disabled: !canWager, onPress: closing() }
-        : { id: "action-raise", label: `${state.wager === "bet" ? "BET" : "RAISE"} ▲`, amount: undefined, variant: "gold" as const, disabled: !canWager, onPress: () => { measureRaise(); onRaiseOpenChange(true); } };
+        : { id: "action-raise", label: `${state.wager === "bet" ? "BET" : "RAISE"} ▲`, amount: undefined, variant: (quiet ? "dark" : "gold") as "dark" | "gold", disabled: !canWager, onPress: () => { measureRaise(); onRaiseOpenChange(true); } };
 
   // Landscape's right thumb (mocks 3a, 4a–4c): Fold and Raise one width, the round wager button
   // between them the largest control, so the row stands one tile tall.
@@ -155,7 +158,7 @@ export function BettingControls({
         scale={buttonScale}
         style={landscapeButton || [styles.action, short && styles.actionShort]}
         testID="action-fold"
-        variant="danger"
+        variant={quiet ? "dark" : "danger"}
       />
       {wagerButton}
       <View

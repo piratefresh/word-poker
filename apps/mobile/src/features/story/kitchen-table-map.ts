@@ -34,6 +34,20 @@ export const FRIENDS: Record<FriendId, { name: string; color: string }> = {
   mira: { name: "Mira", color: "#8a4cc4" },
 };
 
+/** The rooms of the house a hand's table can be laid in; each is a crop of the map's own art. */
+export type RoomId = "porch" | "living-room" | "kitchen" | "study";
+
+/** How far the table zooms into the map's art. */
+export const ROOM_ZOOM = 2.6;
+
+/** Where each room's crop starts, in map points (the art's own 390 × 1760 frame). */
+export const ROOMS: Record<RoomId, { x: number; y: number }> = {
+  porch: { x: 120, y: 1420 },
+  "living-room": { x: 115, y: 1120 },
+  kitchen: { x: 45, y: 830 },
+  study: { x: 120, y: 300 },
+};
+
 export type MapNodeId = "first-hand" | "chips-on-the-table" | "word-wizard" | "bonus" | "professor";
 export type MapNodeKind = "hand" | "bonus" | "boss";
 export type MapNodeState = "locked" | "available" | "completed";
@@ -49,6 +63,12 @@ export interface MapNode {
   y: number;
   /** The friend sitting beside a hand node, and which side of it (points from centre). */
   friend?: { id: FriendId; dx: number };
+  /** The room this node's hand is played in: the table is laid where the node sits on the map. */
+  room: RoomId;
+  /** Who sits across at this node, as the brief sheet names them. */
+  opponent: string;
+  /** The opponent's one line on the brief sheet, before the deal. */
+  opener: string;
   /** The playable challenge in `challenges.ts`, where one is authored. */
   challengeId?: string;
 }
@@ -68,11 +88,11 @@ export const KITCHEN_TABLE = {
   /** The coach's hint after two boss losses in a row. */
   bossHint: "He folds when the bar’s full. Push him.",
   nodes: [
-    { id: "first-hand", kind: "hand", title: "First Hand", glyph: "1", ...at(0.5, 0.885), friend: { id: "ellis", dx: 80 }, challengeId: "first-hand" },
-    { id: "chips-on-the-table", kind: "hand", title: "Chips on the Table", glyph: "2", ...at(0.28, 0.72), friend: { id: "jay", dx: 80 } },
-    { id: "word-wizard", kind: "hand", title: "Word Wizard", glyph: "3", ...at(0.7, 0.565), friend: { id: "mira", dx: -80 }, challengeId: "word-wizard" },
-    { id: "bonus", kind: "bonus", title: "Bonus Puzzle", glyph: "?", ...at(0.2, 0.42) },
-    { id: "professor", kind: "boss", title: "The Professor", glyph: "P", ...at(0.56, 0.26) },
+    { id: "first-hand", kind: "hand", title: "First Hand", glyph: "1", ...at(0.5, 0.885), friend: { id: "ellis", dx: 80 }, challengeId: "first-hand", room: "porch", opponent: "Ellis", opener: "Pull up a chair. Spell a word with your two tiles and the board. Best word takes the pot." },
+    { id: "chips-on-the-table", kind: "hand", title: "Chips on the Table", glyph: "2", ...at(0.28, 0.72), friend: { id: "jay", dx: 80 }, room: "living-room", opponent: "Jay", opener: "Chips on the table. Let’s see what you bet." },
+    { id: "word-wizard", kind: "hand", title: "Word Wizard", glyph: "3", ...at(0.7, 0.565), friend: { id: "mira", dx: -80 }, challengeId: "word-wizard", room: "kitchen", opponent: "Mira", opener: "Long words win big. Use all seven tiles for the Full Rack Bonus." },
+    { id: "bonus", kind: "bonus", title: "Bonus Puzzle", glyph: "?", ...at(0.2, 0.42), room: "kitchen", opponent: "Mira", opener: "A little extra, just for you." },
+    { id: "professor", kind: "boss", title: "The Professor", glyph: "P", ...at(0.56, 0.26), room: "study", opponent: "The Professor", opener: "So you think you can spell?" },
   ] satisfies MapNode[] as readonly MapNode[],
 } as const;
 
