@@ -1,6 +1,6 @@
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
-import { addOAuthServerContext, createAuthMiddleware, getOAuthState } from "better-auth/api";
+import { addOAuthServerContext, APIError, createAuthMiddleware, getOAuthState } from "better-auth/api";
 import { anonymous, bearer, lastLoginMethod, username } from "better-auth/plugins";
 import { adoptGuestHistory, eraseAccountData, inTransaction } from "@wordpoker/db";
 import { deleteWallet } from "@wordpoker/economy";
@@ -11,6 +11,7 @@ import { isValidHandle, MAX_HANDLE_LENGTH, MIN_HANDLE_LENGTH } from "@/auth/hand
 import { RESET_PASSWORD_DEEP_LINK } from "@/constants/links";
 
 import { revokeAppleToken } from "./apple-revoke";
+import { avatarStore } from "./avatar-store";
 import { afterEmailVerification, attributeReferral, grantEligibleRewards, REFERRAL_HEADER, sendVerificationEmail } from "./auth-verification";
 import { passwordResetEmail, sendEmail } from "./email";
 import { gameCenterVerifier } from "./game-center";
@@ -133,9 +134,13 @@ export const auth = betterAuth({
   account: {
     accountLinking: { enabled: true, disableImplicitLinking: true, allowDifferentEmails: true, updateUserInfoOnLink: false },
   },
-  // Google and Apple never echo the referral header, so it rides in the server-side OAuth state.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // `image` is only ever set by the avatar route (STO-1050), so a client can't point it at any URL.
+      if ((ctx.path === "/update-user" || ctx.path === "/sign-up/email") && typeof ctx.body === "object" && ctx.body !== null && "image" in ctx.body) {
+        throw new APIError("BAD_REQUEST", { message: "Set your photo from Account settings." });
+      }
+      // Google and Apple never echo the referral header, so it rides in the server-side OAuth state.
       const referral = ctx.path === "/sign-in/social" ? ctx.headers?.get(REFERRAL_HEADER) : null;
       if (referral) await addOAuthServerContext({ referral });
     }),
@@ -190,6 +195,8 @@ export const auth = betterAuth({
           await eraseAccountData(sql, user.id);
           await deleteWallet(user.id);
         });
+        // The avatar goes after the database (STO-1050): a failed R2 call never blocks the erasure.
+        await avatarStore()?.deleteAll(user.id).catch((error) => console.error(`[delete-user] ${user.id}: could not delete the avatar:`, error));
         if (rows[0]?.refreshToken) await revokeAppleToken(rows[0].refreshToken);
       },
     },

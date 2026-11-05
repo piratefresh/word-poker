@@ -19,8 +19,10 @@ import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, linkGameCenter } from "@/auth/client/game-center";
 import { linkSocial, SOCIAL_PROVIDERS, type SocialProvider } from "@/auth/client/social-sign-in";
 import { Field, paper } from "@/components/screens/auth/auth-shell";
+import { pickAvatarPhoto, removeAvatar, uploadAvatar } from "@/lib/avatar/avatar-client";
 import { fonts, layout } from "@/constants/theme";
 import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
+import { webTestID } from "@/lib/ui/web-id";
 
 import { FELT, FeltPill, Panel, Row, SectionLabel, SmallGoldButton } from "./account-card";
 import { DeleteAccount } from "./delete-account";
@@ -117,6 +119,26 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
     }
   };
 
+  // Avatar photo (STO-1050): accounts only. The phone shrinks the photo; the session follows the server.
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const changePhoto = async (change: () => Promise<unknown>, done: string) => {
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      await change();
+      flash(done);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Couldn’t save your photo. Try again.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+  const pickPhoto = async () => {
+    const uri = await pickAvatarPhoto().catch(() => null);
+    if (uri) await changePhoto(() => uploadAvatar(uri), "PHOTO SAVED");
+  };
+
   const [deleting, setDeleting] = useState(false);
 
   const close = () => {
@@ -183,19 +205,49 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
           <View style={styles.handle} />
 
           <View style={styles.header}>
-            <View accessibilityLabel={`Avatar for ${displayName}`} accessibilityRole="image" accessible style={styles.avatar}>
+            {/* The id says which face shows, so a flow can tell a photo from the initial. */}
+            <Pressable
+              accessibilityHint={isGuest ? undefined : "Choose a photo from your library"}
+              accessibilityLabel={`Avatar for ${displayName}`}
+              accessibilityRole={isGuest ? "image" : "button"}
+              disabled={isGuest || photoBusy}
+              id={webTestID(session?.user.image ? "account-avatar-photo" : "account-avatar-initial")}
+              onPress={() => { void pickPhoto(); }}
+              style={[styles.avatar, photoBusy && styles.busy]}
+              testID={session?.user.image ? "account-avatar-photo" : "account-avatar-initial"}
+            >
               {session?.user.image ? (
                 <Image contentFit="cover" source={{ uri: session.user.image }} style={StyleSheet.absoluteFill} />
               ) : (
                 <Text style={styles.initial}>{displayName.charAt(0).toUpperCase()}</Text>
               )}
-            </View>
+            </Pressable>
             <View style={styles.titleBlock}>
               <Text accessibilityRole="header" style={styles.title}>Account</Text>
               {signedInWith ? <Text style={styles.subtitle}>{signedInWith}</Text> : null}
+              {isGuest ? null : (
+                <View style={styles.photoLinks}>
+                  <Pressable accessibilityRole="button" disabled={photoBusy} hitSlop={6} id={webTestID("account-photo-change")} onPress={() => { void pickPhoto(); }} testID="account-photo-change">
+                    <Text style={styles.photoLink}>{photoBusy ? "Saving…" : session?.user.image ? "Change photo" : "Add photo"}</Text>
+                  </Pressable>
+                  {session?.user.image && !photoBusy ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={6}
+                      id={webTestID("account-photo-remove")}
+                      onPress={() => { void changePhoto(removeAvatar, "PHOTO REMOVED"); }}
+                      testID="account-photo-remove"
+                    >
+                      <Text style={styles.photoLink}>Remove</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              )}
             </View>
             <SmallGoldButton label="DONE" onPress={close} testID="account-done" />
           </View>
+
+          {photoError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{photoError}</Text> : null}
 
           <Field
             autoCapitalize="words"
@@ -310,6 +362,9 @@ const styles = StyleSheet.create({
     width: 64,
   },
   initial: { color: "#2a1906", fontFamily: fonts.arcade, fontSize: 28 },
+  busy: { opacity: 0.5 },
+  photoLinks: { flexDirection: "row", gap: 14 },
+  photoLink: { color: paper.body, fontFamily: fonts.rubikSemiBold, fontSize: 13, textDecorationLine: "underline" },
   titleBlock: { flex: 1, gap: 5, minWidth: 0 },
   title: { color: paper.ink, fontFamily: fonts.arcade, fontSize: 26, lineHeight: 28 },
   subtitle: { color: paper.body, fontFamily: fonts.rubik, fontSize: 13 },

@@ -19,6 +19,7 @@ export const FEATURES = {
   quests: { web: "quests", native: "quests" },
   store: { web: "store", native: "store" },
   settings: { web: "settings", native: "settings" },
+  avatar: { native: "avatar", setup: "API with the R2 avatar bucket configured (R2_* env)" },
   offline: { web: "offline-hand", native: "offline-hand" },
   wild: { web: "offline-wild-hand" },
   "wild-power": { web: "offline-wild-power" },

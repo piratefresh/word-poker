@@ -8,7 +8,7 @@ import { FEATURES, main, plan } from "./smoke.mjs";
 
 test("every listed feature points at an existing flow on its supported platforms", () => {
   for (const name of Object.keys(FEATURES)) {
-    for (const platform of FEATURES[name].native ? ["web", "ios", "android"] : ["web"]) {
+    for (const platform of [...(FEATURES[name].web ? ["web"] : []), ...(FEATURES[name].native ? ["ios", "android"] : [])]) {
       for (const job of plan([name, "--platform", platform], {}).jobs) assert(existsSync(job.flow), job.flow);
     }
   }

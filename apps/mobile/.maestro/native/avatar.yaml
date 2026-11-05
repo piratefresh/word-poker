@@ -1,0 +1,98 @@
+appId: com.wordpoker.wordpoker
+name: Account photo — add, replace and remove (native)
+tags: [native, settings, avatar]
+---
+# STO-1050: the Account sheet's photo goes through the real picker, the phone's crop-and-shrink and
+# the API's R2 upload. Needs a signed-in development build and an API with the R2_* env set; without
+# the bucket the route answers 503 and the sheet shows "Photos aren’t available right now."
+#
+# The avatar's id says which face shows: `account-avatar-initial` or `account-avatar-photo`.
+# `fixtures/avatar-landscape.jpg` is 900×600, so the upload also proves the centre crop: the server
+# refuses anything that is not square. The flow starts and ends with no photo, so it is safe to rerun.
+- runFlow: _ensure-session.yaml
+- addMedia:
+    - fixtures/avatar-landscape.jpg
+- tapOn:
+    id: "home-account-menu"
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible:
+      id: "account-settings"
+    timeout: 10000
+
+# A photo left by an earlier, interrupted run goes first.
+- runFlow:
+    when:
+      visible:
+        id: "account-photo-remove"
+    commands:
+      - tapOn:
+          id: "account-photo-remove"
+      - extendedWaitUntil:
+          visible:
+            id: "account-avatar-initial"
+          timeout: 20000
+- assertVisible:
+    id: "account-avatar-initial"
+- assertVisible: "Add photo"
+
+# Add.
+- tapOn:
+    id: "account-photo-change"
+- runFlow: _pick-newest-photo.yaml
+- extendedWaitUntil:
+    visible: "PHOTO SAVED"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "account-avatar-photo"
+    timeout: 10000
+- assertVisible: "Change photo"
+- assertVisible:
+    id: "account-photo-remove"
+- takeScreenshot: avatar-added
+
+# Replace: the same photo again is a new upload under a new key.
+- tapOn:
+    id: "account-photo-change"
+- runFlow: _pick-newest-photo.yaml
+- extendedWaitUntil:
+    visible: "PHOTO SAVED"
+    timeout: 30000
+- assertVisible:
+    id: "account-avatar-photo"
+
+# The photo survives closing and reopening the sheet: it comes from the session, not local state.
+- tapOn:
+    id: "account-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "account-settings"
+    timeout: 10000
+- tapOn:
+    id: "home-account-menu"
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible:
+      id: "account-avatar-photo"
+    timeout: 10000
+
+# Remove.
+- tapOn:
+    id: "account-photo-remove"
+- extendedWaitUntil:
+    visible: "PHOTO REMOVED"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "account-avatar-initial"
+    timeout: 10000
+- assertNotVisible:
+    id: "account-photo-remove"
+- takeScreenshot: avatar-removed
+- tapOn:
+    id: "account-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "account-settings"
+    timeout: 10000
