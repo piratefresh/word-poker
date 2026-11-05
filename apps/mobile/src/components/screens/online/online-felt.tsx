@@ -67,6 +67,7 @@ import {
   type RoomConnectionLike,
 } from "@/features/online/use-room-connection";
 import { useBalanceView } from "@/lib/wallet/use-balance-view";
+import { posthog } from "@/lib/analytics/posthog";
 
 import { InviteSheet } from "./invite-sheet";
 import { SaveProgressSheet } from "./save-progress-sheet";
@@ -135,6 +136,15 @@ export function OnlineFelt({
   });
 
   const reconnecting = connection === "reconnecting";
+  const submitWord = useCallback(() => {
+    if (game?.wordSubmission !== null && game?.wordSubmission !== undefined) {
+      posthog?.capture("word_submitted", {
+        game_mode: "online",
+        power_ups_enabled: powers !== null,
+      });
+    }
+    primary();
+  }, [game?.wordSubmission, powers, primary]);
 
   // The table has no hand to draw yet — a seat sat down but the deal is still waiting on the room.
   const body =
@@ -229,7 +239,7 @@ export function OnlineFelt({
             onBack={onLeave}
             onBalancePress={goToSignIn}
             onBet={wager}
-            onCheckOrCall={primary}
+            onCheckOrCall={submitWord}
             onFold={fold}
             onRaise={wager}
             rack={

@@ -22,6 +22,7 @@ import { HOME_NAV_RACK_OVERLAP } from "@/components/screens/home/home-nav-rack";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, layout, ledger, spacing } from "@/constants/theme";
 import { useQuests } from "@/lib/quests/quests-provider";
+import { posthog } from "@/lib/analytics/posthog";
 import { useTileSets } from "@/lib/tile-sets/tile-sets-provider";
 import { formatCoins } from "@/lib/ui/format";
 
@@ -65,7 +66,10 @@ export function StoreScreen() {
   const { coins, refreshCoins } = useQuests();
   const tileSets = useTileSets();
   const { toast, show } = useToast();
-  const daily = useDailyBonus(useCallback((reward: number) => show(`+${formatCoins(reward)} DAILY BONUS`), [show]));
+  const daily = useDailyBonus(useCallback((reward: number) => {
+    posthog?.capture("daily_bonus_claimed", { reward });
+    show(`+${formatCoins(reward)} DAILY BONUS`);
+  }, [show]));
 
   const [width, setWidth] = useState(0);
   const [tab, setTab] = useState<StoreTab>("coins");
@@ -91,6 +95,11 @@ export function StoreScreen() {
       setSheetError(notice.message);
       return;
     }
+    posthog?.capture("coin_pack_purchased", {
+      product_id: row.productId,
+      coins: notice.kind === "added" ? notice.coins : row.coins,
+      fulfillment: notice.kind,
+    });
     show(notice.kind === "added" ? `+${formatCoins(notice.coins)} COINS` : "COINS ON THE WAY");
     void refreshCoins();
     setSheet(null);
@@ -102,6 +111,10 @@ export function StoreScreen() {
     try {
       const result = await tileSets.buy(set);
       if (result.ok) {
+        posthog?.capture("tile_set_purchased", {
+          tile_set: set,
+          coins_spent: TILE_SET_PRICES[set],
+        });
         show(`${TILE_SET_COPY[set].name.toUpperCase()} TILES EQUIPPED`);
         void refreshCoins();
         setSheet(null);
@@ -126,6 +139,7 @@ export function StoreScreen() {
     try {
       const result = await tileSets.equip(set);
       if (!result.ok) show(result.message.toUpperCase());
+      else posthog?.capture("tile_set_equipped", { tile_set: set });
     } catch {
       show("COULDN’T EQUIP. TRY AGAIN.");
     }

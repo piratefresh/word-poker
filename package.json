@@ -38,7 +38,6 @@
     "test:smoke": "node --test scripts/smoke.test.mjs"
   },
   "dependencies": {
-    "@sentry/react-native": "^8.29.0",
     "expo": "~57.0.21",
     "react": "19.2.3",
     "react-native": "0.86.3"

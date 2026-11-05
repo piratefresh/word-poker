@@ -17,7 +17,6 @@ import {
   NotoSerif_700Bold_Italic,
 } from "@expo-google-fonts/noto-serif";
 import { RobotoSlab_800ExtraBold } from "@expo-google-fonts/roboto-slab";
-import * as Sentry from "@sentry/react-native";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
@@ -27,6 +26,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { PostHogProvider } from "posthog-react-native";
 
 import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, restoreWithGameCenter } from "@/auth/client/game-center";
@@ -36,6 +36,7 @@ import { TableInviteBanner } from "@/components/ui/table-invite-banner";
 import { colors } from "@/constants/theme";
 import { leaveTable } from "@/features/online/room-session";
 import { usePresence } from "@/lib/friends/use-presence";
+import { posthog } from "@/lib/analytics/posthog";
 import { usePushRegistration } from "@/lib/friends/use-push-registration";
 import {
   destinationFromURL,
@@ -48,28 +49,6 @@ import { QuestsProvider } from "@/lib/quests/quests-provider";
 import { TileSetsProvider } from "@/lib/tile-sets/tile-sets-provider";
 import { E2E_AUTH_BYPASS } from "@/lib/testing/e2e";
 import { useRevenueCatIdentity } from "@/lib/wallet/use-revenuecat";
-
-Sentry.init({
-  dsn: "https://275e0d7eaac4989bad2cdca3b110a5c0@o4512200430125056.ingest.us.sentry.io/4512200442904576",
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [
-    Sentry.mobileReplayIntegration(),
-    Sentry.feedbackIntegration(),
-  ],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
-});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -88,6 +67,7 @@ const RESTORE_COVER_MS = 15_000;
 
 export function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
+  const identifiedUserId = useRef<string | null>(null);
   // Better Auth puts a signed-out session back to pending on every refetch (each return to the
   // foreground). Only the first check may hold the UI: unmounting the Stack on a later one remounts
   // it at sign-in, which throws away the route a link just opened (the emailed reset link).
@@ -133,6 +113,27 @@ export function RootLayout() {
   // Capped, in case GameKit never answers.
   const signedOut = !E2E_AUTH_BYPASS && sessionChecked && !session && fontsLoaded;
   const [restoring, setRestoring] = useState(GAME_CENTER_AVAILABLE && !E2E_AUTH_BYPASS);
+
+  // The session is the authentication boundary for every login method, including social and
+  // platform restores. Identifying here lets all subsequent events and captured exceptions
+  // inherit Better Auth's stable user ID without repeating identity at individual call sites.
+  useEffect(() => {
+    const user = session?.user;
+    const userId = user && !user.isAnonymous ? user.id : null;
+    if (identifiedUserId.current === userId) return;
+
+    if (identifiedUserId.current !== null) posthog?.reset();
+    if (userId && user) {
+      posthog?.identify(userId, {
+        $set: {
+          email: user.email,
+          name: user.name,
+        },
+      });
+    }
+    identifiedUserId.current = userId;
+  }, [session]);
+
   useEffect(() => {
     if (!signedOut) return;
     const cap = setTimeout(() => setRestoring(false), RESTORE_COVER_MS);
@@ -149,7 +150,7 @@ export function RootLayout() {
   // session check can only fail — nothing is listening — so it does not wait on one.
   if ((!sessionChecked && !E2E_AUTH_BYPASS) || !fontsLoaded) return null;
 
-  return (
+  const content = (
     <DeepLinks session={!!session} account={account}>
       <GestureHandlerRootView style={styles.root}>
         <KeyboardProvider>
@@ -196,6 +197,8 @@ export function RootLayout() {
       </GestureHandlerRootView>
     </DeepLinks>
   );
+
+  return posthog ? <PostHogProvider client={posthog}>{content}</PostHogProvider> : content;
 }
 
 /**
@@ -322,4 +325,4 @@ function DeepLinks({
   return children;
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;

@@ -1,7 +1,8 @@
 const path = require("node:path");
-const { getDefaultConfig } = require("expo/metro-config");
+const { getPostHogExpoConfig } = require("posthog-react-native/metro");
 
-const config = getDefaultConfig(__dirname);
+// Expo's default config plus debug-ID injection, so PostHog can match uploaded source maps.
+const config = getPostHogExpoConfig(__dirname);
 const defaultResolveRequest = config.resolver.resolveRequest;
 
 // Rive files are bundled as local assets by `useRiveFile(require(...))`.

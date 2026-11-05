@@ -17,6 +17,7 @@ import {
 
 import { fonts, nightLobby } from "@/constants/theme";
 import { createTable } from "@/features/online/room-session";
+import { posthog } from "@/lib/analytics/posthog";
 
 import { CreateTableLayout } from "./create-table-layout";
 import { NightLobbyButton } from "./night-lobby-button";
@@ -63,6 +64,11 @@ export function CreateTableForm({ visible, onClose, onCreated }: CreateTableForm
     setSubmitting(true);
     void createTable(checked.options)
       .then((roomId) => {
+        posthog?.capture("online_table_created", {
+          buy_in: buyIn,
+          max_seats: maxSeats,
+          power_up_deal: deal,
+        });
         setName("");
         setRefusal(null);
         onClose();
