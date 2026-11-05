@@ -63,7 +63,14 @@ export function BriefSheet({ node, onDeal, onDismiss }: BriefSheetProps): ReactE
           ))}
         </View>
         <Text style={styles.stakes}>No clock · Practice chips · Retry free</Text>
-        <GameButton label="DEAL" onPress={onDeal} testID="story-deal" variant="green" />
+        <GameButton
+          label="DEAL"
+          labelStyle={styles.dealLabel}
+          onPress={onDeal}
+          style={styles.deal}
+          testID="story-deal"
+          variant="green"
+        />
         <Pressable accessibilityRole="button" hitSlop={12} onPress={onDismiss} testID="story-not-now">
           <Text style={styles.notNow}>Not now</Text>
         </Pressable>
@@ -103,5 +110,7 @@ const styles = StyleSheet.create({
   starsOff: { color: "rgba(255,246,226,0.45)" },
   goalLabel: { color: ink.cream, fontFamily: lilita, fontSize: 15 },
   stakes: { color: "#b9c3b4", fontFamily: fonts.rubikMedium, fontSize: 12 },
+  deal: { height: 58, width: "100%" },
+  dealLabel: { fontFamily: lilita, fontSize: 24, letterSpacing: 1 },
   notNow: { color: "#d6d0c2", fontFamily: fonts.rubikMedium, fontSize: 14, textDecorationLine: "underline" },
 });

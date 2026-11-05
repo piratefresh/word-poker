@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 
 import {
   chapterRecord,
+  bestWordToTeach,
   topWords,
   nodeStarGoals,
   nodeStars,
@@ -16,8 +17,6 @@ import {
 import { PowerDrawReveal, PowerHeldChip, PowerUsePrompt, PowerUsedCard, swapFlipOf, usePowerTargeting } from "@/components/powers";
 import { FREE_PLAY, PHASE_LABEL } from "@/components/hud";
 import { GameScreen } from "@/components/screens/game/game-screen";
-import { SimpleWinResultOverlay } from "@/components/screens/results/simple-win-result-overlay";
-import { useSimpleWinCelebration } from "@/components/screens/results/use-simple-win-celebration";
 import { WordBuilder, WordCheckButton, WordHand, WordShuffleButton } from "@/components/word-builder";
 import { randomSeed } from "@/features/offline/offline-seed";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
@@ -29,7 +28,7 @@ import { saveStoryProgress, storyProgress } from "@/features/story/story-progres
 import { StoryMeter } from "./story-meter";
 import { StoryRoom } from "./story-room";
 import { StorySpeech } from "./story-speech";
-import { StoryVerdict } from "./story-verdict";
+import { StoryVerdict, type BuiltWord } from "./story-verdict";
 
 const CHAPTER = storyChapter("kitchen-table");
 /** Where the coach's bubble starts down the felt: below the opponent's seat. */
@@ -48,13 +47,15 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const session = useMemo(() => storySession(storyTable(node), dictionary, powersHeld), [node, dictionary, powersHeld]);
   const offline = useOfflineGame({ seed: 0, dictionary, session });
   const { game, words, results, powers } = offline;
-  const { active: celebratingWin, complete: finishWinCelebration } = useSimpleWinCelebration(results);
   const power = usePowerTargeting({ held: powers?.held, onUse: offline.usePower });
   const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
 
   // The run hears about each settled hand once: a boss replay deals a fresh one.
   const [verdict, setVerdict] = useState<RecordedHand | null>(null);
+  // The word on the rack as the hand ended: a fold-out has no submitted word, but the player still built one.
+  const builtRef = useRef<BuiltWord | null>(null);
+  const [built, setBuilt] = useState<BuiltWord | null>(null);
   const recorded = useRef<typeof results>(null);
   useEffect(() => {
     if (results === null || recorded.current === results) return;
@@ -63,11 +64,13 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     const outcome = { won: hero?.takesPot ?? false, score: hero?.total ?? 0 };
     const next = recordHand(storyProgress(), CHAPTER.id, node.id, outcome, randomSeed());
     saveStoryProgress(next.progress);
+    setBuilt(builtRef.current);
     setVerdict(next);
   }, [node.id, results]);
 
   const replay = () => {
     setVerdict(null);
+    setBuilt(null);
     offline.newGame();
   };
 
@@ -76,6 +79,16 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   // The coach reads the word on the rack; the authored line for the street is what it says before there is one.
   const handTiles = [...game.privateTiles, ...game.community.filter((tile) => tile !== null)];
   const wordIsReal = dictionary.isWord(words?.word ?? "");
+  const builtScore = wordIsReal ? (words?.score?.total ?? null) : null;
+  const builtWord = words?.word ?? "";
+  const builtPlays = words?.plays;
+  useEffect(() => {
+    if (results !== null || builtScore === null || builtPlays === undefined) return;
+    const tiles = builtPlays.flatMap((play) => handTiles.filter((tile) => tile.id === play.tileId));
+    builtRef.current = { word: builtWord, score: builtScore, tiles };
+    // handTiles is rebuilt each render from the same dealt tiles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builtPlays, builtScore, builtWord, results]);
   const coachLine = verdict?.coachHint
     ? KITCHEN_TABLE.bossHint
     : storyCoachLine({
@@ -92,14 +105,13 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const winner = results?.seats.find((seat) => seat.takesPot && !seat.isYou) ?? null;
   const teach = useMemo(() => {
     if (results === null) return null;
-    // Ties are common (BANKS, BONKS, KNOBS): the lesson's own word first, then the one that plays the most of the player's own tiles.
-    const top = topWords({ available: handTiles, dictionary }, 12);
-    const ceiling = top[0]?.score ?? 0;
+    // Ties are common (BANKS, BONKS, KNOBS): the lesson's own word where it is among the best, else the rule's pick.
     const own = new Set(game.privateTiles.map((tile) => tile.id));
-    const held = (word: (typeof top)[number]) => word.submission.plays.filter((play) => own.has(play.tileId)).length;
-    const tied = top.filter((word) => word.score === ceiling);
-    const best = tied.find((word) => word.word === challenge?.teachWord) ?? tied.sort((a, b) => held(b) - held(a))[0];
-    if (best === undefined) return null;
+    const rule = bestWordToTeach({ available: handTiles, dictionary }, own);
+    if (rule === null) return null;
+    const lesson = challenge?.teachWord;
+    const named = lesson === undefined ? undefined : topWords({ available: handTiles, dictionary }, Number.MAX_SAFE_INTEGER).find((word) => word.word === lesson && word.score === rule.score);
+    const best = named ?? rule;
     const rival = results.seats.find((seat) => !seat.isYou)?.total ?? 0;
     const beats = best.score > rival;
     return { word: best.word, score: best.score, beats, stars: beats ? nodeStars(goals.two, { won: true, score: best.score }) : 0 };
@@ -139,11 +151,6 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
               <PowerHeldChip active={power.targeting.stage !== "idle"} held={powers.held} onPress={power.toggle} />
             )
           }
-          winOverlay={
-            celebratingWin && results !== null ? (
-              <SimpleWinResultOverlay key={results.hand} onComplete={finishWinCelebration} snapshot={results} />
-            ) : null
-          }
           onAllIn={offline.allIn}
           onBet={offline.wager}
           onCheckOrCall={offline.primary}
@@ -180,11 +187,12 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           }
         />
       </View>
-      {game.phase === "payout" && results !== null && verdict !== null && !celebratingWin ? (
+      {game.phase === "payout" && results !== null && verdict !== null ? (
         <StoryVerdict
           chapterId={CHAPTER.id}
           node={node}
           hero={hero}
+          built={built}
           into={into}
           teach={teach}
           verdict={verdict}
