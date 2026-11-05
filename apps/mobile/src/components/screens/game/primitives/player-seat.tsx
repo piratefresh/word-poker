@@ -26,6 +26,7 @@ import {
   palette,
 } from "@/constants/theme";
 import { formatAmount, formatCoins } from "@/lib/ui/format";
+import { AvatarArt } from "@/components/ui/avatar-art";
 import { webTestID } from "@/lib/ui/web-id";
 
 import type { GamePlayer, PlayerRole, PlayerStatus } from "../game-types";
@@ -304,7 +305,11 @@ export function PlayerSeat({
             ]}
             testID={`seat-avatar-${seat.id}`}
           >
-            <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
+            {seat.face === undefined ? (
+              <Text style={[styles.initials, scaled.initials]}>{seat.initials}</Text>
+            ) : (
+              <AvatarArt size={metrics.avatar - 2 * metrics.avatarBorder} source={seat.face} />
+            )}
           </View>
         </SeatBeam>
         {level !== undefined ? (

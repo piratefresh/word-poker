@@ -28,8 +28,21 @@ export const MAP_HEIGHT = 1760;
 
 export type FriendId = "ellis" | "jay" | "mira";
 
-export const FRIENDS: Record<FriendId, { name: string; color: string }> = {
-  ellis: { name: "Ellis", color: "#d9603f" },
+/** How a friend's portrait looks: neutral by default, and what the table makes of the moment. */
+export type Expression = "neutral" | "thinking" | "happy" | "wink" | "determined" | "surprised";
+
+/** Ellis's faces (the user's own art kit); a friend with none shows their initial. */
+const ELLIS_FACES: Record<Expression, number> = {
+  neutral: require("@/assets/images/story/ellis/face-neutral.svg"),
+  thinking: require("@/assets/images/story/ellis/face-thinking.svg"),
+  happy: require("@/assets/images/story/ellis/face-happy.svg"),
+  wink: require("@/assets/images/story/ellis/face-wink.svg"),
+  determined: require("@/assets/images/story/ellis/face-determined.svg"),
+  surprised: require("@/assets/images/story/ellis/face-surprised.svg"),
+};
+
+export const FRIENDS: Record<FriendId, { name: string; color: string; faces?: Record<Expression, number> }> = {
+  ellis: { name: "Ellis", color: "#d9603f", faces: ELLIS_FACES },
   jay: { name: "Jay", color: "#2f7fc8" },
   mira: { name: "Mira", color: "#8a4cc4" },
 };

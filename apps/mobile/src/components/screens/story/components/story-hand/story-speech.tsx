@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     boxShadow: `0px 5px 0px ${ink.plum}, 0px 12px 20px rgba(0,0,0,0.35)`,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
-  line: { color: ink.plum, fontFamily: fonts.rubikSemiBold, fontSize: 14, lineHeight: 18, textAlign: "center" },
+  line: { color: ink.plum, fontFamily: fonts.rubikSemiBold, fontSize: 13.5, lineHeight: 17, textAlign: "center" },
 });

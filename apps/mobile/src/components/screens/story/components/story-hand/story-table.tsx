@@ -22,7 +22,7 @@ import { randomSeed } from "@/features/offline/offline-seed";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { challengeById, storySession, storyTable } from "@/features/story/challenges";
 import { bestUnusedTile, storyCoachLine } from "@/features/story/story-coach";
-import { KITCHEN_TABLE, type MapNode } from "@/features/story/kitchen-table-map";
+import { FRIENDS, KITCHEN_TABLE, type Expression, type FriendId, type MapNode } from "@/features/story/kitchen-table-map";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
 
 import { StoryMeter } from "./story-meter";
@@ -31,8 +31,15 @@ import { StorySpeech } from "./story-speech";
 import { StoryVerdict, type BuiltWord } from "./story-verdict";
 
 const CHAPTER = storyChapter("kitchen-table");
+
+/** Which face the opponent wears: determined when betting, thinking while the player builds a word, and a smile or a wink at the end. */
+function expressionAt({ status, phase, building, heroWon }: { status: string; phase: string; building: boolean; heroWon: boolean | null }): Expression {
+  if (phase === "payout" && heroWon !== null) return heroWon ? "wink" : "happy";
+  if (status === "bet" || status === "raise" || status === "all-in") return "determined";
+  return building ? "thinking" : "neutral";
+}
 /** Where the coach's bubble starts down the felt: below the opponent's seat. */
-const COACH_TOP = 104;
+const COACH_TOP = 115;
 
 export interface StoryTableProps {
   node: MapNode;
@@ -122,6 +129,13 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const following = hands[hands.indexOf(node) + 1];
   const into = following === undefined ? KITCHEN_TABLE.boss : `Hand ${hands.indexOf(following) + 1}`;
 
+  // A friend with art shows it in their seat, in the face the moment calls for.
+  const players = game.players.map((player) => {
+    const faces = player === null ? undefined : FRIENDS[player.id as FriendId]?.faces;
+    if (player === null || faces === undefined) return player;
+    return { ...player, face: faces[expressionAt({ status: player.status, phase: game.phase, building: wordIsReal, heroWon: hero?.takesPot ?? null })] };
+  });
+
   return (
     <WordBuilder
       community={game.community}
@@ -144,7 +158,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           backdrop={<StoryRoom room={node.room} />}
           balance={FREE_PLAY}
           lesson={{ stamp: `${PHASE_LABEL[game.phase]} · ${node.title.toUpperCase()}` }}
-          game={game}
+          game={{ ...game, players }}
           onPickCommunityTile={power.tablePick}
           heroSideAccessory={
             powers === null ? null : (

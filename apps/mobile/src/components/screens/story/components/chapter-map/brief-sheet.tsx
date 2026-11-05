@@ -41,7 +41,7 @@ export function BriefSheet({ node, onDeal, onDismiss }: BriefSheetProps): ReactE
       <View style={styles.sheet}>
         <View style={styles.avatar}>
           {node.friend ? (
-            <FriendAvatar friend={node.friend.id} size={84} />
+            <FriendAvatar expression="happy" friend={node.friend.id} size={84} />
           ) : (
             <View style={styles.bossAvatar}>
               <Text style={styles.bossInitial}>{node.glyph}</Text>

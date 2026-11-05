@@ -37,7 +37,7 @@ export function StoryReveal({ node, winner, hero, teach, hint, onReplay, onLeave
         {winner === null ? null : (
           <View style={styles.side}>
             <View style={styles.who}>
-              {node.friend ? <FriendAvatar friend={node.friend.id} size={40} /> : null}
+              {node.friend ? <FriendAvatar expression="happy" friend={node.friend.id} size={40} /> : null}
               <Text style={styles.name}>{winner.name.toUpperCase()}</Text>
               <Text style={styles.takes}>TAKES THE POT</Text>
             </View>
@@ -58,7 +58,7 @@ export function StoryReveal({ node, winner, hero, teach, hint, onReplay, onLeave
         <Text style={styles.heading}>So close!</Text>
         {line === null ? null : (
           <View style={styles.coach}>
-            {node.friend ? <FriendAvatar friend={node.friend.id} size={38} /> : null}
+            {node.friend ? <FriendAvatar expression="wink" friend={node.friend.id} size={38} /> : null}
             <Text style={styles.coachLine} testID="story-teach">
               {line}
             </Text>
