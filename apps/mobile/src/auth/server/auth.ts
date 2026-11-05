@@ -130,9 +130,12 @@ export const auth = betterAuth({
         }
       : {}),
   },
-  // A matching email never joins accounts (STO-594): a login is added on purpose, from Account settings.
+  // A Google or Apple login with the same email joins the existing account, but only when both
+  // the provider and the account have verified it (Better Auth's `requireLocalEmailVerified`
+  // default), so an unverified sign-up can't claim someone's inbox. Any other login is added on
+  // purpose, from Account settings.
   account: {
-    accountLinking: { enabled: true, disableImplicitLinking: true, allowDifferentEmails: true, updateUserInfoOnLink: false },
+    accountLinking: { enabled: true, allowDifferentEmails: true, updateUserInfoOnLink: false },
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {

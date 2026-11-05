@@ -70,8 +70,10 @@ The guest invite scenario assumes the server allows that guest's seat; Wallet-en
 servers may refuse it. `lobby-coins` separately asserts the current guest account restriction.
 
 These smokes exercise specific paths, not complete feature acceptance. Before closed beta,
-also verify native sandbox purchases and credit delivery, Apple/Google/Game Center login,
-email verification and delivered reset links, friend request/accept/invite across two accounts,
+also verify native sandbox purchases and credit delivery, Apple/Google/Game Center login
+(including a Google or Apple login whose email matches an existing verified account: it must
+land in that account and show the provider under Account settings, while an unverified
+account refuses it), email verification and delivered reset links, friend request/accept/invite across two accounts,
 push delivery/preferences, story stars/drafts/boss progression and persistence, account deletion,
 and online disconnect/reconnect on physical devices. The store smoke does not initiate purchases;
 the settings smoke does not change account details. Native flows must be executed on both
