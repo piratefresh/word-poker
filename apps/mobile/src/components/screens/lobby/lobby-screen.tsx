@@ -15,6 +15,7 @@ import { artPoint, STREETS } from "@/components/screens/home/street-art";
 import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
 import { authClient } from "@/auth/client/auth-client";
 import { useQuests } from "@/lib/quests/quests-provider";
+import { posthog } from "@/lib/analytics/posthog";
 import { filterLobbyRooms, LOBBY_FILTERS, type LobbyFilter } from "@/features/online/lobby-view";
 import { joinTable, useActiveRoomId, useHostedRoomIds } from "@/features/online/room-session";
 import { useLobby } from "@/features/online/use-lobby";
@@ -145,6 +146,12 @@ export function LobbyScreen() {
     setJoining(roomId);
     void joinTable(roomId)
       .then(() => {
+        const joinedRoom = rooms.find((room) => room.roomId === roomId);
+        posthog?.capture("online_table_joined", joinedRoom ? {
+          buy_in: joinedRoom.metadata.buyIn,
+          max_seats: joinedRoom.maxClients,
+          power_up_deal: joinedRoom.metadata.powerUps.deal,
+        } : {});
         setSelectedRoomId(null);
         travelToTable(roomId);
       })

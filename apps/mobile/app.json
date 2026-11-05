@@ -33,6 +33,7 @@
     },
     "plugins": [
       "expo-router",
+      "posthog-react-native/expo",
       "./plugins/launch-mode",
       [
         "expo-screen-orientation",
@@ -68,7 +69,8 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

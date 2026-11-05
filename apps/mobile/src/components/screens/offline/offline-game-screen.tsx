@@ -44,6 +44,7 @@ import { pinnedCarry, pinnedPowerUps, pinnedSeed, pinnedStartingChips, pinnedTur
 import { useDictionary } from "@/features/table/use-dictionary";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { useHistory } from "@/lib/history/history-provider";
+import { posthog } from "@/lib/analytics/posthog";
 
 /**
  * The offline table: a whole session played on the device with the server stopped.
@@ -183,6 +184,15 @@ function OfflineTable({
     if (router.canGoBack()) router.back();
     else router.replace("/");
   }, []);
+  const submitWord = useCallback(() => {
+    if (game.wordSubmission !== null && game.wordSubmission !== undefined) {
+      posthog?.capture("word_submitted", {
+        game_mode: "offline",
+        power_ups_enabled: powerUps === "choose3",
+      });
+    }
+    primary();
+  }, [game.wordSubmission, powerUps, primary]);
 
   return (
     // §19's window is the felt's rack made playable: the hand the seat is dealt is the hand it
@@ -236,7 +246,7 @@ function OfflineTable({
           // The wager slider names its own action, and `wager` dispatches the one it names: BET
           // opens the round, RAISE answers it (§22).
           onBet={wager}
-          onCheckOrCall={primary}
+          onCheckOrCall={submitWord}
           onChipFlightEnd={endChipFlight}
           onFold={fold}
           onHelp={help.open}

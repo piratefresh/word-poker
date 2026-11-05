@@ -27,6 +27,7 @@
     "@expo/ui": "~57.0.21",
     "@expo/vector-icons": "^15.1.1",
     "@legendapp/list": "3.6.0",
+    "@posthog/react-native-plugin": "^2.13.0",
     "@revenuecat/purchases-js": "^1.67.1",
     "@rive-app/canvas": "^2.44.0",
     "@rive-app/react-native": "^0.5.4",
@@ -39,6 +40,7 @@
     "better-auth": "^1.7.4",
     "dotenv": "17.4.2",
     "expo": "~57.0.26",
+    "expo-application": "~57.0.3",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
     "expo-blur": "^57.0.3",
@@ -46,6 +48,7 @@
     "expo-constants": "~57.0.20",
     "expo-dev-client": "~57.0.19",
     "expo-device": "~57.0.2",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-glass-effect": "~57.0.4",
     "expo-haptics": "~57.0.3",
@@ -54,6 +57,7 @@
     "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.11",
+    "expo-localization": "~57.0.2",
     "expo-network": "^57.0.2",
     "expo-notifications": "~57.0.22",
     "expo-router": "~57.0.24",
@@ -66,6 +70,7 @@
     "expo-system-ui": "~57.0.4",
     "expo-web-browser": "~57.0.3",
     "pg": "8.23.0",
+    "posthog-react-native": "^4.85.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -108,7 +113,7 @@
       "**/*.test.tsx"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|standard-navigation|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg))"
+      "node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|standard-navigation|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|native-base|react-native-svg))"
     ]
   }
 }

@@ -30,6 +30,7 @@ import { handleCandidates, MAX_HANDLE_LENGTH } from "@/auth/handle";
 import { pendingHistory } from "@/lib/history/history-store";
 import { syncHistory } from "@/lib/history/history-sync";
 import { pendingReferral } from "@/lib/navigation/pending-destination";
+import { posthog } from "@/lib/analytics/posthog";
 
 const SUGGESTIONS_SHOWN = 3;
 
@@ -152,6 +153,9 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
         else setError(authError.message ?? "Something went wrong. Please try again.");
         return;
       }
+      posthog?.capture(mode === "sign-up" ? "account_signed_up" : "account_signed_in", {
+        authentication_method: "credentials",
+      });
       await setAutoRestore(true);
     } catch {
       // A dropped connection rejects instead of returning `{ error }`.
@@ -162,7 +166,10 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
   };
 
   /** Game Center, Google or Apple: each leaves the form behind, so it shares one guarded path. */
-  const continueWith = async (signIn: () => Promise<{ ok: true } | { ok: false; message: string }>) => {
+  const continueWith = async (
+    authenticationMethod: "apple" | "game_center" | "google",
+    signIn: () => Promise<{ ok: true } | { ok: false; message: string }>,
+  ) => {
     if (pending) return;
     setPending(true);
     setError(null);
@@ -173,6 +180,7 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
       }
       const result = await signIn();
       if (!result.ok) setError(result.message);
+      else posthog?.capture("account_signed_in", { authentication_method: authenticationMethod });
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -190,7 +198,8 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
     router.replace("/");
   }, [guestId]);
 
-  const continueWithSocial = (provider: SocialProvider) => continueWith(() => signInWithSocial(provider, referralHeaders()));
+  const continueWithSocial = (provider: SocialProvider) =>
+    continueWith(provider, () => signInWithSocial(provider, referralHeaders()));
 
   const playAsGuest = async () => {
     if (pending) return;
@@ -208,6 +217,8 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
       if (authError) {
         guestTapped = false;
         setError(authError.message ?? "Something went wrong. Please try again.");
+      } else {
+        posthog?.capture("guest_session_started");
       }
     } catch {
       guestTapped = false;
@@ -242,7 +253,7 @@ function AuthScreen({ mode }: { mode: AuthMode }) {
           {mode === "sign-in" && GAME_CENTER_AVAILABLE && (
             <FooterLine
               cta="USE GAME CENTER"
-              onPress={() => continueWith(() => signInWithGameCenter({ adoptGuestProgress: !!guestId }))}
+              onPress={() => continueWith("game_center", () => signInWithGameCenter({ adoptGuestProgress: !!guestId }))}
               text="Game Center player?"
             />
           )}

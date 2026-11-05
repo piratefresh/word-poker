@@ -5,16 +5,6 @@
         "projectId": "3e279b47-6c06-47a9-ac2b-6bcd49f37df8"
       }
     },
-    "plugins": [
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "react-native",
-          "organization": "word-poker"
-        }
-      ]
-    ],
     "ios": {
       "bundleIdentifier": "com.wordpoker.wordpoker",
       "infoPlist": {
