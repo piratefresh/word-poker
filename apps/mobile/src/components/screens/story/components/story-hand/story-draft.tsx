@@ -72,7 +72,7 @@ export function StoryDraft({ chapterId, offers, into, onSettled }: StoryDraftPro
           );
         })}
       </View>
-      <GameButton label={swapping ? `SWAP FOR ${POWER_UPS[chosen].title.toUpperCase()}` : `TAKE ${POWER_UPS[chosen].title.toUpperCase()}`} onPress={take} testID="story-take" variant="green" />
+      <GameButton label={swapping ? `SWAP FOR ${POWER_UPS[chosen].title.toUpperCase()}` : `TAKE ${POWER_UPS[chosen].title.toUpperCase()}`} onPress={take} testID="story-take" variant="gold" />
     </View>
   );
 }

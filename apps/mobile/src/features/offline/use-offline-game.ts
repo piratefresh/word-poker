@@ -88,6 +88,14 @@ const ROSTER: readonly { id: PlayerId; name: string }[] = [
   { id: "mira", name: "Mira" },
 ];
 
+/** Seats a session brings that the default table never deals: story's boss. */
+const GUEST_NAMES: Readonly<Record<string, string>> = { professor: "The Professor" };
+
+/** A seat's printed name, by who sits there: a session seats its own players, so a seat's index says nothing. */
+function rosterName(id: PlayerId): string {
+  return ROSTER.find((player) => player.id === id)?.name ?? GUEST_NAMES[id] ?? id;
+}
+
 /**
  * A table that is not ordinary offline play — the tutorial's guided hand (STO-507) — brings its
  * own clock, deal, gate and opponents. Absent, the table is the one `/offline` plays, on the
@@ -787,7 +795,7 @@ function powerViewOf(
       .filter((event) => event.handId === state.hand)
       .map((event) => ({
         ...event,
-        name: ROSTER[event.seat]?.name ?? state.seats[event.seat]?.id ?? "",
+        name: rosterName(state.seats[event.seat]?.id ?? ""),
         mine: state.seats[event.seat]?.id === HERO_ID,
       })),
   };
@@ -1065,7 +1073,7 @@ function perspectiveOf(
     phase: state.phase,
     seatCount: toSeatCount(state.seats.length),
     seats: state.seats.map((seat, index) => {
-      const name = ROSTER[index]?.name ?? seat.id;
+      const name = rosterName(seat.id);
       return {
         ...seat,
         place: index,

@@ -69,7 +69,7 @@ export function BriefSheet({ node, onDeal, onDismiss }: BriefSheetProps): ReactE
           onPress={onDeal}
           style={styles.deal}
           testID="story-deal"
-          variant="green"
+          variant="gold"
         />
         <Pressable accessibilityRole="button" hitSlop={12} onPress={onDismiss} testID="story-not-now">
           <Text style={styles.notNow}>Not now</Text>

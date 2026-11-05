@@ -78,6 +78,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const replay = () => {
     setVerdict(null);
     setBuilt(null);
+    builtRef.current = null;
     offline.newGame();
   };
 

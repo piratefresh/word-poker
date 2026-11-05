@@ -20,6 +20,7 @@ import { duration } from "@/constants/theme";
 import type { GamePlayer } from "@/components/screens/game/game-types";
 
 import { testDictionary } from "@/test-support/dictionary-fixtures";
+import { storySession } from "@/features/story/challenges";
 import { useOfflineGame, type OfflineGame } from "./use-offline-game";
 
 // The adapter reaches the HUD for the phase numbers, and the HUD's loop gate asks the router
@@ -1263,5 +1264,19 @@ describe("useOfflineGame — the Wild table (§44)", () => {
     });
 
     expect(result.current.powers?.draw).not.toBeNull();
+  });
+});
+
+describe("useOfflineGame — a session's own seats", () => {
+  test("names each seat by who sits in it, not by its place at the table", async () => {
+    const dictionary = testDictionary();
+    const jay = await renderHook(() =>
+      useOfflineGame({ seed: SEED, dictionary, session: storySession({ players: ["hero", "jay"] }, dictionary) }),
+    );
+    expect(jay.result.current.game.players.map((player) => player?.name)).toEqual(["Guest", "Jay"]);
+    const boss = await renderHook(() =>
+      useOfflineGame({ seed: SEED, dictionary, session: storySession({ players: ["hero", "professor"] }, dictionary) }),
+    );
+    expect(boss.result.current.game.players[1]?.name).toBe("The Professor");
   });
 });
