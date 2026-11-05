@@ -177,7 +177,7 @@ export function deepLinkInterstitial(deepLink: string): Response {
 
 /** Fixed copy per Better Auth error code: the query string is never echoed into the page. */
 const OAUTH_FAILURES: Record<string, string> = {
-  account_not_linked: "That email already has a Word Poker account. Sign in the way you usually do, then add this login in Account settings.",
+  account_not_linked: "That email already has a Word Poker account that isn't verified yet. Sign in the way you usually do, then add this login in Account settings.",
   account_already_linked_to_different_user: "That login already belongs to a different Word Poker account. Nothing was changed.",
   access_denied: "Sign-in was cancelled.",
   user_cancelled_authorize: "Sign-in was cancelled.",
