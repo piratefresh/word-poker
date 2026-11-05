@@ -14,7 +14,7 @@ import { Host } from "@expo/ui";
 import { isAccountEligible } from "@wordpoker/contracts";
 import { Image } from "expo-image";
 import { useNetworkState } from "expo-network";
-import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams, usePathname, type Href } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   Pressable,
@@ -42,7 +42,7 @@ import {
 } from "@/components/screens/home/components/menu-slab";
 import type { ModeVariant } from "@/components/screens/home/components/mode-variants";
 import { OfflineTray } from "@/components/screens/home/components/offline-tray";
-import { HomeHeader } from "@/components/screens/home/home-header";
+import { HomeHeader, homeHeaderTop } from "@/components/screens/home/home-header";
 import { artPoint, STREETS } from "@/components/screens/home/street-art";
 import { LEDGER_CLOSE_MS } from "@/components/screens/history/ledger/ledger-stage";
 import { StreetLogo } from "@/components/screens/home/street-logo";
@@ -237,7 +237,9 @@ export function HomeScreen() {
       height: nativeEvent.layout.height,
     });
 
-  const headerTop = Math.max(insets.top + spacing.sm, box.height >= 700 ? 54 : 20);
+  // The window, not the street's box: the store tab places the same HUD from it, so the two line up.
+  const headerTop = homeHeaderTop(insets.top, windowHeight);
+  const storeOpen = usePathname() === "/store";
 
   return (
     <View onLayout={onLayout} style={styles.root}>
@@ -276,7 +278,8 @@ export function HomeScreen() {
           >
             <View style={{ height: headerHeight }} />
 
-            <View style={[styles.gutter, styles.logo]}>
+            {/* The store tab dims the street and draws over it, so the logo and menu step aside (STO-1045). */}
+            <View style={[styles.gutter, styles.logo, storeOpen && styles.underStore]}>
               <StreetLogo width={Math.min(contentWidth, LOGO_MAX_WIDTH)} />
             </View>
 
@@ -318,7 +321,7 @@ export function HomeScreen() {
           </View>
 
           {/* A short phone (375×667) closes the stack up so Offline clears the rack. */}
-          <View style={[styles.slabs, { marginLeft: slabsX, gap: box.height < 700 ? 8 : 14 }]}>
+          <View style={[styles.slabs, { marginLeft: slabsX, gap: box.height < 700 ? 8 : 14 }, storeOpen && styles.underStore]}>
             {SLABS.map(({ key, href, online, ...slab }) => (
               <MenuSlab
                 key={key}
@@ -391,6 +394,7 @@ const styles = StyleSheet.create({
   menuTop: { gap: spacing.md, paddingBottom: spacing.md },
   gutter: { paddingHorizontal: spacing.gutter },
   logo: { alignItems: "center" },
+  underStore: { opacity: 0 },
   slabs: { alignItems: "flex-start" },
   header: { position: "absolute", left: spacing.gutter, right: spacing.gutter },
   banner: {

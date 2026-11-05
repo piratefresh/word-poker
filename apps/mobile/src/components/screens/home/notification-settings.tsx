@@ -3,26 +3,29 @@
  *
  * The switches are the account's (`notify*` on the Better Auth user), so they follow the player
  * across devices; the server checks them before it sends, so a hidden switch is not the only guard.
- * Where the OS has denied permission the switches still save, and a button leads to system settings.
+ * Each tap saves on its own (STO-1044). Where the OS has denied permission the switches still save,
+ * and a link leads to system settings.
  */
 
-import { Button, Column, Switch, Text } from "@expo/ui";
 import * as Notifications from "expo-notifications";
 import { useEffect, useState } from "react";
-import { Linking } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 
 import { authClient } from "@/auth/client/auth-client";
-import { colors, fonts, fontSize, spacing } from "@/constants/theme";
+import { paper } from "@/components/screens/auth/auth-shell";
+import { fonts } from "@/constants/theme";
+
+import { CardSwitch, Panel, Row, SectionLabel } from "./account-card";
 
 const KINDS = [
-  { key: "notifyTableInvite", label: "Table invites", fallback: true },
-  { key: "notifyFriendRequest", label: "Friend requests", fallback: true },
-  { key: "notifyFriendOnline", label: "Friends coming online", fallback: false },
+  { key: "notifyTableInvite", label: "Table invites", caption: "When a friend deals you in", fallback: true },
+  { key: "notifyFriendRequest", label: "Friend requests", caption: "When someone adds you", fallback: true },
+  { key: "notifyFriendOnline", label: "Friends coming online", caption: "When a friend shows up on the street", fallback: false },
 ] as const;
 
 type Key = (typeof KINDS)[number]["key"];
 
-export function NotificationSettings() {
+export function NotificationSettings({ onSaved }: { onSaved: () => void }) {
   const { data: session } = authClient.useSession();
   const [denied, setDenied] = useState(false);
   const [saved, setSaved] = useState<Partial<Record<Key, boolean>>>({});
@@ -40,6 +43,7 @@ export function NotificationSettings() {
     try {
       const result = await authClient.updateUser({ [key]: value });
       if (result.error) throw new Error(result.error.message);
+      onSaved();
     } catch {
       setSaved((prev) => ({ ...prev, [key]: !value }));
       setError(true);
@@ -47,26 +51,41 @@ export function NotificationSettings() {
   };
 
   return (
-    <Column spacing={spacing.sm}>
-      <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Notifications</Text>
-      {KINDS.map(({ key, label, fallback }) => (
-        <Switch
-          key={key}
-          label={label}
-          onValueChange={(value) => { void toggle(key, value); }}
-          testID={`notify-${key}`}
-          value={saved[key] ?? session?.user[key] ?? fallback}
-        />
-      ))}
-      {error ? <Text textStyle={{ color: colors.danger }}>Couldn’t save that. Try again.</Text> : null}
+    <View style={styles.section}>
+      <SectionLabel>Notifications</SectionLabel>
+      <Panel>
+        {KINDS.map(({ key, label, caption, fallback }) => (
+          <Row
+            caption={caption}
+            end={
+              <CardSwitch
+                label={label}
+                onChange={(value) => { void toggle(key, value); }}
+                testID={`notify-${key}`}
+                value={saved[key] ?? session?.user[key] ?? fallback}
+              />
+            }
+            key={key}
+            title={label}
+          />
+        ))}
+      </Panel>
+      {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>Couldn’t save that. Try again.</Text> : null}
       {denied ? (
-        <>
-          <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>
-            Notifications are off for Word Poker in system settings.
+        <Text style={styles.note}>
+          Notifications are off for Word Poker in system settings.{" "}
+          <Text accessibilityRole="link" onPress={() => { void Linking.openSettings(); }} style={styles.link} testID="notify-open-settings">
+            Open settings
           </Text>
-          <Button label="Open system settings" onPress={() => { void Linking.openSettings(); }} testID="notify-open-settings" variant="text" />
-        </>
+        </Text>
       ) : null}
-    </Column>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  section: { gap: 6 },
+  error: { color: paper.error, fontFamily: fonts.rubikMedium, fontSize: 13, lineHeight: 18 },
+  note: { color: paper.body, fontFamily: fonts.rubik, fontSize: 13, lineHeight: 18 },
+  link: { color: paper.link, fontFamily: fonts.rubikSemiBold, textDecorationLine: "underline" },
+});

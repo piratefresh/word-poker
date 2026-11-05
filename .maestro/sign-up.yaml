@@ -23,7 +23,7 @@
 #
 # Non-UI agents don't need this flow; the same registration works over HTTP:
 #   POST /api/auth/sign-up/email {"name": ..., "username": ..., "email": ..., "password": ...}
-url: http://localhost:8081/sign-up
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-up"
 name: Register a new user through the real sign-up screen
 tags:
   - web
@@ -35,20 +35,13 @@ env:
 - evalScript: ${output.email = 'e2e-signup-' + Date.now() + '@wordpoker.dev'}
 - evalScript: ${output.handle = 'E2E' + String(Date.now()).slice(-9)}
 
-- openLink: http://localhost:8081/sign-up
-
-# The app hides everything until the first session check resolves, so give it a
-# beat before deciding which screen we're on.
-- waitForAnimationToEnd:
-    timeout: 5000
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-up"
 
 # A session left by a previous run bounces /sign-up to the home screen, so it is
-# dropped first. `optional` — a signed-out profile shows the form straight away.
+# dropped first. A signed-out profile shows the form straight away.
 - extendedWaitUntil:
-    visible:
-      id: "home-account-menu"
-    timeout: 20000
-    optional: true
+    visible: "Offline|Pull up a chair\\."
+    timeout: 60000
 - runFlow:
     when:
       visible:
@@ -62,7 +55,7 @@ env:
           visible: "TAKE YOUR SEAT"
           timeout: 30000
       # Signing out lands on the sign-in screen; the form is one link away.
-      - openLink: http://localhost:8081/sign-up
+      - openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/sign-up"
 
 # The sign-up form.
 - extendedWaitUntil:
@@ -89,10 +82,16 @@ env:
     id: "home-account-menu"
 - tapOn:
     text: "Settings"
-- assertVisible:
-    text: ${output.email}
+# The email shows once the sheet has read the sign-in methods.
+- extendedWaitUntil:
+    visible: ${output.email}
+    timeout: 15000
 - tapOn:
-    text: "Cancel"
+    id: "account-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "account-settings"
+    timeout: 10000
 
 # Leave the profile the way the flow found it: signed out.
 - tapOn:

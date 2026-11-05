@@ -1,5 +1,4 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { router } from "expo-router";
 
 import TabLayout from "../../../app/(tabs)/_layout";
 
@@ -8,7 +7,6 @@ jest.mock("@/components/hud/use-reduce-motion", () => ({ useReduceMotion: () => 
 const mockNavigate = jest.fn();
 const mockEmit = jest.fn(() => ({ defaultPrevented: false }));
 jest.mock("expo-router", () => ({
-  router: { push: jest.fn() },
   Tabs: Object.assign(
     ({ layout }: { layout: (props: unknown) => unknown }) => layout({
       state: {
@@ -17,6 +15,7 @@ jest.mock("expo-router", () => ({
           { key: "home", name: "index" },
           { key: "friends", name: "friends" },
           { key: "history", name: "history" },
+          { key: "store", name: "store" },
           { key: "explore", name: "explore" },
         ],
       },
@@ -24,6 +23,7 @@ jest.mock("expo-router", () => ({
         home: { options: {}, render: () => null, navigation: { emit: mockEmit } },
         friends: { options: { tabBarBadge: 3 }, render: () => null, navigation: { emit: mockEmit } },
         history: { options: {}, render: () => null, navigation: { emit: mockEmit } },
+        store: { options: {}, render: () => null, navigation: { emit: mockEmit } },
       },
       navigation: { navigate: mockNavigate, emit: mockEmit },
     }),
@@ -58,16 +58,17 @@ test("rack preserves tab selection, badge, and cancelable navigation", async () 
   expect(mockNavigate).not.toHaveBeenCalled();
 });
 
-test("Store is visible but only opens while the existing feature flag is enabled", async () => {
+test("Store is a tab that only opens while the existing feature flag is enabled", async () => {
   delete process.env.EXPO_PUBLIC_COIN_STORE;
   const disabled = await render(<TabLayout />);
   expect(disabled.getByTestId("tab-store").props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(disabled.getByTestId("tab-store"));
-  expect(router.push).not.toHaveBeenCalled();
+  expect(mockNavigate).not.toHaveBeenCalled();
   await disabled.unmount();
 
   process.env.EXPO_PUBLIC_COIN_STORE = "1";
   const enabled = await render(<TabLayout />);
+  expect(enabled.getByRole("tab", { name: "Store" })).toBeTruthy();
   await fireEvent.press(enabled.getByTestId("tab-store"));
-  expect(router.push).toHaveBeenCalledWith("/store");
+  expect(mockNavigate).toHaveBeenCalledWith("store", undefined);
 });

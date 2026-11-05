@@ -1,0 +1,22 @@
+appId: com.wordpoker.wordpoker
+name: Friends load and refresh (native)
+tags: [native, friends]
+---
+- runFlow: _ensure-session.yaml
+- tapOn:
+    id: "tab-friends"
+- extendedWaitUntil:
+    visible: "YOUR CODE: .*"
+    timeout: 30000
+- tapOn:
+    id: "friends-refresh"
+- extendedWaitUntil:
+    visible:
+      id: "friends-refresh"
+    timeout: 30000
+- assertVisible: "YOUR CODE: .*"
+- tapOn:
+    id: "friends-close"
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 10000

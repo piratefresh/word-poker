@@ -2,6 +2,80 @@
 
 Maestro flows (web and native), the online smokes, and the shared E2E user.
 
+## Feature smoke suite
+
+Run from the repository root with Maestro on PATH (`MAESTRO_BIN` can name another install):
+
+```bash
+pnpm smoke --list
+pnpm smoke story                      # one feature
+pnpm smoke friends quests store       # selected features, sequentially
+pnpm smoke --headless                 # default web suite
+pnpm smoke story --headless --screen-size 375x812
+pnpm smoke story --platform ios       # installed, running native build
+pnpm smoke --platform android --dry-run
+pnpm test:smoke                       # runner checks, no app or devices
+```
+
+The runner uses existing servers and installed apps; start Expo web on 8081 first. For local
+APIs, set `EXPO_PUBLIC_LOCAL_API=1` before starting Expo. Seed the E2E account as described below.
+The default web suite needs real auth, friends, Wallet and quests APIs plus the migrated history
+database. Native account/API flows require a signed-in development build and device-reachable
+API URLs; auth bypass only covers offline gameplay, home, tutorial and story. The runner does
+not build, install or attach a development client to Metro. Use the existing native online
+runner below when that setup is needed.
+
+`WEB_URL` selects another web origin, and is forwarded through composed legacy flows.
+`TEST_USER_EMAIL` / `TEST_USER_PASSWORD` override the seeded credentials. These are process
+environment variables, not `pnpm smoke` arguments. The runner does not load `.env` files.
+`--timeout 600000` sets the per-feature process timeout in milliseconds (ten minutes by default).
+Each run writes `.tmp/smoke/<timestamp>/results.md` and `results.json`; each feature directory
+contains `runner.log`, JUnit, and Maestro artifacts. Any failed, errored or blocked feature
+returns a nonzero exit code. Reports are saved after each feature. `--dry-run` only checks
+selection and required room variables; it does not prove that APIs, accounts or devices work.
+
+| Feature name | Smoke scope | Platforms |
+| --- | --- | --- |
+| `auth` | Real sign-in, verify account email in settings | Web |
+| `auth-validation` | Empty sign-in and password-reset validation | Web, native |
+| `registration` | New handle/account, settings, sign out | Web |
+| `home` | Bottom navigation on web; mode choices and practice chip settings on native | Web, native |
+| `tutorial` | Coach steps, first call, reach flop | Web, native |
+| `story` | Saved map, open First Hand, leave back to map | Web, native |
+| `friends` | Load personal code, refresh, close tray | Web, native |
+| `quests` | Wallet/streak cards and quest catalog, return home | Web, native |
+| `store` | Real Wallet balance, return home | Web, native |
+| `settings` | Open account settings, display name field, cancel | Web, native |
+| `offline` | Seeded betting, word building/check/shuffle, payout, next hand | Web, native |
+| `wild` | Power draw and CPU power use through results | Web |
+| `wild-power` | Hero uses Vowel Magnet; result reveals powered tile | Web |
+| `history` | Completed offline hand, session, hand details and action log; native also reconnects | Web, native |
+| `create-table` | Form validation and reachable footer | Web |
+| `lobby` | Create/join/leave, live counts, missing-room deep links | Web |
+| `lobby-coins` | Funded, broke and guest lobby states | Web |
+| `online` | Classic seeded multiplayer hand | Web, native |
+| `online-wild` | Seeded multiplayer power use and word submission | Web |
+| `guest` | Fresh-profile invite and guest hand | Web |
+
+Features needing Colyseus or prepared opponents are excluded from the default suite. Run them
+by name after provisioning their prerequisites (`pnpm smoke --list` shows them). `lobby` and
+`lobby-coins` need `hold-table.ts` holding Node Table; the latter also needs the Wallet personas.
+`online`, `online-wild` and `guest` require `ROOM_ID`. Each gameplay run needs a fresh room with
+its documented seed; one room ID cannot be reused across those scenarios. Prefer the existing
+`pnpm smoke:online`, `smoke:online:wild`, `smoke:online:guest`, `smoke:online:four`, and
+`smoke:cross:ios` / `smoke:cross:android` orchestration commands when available. The four-seat
+scenario covers re-raises, folds, all-ins, side pots, busts and re-readying with fewer players.
+The guest invite scenario assumes the server allows that guest's seat; Wallet-enforced beta
+servers may refuse it. `lobby-coins` separately asserts the current guest account restriction.
+
+These smokes exercise specific paths, not complete feature acceptance. Before closed beta,
+also verify native sandbox purchases and credit delivery, Apple/Google/Game Center login,
+email verification and delivered reset links, friend request/accept/invite across two accounts,
+push delivery/preferences, story stars/drafts/boss progression and persistence, account deletion,
+and online disconnect/reconnect on physical devices. The store smoke does not initiate purchases;
+the settings smoke does not change account details. Native flows must be executed on both
+platforms before counting them as release evidence.
+
 ## History testing
 
 History testing needs auth and history routes from this checkout, plus the room server's history
@@ -203,6 +277,26 @@ with `e2e-test`, then runs `.maestro/native/offline-hand.yaml` on an iOS simulat
 manually from `apps/mobile` with `eas workflow:run .eas/workflows/e2e-ios.yml`, or add the `e2e`
 label to a pull request. EAS Workflows and its Maestro job require an Expo plan that includes
 those services.
+
+### Coin packs in development (RevenueCat Test Store)
+
+A simulator, an emulator and a sideloaded build can't buy real App Store or Play products, so the
+store shows RevenueCat's "no products" error there. Development builds can use RevenueCat's Test
+Store instead; the web build keeps its Web Billing (Stripe sandbox) key.
+
+1. In the RevenueCat dashboard, open **Apps and providers → Test configuration** and create a Test
+   Store. Copy its API key.
+2. Create Test Store products with the identifiers `coins_small`, `coins_medium` and `coins_large`
+   (the catalog only knows `COIN_PACK_IDS`). Add them to the current coin Offering, and to the `COIN`
+   virtual currency grants with the same amounts as the real products, or the store hides them.
+3. Set `EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY` in `apps/mobile/.env` and restart Metro.
+
+Under `__DEV__` that key replaces the Apple and Google keys (`src/lib/wallet/revenuecat.ts`); a
+purchase opens RevenueCat's dialog, which can succeed, fail or cancel. Test Store purchases are
+sandbox data. Never use the key outside a development build: the SDK crashes a release build on
+purpose when it is configured with a Test Store key, and that includes TestFlight and the Play
+testing tracks. So an Android *test* build needs either a development build or real Play products
+on the internal testing track with a license tester.
 
 ### Online device smoke
 

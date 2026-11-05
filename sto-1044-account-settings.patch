@@ -1,0 +1,1226 @@
+From 3af00b6775acf1f2623b834e2825335e9e335178 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 5 Nov 2026 00:15:05 -0500
+Subject: [PATCH] STO-1044: restyle Account settings as the cream menu card
+ with autosave
+
+The Account sheet becomes the login form's cream menu card, sliding up over the
+dimmed street with the HUD above it. Every change saves on its own and a felt
+tag confirms it, so Save and Cancel are gone; DONE closes the sheet.
+
+- Display name reuses the login Field and saves on blur, Return or DONE.
+  Empty and over-16 names show an error and never save (16 is a placeholder).
+- Sign-in panel: Email shows SIGNED IN; Game Center, Google and Apple go
+  LINK -> LINKING... -> LINKED with the linked caption.
+- Notifications use a gold toggle with a switch role and label, saving on tap.
+- Delete account moves to a red link at the bottom. Its red panel needs DELETE
+  typed (plus the password for email accounts) and runs the STO-821 flow.
+- The HUD avatar and the sheet show session.user.image when set, ready for
+  avatar upload (STO-1050).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VcB1EEBaCXdrfzs6APaxiy
+---
+ .../components/screens/auth/auth-shell.tsx    |  20 +-
+ .../components/screens/home/account-card.tsx  | 163 ++++++++
+ .../screens/home/account-settings.tsx         | 373 ++++++++++++++----
+ .../screens/home/delete-account.test.tsx      |  31 +-
+ .../screens/home/delete-account.tsx           | 113 ++++--
+ .../screens/home/home-header.test.tsx         | 115 ++++--
+ .../components/screens/home/home-header.tsx   |   8 +-
+ .../screens/home/notification-settings.tsx    |  71 ++--
+ .../home/notification-settings.web.tsx        |   2 +-
+ 9 files changed, 720 insertions(+), 176 deletions(-)
+ create mode 100644 apps/mobile/src/components/screens/home/account-card.tsx
+
+diff --git a/apps/mobile/src/components/screens/auth/auth-shell.tsx b/apps/mobile/src/components/screens/auth/auth-shell.tsx
+index 278a5d5..8c32de6 100644
+--- a/apps/mobile/src/components/screens/auth/auth-shell.tsx
++++ b/apps/mobile/src/components/screens/auth/auth-shell.tsx
+@@ -31,7 +31,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
+ import { fonts, layout, tileMaterial } from "@/constants/theme";
+ 
+ /** The menu card's paper: its own warm palette, not the felt's. */
+-const paper = {
++export const paper = {
+   ink: "#3a2210",
+   body: "#7a5634",
+   faint: "#a8967e",
+@@ -195,6 +195,8 @@ export function AuthShell({
+ 
+ export type FieldProps = TextInputProps & {
+   label: string;
++  /** Sits at the far end of the label's line: the account sheet's "✓ SAVED". */
++  labelEnd?: ReactNode;
+   /** Shown under the field after a submit; turns its frame red. */
+   error?: string;
+   /** Standing help under the field, until an error replaces it. */
+@@ -210,7 +212,7 @@ export type FieldProps = TextInputProps & {
+ };
+ 
+ /** A labelled `InputGroup`: label, the framed control with its addons, then error or hint. */
+-export function Field({ label, error, hint, secret = false, start, end, children, editable, ...input }: FieldProps) {
++export function Field({ label, labelEnd, error, hint, secret = false, start, end, children, editable, ...input }: FieldProps) {
+   const [shown, setShown] = useState(false);
+ 
+   const trailing =
+@@ -231,7 +233,14 @@ export function Field({ label, error, hint, secret = false, start, end, children
+ 
+   return (
+     <View style={styles.field}>
+-      <Text style={styles.fieldLabel}>{label}</Text>
++      {labelEnd ? (
++        <View style={styles.fieldLabelRow}>
++          <Text style={styles.fieldLabel}>{label}</Text>
++          {labelEnd}
++        </View>
++      ) : (
++        <Text style={styles.fieldLabel}>{label}</Text>
++      )}
+       <InputGroup disabled={editable === false} invalid={!!error}>
+         {start ? <InputGroupAddon>{start}</InputGroupAddon> : null}
+         <InputGroupInput
+@@ -479,6 +488,11 @@ const styles = StyleSheet.create({
+   field: {
+     gap: 6,
+   },
++  fieldLabelRow: {
++    alignItems: "center",
++    flexDirection: "row",
++    justifyContent: "space-between",
++  },
+   fieldLabel: {
+     color: paper.body,
+     fontFamily: fonts.rubikSemiBold,
+diff --git a/apps/mobile/src/components/screens/home/account-card.tsx b/apps/mobile/src/components/screens/home/account-card.tsx
+new file mode 100644
+index 0000000..8317ab8
+--- /dev/null
++++ b/apps/mobile/src/components/screens/home/account-card.tsx
+@@ -0,0 +1,163 @@
++/**
++ * account-card.tsx — the pieces the Account sheet (STO-1044) builds from, on the login form's cream
++ * menu card: a section label, the light panel its rows sit on, a felt-green tag, a small gold
++ * button and the gold toggle. Colours are the login card's, the gold buttons' and the felt tag's.
++ */
++
++import { LinearGradient } from "expo-linear-gradient";
++import { Children, type ReactNode, useEffect } from "react";
++import { Pressable, StyleSheet, Text, View } from "react-native";
++import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
++
++import { paper } from "@/components/screens/auth/auth-shell";
++import { fonts } from "@/constants/theme";
++
++const GOLD = ["#ffd877", "#e6a73e"] as const;
++/** The felt tag: green felt, an amber edge, gold Lilita lettering. */
++export const FELT = { face: "#1f4a33", edge: "#e0974a", ink: "#f7d77a" };
++
++/** A small uppercase label over a group, with an optional note at its end (Display name's "✓ SAVED"). */
++export function SectionLabel({ children, end }: { children: string; end?: ReactNode }) {
++  return (
++    <View style={styles.labelRow}>
++      <Text accessibilityRole="header" style={styles.label}>{children}</Text>
++      {end}
++    </View>
++  );
++}
++
++/** The light panel a section's rows sit on; each row after the first gets a thin divider. */
++export function Panel({ children }: { children: ReactNode }) {
++  return (
++    <View style={styles.panel}>
++      {Children.toArray(children).map((row, index) => (
++        <View key={index} style={index > 0 && styles.divider}>{row}</View>
++      ))}
++    </View>
++  );
++}
++
++/** A row in a panel: a title, a one-line caption under it, and its control at the end. */
++export function Row({ title, caption, end }: { title: string; caption?: string; end?: ReactNode }) {
++  return (
++    <View style={styles.row}>
++      <View style={styles.rowText}>
++        <Text style={styles.rowTitle}>{title}</Text>
++        {caption ? <Text numberOfLines={2} style={styles.rowCaption}>{caption}</Text> : null}
++      </View>
++      {end}
++    </View>
++  );
++}
++
++/** A felt-green status pill: SIGNED IN, LINKED. */
++export function FeltPill({ label }: { label: string }) {
++  return (
++    <View style={styles.feltPill}>
++      <Text style={styles.feltPillLabel}>{label}</Text>
++    </View>
++  );
++}
++
++/** The small gold button of the sheet's header (DONE) and its rows (LINK). */
++export function SmallGoldButton({ label, onPress, busy = false, testID }: { label: string; onPress: () => void; busy?: boolean; testID?: string }) {
++  return (
++    <Pressable
++      accessibilityRole="button"
++      accessibilityState={{ busy, disabled: busy }}
++      disabled={busy}
++      onPress={onPress}
++      style={({ pressed }) => [styles.gold, pressed && styles.goldPressed, busy && styles.goldBusy]}
++      testID={testID}
++    >
++      <LinearGradient colors={GOLD} style={styles.goldFace}>
++        <Text style={styles.goldLabel}>{label}</Text>
++      </LinearGradient>
++    </Pressable>
++  );
++}
++
++const KNOB_TRAVEL = 22;
++
++/** The gold toggle: a brass track when on, a pale one when off, a cream tile for its knob. */
++export function CardSwitch({ label, value, onChange, testID }: { label: string; value: boolean; onChange: (value: boolean) => void; testID?: string }) {
++  const reducedMotion = useReducedMotion();
++  const offset = useSharedValue(value ? KNOB_TRAVEL : 0);
++  useEffect(() => {
++    offset.value = reducedMotion ? (value ? KNOB_TRAVEL : 0) : withTiming(value ? KNOB_TRAVEL : 0, { duration: 180 });
++  }, [offset, reducedMotion, value]);
++  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
++
++  return (
++    <Pressable
++      accessibilityLabel={label}
++      accessibilityRole="switch"
++      accessibilityState={{ checked: value }}
++      hitSlop={8}
++      onPress={() => onChange(!value)}
++      style={[styles.track, value ? styles.trackOn : styles.trackOff]}
++      testID={testID}
++    >
++      {value ? <LinearGradient colors={GOLD} style={StyleSheet.absoluteFill} /> : null}
++      <Animated.View style={[styles.knob, knob]} />
++    </Pressable>
++  );
++}
++
++const styles = StyleSheet.create({
++  labelRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
++  label: {
++    color: paper.body,
++    fontFamily: fonts.rubikSemiBold,
++    fontSize: 12,
++    letterSpacing: 0.96,
++    textTransform: "uppercase",
++  },
++  panel: {
++    backgroundColor: "#fffaf0",
++    borderColor: "#e3c896",
++    borderRadius: 12,
++    borderWidth: 2,
++    boxShadow: "0px 3px 0px #dcb888",
++  },
++  divider: { borderTopColor: "rgba(122, 86, 52, 0.18)", borderTopWidth: 1 },
++  row: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 56, paddingHorizontal: 14, paddingVertical: 12 },
++  rowText: { flex: 1, gap: 3, minWidth: 0 },
++  rowTitle: { color: "#2b1c10", fontFamily: fonts.rubikMedium, fontSize: 15 },
++  rowCaption: { color: paper.body, fontFamily: fonts.rubik, fontSize: 12, lineHeight: 16 },
++  feltPill: {
++    backgroundColor: FELT.face,
++    borderColor: FELT.edge,
++    borderRadius: 999,
++    borderWidth: 2,
++    paddingHorizontal: 9,
++    paddingVertical: 3,
++  },
++  feltPillLabel: { color: FELT.ink, fontFamily: fonts.arcade, fontSize: 12, letterSpacing: 0.5 },
++  gold: {
++    borderColor: "#9a5f1c",
++    borderRadius: 10,
++    borderWidth: 2,
++    boxShadow: "0px 3px 0px #8a4f14",
++    height: 38,
++    minWidth: 76,
++    overflow: "hidden",
++  },
++  goldPressed: { boxShadow: "0px 1px 0px #8a4f14", transform: [{ translateY: 2 }] },
++  goldBusy: { opacity: 0.75 },
++  goldFace: { alignItems: "center", flex: 1, justifyContent: "center", paddingHorizontal: 14 },
++  goldLabel: { color: paper.ink, fontFamily: fonts.arcade, fontSize: 16, letterSpacing: 0.64 },
++  track: { borderRadius: 999, borderWidth: 2, height: 32, overflow: "hidden", width: 54 },
++  trackOn: { borderColor: "#9a5f1c" },
++  trackOff: { backgroundColor: "#e6d2ab", borderColor: "#c9a978", boxShadow: "inset 0px 2px 3px rgba(90, 50, 20, 0.18)" },
++  knob: {
++    backgroundColor: "#fffdf6",
++    borderRadius: 6,
++    boxShadow: "0px 2px 0px #c4743a, 0px 2px 4px rgba(90, 50, 20, 0.3)",
++    height: 22,
++    left: 3,
++    position: "absolute",
++    top: 3,
++    width: 22,
++  },
++});
+diff --git a/apps/mobile/src/components/screens/home/account-settings.tsx b/apps/mobile/src/components/screens/home/account-settings.tsx
+index 8f057ba..e307024 100644
+--- a/apps/mobile/src/components/screens/home/account-settings.tsx
++++ b/apps/mobile/src/components/screens/home/account-settings.tsx
+@@ -1,26 +1,55 @@
+-import { BottomSheet, Button, Column, Host, Text, TextInput, useNativeState } from "@expo/ui";
++/**
++ * account-settings.tsx — the Account sheet (STO-1044): the login form's cream menu card, sliding up
++ * over the dimmed street with the HUD still showing above it.
++ *
++ * Every change saves on its own: a switch on tap, the display name on blur or Return, a link once
++ * its flow finishes. A felt-green tag drops in near the top of the sheet to confirm each one, so
++ * there is no Save or Cancel, only DONE.
++ */
++
+ import { isPlaceholderEmail } from "@wordpoker/contracts";
+-import { useEffect, useState } from "react";
+-import { useWindowDimensions, View } from "react-native";
++import { Image } from "expo-image";
++import { LinearGradient } from "expo-linear-gradient";
++import { useEffect, useRef, useState } from "react";
++import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
++import Animated, { FadeIn, FadeInUp, FadeOut, SlideInDown } from "react-native-reanimated";
++import { useSafeAreaInsets } from "react-native-safe-area-context";
+ 
+ import { authClient } from "@/auth/client/auth-client";
+ import { GAME_CENTER_AVAILABLE, linkGameCenter } from "@/auth/client/game-center";
+ import { linkSocial, SOCIAL_PROVIDERS, type SocialProvider } from "@/auth/client/social-sign-in";
+-import { colors, fonts, fontSize, spacing } from "@/constants/theme";
++import { Field, paper } from "@/components/screens/auth/auth-shell";
++import { fonts, layout } from "@/constants/theme";
++import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
+ 
++import { FELT, FeltPill, Panel, Row, SectionLabel, SmallGoldButton } from "./account-card";
+ import { DeleteAccount } from "./delete-account";
+ import { NotificationSettings } from "./notification-settings";
+ 
+ /** Better Auth's provider ids, as the player knows them. */
+ const LOGIN_METHODS: Record<string, string> = { credential: "Email", "game-center": "Game Center", google: "Google", apple: "Apple" };
++/** Placeholder until the real display-name rule is settled (STO-1044's open question). */
++export const DISPLAY_NAME_MAX = 16;
++const TAG_MS = 1600;
++/** The design's sheet starts 112pt down a 54pt status bar: the HUD row's height plus a little air. */
++const SHEET_BELOW_SAFE_TOP = 58;
++
++export function displayNameError(value: string): string | null {
++  const name = value.trim();
++  if (!name) return "Enter a display name.";
++  if (name.length > DISPLAY_NAME_MAX) return `Use ${DISPLAY_NAME_MAX} characters or fewer.`;
++  return null;
++}
+ 
+ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
++  const insets = useSafeAreaInsets();
+   const { data: session } = authClient.useSession();
+-  const userId = session?.user.isAnonymous ? null : session?.user.id;
++  const isGuest = !!session?.user.isAnonymous;
++  const userId = isGuest ? null : session?.user.id;
++
+   // Kept with the account it was read for, so a different (or no) account never shows these.
+   const [loaded, setLoaded] = useState<{ userId: string; providers: string[] } | null>(null);
+   const providers = userId && loaded?.userId === userId ? loaded.providers : null;
+-  const methods = providers?.map((provider) => LOGIN_METHODS[provider] ?? provider).join(", ");
+   const [listed, setListed] = useState(0);
+   useEffect(() => {
+     if (!userId) return;
+@@ -30,90 +59,280 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
+     }, () => {});
+     return () => { current = false; };
+   }, [userId, listed]);
+-  // Offered once the methods are known, so an account that already has Game Center never sees it.
+-  const canLinkGameCenter = GAME_CENTER_AVAILABLE && !!providers && !providers.includes("game-center");
+-  const linkableProviders = SOCIAL_PROVIDERS.filter((provider) => providers && !providers.includes(provider));
+-  const [linking, setLinking] = useState(false);
+-  const [deleting, setDeleting] = useState(false);
+-  const name = useNativeState(session?.user.name ?? "");
+-  const [saving, setSaving] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
+-  const { width } = useWindowDimensions();
+-
+-  const save = async () => {
+-    const nextName = name.value.trim();
+-    if (!nextName) {
+-      setError("Enter a display name.");
+-      return;
+-    }
+-    setSaving(true);
+-    setError(null);
++
++  // The confirmation tag. Its id restarts the drop-in when the same message comes twice.
++  const [tag, setTag] = useState<{ id: number; text: string } | null>(null);
++  const tagTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
++  const flash = (text: string) => {
++    clearTimeout(tagTimer.current);
++    setTag((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
++    tagTimer.current = setTimeout(() => setTag(null), TAG_MS);
++  };
++  useEffect(() => () => clearTimeout(tagTimer.current), []);
++
++  // Display name: saved on blur or Return, never while invalid.
++  const [name, setName] = useState(session?.user.name ?? "");
++  const savedName = useRef((session?.user.name ?? "").trim());
++  const [nameSaved, setNameSaved] = useState(false);
++  const [nameFailed, setNameFailed] = useState(false);
++  const nameError = displayNameError(name);
++  const commitName = async () => {
++    const next = name.trim();
++    if (displayNameError(next) || next === savedName.current) return;
++    const previous = savedName.current;
++    savedName.current = next;
++    setName(next);
++    setNameFailed(false);
+     try {
+-      const result = await authClient.updateUser({ name: nextName });
+-      if (result.error) {
+-        setError("Couldn’t save your name. Try again.");
+-        return;
+-      }
+-      onDismiss();
++      const result = await authClient.updateUser({ name: next });
++      if (result.error) throw new Error(result.error.message);
++      setNameSaved(true);
++      flash("SAVED");
+     } catch {
+-      setError("Couldn’t save your name. Try again.");
+-    } finally {
+-      setSaving(false);
++      savedName.current = previous;
++      setNameSaved(false);
++      setNameFailed(true);
+     }
+   };
+ 
+-  const link = async (provider?: SocialProvider) => {
+-    setLinking(true);
+-    setError(null);
++  // Sign-in links: one at a time, since each opens a system flow.
++  const [linking, setLinking] = useState<string | null>(null);
++  const [linkError, setLinkError] = useState<string | null>(null);
++  const link = async (provider: "game-center" | SocialProvider) => {
++    setLinking(provider);
++    setLinkError(null);
+     try {
+-      const result = await (provider ? linkSocial(provider) : linkGameCenter());
++      const result = await (provider === "game-center" ? linkGameCenter() : linkSocial(provider));
+       // An identity already linked to another account stays there: nothing merges.
+-      if (result.ok) setListed((n) => n + 1);
+-      else setError(result.message);
++      if (!result.ok) {
++        setLinkError(result.message);
++        return;
++      }
++      setListed((n) => n + 1);
++      flash(`${LOGIN_METHODS[provider].toUpperCase()} LINKED`);
+     } catch {
+-      setError(`Couldn’t link ${provider ? LOGIN_METHODS[provider] : "Game Center"}. Try again.`);
++      setLinkError(`Couldn’t link ${LOGIN_METHODS[provider]}. Try again.`);
+     } finally {
+-      setLinking(false);
++      setLinking(null);
+     }
+   };
+ 
++  const [deleting, setDeleting] = useState(false);
++
++  const close = () => {
++    // A name typed and never blurred still counts: DONE saves it on the way out.
++    void commitName();
++    onDismiss();
++  };
++
++  const displayName = (session?.user.name?.trim() || session?.user.email || "Player").trim();
++  const email = session?.user.email && !isPlaceholderEmail(session.user.email) ? session.user.email : null;
++  const signedInWith = isGuest
++    ? "Guest account"
++    : providers?.length
++      ? `Signed in with ${providers.includes("credential") ? "email" : LOGIN_METHODS[providers[0]] ?? providers[0]}`
++      : "";
++
++  const linkRow = (provider: "game-center" | SocialProvider, linked: { caption: string }, unlinked: { caption: string }) => {
++    const isLinked = !!providers?.includes(provider);
++    return (
++      <Row
++        caption={isLinked ? linked.caption : unlinked.caption}
++        end={
++          isLinked ? (
++            <FeltPill label="LINKED" />
++          ) : (
++            <SmallGoldButton
++              busy={linking !== null}
++              label={linking === provider ? "LINKING…" : "LINK"}
++              onPress={() => { void link(provider); }}
++              testID={`account-link-${provider}`}
++            />
++          )
++        }
++        key={provider}
++        title={LOGIN_METHODS[provider]}
++      />
++    );
++  };
++
+   return (
+-    <BottomSheet containerColor={colors.bgElevated} isPresented onDismiss={onDismiss} testID="account-settings">
+-      <View style={{ paddingBottom: spacing.lg }}>
+-        <Host colorScheme="dark" seedColor={colors.gold} matchContents>
+-          <Column spacing={spacing.md} style={{ width: width - spacing.lg * 2 }}>
+-            {deleting && providers ? (
+-              <DeleteAccount onBack={() => setDeleting(false)} onDeleted={onDismiss} providers={providers} />
+-            ) : (
+-              <>
+-                <Text textStyle={{ color: colors.textBright, fontFamily: fonts.ui, fontSize: fontSize.h3 }}>Account settings</Text>
+-                <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>
+-                  {session?.user.isAnonymous
+-                    ? "Guest account"
+-                    : isPlaceholderEmail(session?.user.email) ? "" : session?.user.email}
+-                </Text>
+-                {methods ? (
+-                  <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>{`Sign-in: ${methods}`}</Text>
+-                ) : null}
+-                <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Display name</Text>
+-                <TextInput placeholder="Display name" editable={!saving} testID="account-display-name" value={name} />
+-                {canLinkGameCenter ? (
+-                  <Button disabled={linking} label={linking ? "Linking…" : "Link Game Center"} onPress={() => link()} variant="text" testID="account-link-game-center" />
++    <Modal
++      animationType="none"
++      onRequestClose={close}
++      statusBarTranslucent
++      supportedOrientations={MODAL_ORIENTATIONS}
++      transparent
++      visible
++    >
++      <Animated.View entering={FadeIn.duration(200)} style={styles.scrim}>
++        <Pressable accessibilityLabel="Close account settings" onPress={close} style={StyleSheet.absoluteFill} />
++      </Animated.View>
++      <Animated.View
++        entering={SlideInDown.springify().damping(18).stiffness(160)}
++        style={[styles.sheet, { top: insets.top + SHEET_BELOW_SAFE_TOP }]}
++        testID="account-settings"
++      >
++        <LinearGradient colors={paper.gradient} style={StyleSheet.absoluteFill} />
++        <ScrollView
++          automaticallyAdjustKeyboardInsets
++          contentContainerStyle={[styles.content, { paddingBottom: 34 + insets.bottom }]}
++          keyboardShouldPersistTaps="handled"
++          showsVerticalScrollIndicator={false}
++        >
++          <View style={styles.handle} />
++
++          <View style={styles.header}>
++            <View accessibilityLabel={`Avatar for ${displayName}`} accessibilityRole="image" accessible style={styles.avatar}>
++              {session?.user.image ? (
++                <Image contentFit="cover" source={{ uri: session.user.image }} style={StyleSheet.absoluteFill} />
++              ) : (
++                <Text style={styles.initial}>{displayName.charAt(0).toUpperCase()}</Text>
++              )}
++            </View>
++            <View style={styles.titleBlock}>
++              <Text accessibilityRole="header" style={styles.title}>Account</Text>
++              {signedInWith ? <Text style={styles.subtitle}>{signedInWith}</Text> : null}
++            </View>
++            <SmallGoldButton label="DONE" onPress={close} testID="account-done" />
++          </View>
++
++          <Field
++            autoCapitalize="words"
++            autoCorrect={false}
++            error={nameError ?? (nameFailed ? "Couldn’t save your name. Try again." : undefined)}
++            hint="Other players see this at the table."
++            label="Display name"
++            labelEnd={nameSaved && !nameError ? <Text style={styles.saved}>✓ SAVED</Text> : undefined}
++            onBlur={() => { void commitName(); }}
++            onChangeText={(value) => {
++              setName(value);
++              setNameSaved(false);
++            }}
++            onSubmitEditing={() => { void commitName(); }}
++            placeholder="Shown at the table"
++            returnKeyType="done"
++            testID="account-display-name"
++            value={name}
++          />
++
++          {providers ? (
++            <View style={styles.section}>
++              <SectionLabel>Sign-in</SectionLabel>
++              <Panel>
++                {providers.includes("credential") ? (
++                  <Row caption={email ?? "Email and password"} end={<FeltPill label="SIGNED IN" />} title="Email" />
+                 ) : null}
+-                {linkableProviders.map((provider) => (
+-                  <Button disabled={linking} key={provider} label={linking ? "Linking…" : `Link ${LOGIN_METHODS[provider]}`} onPress={() => link(provider)} variant="text" testID={`account-link-${provider}`} />
+-                ))}
+-                {session?.user.isAnonymous ? null : <NotificationSettings />}
+-                {error ? <Text textStyle={{ color: colors.danger }}>{error}</Text> : null}
+-                <Button disabled={saving} label={saving ? "Saving…" : "Save changes"} onPress={save} testID="account-save" />
+-                <Button disabled={saving} label="Cancel" onPress={onDismiss} variant="text" />
+-                {/* Waits on the sign-in methods, which guests never load: they have no account to delete. */}
+-                {providers ? <Button disabled={saving} label="Delete account" onPress={() => setDeleting(true)} variant="text" testID="account-delete" /> : null}
+-              </>
+-            )}
+-          </Column>
+-        </Host>
+-      </View>
+-    </BottomSheet>
++                {GAME_CENTER_AVAILABLE || providers.includes("game-center")
++                  ? linkRow(
++                      "game-center",
++                      { caption: "Linked. Your progress follows you to any iPhone." },
++                      { caption: "Link to keep your progress on any iPhone." },
++                    )
++                  : null}
++                {(["google", "apple"] as const)
++                  .filter((provider) => providers.includes(provider) || SOCIAL_PROVIDERS.includes(provider))
++                  .map((provider) =>
++                    linkRow(
++                      provider,
++                      { caption: `Linked. You can sign in with ${LOGIN_METHODS[provider]} too.` },
++                      { caption: `Link to sign in with ${LOGIN_METHODS[provider]} too.` },
++                    ),
++                  )}
++              </Panel>
++              {linkError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{linkError}</Text> : null}
++            </View>
++          ) : null}
++
++          {isGuest ? null : <NotificationSettings onSaved={() => flash("SAVED")} />}
++
++          {/* Waits on the sign-in methods, which guests never load: they have no account to delete. */}
++          {providers ? (
++            <View style={styles.danger}>
++              {deleting ? (
++                <DeleteAccount onBack={() => setDeleting(false)} onDeleted={onDismiss} providers={providers} />
++              ) : (
++                <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setDeleting(true)} style={styles.deleteLink} testID="account-delete">
++                  <Text style={styles.deleteLabel}>Delete account</Text>
++                </Pressable>
++              )}
++            </View>
++          ) : null}
++        </ScrollView>
++
++        {tag ? (
++          <Animated.View
++            accessibilityLiveRegion="polite"
++            entering={FadeInUp.springify().damping(14)}
++            exiting={FadeOut.duration(200)}
++            key={tag.id}
++            pointerEvents="none"
++            style={styles.tagSlot}
++          >
++            <View style={styles.tag}>
++              <Text accessibilityRole="alert" style={styles.tagLabel} testID="account-tag">{tag.text}</Text>
++            </View>
++          </Animated.View>
++        ) : null}
++      </Animated.View>
++    </Modal>
+   );
+ }
++
++const styles = StyleSheet.create({
++  scrim: { backgroundColor: "rgba(4, 6, 14, 0.6)", bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
++  sheet: {
++    alignSelf: "center",
++    borderTopColor: "#c4743a",
++    borderTopLeftRadius: 26,
++    borderTopRightRadius: 26,
++    borderTopWidth: 4,
++    bottom: 0,
++    boxShadow: "0px -14px 40px rgba(0, 0, 0, 0.6)",
++    maxWidth: layout.maxContentWidth,
++    overflow: "hidden",
++    position: "absolute",
++    width: "100%",
++  },
++  content: { gap: 18, paddingHorizontal: 20, paddingTop: 12 },
++  handle: { alignSelf: "center", backgroundColor: "rgba(122, 86, 52, 0.3)", borderRadius: 3, height: 5, width: 42 },
++  header: { alignItems: "center", flexDirection: "row", gap: 12 },
++  avatar: {
++    alignItems: "center",
++    backgroundColor: "#d4a24c",
++    borderColor: "#e0974a",
++    borderRadius: 32,
++    borderWidth: 3,
++    boxShadow: "0px 3px 0px #6b3416",
++    height: 64,
++    justifyContent: "center",
++    overflow: "hidden",
++    width: 64,
++  },
++  initial: { color: "#2a1906", fontFamily: fonts.arcade, fontSize: 28 },
++  titleBlock: { flex: 1, gap: 5, minWidth: 0 },
++  title: { color: paper.ink, fontFamily: fonts.arcade, fontSize: 26, lineHeight: 28 },
++  subtitle: { color: paper.body, fontFamily: fonts.rubik, fontSize: 13 },
++  saved: { color: "#2f7a52", fontFamily: fonts.rubikSemiBold, fontSize: 12, letterSpacing: 0.72 },
++  section: { gap: 6 },
++  error: { color: paper.error, fontFamily: fonts.rubikMedium, fontSize: 13, lineHeight: 18 },
++  danger: { paddingTop: 6 },
++  deleteLink: { alignSelf: "center", paddingHorizontal: 12, paddingVertical: 8 },
++  deleteLabel: {
++    color: paper.error,
++    fontFamily: fonts.rubikSemiBold,
++    fontSize: 14,
++    textDecorationLine: "underline",
++  },
++  tagSlot: { alignItems: "center", left: 0, position: "absolute", right: 0, top: 10 },
++  tag: {
++    backgroundColor: FELT.face,
++    borderColor: FELT.edge,
++    borderRadius: 999,
++    borderWidth: 2,
++    boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.45)",
++    paddingHorizontal: 14,
++    paddingVertical: 6,
++  },
++  tagLabel: { color: FELT.ink, fontFamily: fonts.arcade, fontSize: 14, letterSpacing: 0.7 },
++});
+diff --git a/apps/mobile/src/components/screens/home/delete-account.test.tsx b/apps/mobile/src/components/screens/home/delete-account.test.tsx
+index a977e12..fff947a 100644
+--- a/apps/mobile/src/components/screens/home/delete-account.test.tsx
++++ b/apps/mobile/src/components/screens/home/delete-account.test.tsx
+@@ -12,24 +12,13 @@ jest.mock("@/auth/client/session-coordinator", () => ({
+   changeSession: (change: () => Promise<unknown>) => change(),
+   setAutoRestore: jest.fn(async () => {}),
+ }));
+-jest.mock("@expo/ui", () => {
+-  const React = require("react");
+-  const { Pressable, Text, TextInput } = require("react-native");
+-  return {
+-    Button: ({ label, onPress, testID }: { label: string; onPress: () => void; testID: string }) =>
+-      React.createElement(Pressable, { onPress, testID }, React.createElement(Text, null, label)),
+-    Text: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
+-    TextInput: ({ value, testID }: { value: { value: string }; testID: string }) =>
+-      React.createElement(TextInput, { testID, onChangeText: (text: string) => { value.value = text; } }),
+-    useNativeState: (initial: string) => React.useRef({ value: initial }).current,
+-  };
+-});
+ 
+ const deleteUser = jest.mocked(authClient.deleteUser);
+ const reauth = jest.mocked(reauthenticateWithGameCenter);
+ const onDeleted = jest.fn();
+ 
+ const show = (providers: string[]) => render(<DeleteAccount onBack={jest.fn()} onDeleted={onDeleted} providers={providers} />);
++const typeDelete = () => fireEvent.changeText(screen.getByTestId("delete-account-word"), "delete");
+ const confirm = () => fireEvent.press(screen.getByTestId("delete-account-confirm"));
+ 
+ beforeEach(() => {
+@@ -40,12 +29,27 @@ beforeEach(() => {
+ 
+ it("warns what goes and that coins are not refunded", async () => {
+   await show(["credential"]);
+-  expect(screen.getByText(/account, coin balance, XP and level, match history, and friends/)).toBeTruthy();
++  expect(screen.getByText(/lose your level, your coins and your friends list/)).toBeTruthy();
+   expect(screen.getByText(/Coins aren’t refundable/)).toBeTruthy();
+ });
+ 
++it("stays off until DELETE is typed", async () => {
++  await show(["game-center"]);
++  expect(screen.getByTestId("delete-account-confirm").props.accessibilityState).toMatchObject({ disabled: true });
++  await confirm();
++  expect(deleteUser).not.toHaveBeenCalled();
++
++  await fireEvent.changeText(screen.getByTestId("delete-account-word"), "DELET");
++  await confirm();
++  expect(deleteUser).not.toHaveBeenCalled();
++
++  await typeDelete();
++  expect(screen.getByTestId("delete-account-confirm").props.accessibilityState).toMatchObject({ disabled: false });
++});
++
+ it("needs the password of an email account, and reports a wrong one", async () => {
+   await show(["credential", "game-center"]);
++  await typeDelete();
+   await confirm();
+   expect(screen.getByText("Enter your password.")).toBeTruthy();
+   expect(deleteUser).not.toHaveBeenCalled();
+@@ -66,6 +70,7 @@ it("needs the password of an email account, and reports a wrong one", async () =
+ 
+ it("proves a Game Center account first, and stops if that fails", async () => {
+   await show(["game-center"]);
++  await typeDelete();
+   reauth.mockResolvedValueOnce({ ok: false, code: "CANCELLED", message: "Cancelled." });
+   await confirm();
+   expect(screen.getByText("Cancelled.")).toBeTruthy();
+diff --git a/apps/mobile/src/components/screens/home/delete-account.tsx b/apps/mobile/src/components/screens/home/delete-account.tsx
+index 5a9993c..dde33f6 100644
+--- a/apps/mobile/src/components/screens/home/delete-account.tsx
++++ b/apps/mobile/src/components/screens/home/delete-account.tsx
+@@ -1,25 +1,34 @@
+-import { Button, Text, TextInput, useNativeState } from "@expo/ui";
++import { LinearGradient } from "expo-linear-gradient";
+ import { useState } from "react";
++import { Pressable, StyleSheet, Text, View } from "react-native";
+ 
+ import { authClient } from "@/auth/client/auth-client";
+ import { GAME_CENTER_AVAILABLE, reauthenticateWithGameCenter } from "@/auth/client/game-center";
+ import { changeSession, setAutoRestore } from "@/auth/client/session-coordinator";
+-import { colors, fonts, fontSize } from "@/constants/theme";
++import { Field, paper } from "@/components/screens/auth/auth-shell";
++import { fonts } from "@/constants/theme";
+ 
+ const FAILED = "Couldn’t delete your account. Try again.";
+ // A dropped connection rejects instead of returning `{ error }`.
+ const UNREACHABLE = "Could not reach the server — check your connection and try again.";
++const CONFIRM_WORD = "DELETE";
+ 
+-/** The warning and confirmation inside Account settings (STO-821). Better Auth's providers name the proof asked for. */
++/**
++ * The red-edged confirmation at the foot of Account settings (STO-821, restyled in STO-1044).
++ * Typing DELETE arms the button; Better Auth's providers name the proof asked for on top of that.
++ */
+ export function DeleteAccount({ onBack, onDeleted, providers }: { onBack: () => void; onDeleted: () => void; providers: string[] }) {
+   const usesPassword = providers.includes("credential");
+   const usesGameCenter = !usesPassword && GAME_CENTER_AVAILABLE && providers.includes("game-center");
+-  const password = useNativeState("");
++  const [typed, setTyped] = useState("");
++  const [password, setPassword] = useState("");
+   const [deleting, setDeleting] = useState(false);
+   const [error, setError] = useState<string | null>(null);
++  const armed = typed.trim().toUpperCase() === CONFIRM_WORD && !deleting;
+ 
+   const confirm = async () => {
+-    if (usesPassword && !password.value) {
++    if (!armed) return;
++    if (usesPassword && !password) {
+       setError("Enter your password.");
+       return;
+     }
+@@ -35,7 +44,7 @@ export function DeleteAccount({ onBack, onDeleted, providers }: { onBack: () =>
+       }
+       // Before the session goes: a restore must not make a new account from this device's Game Center.
+       await setAutoRestore(false);
+-      const result = await changeSession(() => authClient.deleteUser(usesPassword ? { password: password.value } : {}));
++      const result = await changeSession(() => authClient.deleteUser(usesPassword ? { password } : {}));
+       if (!result.error) {
+         onDeleted();
+         return;
+@@ -56,26 +65,82 @@ export function DeleteAccount({ onBack, onDeleted, providers }: { onBack: () =>
+     }
+   };
+ 
+-  const body = { color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body };
+-
+   return (
+-    <>
+-      <Text textStyle={{ color: colors.textBright, fontFamily: fonts.ui, fontSize: fontSize.h3 }}>Delete account</Text>
+-      <Text textStyle={body}>This permanently deletes your account, coin balance, XP and level, match history, and friends. It can’t be undone.</Text>
+-      <Text textStyle={body}>Coins aren’t refundable. Refunds for purchases go through Apple or Google.</Text>
+-      <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>
+-        Hands you played with others stay in their history, with your name shown as Anonymous.
+-      </Text>
++    <View style={styles.panel} testID="delete-account">
++      <View style={styles.copy}>
++        <Text accessibilityRole="header" style={styles.title}>Delete your account?</Text>
++        <Text style={styles.body}>
++          You’ll lose your level, your coins and your friends list, along with your XP and match history. This can’t be undone.
++        </Text>
++        <Text style={styles.small}>Coins aren’t refundable. Refunds for purchases go through Apple or Google.</Text>
++        <Text style={styles.small}>Hands you played with others stay in their history, with your name shown as Anonymous.</Text>
++      </View>
++      <Field
++        autoCapitalize="characters"
++        autoCorrect={false}
++        editable={!deleting}
++        label="Type DELETE to confirm"
++        onChangeText={setTyped}
++        placeholder={CONFIRM_WORD}
++        testID="delete-account-word"
++        value={typed}
++      />
+       {usesPassword ? (
+-        <>
+-          <Text textStyle={body}>Enter your password to confirm.</Text>
+-          <TextInput autoComplete="current-password" editable={!deleting} placeholder="Password" secureTextEntry testID="delete-account-password" value={password} />
+-        </>
++        <Field
++          autoComplete="current-password"
++          editable={!deleting}
++          label="Password"
++          onChangeText={setPassword}
++          onSubmitEditing={() => { void confirm(); }}
++          secret
++          testID="delete-account-password"
++          value={password}
++        />
+       ) : null}
+-      {usesGameCenter ? <Text textStyle={body}>You’ll confirm with Game Center.</Text> : null}
+-      {error ? <Text textStyle={{ color: colors.danger }}>{error}</Text> : null}
+-      <Button disabled={deleting} label={deleting ? "Deleting…" : "Delete my account"} onPress={confirm} testID="delete-account-confirm" />
+-      <Button disabled={deleting} label="Keep my account" onPress={onBack} variant="text" testID="delete-account-back" />
+-    </>
++      {usesGameCenter ? <Text style={styles.small}>You’ll confirm with Game Center.</Text> : null}
++      {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
++      <View style={styles.actions}>
++        <Pressable
++          accessibilityRole="button"
++          disabled={deleting}
++          onPress={onBack}
++          style={({ pressed }) => [styles.action, styles.keep, pressed && styles.keepPressed]}
++          testID="delete-account-back"
++        >
++          <Text style={styles.keepLabel}>KEEP IT</Text>
++        </Pressable>
++        <Pressable
++          accessibilityLabel="Delete my account"
++          accessibilityRole="button"
++          accessibilityState={{ busy: deleting, disabled: !armed }}
++          disabled={!armed}
++          onPress={() => { void confirm(); }}
++          style={({ pressed }) => [styles.action, armed ? styles.danger : styles.dangerOff, pressed && armed && styles.dangerPressed]}
++          testID="delete-account-confirm"
++        >
++          {armed ? <LinearGradient colors={["#e5574a", "#b3322a"]} style={StyleSheet.absoluteFill} /> : null}
++          <Text style={[styles.dangerLabel, !armed && styles.dangerLabelOff]}>{deleting ? "DELETING…" : CONFIRM_WORD}</Text>
++        </Pressable>
++      </View>
++    </View>
+   );
+ }
++
++const styles = StyleSheet.create({
++  panel: { backgroundColor: "#fbe4d8", borderColor: "#c2352b", borderRadius: 14, borderWidth: 2, gap: 12, padding: 16 },
++  copy: { gap: 6 },
++  title: { color: paper.ink, fontFamily: fonts.arcade, fontSize: 20 },
++  body: { color: "#7a3a2a", fontFamily: fonts.rubik, fontSize: 13, lineHeight: 18 },
++  small: { color: paper.body, fontFamily: fonts.rubik, fontSize: 12, lineHeight: 16 },
++  error: { color: paper.error, fontFamily: fonts.rubikMedium, fontSize: 13, lineHeight: 18 },
++  actions: { flexDirection: "row", gap: 10 },
++  action: { alignItems: "center", borderRadius: 12, flex: 1, height: 46, justifyContent: "center", overflow: "hidden" },
++  keep: { backgroundColor: "#fffdf6", boxShadow: "0px 4px 0px #c4743a" },
++  keepPressed: { boxShadow: "0px 2px 0px #c4743a", transform: [{ translateY: 2 }] },
++  keepLabel: { color: paper.ink, fontFamily: fonts.arcade, fontSize: 16, letterSpacing: 0.64 },
++  danger: { boxShadow: "0px 4px 0px #7a1c15" },
++  dangerPressed: { boxShadow: "0px 2px 0px #7a1c15", transform: [{ translateY: 2 }] },
++  dangerOff: { backgroundColor: "#ead8b6" },
++  dangerLabel: { color: "#fff", fontFamily: fonts.arcade, fontSize: 16, letterSpacing: 0.64 },
++  dangerLabelOff: { color: "#a8906c" },
++});
+diff --git a/apps/mobile/src/components/screens/home/home-header.test.tsx b/apps/mobile/src/components/screens/home/home-header.test.tsx
+index ecce7ab..ff52241 100644
+--- a/apps/mobile/src/components/screens/home/home-header.test.tsx
++++ b/apps/mobile/src/components/screens/home/home-header.test.tsx
+@@ -2,18 +2,26 @@ import { act, fireEvent, render } from "@testing-library/react-native";
+ 
+ import { authClient } from "@/auth/client/auth-client";
+ 
++import { linkGameCenter } from "@/auth/client/game-center";
++
+ import { AccountSettings } from "./account-settings";
+ import { NotificationSettings } from "./notification-settings";
+ import { HomeHeader } from "./home-header";
+ 
+ jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
++let mockUser: Record<string, unknown> = { name: "Ada", email: "ada@example.com" };
+ jest.mock("@/auth/client/auth-client", () => ({
+   authClient: {
+-    useSession: () => ({ data: { user: { name: "Ada", email: "ada@example.com" } } }),
++    useSession: () => ({ data: { user: mockUser } }),
+     signOut: jest.fn(),
+     updateUser: jest.fn(),
++    listAccounts: jest.fn(async () => ({ data: [] })),
+   },
+ }));
++jest.mock("react-native-safe-area-context", () =>
++  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
++);
++jest.mock("@/auth/client/game-center", () => ({ GAME_CENTER_AVAILABLE: true, linkGameCenter: jest.fn(), reauthenticateWithGameCenter: jest.fn() }));
+ 
+ // The coordinator leaves the online table first, which loads Colyseus; these tests only need the call.
+ jest.mock("@/auth/client/social-sign-in", () => ({ SOCIAL_PROVIDERS: [], linkSocial: jest.fn() }));
+@@ -35,20 +43,6 @@ jest.mock("@/lib/quests/quests-provider", () => ({
+   useQuests: () => ({ coins: 1250, state: { xp: 50 } }),
+ }));
+ 
+-// Expo's observable text state and sheet presentation require a native runtime.
+-jest.mock("@expo/ui", () => {
+-  const React = require("react");
+-  const { View, TextInput } = require("react-native");
+-  return {
+-    ...jest.requireActual("@expo/ui"),
+-    useNativeState: (initial: string) => React.useRef({ value: initial }).current,
+-    BottomSheet: ({ children, testID }: { children: unknown; testID: string }) => React.createElement(View, { testID }, children),
+-    TextInput: ({ value, ...props }: { value: { value: string } }) => React.createElement(TextInput, {
+-      ...props, value: value.value, onChangeText: (text: string) => { value.value = text; },
+-    }),
+-  };
+-});
+-
+ // Drive the menu's native selection event without requiring a system popup in Jest.
+ jest.mock("@expo/ui/community/menu", () => ({
+   MenuView: (props: Record<string, unknown>) => {
+@@ -58,7 +52,10 @@ jest.mock("@expo/ui/community/menu", () => ({
+   },
+ }));
+ 
+-beforeEach(() => jest.clearAllMocks());
++beforeEach(() => {
++  jest.clearAllMocks();
++  mockUser = { name: "Ada", email: "ada@example.com" };
++});
+ 
+ test("shows coins and XP, opens Settings, and signs out through the avatar menu", async () => {
+   jest.mocked(authClient.signOut).mockResolvedValue({ data: { success: true }, error: null } as never);
+@@ -85,34 +82,90 @@ test("takes the push token back before the session goes", async () => {
+   expect(mockOrder).toEqual(["unregister", "signOut"]);
+ });
+ 
+-test("a notification switch saves to the account", async () => {
++test("a notification switch saves to the account on tap", async () => {
+   jest.mocked(authClient.updateUser).mockResolvedValue({ data: { status: true }, error: null } as never);
+-  const view = await render(<NotificationSettings />);
++  const onSaved = jest.fn();
++  const view = await render(<NotificationSettings onSaved={onSaved} />);
+   const online = view.getByTestId("notify-notifyFriendOnline");
+-  await act(async () => { await online.props.onIsOnChange({ nativeEvent: { isOn: true } }); });
++  expect(online.props.accessibilityRole).toBe("switch");
++  expect(online.props.accessibilityLabel).toBe("Friends coming online");
++  await act(async () => { fireEvent.press(online); });
+   expect(authClient.updateUser).toHaveBeenCalledWith({ notifyFriendOnline: true });
++  expect(onSaved).toHaveBeenCalledTimes(1);
++  expect(view.getByTestId("notify-notifyFriendOnline").props.accessibilityState).toMatchObject({ checked: true });
+ });
+ 
+-test("rejects an empty display name, saves a trimmed name, and keeps failed saves open", async () => {
++test("saves the display name on blur or Return, never while it is invalid", async () => {
+   const dismiss = jest.fn();
+   const view = await render(<AccountSettings onDismiss={dismiss} />);
+-  const save = () => act(async () => {
+-    const button = view.getByTestId("account-save");
+-    await button.props.onButtonPress();
+-  });
++  const field = () => view.getByTestId("account-display-name");
+ 
+-  await fireEvent.changeText(view.getByTestId("account-display-name"), "   ");
+-  await save();
++  await fireEvent.changeText(field(), "   ");
++  expect(view.getByText("Enter a display name.")).toBeTruthy();
++  await act(async () => { fireEvent(field(), "blur"); });
++  expect(authClient.updateUser).not.toHaveBeenCalled();
++
++  await fireEvent.changeText(field(), "Ada the Seventeenth");
++  expect(view.getByText("Use 16 characters or fewer.")).toBeTruthy();
++  await act(async () => { fireEvent(field(), "submitEditing"); });
+   expect(authClient.updateUser).not.toHaveBeenCalled();
+-  expect(dismiss).not.toHaveBeenCalled();
+ 
+-  await fireEvent.changeText(view.getByTestId("account-display-name"), "  Ada Lovelace  ");
++  await fireEvent.changeText(field(), "  Ada Lovelace  ");
+   jest.mocked(authClient.updateUser).mockResolvedValueOnce({ error: { message: "Unavailable" } } as never);
+-  await save();
+-  expect(dismiss).not.toHaveBeenCalled();
++  await act(async () => { fireEvent(field(), "submitEditing"); });
++  expect(view.getByText("Couldn’t save your name. Try again.")).toBeTruthy();
+ 
+   jest.mocked(authClient.updateUser).mockResolvedValueOnce({ data: { status: true }, error: null } as never);
+-  await save();
++  await act(async () => { fireEvent(field(), "blur"); });
+   expect(authClient.updateUser).toHaveBeenLastCalledWith({ name: "Ada Lovelace" });
++  expect(view.getByText("✓ SAVED")).toBeTruthy();
++  expect(view.getByTestId("account-tag")).toHaveTextContent("SAVED");
++
++  // Unchanged since the last save: blurring again sends nothing.
++  await act(async () => { fireEvent(field(), "blur"); });
++  expect(authClient.updateUser).toHaveBeenCalledTimes(2);
++  expect(dismiss).not.toHaveBeenCalled();
++});
++
++test("DONE closes the sheet and saves a name that was never blurred", async () => {
++  jest.mocked(authClient.updateUser).mockResolvedValue({ data: { status: true }, error: null } as never);
++  const dismiss = jest.fn();
++  const view = await render(<AccountSettings onDismiss={dismiss} />);
++  await fireEvent.changeText(view.getByTestId("account-display-name"), "Grace");
++  await act(async () => { fireEvent.press(view.getByTestId("account-done")); });
++  expect(authClient.updateUser).toHaveBeenCalledWith({ name: "Grace" });
+   expect(dismiss).toHaveBeenCalledTimes(1);
+ });
++
++test("links Game Center and shows it as linked", async () => {
++  mockUser = { id: "u1", name: "Ada", email: "ada@example.com" };
++  jest.mocked(authClient.listAccounts)
++    .mockResolvedValueOnce({ data: [{ providerId: "credential" }] } as never)
++    .mockResolvedValueOnce({ data: [{ providerId: "credential" }, { providerId: "game-center" }] } as never);
++  jest.mocked(linkGameCenter).mockResolvedValue({ ok: true });
++  const view = await render(<AccountSettings onDismiss={jest.fn()} />);
++  await act(async () => {});
++
++  expect(view.getByText("Signed in with email")).toBeTruthy();
++  expect(view.getByText("SIGNED IN")).toBeTruthy();
++  expect(view.getByText("Link to keep your progress on any iPhone.")).toBeTruthy();
++
++  await act(async () => { fireEvent.press(view.getByTestId("account-link-game-center")); });
++  expect(linkGameCenter).toHaveBeenCalledTimes(1);
++  expect(view.getByTestId("account-tag")).toHaveTextContent("GAME CENTER LINKED");
++  expect(view.getByText("LINKED")).toBeTruthy();
++  expect(view.getByText("Linked. Your progress follows you to any iPhone.")).toBeTruthy();
++});
++
++test("Delete account opens the typed confirmation, and KEEP IT closes it", async () => {
++  mockUser = { id: "u1", name: "Ada", email: "ada@example.com" };
++  jest.mocked(authClient.listAccounts).mockResolvedValue({ data: [{ providerId: "credential" }] } as never);
++  const view = await render(<AccountSettings onDismiss={jest.fn()} />);
++  await act(async () => {});
++
++  await fireEvent.press(view.getByTestId("account-delete"));
++  expect(view.getByText("Delete your account?")).toBeTruthy();
++  await fireEvent.press(view.getByTestId("delete-account-back"));
++  expect(view.queryByText("Delete your account?")).toBeNull();
++  expect(view.getByTestId("account-delete")).toBeTruthy();
++});
+diff --git a/apps/mobile/src/components/screens/home/home-header.tsx b/apps/mobile/src/components/screens/home/home-header.tsx
+index 6638098..34f10ce 100644
+--- a/apps/mobile/src/components/screens/home/home-header.tsx
++++ b/apps/mobile/src/components/screens/home/home-header.tsx
+@@ -1,3 +1,4 @@
++import { Image } from "expo-image";
+ import { router } from "expo-router";
+ import { useState } from "react";
+ import { Pressable, StyleSheet, Text, View } from "react-native";
+@@ -44,7 +45,11 @@ export function HomeHeader({ width }: { width: number }) {
+       <View style={styles.header} testID="home-header">
+         <AccountMenu name={name} onSettings={() => setSettingsOpen(true)} onSignOut={signOut}>
+           <View accessibilityLabel={`Avatar for ${name}`} accessibilityRole="image" accessible style={styles.avatar}>
+-            <Text style={styles.initial}>{name.charAt(0).toUpperCase()}</Text>
++            {session?.user.image ? (
++              <Image contentFit="cover" source={{ uri: session.user.image }} style={StyleSheet.absoluteFill} />
++            ) : (
++              <Text style={styles.initial}>{name.charAt(0).toUpperCase()}</Text>
++            )}
+           </View>
+         </AccountMenu>
+         <View style={styles.stats}>
+@@ -94,6 +99,7 @@ const styles = StyleSheet.create({
+     borderBottomColor: "#8f5f22",
+     alignItems: "center",
+     justifyContent: "center",
++    overflow: "hidden",
+   },
+   initial: { color: "#3a2410", fontFamily: fonts.arcade, fontSize: 22 },
+   stats: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexShrink: 1, marginLeft: spacing.sm },
+diff --git a/apps/mobile/src/components/screens/home/notification-settings.tsx b/apps/mobile/src/components/screens/home/notification-settings.tsx
+index e4e6ad0..3af7cc3 100644
+--- a/apps/mobile/src/components/screens/home/notification-settings.tsx
++++ b/apps/mobile/src/components/screens/home/notification-settings.tsx
+@@ -3,26 +3,29 @@
+  *
+  * The switches are the account's (`notify*` on the Better Auth user), so they follow the player
+  * across devices; the server checks them before it sends, so a hidden switch is not the only guard.
+- * Where the OS has denied permission the switches still save, and a button leads to system settings.
++ * Each tap saves on its own (STO-1044). Where the OS has denied permission the switches still save,
++ * and a link leads to system settings.
+  */
+ 
+-import { Button, Column, Switch, Text } from "@expo/ui";
+ import * as Notifications from "expo-notifications";
+ import { useEffect, useState } from "react";
+-import { Linking } from "react-native";
++import { Linking, StyleSheet, Text, View } from "react-native";
+ 
+ import { authClient } from "@/auth/client/auth-client";
+-import { colors, fonts, fontSize, spacing } from "@/constants/theme";
++import { paper } from "@/components/screens/auth/auth-shell";
++import { fonts } from "@/constants/theme";
++
++import { CardSwitch, Panel, Row, SectionLabel } from "./account-card";
+ 
+ const KINDS = [
+-  { key: "notifyTableInvite", label: "Table invites", fallback: true },
+-  { key: "notifyFriendRequest", label: "Friend requests", fallback: true },
+-  { key: "notifyFriendOnline", label: "Friends coming online", fallback: false },
++  { key: "notifyTableInvite", label: "Table invites", caption: "When a friend deals you in", fallback: true },
++  { key: "notifyFriendRequest", label: "Friend requests", caption: "When someone adds you", fallback: true },
++  { key: "notifyFriendOnline", label: "Friends coming online", caption: "When a friend shows up on the street", fallback: false },
+ ] as const;
+ 
+ type Key = (typeof KINDS)[number]["key"];
+ 
+-export function NotificationSettings() {
++export function NotificationSettings({ onSaved }: { onSaved: () => void }) {
+   const { data: session } = authClient.useSession();
+   const [denied, setDenied] = useState(false);
+   const [saved, setSaved] = useState<Partial<Record<Key, boolean>>>({});
+@@ -40,6 +43,7 @@ export function NotificationSettings() {
+     try {
+       const result = await authClient.updateUser({ [key]: value });
+       if (result.error) throw new Error(result.error.message);
++      onSaved();
+     } catch {
+       setSaved((prev) => ({ ...prev, [key]: !value }));
+       setError(true);
+@@ -47,26 +51,41 @@ export function NotificationSettings() {
+   };
+ 
+   return (
+-    <Column spacing={spacing.sm}>
+-      <Text textStyle={{ color: colors.text, fontFamily: fonts.sans, fontSize: fontSize.body }}>Notifications</Text>
+-      {KINDS.map(({ key, label, fallback }) => (
+-        <Switch
+-          key={key}
+-          label={label}
+-          onValueChange={(value) => { void toggle(key, value); }}
+-          testID={`notify-${key}`}
+-          value={saved[key] ?? session?.user[key] ?? fallback}
+-        />
+-      ))}
+-      {error ? <Text textStyle={{ color: colors.danger }}>Couldn’t save that. Try again.</Text> : null}
++    <View style={styles.section}>
++      <SectionLabel>Notifications</SectionLabel>
++      <Panel>
++        {KINDS.map(({ key, label, caption, fallback }) => (
++          <Row
++            caption={caption}
++            end={
++              <CardSwitch
++                label={label}
++                onChange={(value) => { void toggle(key, value); }}
++                testID={`notify-${key}`}
++                value={saved[key] ?? session?.user[key] ?? fallback}
++              />
++            }
++            key={key}
++            title={label}
++          />
++        ))}
++      </Panel>
++      {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>Couldn’t save that. Try again.</Text> : null}
+       {denied ? (
+-        <>
+-          <Text textStyle={{ color: colors.textDim, fontFamily: fonts.sans, fontSize: fontSize.small }}>
+-            Notifications are off for Word Poker in system settings.
++        <Text style={styles.note}>
++          Notifications are off for Word Poker in system settings.{" "}
++          <Text accessibilityRole="link" onPress={() => { void Linking.openSettings(); }} style={styles.link} testID="notify-open-settings">
++            Open settings
+           </Text>
+-          <Button label="Open system settings" onPress={() => { void Linking.openSettings(); }} testID="notify-open-settings" variant="text" />
+-        </>
++        </Text>
+       ) : null}
+-    </Column>
++    </View>
+   );
+ }
++
++const styles = StyleSheet.create({
++  section: { gap: 6 },
++  error: { color: paper.error, fontFamily: fonts.rubikMedium, fontSize: 13, lineHeight: 18 },
++  note: { color: paper.body, fontFamily: fonts.rubik, fontSize: 13, lineHeight: 18 },
++  link: { color: paper.link, fontFamily: fonts.rubikSemiBold, textDecorationLine: "underline" },
++});
+diff --git a/apps/mobile/src/components/screens/home/notification-settings.web.tsx b/apps/mobile/src/components/screens/home/notification-settings.web.tsx
+index cf4f042..b713a94 100644
+--- a/apps/mobile/src/components/screens/home/notification-settings.web.tsx
++++ b/apps/mobile/src/components/screens/home/notification-settings.web.tsx
+@@ -1,4 +1,4 @@
+ /** No push on web (STO-585): the in-app invite banner covers it. */
+-export function NotificationSettings() {
++export function NotificationSettings(_: { onSaved: () => void }) {
+   return null;
+ }
+-- 
+2.43.0
+

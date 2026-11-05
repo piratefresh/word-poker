@@ -1,7 +1,7 @@
 # Subflow: wait for the full board, before a seat taps its word's tiles.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat - river
 ---
 - extendedWaitUntil:
-    visible: "COMMUNITY · 5/5"
+    visible: "RIVER( [1-5]/5)?|FINAL STAGE"
     timeout: 150000

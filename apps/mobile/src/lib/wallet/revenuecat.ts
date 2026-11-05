@@ -8,7 +8,7 @@
  * platform through `GET /api/wallet`, so a purchase only has to finish and the server says the rest.
  */
 
-import { Platform } from "react-native";
+import { LogBox, Platform } from "react-native";
 import Purchases, { PURCHASES_ERROR_CODE, type PurchasesError, type PurchasesPackage } from "react-native-purchases";
 
 import {
@@ -21,8 +21,20 @@ import {
 
 export { StoreUnavailableError } from "./coin-offering";
 
-/** The platform's public SDK key. Written out literally: Expo inlines only literal names. */
+// Without App Store products (a simulator, no StoreKit config) the SDK logs this as a console
+// error, and its development LogBox banner covers CALL and the tab bar.
+LogBox.ignoreLogs([/\[RevenueCat\].*(Error fetching offerings|There is an issue with your configuration)/]);
+
+/**
+ * The platform's public SDK key. Written out literally: Expo inlines only literal names.
+ *
+ * A development build can use RevenueCat's Test Store instead, which sells the dashboard's Test
+ * Store products through a simulated purchase dialog, with no App Store or Play setup. Only ever
+ * under `__DEV__`: the SDK crashes a release build (TestFlight, Play testing tracks) on purpose
+ * when it is configured with a Test Store key.
+ */
 function apiKey(): string | undefined {
+  if (__DEV__ && process.env.EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY) return process.env.EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY;
   if (Platform.OS === "ios") return process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY || undefined;
   if (Platform.OS === "android") return process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY || undefined;
 

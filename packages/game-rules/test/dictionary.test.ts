@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -13,14 +16,13 @@ import {
 
 /**
  * The dictionary is prepared data (`dictionary:prepare`) that no reviewer reads end to end, so
- * these numbers are pinned independently of it: the raw list's fingerprint was taken from the
- * reviewed source (`sha256sum en_US-large.txt` — 1,800,994 bytes, 168,211 lines) and the entry
- * count from the same normalization policy. Nothing below is derived from the artifact under
+ * these numbers are pinned independently of it: the ESDB export's fingerprint and line count
+ * were taken before preparation (see data/README.md). Nothing below is derived from the artifact under
  * test; regenerating it from a different source or with different rules has to fail here.
  */
-const SOURCE_SHA256 = "5168f54df086cfcbf4980ceef028b99d133df057e2734181a0b77b809b28d2b0";
-const SOURCE_LINES = 168_211;
-const ENTRY_COUNT = 141_962;
+const SOURCE_SHA256 = "b50d11e4b493376f3e4f562c5c420560e0735af8e4fb1b20badd86c6c0b43e89";
+const SOURCE_LINES = 108_339;
+const ENTRY_COUNT = 78_656;
 
 const ARTIFACT_PATH = fileURLToPath(new URL("../data/en_US-large.json", import.meta.url));
 
@@ -28,10 +30,10 @@ const ARTIFACT_PATH = fileURLToPath(new URL("../data/en_US-large.json", import.m
 const artifact: DictionaryArtifact = JSON.parse(readFileSync(ARTIFACT_PATH, "utf8"));
 
 /** Words the rules doc's own examples use, plus two-letter entries the list is known to hold. */
-const PRESENT = ["STRONG", "MONSTER", "MARKET", "QI", "AA"] as const;
+const PRESENT = ["STRONG", "MONSTER", "MARKET", "AT", "TO", "ZOO"] as const;
 
 /** Non-words of every kind §11 can be handed: below the length floor, absent, or never a word. */
-const ABSENT = ["A", "Z", "ZA", "ZZZZ", "A'S", "123"] as const;
+const ABSENT = ["A", "Z", "ZA", "ZZZZ", "A'S", "123", "AAA", "ABB", "NASA", "LONDON", "XIV"] as const;
 
 function artifactWith(overrides: Partial<DictionaryArtifact>): DictionaryArtifact {
   return { ...artifact, ...overrides };
@@ -40,9 +42,10 @@ function artifactWith(overrides: Partial<DictionaryArtifact>): DictionaryArtifac
 describe("the shipped dictionary artifact", () => {
   it("records the reviewed source it was prepared from", () => {
     assert.equal(artifact.id, "en_US-large");
-    assert.equal(artifact.source.file, "en_US-large.txt");
+    assert.equal(artifact.source.file, "esdb-en-us-60.txt");
     assert.equal(artifact.source.sha256, SOURCE_SHA256, "prepared from a different raw list");
     assert.equal(artifact.source.lines, SOURCE_LINES, "raw list line count changed");
+    assert.equal(artifact.copyright, readFileSync(new URL("../data/ESDB-COPYRIGHT.txt", import.meta.url), "utf8"));
   });
 
   it("holds the pinned entries and only playable words", () => {
@@ -56,6 +59,28 @@ describe("the shipped dictionary artifact", () => {
 
   it("carries only the labels this build displays", () => {
     assert.equal(artifact.label, DICTIONARIES["en_US-large"].label);
+  });
+});
+
+describe("dictionary preparation", () => {
+  it("filters before uppercasing, then deduplicates and sorts", () => {
+    const directory = mkdtempSync(join(tmpdir(), "word-poker-dictionary-"));
+    try {
+      const source = join(directory, "words.txt");
+      const output = join(directory, "dictionary.json");
+      writeFileSync(source, "zoo\r\nAAA\nABB\nLondon\nNASA\naa\n cat \ncat\nto\na\nA's\ncafé\nstraße\n123\n");
+      execFileSync(process.execPath, [
+        "--import", "tsx",
+        fileURLToPath(new URL("../scripts/prepare-dictionary.ts", import.meta.url)),
+        source, output,
+      ]);
+      const prepared: DictionaryArtifact = JSON.parse(readFileSync(output, "utf8"));
+      assert.deepEqual(prepared.words, ["AA", "CAT", "TO", "ZOO"]);
+      assert.equal(prepared.count, 4);
+      assert.equal(createDictionary(prepared).isWord("CAT"), true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 

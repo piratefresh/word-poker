@@ -1,0 +1,54 @@
+appId: com.wordpoker.wordpoker
+name: Account sheet opens, arms delete only on DELETE, closes with DONE (native)
+tags: [native, settings]
+---
+# STO-1044: the Account sheet autosaves, so it has DONE and no Save/Cancel. This flow changes
+# nothing: it types into the delete confirmation and backs out with KEEP IT.
+- runFlow: _ensure-session.yaml
+- tapOn:
+    id: "home-account-menu"
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible:
+      id: "account-settings"
+    timeout: 10000
+- assertVisible: "Account"
+- assertVisible:
+    id: "account-display-name"
+- assertVisible: "Sign-in"
+- takeScreenshot: settings-account-sheet
+- scrollUntilVisible:
+    element:
+      id: "account-delete"
+- tapOn:
+    id: "account-delete"
+- assertVisible: "Delete your account?"
+- scrollUntilVisible:
+    element:
+      id: "delete-account-confirm"
+- assertVisible:
+    id: "delete-account-confirm"
+    enabled: false
+- tapOn:
+    id: "delete-account-word"
+- inputText: "DELETE"
+- hideKeyboard
+- assertVisible:
+    id: "delete-account-confirm"
+    enabled: true
+- takeScreenshot: settings-delete-armed
+- tapOn:
+    id: "delete-account-back"
+- assertNotVisible:
+    id: "delete-account"
+- scrollUntilVisible:
+    element:
+      id: "account-done"
+    direction: UP
+- tapOn:
+    id: "account-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "account-settings"
+    timeout: 10000
+- assertVisible: "Offline"

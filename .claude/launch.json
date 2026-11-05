@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@wordpoker/mobile",
+        "web"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "mobile-metro",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@wordpoker/mobile",
+        "start"
+      ],
+      "port": 8081
+    }
+  ]
+}

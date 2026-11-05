@@ -39,22 +39,23 @@
 # while a bot holds it.
 #
 # The pinned seed's personality-policy line (also asserted by game-rules/test/bot.test.ts):
-# mira raises preflop to 40, called around; the flop checks through. On the turn Mira bets
-# 100, the hero and Ellis call, and Jay folds. The river checks to the hero with pot 460.
-# The hero opens for 20, Ellis calls, Mira raises to 480, and the hero calls the remaining 460.
-# Ellis calls the raise too; pot 1,900 opens the word window. The hero's Z/A tiles are unchanged.
+# Mira calls preflop, called/checked around. On the flop Mira bets 60; the hero and Ellis
+# call, and Jay folds. Mira bets 240 on the turn, called by the hero and Ellis.
+# The river checks to the hero with pot 980. The hero opens for 20, Ellis calls, Mira raises
+# to 440, and the hero calls the remaining 420. Ellis calls too; pot 2,300 opens the word
+# window. The hero's Z/I/G tiles still spell ZIG for 14 points.
 #
 # The felt reaches its row by `id:` rather than by text. Its controls carry test ids
 # (`action-check-call` walks the round and, inside §19's window, is the confirm), because the
 # seat nameplates print CHECK and CALL as status too and a text selector for a control can
 # land on a seat instead — see the selector note in the native flow.
-url: http://localhost:8081/offline?seed=7578
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=7578&turn=300000"
 name: Offline hand — bet, build a word and pay out
 tags:
   - web
   - offline
 ---
-- openLink: http://localhost:8081/offline?seed=7578
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=7578&turn=300000"
 
 # If the guard bounced a fresh profile to the sign-in screen, sign in as the
 # E2E user and come back to the table. The wait is optional: a profile that is
@@ -67,26 +68,26 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: http://localhost:8081/offline?seed=7578
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=7578&turn=300000"
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 90000
 - assertVisible:
-    text: "COMMUNITY · 0/5"
+    id: "community-strip"
 
 # The blinds are posted before the deal, and the seat clockwise from the big blind opens the
-# round a beat later: mira raises the blind to 40, and the row states the call that leaves the
+# round a beat later: Mira calls the blind of 20, and the row states the call that leaves the
 # hero owing — the engine's number, not a placeholder. The control prints its label and its
 # amount as two nodes, so a selector reaches the amount through the control's own test id
-# (`containsDescendants`) rather than through text that reads "CALL $40" in one piece. This is the
+# (`containsDescendants`) rather than through text that reads "CALL $20" in one piece. This is the
 # seed's line, so a changed seed or table configuration fails here, loudly.
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
       containsDescendants:
-        - text: "\\$40"
+        - text: "\\$20"
     timeout: 20000
 
 # Play the hero's turns to the river. Each pass waits for the hero to hold the table — the
@@ -97,10 +98,10 @@ tags:
 - repeat:
     while:
       notVisible:
-        text: "RIVER"
+        text: "RIVER( [1-5]/5)?"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER"
+          visible: "YOUR TURN|RIVER( [1-5]/5)?"
           timeout: 40000
           optional: true
       - runFlow:
@@ -124,19 +125,31 @@ tags:
     containsDescendants:
       - text: "\\$20"
 - assertVisible:
-    text: "\\$460"
+    text: "\\$980"
 - tapOn:
     id: "action-wager"
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
       containsDescendants:
-        - text: "\\$460"
+        - text: "\\$420"
     timeout: 20000
+# Draft before closing river betting so UI automation does not spend the word window.
+- tapOn:
+    id: "word-builder-tile-Z-1"
+- tapOn:
+    id: "word-builder-tile-I-9"
+- tapOn:
+    id: "word-builder-tile-G-1"
+- assertVisible:
+    text: "ZIG"
+- assertVisible:
+    id: "ZIG, 14 points(, valid)?"
+
 - tapOn:
     id: "action-check-call"
 - extendedWaitUntil:
-    visible: "\\$1,900"
+    visible: "2,300"
     timeout: 20000
 - assertNotVisible:
     id: "action-wager"
@@ -152,30 +165,6 @@ tags:
 - assertNotVisible:
     id: "all-in-button"
 
-# The river's close opened §19's window: the band under the felt — the draft line and the
-# strip of tiles the seat sorts — is what the flow builds its word through. The HUD names
-# the final stage while the gameplay phase stays river.
-#
-# Build the word out of three tiles the strip holds for this seed. The strip's tiles carry test
-# ids and the felt's copies of them carry none — those draw the state alone — so by its id a tap
-# can only land in the strip. A tap toggles a tile where it lies, so the word is the played
-# tiles read left to right, not the order they were tapped: Z-1, I-9 and G-1 sit in that
-# order in this deal's strip, and the draft spells ZIG.
-#
-# Those three are the deal's own for the seed the URL pins — Z-1, I-9 and G-1 — so a
-# changed seed or table configuration fails here, loudly, instead of silently playing some other
-# word; their word is 14 points.
-- tapOn:
-    id: "word-builder-tile-Z-1"
-- tapOn:
-    id: "word-builder-tile-I-9"
-- tapOn:
-    id: "word-builder-tile-G-1"
-- assertVisible:
-    text: "ZIG"
-- assertVisible:
-    text: "14 pts"
-
 # Shuffling rearranges the tiles the word does not hold, so the draft the seat has built stands
 # exactly as it was — which is the whole point of shuffling while a word is being built. The
 # icon button carries no text, so it is reached by the same test id a device flow uses.
@@ -184,17 +173,17 @@ tags:
 - assertVisible:
     text: "ZIG"
 - assertVisible:
-    text: "14 pts"
+    id: "ZIG, 14 points(, valid)?"
 
 # Validate Word spends one of the hand's five lookups without submitting: the count drops on
 # every tap, which is what proves the tap reached the button (the betting row used to sit over
 # part of it and swallow the press).
 - assertVisible:
-    text: "VALIDATE WORD 5/5"
+    text: "CHECK WORD 5/5"
 - tapOn:
     id: "word-check-button"
 - assertVisible:
-    text: "VALIDATE WORD 4/5"
+    text: "CHECK WORD 4/5"
 - assertVisible:
     text: "ZIG"
 
@@ -207,22 +196,16 @@ tags:
 
 # Every seat has answered, so the window closes and the hand pays out on the real judging:
 # immediately when the bots found words, or on the window's clock when they did not.
-- extendedWaitUntil:
-    visible: "PAYOUT"
-    timeout: 70000
-- assertVisible:
-    text: "WINNER"
 
 # The payout of the hand is the results, presented over the felt: this hand's number, its pot
 # counted up, every seat that reached the reveal, and the rating card under the scoreboard.
 # The table's own Deal is gone — the results' primary is the only deal left on the table.
+- runFlow: _show-results.yaml
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 5000
 - assertVisible:
-    text: "SCOREBOARD"
-- assertVisible:
-    text: ".*WORDS PLAYED.*"
+    text: "[0-9]+ PLAYERS? · [0-9]+ FOLDS? · [0-9]+ WORDS? PLAYED"
 - assertVisible:
     text: "DEAL ANOTHER"
 # The seat confirmed its word inside §19's window, so its own card carries that submission rather
@@ -236,8 +219,8 @@ tags:
 - tapOn:
     text: "DEAL ANOTHER"
 - assertVisible:
-    text: "PREFLOP"
+    text: "PREFLOP( [1-5]/5)?"
 - assertVisible:
-    text: "COMMUNITY · 0/5"
+    id: "community-strip"
 - assertNotVisible:
     text: "HAND #1 · RESULTS"

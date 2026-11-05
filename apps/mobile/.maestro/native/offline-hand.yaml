@@ -27,10 +27,11 @@
 # (src/lib/e2e.ts) and the guard lets the seat through. No account, no network, no backend.
 #
 # The pinned seed's personality-policy line (also asserted by game-rules/test/bot.test.ts):
-# mira raises preflop to 40, called around; the flop checks through. On the turn Mira bets
-# 100, the hero and Ellis call, and Jay folds. The river checks to the hero with pot 460.
-# The hero opens for 20, Ellis calls, Mira raises to 480, and the hero calls the remaining 460.
-# Ellis calls the raise too; pot 1,900 opens the word window. The hero's Z/A tiles are unchanged.
+# Mira calls preflop, called/checked around. On the flop Mira bets 60; the hero and Ellis
+# call, and Jay folds. Mira bets 240 on the turn, called by the hero and Ellis.
+# The river checks to the hero with pot 980. The hero opens for 20, Ellis calls, Mira raises
+# to 440, and the hero calls the remaining 420. Ellis calls too; pot 2,300 opens the word
+# window. The hero's Z/I/G tiles still spell ZIG for 14 points.
 #
 # The CPU plays on a beat of its own — one seat's action per `duration.cpuBeat` — so the table
 # between two hero actions moves on its own, and every step that waits for a bot waits for it
@@ -81,14 +82,14 @@ tags:
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 90000
 
-# Mira raises the blind to 40: a changed seed or table configuration fails here.
+# Mira calls the blind of 20: a changed seed or table configuration fails here.
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
-      text: "Call \\$40"
+      text: "Call \\$20"
     timeout: 20000
 
 # Follow the seeded betting line directly. Repeated condition checks on the animated table
@@ -98,7 +99,7 @@ tags:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "FLOP"
+    visible: "FLOP( [1-5]/5)?"
     timeout: 20000
 - extendedWaitUntil:
     visible: "YOUR TURN"
@@ -107,7 +108,7 @@ tags:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "TURN"
+    visible: "TURN( [1-5]/5)?"
     timeout: 20000
 - extendedWaitUntil:
     visible: "YOUR TURN"
@@ -116,7 +117,7 @@ tags:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "RIVER"
+    visible: "RIVER( [1-5]/5)?"
     timeout: 20000
 
 # The hero can open the river. Mira answers with a raise; draft before calling it.
@@ -126,20 +127,33 @@ tags:
 - tapOn:
     id: "action-raise"
     waitToSettleTimeoutMs: 500
-- tapOn: "MIN"
+- tapOn:
+    id: "wager-preset-minimum"
+# iOS folds the button's texts into one label ("CONFIRM $20"); Android keeps them as children.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "action-wager"
+          containsDescendants:
+            - text: "\\$20"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "action-wager"
+          text: ".*\\$20"
 - assertVisible:
-    id: "action-wager"
-    containsDescendants:
-      - text: "\\$20"
-- assertVisible:
-    text: "\\$460"
+    text: "\\$980"
 - tapOn:
     id: "action-wager"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
-      text: "Call \\$460"
+      text: "Call \\$420"
     timeout: 20000
 # Draft before calling the river raise, as in cross-platform-hand.yaml. Slow native taps
 # otherwise consume §19's shared 60-second window before the word can be confirmed.
@@ -160,7 +174,7 @@ tags:
 - assertVisible:
     text: "ZIG"
 - assertVisible:
-    text: "14 pts"
+    text: "ZIG, 14 points(, valid)?"
 
 # Shuffling rearranges the tiles the word does not hold, so the draft stands as built.
 - tapOn:
@@ -169,14 +183,14 @@ tags:
 - assertVisible:
     text: "ZIG"
 - assertVisible:
-    text: "14 pts"
+    text: "ZIG, 14 points(, valid)?"
 
 # Calling the raise closes betting; §19 turns the same control into the word confirm.
 - tapOn:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "\\$1,900"
+    visible: "2,300"
     timeout: 20000
 - extendedWaitUntil:
     visible:
@@ -239,7 +253,7 @@ tags:
     text: "DEAL ANOTHER"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 15000
 - assertNotVisible:
     text: "HAND #1 · RESULTS"

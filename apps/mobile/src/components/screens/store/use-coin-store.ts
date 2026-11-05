@@ -44,7 +44,8 @@ export interface CoinStore {
   /** Buy buttons wait until RevenueCat is logged in as this player. */
   readonly canBuy: boolean;
   readonly notice: PurchaseNotice | null;
-  buy(row: CoinPackRow): Promise<void>;
+  /** Resolves with what the purchase came to (also set as `notice`), or null when it was cancelled. */
+  buy(row: CoinPackRow): Promise<PurchaseNotice | null>;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -95,13 +96,17 @@ export function useCoinStore(userId: string | undefined): CoinStore {
   }, [available, userId]);
 
   const buy = useCallback(
-    async (row: CoinPackRow) => {
+    async (row: CoinPackRow): Promise<PurchaseNotice | null> => {
+      const settle = (next: PurchaseNotice) => {
+        setNotice(next);
+        return next;
+      };
       const before = balance.status === "ready" ? balance.coins : null;
       setBuying(row.productId);
       setNotice(null);
 
       try {
-        if ((await purchaseCoinPack(row.pack)) === "cancelled") return;
+        if ((await purchaseCoinPack(row.pack)) === "cancelled") return null;
 
         for (let attempt = 0; attempt < BALANCE_RETRIES; attempt += 1) {
           if (attempt > 0) await sleep(BALANCE_RETRY_MS);
@@ -109,13 +114,12 @@ export function useCoinStore(userId: string | undefined): CoinStore {
           if (wallet === null) continue;
           setBalance({ status: "ready", ...wallet });
           if (before === null || wallet.coins > before) {
-            setNotice({ kind: "added", coins: before === null ? row.coins : wallet.coins - before });
-            return;
+            return settle({ kind: "added", coins: before === null ? row.coins : wallet.coins - before });
           }
         }
-        setNotice({ kind: "on-the-way" });
+        return settle({ kind: "on-the-way" });
       } catch (error) {
-        setNotice({ kind: "error", message: message(error, "The purchase did not go through.") });
+        return settle({ kind: "error", message: message(error, "The purchase did not go through.") });
       } finally {
         setBuying(null);
       }

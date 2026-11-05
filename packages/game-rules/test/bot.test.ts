@@ -370,7 +370,7 @@ describe("offline smoke replay", () => {
   it("pins the real-dictionary hand used by the web and native smoke flows", async () => {
     const dictionary = await loadDictionary();
     let state = startHand({ seed: 7_578, players: SEATS, nowMs: NOW, dictionary });
-    assert.deepEqual(decideOfflineMove(state, "mira"), { type: "raise", playerId: "mira", amount: 40 });
+    assert.deepEqual(decideOfflineMove(state, "mira"), { type: "call", playerId: "mira" });
     while (!(state.phase === "river" && state.toActIndex === 0)) {
       const id = actingSeatId(state);
       const seat = state.seats[state.toActIndex ?? -1];
@@ -379,20 +379,20 @@ describe("offline smoke replay", () => {
         : decideOfflineMove(state, id);
       state = reduce(state, action, NOW);
     }
-    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 460);
+    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 980);
     state = reduce(state, { type: "bet", playerId: "hero", amount: 20 }, NOW);
     const ellis = decideOfflineMove(state, "ellis");
     assert.deepEqual(ellis, { type: "call", playerId: "ellis" });
     state = reduce(state, ellis, NOW);
     const answer = decideOfflineMove(state, "mira");
-    assert.deepEqual(answer, { type: "raise", playerId: "mira", amount: 480 });
+    assert.deepEqual(answer, { type: "raise", playerId: "mira", amount: 440 });
     state = reduce(state, answer, NOW);
     state = reduce(state, { type: "call", playerId: "hero" }, NOW);
     const ellisAnswer = decideOfflineMove(state, "ellis");
     assert.deepEqual(ellisAnswer, { type: "call", playerId: "ellis" });
     state = reduce(state, ellisAnswer, NOW);
     assert.equal(state.wordWindow?.status, "open");
-    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 1_900);
+    assert.equal(state.seats.reduce((sum, seat) => sum + seat.committedHand, 0), 2_300);
   });
 
   it("replays whole sessions across rotating blinds and short stacks", async () => {

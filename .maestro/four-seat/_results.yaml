@@ -4,14 +4,19 @@
 # The wait is long on purpose: four browsers play one table, one seat at a time, and a hand runs
 # its four streets through all of them before it pays out — a street costs the room whole seconds
 # per seat, so a hand that takes three minutes is the smoke working, not stalling.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat - results
 ---
+- extendedWaitUntil:
+    visible:
+      id: "xp-result-continue|simple-win-continue|Back to the main menu"
+    timeout: 300000
+- runFlow: ../_show-results.yaml
 - extendedWaitUntil:
     visible: "HAND #${HAND} · RESULTS"
     timeout: 300000
 - assertVisible:
-    text: "SCOREBOARD"
+    text: "[0-9]+ PLAYERS? · [0-9]+ FOLDS? · [0-9]+ WORDS? PLAYED"
 - assertVisible:
     text: ".*${WORD}.*"
 - tapOn:

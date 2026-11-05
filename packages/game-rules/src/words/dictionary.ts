@@ -9,11 +9,11 @@
  * `loadDictionary` fetches the shipped one. Neither reads a clock, the environment, or
  * anything else outside its arguments, so the same artifact always yields the same answers.
  *
- * The artifact is ~1.4 MB of words, so nothing here loads it implicitly. `DICTIONARIES` is
+ * Nothing here loads the artifact implicitly. `DICTIONARIES` is
  * what a mode displays before play (§11: the dictionary has to be named before joining) and
  * costs a table lookup; the word list itself arrives the first time a mode asks for it —
  * entering the tutorial or an offline hand — and is kept after that. Lookups binary-search
- * the artifact's sorted words, which needs no second copy of 141,962 strings.
+ * the artifact's sorted words, which needs no second copy of the strings.
  */
 
 import { DICTIONARY_IDS, isDictionaryId, type DictionaryId } from "@wordpoker/contracts";
@@ -41,7 +41,8 @@ export interface DictionaryInfo {
  * the app displays it.
  */
 export const DICTIONARIES: Readonly<Record<DictionaryId, DictionaryInfo>> = {
-  "en_US-large": { id: "en_US-large", label: "en_US-large (broad English)" },
+  // Keep the stored/wire id stable; the source fingerprint identifies the vocabulary revision.
+  "en_US-large": { id: "en_US-large", label: "Word Poker English (ESDB 60)" },
 };
 
 /** Which file the words were prepared from, with the fingerprint that pins that source. */
@@ -59,6 +60,7 @@ export interface DictionarySource {
 export interface DictionaryArtifact {
   readonly id: string;
   readonly label: string;
+  readonly copyright?: string;
   readonly source: DictionarySource;
   readonly count: number;
   readonly words: readonly string[];

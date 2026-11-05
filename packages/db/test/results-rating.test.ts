@@ -150,6 +150,8 @@ describe(
           "Migration20261016120000_notifications",
           "Migration20261017120000_platform_auth",
           "Migration20261029120000_table_wallet",
+          "Migration20261030120000_username",
+          "Migration20261105120000_tile_sets",
         ],
         "the migrations are pending again",
       );

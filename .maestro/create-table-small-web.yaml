@@ -5,24 +5,15 @@
 #
 # The flow composes the real sign-in flow when the browser profile is signed out. It only opens and
 # dismisses the sheet, so it does not create a table or require a live table holder.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Create-table actions stay reachable on a small web viewport
 tags:
   - web
   - regression
   - STO-445
 ---
-- openLink: http://localhost:8081/online
-
-- extendedWaitUntil:
-    visible: "TAKE YOUR SEAT"
-    timeout: 15000
-    optional: true
-- runFlow:
-    when:
-      visible: "TAKE YOUR SEAT"
-    file: sign-in.yaml
-- openLink: http://localhost:8081/online
+- runFlow: sign-in.yaml
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 
 - extendedWaitUntil:
     visible: ".*DEAL A NEW TABLE"

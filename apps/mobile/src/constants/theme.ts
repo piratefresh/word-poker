@@ -282,6 +282,19 @@ export const tileMaterial = {
   },
 } as const;
 
+/**
+ * The store's tile sets (STO-1045): the face, slab and ink a set paints on every tile that is not a
+ * seat's own private letters. `ivory` is `gradients.tile` on `tileMaterial.slab`, exactly the tile
+ * the table drew before sets existed. Keyed by `TILE_SET_IDS` from `@wordpoker/contracts`.
+ */
+export const tileSetMaterial = {
+  ivory: { gradient: gradients.tile.colors, slab: tileMaterial.slab, ink: tileMaterial.ink },
+  jade: { gradient: ["#bcc79c", "#8f9a72"] as const, slab: "#5f6b48", ink: "#1f2a14" },
+  rosewood: { gradient: ["#d27b62", "#97402f"] as const, slab: "#5a2218", ink: "#fff1df" },
+  midnight: { gradient: ["#34313c", "#141318"] as const, slab: "#000000", ink: "#f2c75a" },
+  "neon-alley": { gradient: ["#3b2a7a", "#1d1446"] as const, slab: "#0d0826", ink: "#7df2ff" },
+} as const;
+
 /* ── spacing — 4pt base ──────────────────────────────────────────── */
 
 export const spacing = {

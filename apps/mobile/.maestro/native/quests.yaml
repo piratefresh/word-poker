@@ -1,0 +1,28 @@
+appId: com.wordpoker.wordpoker
+name: Quests wallet and streak catalog (native)
+tags: [native, quests]
+---
+- runFlow: _ensure-session.yaml
+- tapOn:
+    id: "home-level"
+- extendedWaitUntil:
+    visible:
+      id: "quest-wallet"
+    timeout: 30000
+- assertNotVisible:
+    id: "quests-unverified"
+- assertVisible:
+    id: "quest-streak"
+- scrollUntilVisible:
+    element:
+      id: "quest-row-.*"
+    direction: DOWN
+- assertVisible:
+    id: "quest-row-.*"
+- scrollUntilVisible:
+    element:
+      id: "quests-back"
+    direction: UP
+- tapOn:
+    id: "quests-back"
+- assertVisible: "Offline"

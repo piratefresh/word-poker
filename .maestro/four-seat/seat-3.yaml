@@ -1,5 +1,5 @@
 # The four-browser online smoke, seat P3 (STO-483): the bust. Seed, racks and taps: seat-1.yaml.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat P3 - loses hand 1, shoves and busts, sits out hand 3 and leaves
 tags:
   - web
@@ -66,7 +66,7 @@ tags:
 
 # Hand 3 is dealt without it: the seat reads BUSTED, sees the hand start, and leaves the table.
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 60000
 - assertVisible:
     text: "BUSTED"

@@ -1,4 +1,4 @@
-import { router, Tabs } from "expo-router";
+import { Tabs } from "expo-router";
 import { type ComponentProps } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,15 +19,11 @@ type TabLayoutProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["layout
 const AppTabsNavRack = ({ state, descriptors, navigation }: Omit<TabLayoutProps, "children">) => {
   const emit = navigation.emit as Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0]["navigation"]["emit"];
   const currentName = state.routes[state.index].name;
-  const active = currentName === "index" ? "home" : currentName === "friends" || currentName === "history" ? currentName : null;
+  const active = currentName === "index" ? "home" : currentName === "friends" || currentName === "history" || currentName === "store" ? currentName : null;
   const friends = state.routes.find((route) => route.name === "friends");
   const friendsBadge = friends === undefined ? undefined : descriptors[friends.key].options.tabBarBadge;
 
   const navigate = (destination: HomeNavDestination) => {
-    if (destination === "store") {
-      router.push("/store");
-      return;
-    }
     const routeName = destination === "home" ? "index" : destination;
     const route = state.routes.find((item) => item.name === routeName);
     if (route === undefined) return;
@@ -37,7 +33,6 @@ const AppTabsNavRack = ({ state, descriptors, navigation }: Omit<TabLayoutProps,
   };
 
   const longPress = (destination: HomeNavDestination) => {
-    if (destination === "store") return;
     const routeName = destination === "home" ? "index" : destination;
     const route = state.routes.find((item) => item.name === routeName);
     if (route !== undefined) emit({ type: "tabLongPress", target: route.key });
@@ -75,6 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="friends" options={{ title: "Friends" }} />
       <Tabs.Screen name="history" options={{ title: "Game History" }} />
+      <Tabs.Screen name="store" options={{ title: "Store" }} />
       <Tabs.Screen name="explore" options={{ href: null }} />
     </Tabs>
   );

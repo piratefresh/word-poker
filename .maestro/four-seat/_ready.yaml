@@ -1,6 +1,6 @@
 # Subflow: the barrier. Wait until SEATS seats are at the table, then say ready. Nothing deals
 # until every seated browser has done the same.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat - ready up
 ---
 - extendedWaitUntil:
@@ -9,5 +9,5 @@ name: Four-seat - ready up
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 180000

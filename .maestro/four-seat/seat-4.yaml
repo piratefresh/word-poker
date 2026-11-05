@@ -1,5 +1,5 @@
 # The four-browser online smoke, seat P4 (STO-483). Seed, racks and taps: the header of seat-1.yaml.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat P4 - opens with a raise, folds to the shove, plays 3-handed
 tags:
   - web

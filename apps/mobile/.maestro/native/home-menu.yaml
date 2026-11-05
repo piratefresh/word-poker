@@ -13,8 +13,7 @@ tags:
   - native
   - home
 ---
-- launchApp:
-    clearState: false
+- runFlow: _ensure-session.yaml
 
 - extendedWaitUntil:
     visible: "Offline"
@@ -43,28 +42,35 @@ tags:
 # Choosing a card updates the deal; dismissing preserves the choice.
 - tapOn:
     id: "offline-wild"
-- assertVisible:
-    id: "offline-wild"
-    checked: true
+- runFlow:
+    file: _assert-checked.yaml
+    env:
+      CHECKED_ID: "offline-wild"
 - tapOn:
     id: "offline-close"
 - assertNotVisible:
     id: "offline-tray"
 - tapOn:
     id: "home-slab-offline"
-- assertVisible:
-    id: "offline-wild"
-    checked: true
+- runFlow:
+    file: _assert-checked.yaml
+    env:
+      CHECKED_ID: "offline-wild"
 
 # Normal walks through the door only after DEAL.
 - tapOn:
     id: "offline-normal"
-- assertVisible:
-    id: "offline-normal"
-    checked: true
-- assertVisible: "Everyone gets 1,000 practice chips. Your coins stay in your wallet."
+- runFlow:
+    file: _assert-checked.yaml
+    env:
+      CHECKED_ID: "offline-normal"
+- tapOn:
+    id: "offline-chips-1000"
+- tapOn:
+    id: "offline-chips-reset"
+- assertVisible: "Everyone gets 1,000 practice chips every hand. Your coins stay in your wallet."
 - tapOn:
     id: "offline-deal"
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 90000

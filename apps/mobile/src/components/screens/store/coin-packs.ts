@@ -3,7 +3,8 @@
  *
  * The store prices a pack and RevenueCat's grant counts its coins; a row needs both. A package the
  * catalog has no grant for is hidden — never shown with a guessed amount. "Best Value" goes on the
- * pack with the most coins per unit of price, whatever the metadata says.
+ * pack with the most coins per unit of price, whatever the metadata says. A pack's bonus is how many
+ * more coins per unit of price it gives than the smallest pack (STO-1045), so it follows the prices.
  */
 
 import type { CoinCatalog } from "@wordpoker/contracts";
@@ -18,6 +19,8 @@ export interface CoinPackRow {
   readonly priceString: string;
   readonly label?: string;
   readonly badge?: string;
+  /** Whole percent more coins per unit of price than the smallest pack; 0 on that pack. */
+  readonly bonusPercent: number;
   readonly pack: CoinPackage;
 }
 
@@ -50,6 +53,9 @@ export function joinCoinPacks(
       ? priced.reduce((top, entry) => (entry.coins / entry.pack.price > top.coins / top.pack.price ? entry : top))
       : undefined;
 
+  const base = priced[0];
+  const baseRate = base && base.pack.price > 0 ? base.coins / base.pack.price : 0;
+
   const rows = priced.map(({ pack, coins }): CoinPackRow => {
     const dressed = display[pack.productId] ?? {};
     const badge = pack === best?.pack ? BEST_VALUE : dressed.badge === BEST_VALUE ? undefined : dressed.badge;
@@ -60,6 +66,7 @@ export function joinCoinPacks(
       priceString: pack.priceString,
       ...(dressed.label ? { label: dressed.label } : {}),
       ...(badge ? { badge } : {}),
+      bonusPercent: baseRate > 0 && pack.price > 0 ? Math.max(0, Math.round(((coins / pack.price) / baseRate - 1) * 100)) : 0,
       pack,
     };
   });

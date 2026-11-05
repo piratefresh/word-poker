@@ -1,0 +1,28 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Quests wallet and streak catalog
+tags: [web, quests]
+---
+- runFlow: sign-in.yaml
+- tapOn:
+    id: "Level [0-9]+, [0-9,]+ of [0-9,]+ XP"
+- extendedWaitUntil:
+    visible:
+      id: "quest-wallet"
+    timeout: 30000
+- assertNotVisible:
+    id: "quests-unverified"
+- assertVisible:
+    id: "quest-streak"
+- scrollUntilVisible:
+    element:
+      id: "quest-row-.*"
+    direction: DOWN
+- assertVisible:
+    id: "quest-row-.*"
+- scrollUntilVisible:
+    element:
+      id: "quests-back"
+    direction: UP
+- tapOn:
+    id: "quests-back"
+- assertVisible: "Offline"

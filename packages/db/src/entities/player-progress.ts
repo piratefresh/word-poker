@@ -20,6 +20,8 @@ export const PlayerProgress = defineEntity({
     xp: p.integer().default(0),
     /** The highest level whose `level` wallet event has been opened; 1 is the starting level. */
     levelPaid: p.integer().default(1),
+    /** The tile set the player wears (STO-1045); null is the default set. */
+    tileSet: p.text().nullable(),
   }),
 });
 

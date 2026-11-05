@@ -1,0 +1,16 @@
+# Real signed-in development build, or auth-bypass build for offline features only.
+appId: com.wordpoker.wordpoker
+---
+- launchApp:
+    clearState: false
+- openLink: wordpoker://
+- extendedWaitUntil:
+    visible: "Offline|TAKE YOUR SEAT"
+    timeout: 60000
+- runFlow:
+    when:
+      visible: "TAKE YOUR SEAT"
+    file: _sign-in.yaml
+- extendedWaitUntil:
+    visible: "Offline"
+    timeout: 60000

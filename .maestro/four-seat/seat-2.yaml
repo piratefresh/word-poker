@@ -1,5 +1,5 @@
 # The four-browser online smoke, seat P2 (STO-483). Seed, racks and taps: the header of seat-1.yaml.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat P2 - re-raises and wins, wins the side pot, plays 3-handed
 tags:
   - web

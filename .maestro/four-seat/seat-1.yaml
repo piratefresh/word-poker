@@ -18,7 +18,7 @@
 # Words are tapped in strip order (rack, then board): a tap never moves a tile. Tiles are taken by
 # their strip test ids (word-builder-tile-<id>); a choice tile by its face chip alone
 # (word-builder-face-<id>-<face>), which plays the tile on that face.
-url: http://localhost:8081/online
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
 name: Four-seat P1 - creates the table, folds, calls a shove, plays 3-handed
 tags:
   - web

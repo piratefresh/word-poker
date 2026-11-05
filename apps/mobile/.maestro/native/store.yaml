@@ -1,0 +1,44 @@
+appId: com.wordpoker.wordpoker
+name: Store tab shows the daily bonus, coin packs and tile sets (native)
+tags: [native, store]
+---
+# STO-1045 (1a): the STORE chip and the HUD coin pill open the same tab. It buys nothing.
+- runFlow: _ensure-session.yaml
+- tapOn:
+    id: "tab-store"
+- extendedWaitUntil:
+    visible:
+      id: "store-daily-bonus"
+    timeout: 30000
+- assertVisible:
+    id: "tab-store"
+    selected: true
+- assertNotVisible:
+    id: "wallet-error"
+- takeScreenshot: store-coins
+- tapOn:
+    id: "store-tab-tiles"
+- assertVisible: "The house set"
+- tapOn:
+    id: "store-tile-buy-jade"
+- extendedWaitUntil:
+    visible:
+      id: "store-sheet"
+    timeout: 10000
+- tapOn:
+    id: "store-sheet-cancel"
+- assertNotVisible:
+    id: "store-sheet"
+- takeScreenshot: store-tiles
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline"
+- tapOn:
+    id: "home-credits"
+- extendedWaitUntil:
+    visible:
+      id: "store-daily-bonus"
+    timeout: 30000
+- tapOn:
+    id: "tab-home"
+- assertVisible: "Offline"

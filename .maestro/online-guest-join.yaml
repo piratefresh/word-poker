@@ -7,13 +7,13 @@
 # Needs a signed-out profile: a profile that already holds a session never becomes a guest.
 #
 #   maestro test --platform web .maestro/online-guest-join.yaml -e ROOM_ID=the-id-printed-by-opponent
-url: http://localhost:8081/online?room=${ROOM_ID}
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online?room=${ROOM_ID}"
 name: Online guest - open an invite link, sit down as a guest, play a hand and get offered an account
 tags:
   - web
   - online
 ---
-- openLink: http://localhost:8081/online?room=${ROOM_ID}
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online?room=${ROOM_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -37,17 +37,17 @@ tags:
 - tapOn:
     id: "action-ready"
 - extendedWaitUntil:
-    visible: "PREFLOP"
+    visible: "PREFLOP( [1-5]/5)?"
     timeout: 30000
 
-# Play the same hand as online-hand.yaml (seed 409, browser is seat 1): check to the river, build BUN, check to payout.
+# Play the same hand as online-hand.yaml (seed 409, browser is seat 1): check to the river, build ILK, check to payout.
 - repeat:
     while:
       notVisible:
-        text: "RIVER"
+        text: "RIVER( [1-5]/5)?"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER"
+          visible: "YOUR TURN|RIVER( [1-5]/5)?"
           timeout: 40000
           optional: true
       - runFlow:
@@ -58,33 +58,26 @@ tags:
                 id: "action-check-call"
             - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible:
-      id: "word-builder-tile-B-2"
+    visible: "RIVER( [1-5]/5)?|FINAL STAGE"
     timeout: 20000
 - tapOn:
-    id: "word-builder-tile-B-2"
+    id: "word-builder-tile-I-2"
 - tapOn:
-    id: "word-builder-tile-U-3"
+    id: "word-builder-face-SL-1-L"
 - tapOn:
-    id: "word-builder-tile-N-5"
+    id: "word-builder-face-QK-1-K"
+- assertVisible:
+    text: "ILK"
+
 - repeat:
     while:
       notVisible:
-        text: "PAYOUT"
+        text: "PAYOUT( [1-5]/5)?|CONTINUE|HAND #[0-9]+ · RESULTS"
     commands:
       - tapOn:
           id: "action-check-call"
       - waitForAnimationToEnd
-# The XP overlay comes first; the results screen, and the offer with it, follow its Continue.
-- extendedWaitUntil:
-    visible: "CONTINUE"
-    timeout: 30000
-    optional: true
-- runFlow:
-    when:
-      visible: "CONTINUE"
-    commands:
-      - tapOn: "CONTINUE"
+- runFlow: _show-results.yaml
 
 # A guest is offered an account at their first results screen; accepting lands on sign-up, which
 # a guest session can still reach.
@@ -93,5 +86,5 @@ tags:
     timeout: 10000
 - tapOn: "CREATE ACCOUNT"
 - extendedWaitUntil:
-    visible: "Take your seat."
+    visible: "Pull up a chair."
     timeout: 10000
