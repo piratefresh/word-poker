@@ -1,0 +1,11 @@
+appId: com.wordpoker.wordpoker
+---
+# The system photo picker, opened by the Account sheet's "Add photo" / "Change photo". It runs out of
+# process, so nothing here has an app test id: each photo is a "Photo, <date>" cell, and the picker
+# opens scrolled to the newest, which is the one `addMedia` just put there.
+- extendedWaitUntil:
+    visible: "Photo, .*"
+    timeout: 15000
+- tapOn:
+    text: "Photo, .*"
+    index: 0

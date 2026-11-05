@@ -46,6 +46,7 @@ selection and required room variables; it does not prove that APIs, accounts or 
 | `quests` | Wallet/streak cards and quest catalog, return home | Web, native |
 | `store` | Real Wallet balance, return home | Web, native |
 | `settings` | Open account settings, display name field, cancel | Web, native |
+| `avatar` | Add, replace and remove the Account photo through the system picker; needs the API's R2_* env | Native |
 | `offline` | Seeded betting, word building/check/shuffle, payout, next hand | Web, native |
 | `wild` | Power draw and CPU power use through results | Web |
 | `wild-power` | Hero uses Vowel Magnet; result reveals powered tile | Web |
