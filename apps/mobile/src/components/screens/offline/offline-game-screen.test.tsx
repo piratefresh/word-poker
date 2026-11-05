@@ -514,6 +514,7 @@ describe("<OfflineGameScreen />", () => {
       wordCheck: { checksRemaining: 0, result: null },
       checkWord: jest.fn(),
       powers: null,
+      bossTells: [],
       pickPower: jest.fn(),
       usePower: jest.fn(),
       endPowerUsed: jest.fn(),

@@ -49,3 +49,18 @@ the hand is Classic. Bots hold no powers.
 
 **The final chapter** has no hands to draft from: the player picks up to 2 different powers from
 its pool before the boss hand.
+
+**Bosses.** A boss is a bot with a play style and one visible **tell**. It holds no powers and sees
+no more than any bot does: its own tiles and the public table. Its tell reads those same tiles,
+which is what makes it a tell. The numbers are config (`packages/game-rules/src/bot/boss.ts`).
+
+| Boss | Play style | Tell |
+| ---- | ---------- | ---- |
+| The Professor | Plays the longest word it can. Never folds until his pressure bar is full, then folds anything short of a strong hand. | The pressure bar: one step each time the most an opponent has put in doubles, full at 16 big blinds. |
+| Vowel Vinny | Plays the most vowel-heavy word. Bets small and rarely raises. | The vowel jar: how many of his two tiles are vowels. |
+| The Hustler | Raises the hand open on his first pre-flop action, every hand. | The chip stack: neat on a premium hand, messier as his hand gets weaker. |
+| Lady Q | Plays the word with the most Q, Z, J and X. Bets harder while she holds one. | Her tiles glint while she holds a Q, Z, J or X. |
+| The Dealer | Plays one of the four styles each hand, drawn from the hand's seed. | That style's tell. |
+
+At the start of a boss hand the coach points at the tell. After 2 boss losses in a row, the coach
+gives a hint about how to read it.

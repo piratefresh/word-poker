@@ -12,14 +12,17 @@ import type { PowerUpId, RoundPhase } from "@wordpoker/contracts";
 import {
   DEFAULT_STAKES,
   fixedDeal,
+  isBossId,
   reduce,
   startHand,
+  type BossId,
   type Dictionary,
   type FixedDealSpec,
 } from "@wordpoker/game-rules";
 
 import { randomSeed } from "@/features/offline/offline-seed";
-import type { MapNode } from "@/features/story/kitchen-table-map";
+import { bossName } from "@/features/story/bosses";
+import { FRIENDS, type FriendId, type MapNode } from "@/features/story/kitchen-table-map";
 import { nextCpuMove, type OfflineSession } from "@/features/offline/use-offline-game";
 
 export interface Challenge {
@@ -75,6 +78,8 @@ export function challengeById(id: string | undefined): Challenge | undefined {
 export interface StoryTable {
   players: readonly string[];
   deal?: FixedDealSpec;
+  /** Seats that play as a boss, by seat id. */
+  bosses?: Readonly<Record<string, BossId>>;
 }
 
 /**
@@ -100,19 +105,27 @@ export function storySession(
         dictionary,
         stakes: DEFAULT_STAKES,
         ...(deal === undefined ? {} : { deal }),
+        ...(table.bosses === undefined ? {} : { bosses: table.bosses }),
         ...(powers.length === 0 ? {} : { powerUps: { deal: "choose3", offers: { [players[0]!]: powers } } }),
       });
     },
     reduce,
     nextMove: nextCpuMove,
+    // The hero (seat 0) keeps the table's own name for it.
+    names: Object.fromEntries(table.players.slice(1).map((id) => [id, seatName(id, table.bosses?.[id])])),
   };
+}
+
+function seatName(id: string, boss: BossId | undefined): string {
+  if (boss !== undefined) return bossName(boss);
+  return id in FRIENDS ? FRIENDS[id as FriendId].name : id;
 }
 
 /** Who sits at a map node, and the authored hand where it has one. */
 export function storyTable(node: MapNode): StoryTable {
   const challenge = challengeById(node.challengeId);
   if (challenge !== undefined) return { players: challenge.players, deal: challenge.deal };
-  // The Professor's own play style and tell are STO-974; until then he is the heuristic bot.
-  if (node.kind === "boss") return { players: ["hero", "professor"] };
+  // A boss node's id names its boss (`BOSS_IDS`), who sits as that seat.
+  if (node.kind === "boss" && isBossId(node.id)) return { players: ["hero", node.id], bosses: { [node.id]: node.id } };
   return { players: ["hero", node.friend?.id ?? "mira"] };
 }

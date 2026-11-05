@@ -12,10 +12,12 @@ import { WordBuilder, WordCheckButton, WordHand, WordShuffleButton } from "@/com
 import { colors, fonts, radius, spacing } from "@/constants/theme";
 import { randomSeed } from "@/features/offline/offline-seed";
 import { useOfflineGame } from "@/features/offline/use-offline-game";
+import { BOSS_COPY, bossCoachLine } from "@/features/story/bosses";
 import { challengeById, storySession, storyTable } from "@/features/story/challenges";
-import { KITCHEN_TABLE, type MapNode } from "@/features/story/kitchen-table-map";
+import type { MapNode } from "@/features/story/kitchen-table-map";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
 
+import { BossTell } from "./boss-tell";
 import { StoryVerdict } from "./story-verdict";
 
 const CHAPTER = storyChapter("kitchen-table");
@@ -32,7 +34,8 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const [powersHeld] = useState(() => chapterRecord(storyProgress(), CHAPTER.id).powers);
   const session = useMemo(() => storySession(storyTable(node), dictionary, powersHeld), [node, dictionary, powersHeld]);
   const offline = useOfflineGame({ seed: 0, dictionary, session });
-  const { game, words, results, powers } = offline;
+  const { game, words, results, powers, bossTells } = offline;
+  const tell = bossTells[0];
   const { active: celebratingWin, complete: finishWinCelebration } = useSimpleWinCelebration(results);
   const power = usePowerTargeting({ held: powers?.held, onUse: offline.usePower });
   const flip = swapFlipOf(powers?.swap, power.discarded);
@@ -59,7 +62,9 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const challenge = challengeById(node.challengeId);
   const threshold = nodeThreshold(CHAPTER, storyNode(CHAPTER, node.id));
   const goal = node.kind === "boss" ? `Take the pot with ${threshold}+ points.` : (challenge?.goal ?? `Win the pot. ${threshold}+ points for ★★.`);
-  const coachLine = verdict?.coachHint ? KITCHEN_TABLE.bossHint : (challenge?.coach[game.phase] ?? "");
+  // A boss hand opens on the coach's pointer at the tell; a second loss in a row earns the hint.
+  const bossLine = tell === undefined ? "" : game.phase === "preflop" ? bossCoachLine(tell.style, tell.boss === "dealer") : "";
+  const coachLine = verdict?.coachHint && tell !== undefined ? BOSS_COPY[tell.style].hint : (challenge?.coach[game.phase] ?? bossLine);
 
   return (
     <WordBuilder
@@ -106,6 +111,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
               <View pointerEvents="none" style={styles.coach} testID="story-coach">
                 <Text style={styles.coachTitle}>{`${node.title.toUpperCase()} · ${goal}`}</Text>
                 {coachLine === "" ? null : <Text style={styles.coachLine}>{coachLine}</Text>}
+                {tell === undefined ? null : <BossTell tell={tell} />}
               </View>
               {powers === null ? null : (
                 <>
@@ -133,6 +139,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           node={node}
           threshold={threshold}
           verdict={verdict}
+          hint={tell === undefined ? null : BOSS_COPY[tell.style].hint}
           word={results.seats.find((seat) => seat.isYou)?.word ?? null}
           score={results.seats.find((seat) => seat.isYou)?.total ?? 0}
           onReplay={replay}
@@ -146,6 +153,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
 const styles = StyleSheet.create({
   table: { flex: 1, overflow: "hidden" },
   coach: {
+    gap: 4,
     backgroundColor: "rgba(2,12,9,0.78)",
     borderRadius: radius.card,
     left: spacing.md,

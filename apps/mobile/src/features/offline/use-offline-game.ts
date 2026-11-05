@@ -46,15 +46,17 @@ import {
   WordRejectionError,
   availableTiles,
   canUsePower,
-  chooseOfflineWord,
   buildLivePots,
+  bossTells,
   chooseBotPower,
   decideBotPowerUse,
+  decideBotWord,
   decideOfflineMove,
   reduce,
   resolveSubmission,
   riverReview,
   startHand,
+  type BossTell,
   type Dictionary,
   type OfflineState,
 } from "@wordpoker/game-rules";
@@ -88,6 +90,13 @@ const ROSTER: readonly { id: PlayerId; name: string }[] = [
   { id: "mira", name: "Mira" },
 ];
 
+type SeatNames = OfflineSession["names"];
+
+function seatName(state: OfflineState, index: number, names: SeatNames): string {
+  const id = state.seats[index]?.id ?? "";
+  return names?.[id] ?? ROSTER[index]?.name ?? id;
+}
+
 /**
  * A table that is not ordinary offline play — the tutorial's guided hand (STO-507) — brings its
  * own clock, deal, gate and opponents. Absent, the table is the one `/offline` plays, on the
@@ -110,6 +119,8 @@ export interface OfflineSession {
   reduce: (state: OfflineState, action: OfflineAction, nowMs: number) => OfflineState | null;
   /** The opponents' one move for this beat, or `null` when none is owed. */
   nextMove: (state: OfflineState, nowMs: number) => OfflineAction | null;
+  /** Names for seats the roster doesn't seat — a story friend or boss. Absent, seats take the roster's. */
+  names?: Readonly<Record<PlayerId, string>>;
 }
 
 export interface OfflineGame {
@@ -163,6 +174,8 @@ export interface OfflineGame {
   checkWord: () => void;
   /** The hero's side of §44's power-ups; `null` at a Classic table. */
   powers: PowerView | null;
+  /** Story mode's boss tells (STO-974), one per boss seat; empty at every other table. */
+  bossTells: readonly BossTell[];
   /** Keeps one of the powers the Power Draw offered the hero. */
   pickPower: (powerUpId: PowerUpId) => void;
   /**
@@ -662,9 +675,11 @@ export function useOfflineGame({
     });
   }, []);
 
+  const names = session?.names;
+  const tells = useMemo(() => bossTells(state), [state]);
   const powers = useMemo(
-    () => powerViewOf(state, powerEvents, ranOutAtMs === state.endsAtMs),
-    [powerEvents, ranOutAtMs, state],
+    () => powerViewOf(state, powerEvents, ranOutAtMs === state.endsAtMs, names),
+    [names, powerEvents, ranOutAtMs, state],
   );
 
   /**
@@ -682,13 +697,13 @@ export function useOfflineGame({
 
   const view = useMemo(
     () =>
-      heroView(perspectiveOf(state, flights, seatActions, displayName), {
+      heroView(perspectiveOf(state, flights, seatActions, displayName, names), {
         draft: heroDraft,
         refusal,
         pendingPill: null,
         pendingConfirm: false,
       }),
-    [displayName, flights, heroDraft, refusal, seatActions, state],
+    [displayName, flights, heroDraft, names, refusal, seatActions, state],
   );
   const { game } = view;
 
@@ -730,6 +745,7 @@ export function useOfflineGame({
     confirmWord,
     checkWord,
     powers,
+    bossTells: tells,
     pickPower,
     usePower,
     endPowerUsed,
@@ -749,6 +765,7 @@ function powerViewOf(
   state: OfflineState,
   events: readonly PowerUsedEvent[],
   clockRanOut: boolean,
+  names: SeatNames,
 ): PowerView | null {
   const powers = state.powers;
   if (powers === undefined) return null;
@@ -787,7 +804,7 @@ function powerViewOf(
       .filter((event) => event.handId === state.hand)
       .map((event) => ({
         ...event,
-        name: ROSTER[event.seat]?.name ?? state.seats[event.seat]?.id ?? "",
+        name: seatName(state, event.seat, names),
         mine: state.seats[event.seat]?.id === HERO_ID,
       })),
   };
@@ -859,10 +876,7 @@ export function nextCpuMove(state: OfflineState, nowMs: number): OfflineAction |
       const use = decideBotPowerUse(state, slot.playerId, nowMs);
       if (use !== null) return { type: "usePowerUp", playerId: slot.playerId, ...use };
 
-      const submission = chooseOfflineWord({
-        available: availableTiles(state, slot.seat),
-        dictionary: state.dictionary,
-      });
+      const submission = decideBotWord(state, slot.seat);
       if (submission !== null) {
         return { type: "confirmWord", playerId: slot.playerId, submission };
       }
@@ -1036,6 +1050,7 @@ function perspectiveOf(
   flights: readonly ChipFlight[],
   seatActions: readonly SeatAction[],
   displayName?: string | null,
+  names?: SeatNames,
 ): HeroPerspective {
   const heroIndex = state.seats.findIndex((seat) => seat.id === HERO_ID);
   const hero = state.seats[heroIndex];
@@ -1065,7 +1080,7 @@ function perspectiveOf(
     phase: state.phase,
     seatCount: toSeatCount(state.seats.length),
     seats: state.seats.map((seat, index) => {
-      const name = ROSTER[index]?.name ?? seat.id;
+      const name = seatName(state, index, names);
       return {
         ...seat,
         place: index,

@@ -3,6 +3,7 @@ import type { OfflineAction } from "@wordpoker/contracts";
 import type { BettingBounds } from "../money/betting";
 import { botDecisionSeed, type BotObservation } from "./bot-observation";
 import { botProfile } from "./bot-profile";
+import { bossBetBend, bossProfile, bossStyle } from "./boss";
 import { assessBotStrength } from "./bot-strength";
 import { buildPots } from "../money/pots";
 import { createRng } from "../core/rng";
@@ -29,8 +30,10 @@ export function decideBotBet(view: BotObservation, bounds: BettingBounds): Offli
   const actor = view.seats[view.seat];
   if (actor === undefined) throw new Error("bot observation has no acting seat");
   const playerId = actor.id;
-  const style = botProfile(view.seat);
   const strength = assessBotStrength(view);
+  const boss = view.boss === undefined ? undefined : bossStyle(view.boss, view.seed);
+  const style = boss === undefined ? botProfile(view.seat) : bossProfile(boss, view);
+  const bend = boss === undefined ? { raise: false, fold: "default" } : bossBetBend(boss, view, strength);
   const opponents = view.seats.filter((seat, index) =>
     index !== view.seat && !seat.folded && !seat.sittingOut);
   const count = Math.max(1, opponents.length);
@@ -74,7 +77,7 @@ export function decideBotBet(view: BotObservation, bounds: BettingBounds): Offli
     call <= Math.max(bb, pot * 0.2) && view.round.lastRaiseSize <= Math.max(bb, pot * 0.35) &&
     bluffRoll < style.bluff * (late ? 1.4 : 0.6) * (strength.potential ? 1.2 : 1) / count;
   const slowPlay = bounds.canCheck && strong && trapRoll < style.slowPlay;
-  const wantsWager = (value || bluff) && !slowPlay;
+  const wantsWager = ((value || bluff) && !slowPlay) || bend.raise;
 
   if (wantsWager && opponents.some((seat) => !seat.allIn)) {
     // Both value and bluffs draw from these overlapping pot fractions.
@@ -94,6 +97,7 @@ export function decideBotBet(view: BotObservation, bounds: BettingBounds): Offli
     }
   }
   if (bounds.canCheck) return { type: "check", playerId };
-  if (bounds.canCall && willing) return { type: "call", playerId };
+  if (bounds.canCall && bend.fold === "never") return { type: "call", playerId };
+  if (bounds.canCall && willing && bend.fold !== "always") return { type: "call", playerId };
   return { type: "fold", playerId };
 }
