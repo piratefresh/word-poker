@@ -1,20 +1,31 @@
 url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
-name: Store tab loads the real wallet
+name: Store tab shows the daily bonus, coin packs and tile sets
 tags: [web, store]
 ---
-# STO-1045: the store is a tab, so the STORE chip opens it.
-# The HUD coin pill opens the same tab.
+# STO-1045 (1a): the STORE chip and the HUD coin pill open the same tab. It buys nothing.
+# Buttons go by their label: on the web an aria-label hides the test id from Maestro.
 - runFlow: sign-in.yaml
 - tapOn:
     id: "tab-store"
 - extendedWaitUntil:
     visible:
-      id: "wallet-coins"
+      id: "store-daily-bonus"
     timeout: 30000
+- assertVisible: "Coins buy tile sets"
 - assertNotVisible:
     id: "wallet-error"
-- assertVisible: "[0-9,]+ COINS"
-- takeScreenshot: store-tab
+- takeScreenshot: store-coins
+- tapOn:
+    id: "store-tab-tiles"
+- assertVisible: "The house set"
+- tapOn:
+    id: "Buy Jade tiles for 2,500 coins"
+- extendedWaitUntil:
+    visible: "JADE TILES"
+    timeout: 10000
+- tapOn: "CANCEL"
+- assertNotVisible: "JADE TILES"
+- takeScreenshot: store-tiles
 - tapOn:
     id: "tab-home"
 - assertVisible: "Offline"
@@ -22,8 +33,8 @@ tags: [web, store]
     id: "Wallet, [0-9,]+ coins"
 - extendedWaitUntil:
     visible:
-      id: "wallet-coins"
+      id: "store-daily-bonus"
     timeout: 30000
 - tapOn:
-    id: "store-back"
+    id: "tab-home"
 - assertVisible: "Offline"

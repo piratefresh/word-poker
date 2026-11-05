@@ -24,6 +24,7 @@ jest.mock("@/auth/client/session-coordinator", () => ({
 let mockRequestedOffline: string | undefined;
 jest.mock("expo-router", () => ({ router: { push: jest.fn(), setParams: jest.fn() }, useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({ offline: mockRequestedOffline }),
+  usePathname: () => "/",
 }));
 jest.mock("react-native-safe-area-context", () =>
   jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,

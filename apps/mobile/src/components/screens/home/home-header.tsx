@@ -16,7 +16,10 @@ import { levelForXp } from "@wordpoker/game-rules";
 import { AccountMenu } from "./account-menu";
 import { AccountSettings } from "./account-settings";
 
-/** Where the top bar sits in a scene of `height` (the street, or a tab drawn over it like the store). */
+/**
+ * Where the top bar sits in a window of `height`. Home and the store tab both pass the window height,
+ * so the store's HUD lands exactly on the street's dimmed one beneath it.
+ */
 export function homeHeaderTop(insetTop: number, height: number): number {
   return Math.max(insetTop + spacing.sm, height >= 700 ? 54 : 20);
 }
