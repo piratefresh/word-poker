@@ -19,14 +19,16 @@ import type { AdPlacement } from "@wordpoker/contracts";
 
 import { configureRevenueCat, revenuecatAvailable } from "@/lib/wallet/revenuecat";
 
-/** `rewarded_free_coins` in AdMob. */
-const ANDROID_REWARDED_UNIT = "ca-app-pub-4407207030015431/4364831894";
+/** `rewarded_free_coins` in AdMob, per platform. */
+const REWARDED_UNITS: Partial<Record<typeof Platform.OS, string>> = {
+  android: "ca-app-pub-4407207030015431/4364831894",
+  ios: "ca-app-pub-4407207030015431/7170958632",
+};
 
 function unitId(): string | null {
   if (__DEV__) return TestIds.REWARDED;
-  if (Platform.OS === "android") return ANDROID_REWARDED_UNIT;
-  // ponytail: iOS ad unit (and app.json's iosAppId, a Google sample for now) pending from AdMob.
-  return null;
+
+  return REWARDED_UNITS[Platform.OS] ?? null;
 }
 
 /** Whether this build can show rewarded ads: the store SDK is set up and the platform has a unit. */

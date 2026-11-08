@@ -75,7 +75,8 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-4407207030015431~7716919393",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "iosAppId": "ca-app-pub-4407207030015431~6721587838",
+          "skAdNetworkItems": ["cstr6suwn9.skadnetwork"]
         }
       ]
     ],
