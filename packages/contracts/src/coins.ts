@@ -16,7 +16,8 @@ export type CoinPackId = (typeof COIN_PACK_IDS)[number];
 
 /**
  * What a wallet_event records; `quest`/`streak`/`level` pay the rewards in `quests.ts` (STO-525, STO-543),
- * and `tile_set` is a store purchase paid in coins (`tile-sets.ts`, STO-1045).
+ * `tile_set` is a store purchase paid in coins (`tile-sets.ts`, STO-1045), and `ad_reward` is a verified
+ * rewarded ad RevenueCat paid (positive) or one over the daily cap our server took back (negative, STO-1062).
  */
 export const WALLET_EVENT_KINDS = [
   "welcome",
@@ -30,6 +31,7 @@ export const WALLET_EVENT_KINDS = [
   "level",
   "referral",
   "tile_set",
+  "ad_reward",
 ] as const;
 
 export type WalletEventKind = (typeof WALLET_EVENT_KINDS)[number];
@@ -41,6 +43,22 @@ export const WELCOME_GRANT = 5000;
 export const REFERRAL_REFERRER_GRANT = 1000;
 export const REFERRAL_REFEREE_GRANT = 500;
 export const REFERRAL_CAP = 20;
+
+/**
+ * Rewarded ads (STO-1059). RevenueCat grants the coins itself once AdMob verifies a full view (its
+ * dashboard's Ads > Rewards rule must say `AD_REWARD_COINS`); our server counts them and takes back
+ * any past the daily cap. A day is a UTC day, the same day the login streak uses.
+ */
+export const AD_REWARD_COINS = 20;
+export const AD_REWARD_DAILY_CAP = 10;
+/** RevenueCat Ad Charts group by these names; keep them exact. */
+export const AD_PLACEMENTS = ["coin_store_rewarded", "out_of_coins_rewarded"] as const;
+export type AdPlacement = (typeof AD_PLACEMENTS)[number];
+
+/** `GET /api/ad-rewards`: how many rewarded ads the player can still be paid for today. */
+export interface AdRewardsResponse {
+  readonly left: number;
+}
 
 /** A guest who registers is paid this much per hand they played, up to the cap, on top of the welcome grant. */
 export const GUEST_HAND_BONUS = 100;
@@ -97,4 +115,10 @@ export function isCoinCatalog(value: unknown): value is CoinCatalog {
   if (typeof value !== "object" || value === null) return false;
   const packs = (value as Record<string, unknown>).packs;
   return Array.isArray(packs) && packs.every(isCoinCatalogPack);
+}
+
+export function isAdRewardsResponse(value: unknown): value is AdRewardsResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const left = (value as Record<string, unknown>).left;
+  return isCoinCount(left) && left <= AD_REWARD_DAILY_CAP;
 }

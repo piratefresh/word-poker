@@ -4,12 +4,13 @@
  * A purchase credits the Wallet on RevenueCat's side; this route only logs it in wallet_event.
  * RevenueCat sends the dashboard's "Authorization header value" in `Authorization`, and redelivers
  * until it sees a 200 — so a database failure answers 500, and a redelivered event records once.
+ * A rewarded-ad grant past the daily cap is taken back here, once, when it is first recorded (STO-1062).
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { recordReportedEvent } from "@wordpoker/db";
-import { parseCurrencyEvent } from "@wordpoker/economy";
+import { enforceAdRewardCap, parseCurrencyEvent } from "@wordpoker/economy";
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -47,6 +48,12 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const recorded = await recordReportedEvent(parsed.record);
+    if (recorded) {
+      // A failed take-back stays a `pending` row that `GET /api/wallet`'s retry resolves; never a 500.
+      await enforceAdRewardCap(parsed.record).catch((error: unknown) =>
+        console.error(`[revenuecat-webhook] ${parsed.record?.userId}: could not enforce the ad cap:`, error),
+      );
+    }
 
     return json({ received: true, recorded }, 200);
   } catch (error) {

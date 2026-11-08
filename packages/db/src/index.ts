@@ -49,6 +49,7 @@ export { equippedTileSet, setEquippedTileSet, tileSetPurchases } from "./tile-se
 export { adoptGuestHistory, countPlayedHands } from "./guest";
 export { eraseAccountData } from "./account-erasure";
 export {
+  adRewardsSince,
   buyInFor,
   hasWelcomeEvent,
   openWalletEvent,

@@ -43,6 +43,7 @@ function coinAmount(adjustments: unknown): number | null {
 
 function kindOf(source: unknown, amount: number): WalletEventKind {
   if (source === "in_app_purchase") return amount >= 0 ? "purchase" : "refund";
+  if (source === "ad_reward") return "ad_reward";
 
   return "adjustment";
 }
