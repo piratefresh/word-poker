@@ -12,7 +12,15 @@
  */
 
 import { Platform } from "react-native";
-import mobileAds, { AdEventType, RewardedAdEventType, TestIds, type RewardedAd } from "react-native-google-mobile-ads";
+import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
+import mobileAds, {
+  AdEventType,
+  AdsConsent,
+  AdsConsentPrivacyOptionsRequirementStatus,
+  RewardedAdEventType,
+  TestIds,
+  type RewardedAd,
+} from "react-native-google-mobile-ads";
 import { RevenueCatAdMob } from "react-native-purchases-admob";
 
 import type { AdPlacement } from "@wordpoker/contracts";
@@ -36,14 +44,46 @@ export function rewardedAdsAvailable(): boolean {
   return revenuecatAvailable() && unitId() !== null;
 }
 
-let initialized: Promise<unknown> | null = null;
+let initialized: Promise<boolean> | null = null;
 
-/** RevenueCat first, then Mobile Ads: the adapter only tracks while Purchases is configured. */
-function initAds(): Promise<unknown> {
+/**
+ * Consent, then (iOS) tracking, then RevenueCat and Mobile Ads; resolves whether ads may be
+ * requested (STO-1061). Runs before the first ad load rather than at launch, so a player who never
+ * opens the store or lobby is never asked. UMP shows its form only where the law needs it and
+ * remembers the answer; a "no" still gets ads, because the SDK reads UMP's consent string and
+ * serves non-personalized ones on its own.
+ */
+async function gate(): Promise<boolean> {
+  // Offline or a form error: fall back to the answer saved from an earlier session.
+  const consent = await AdsConsent.gatherConsent().catch(() => AdsConsent.getConsentInfo());
+  if (!consent.canRequestAds) return false;
+  if (Platform.OS === "ios") await requestTrackingPermissionsAsync();
+  // RevenueCat first: the adapter only tracks while Purchases is configured.
   configureRevenueCat();
-  initialized ??= mobileAds().initialize();
+  await mobileAds().initialize();
+
+  return true;
+}
+
+function initAds(): Promise<boolean> {
+  initialized ??= gate().catch(() => false).then((ok) => {
+    // No answer yet (or a failure): ask again before the next ad instead of staying shut for the session.
+    if (!ok) initialized = null;
+    return ok;
+  });
 
   return initialized;
+}
+
+/** Whether UMP wants an "Ad privacy" button (EEA and similar), so the player can change their answer. */
+export async function adPrivacyOptionsRequired(): Promise<boolean> {
+  const { privacyOptionsRequirementStatus } = await AdsConsent.getConsentInfo();
+
+  return privacyOptionsRequirementStatus === AdsConsentPrivacyOptionsRequirementStatus.REQUIRED;
+}
+
+export async function showAdPrivacyOptions(): Promise<void> {
+  await AdsConsent.showPrivacyOptionsForm();
 }
 
 /**
@@ -53,7 +93,7 @@ function initAds(): Promise<unknown> {
 export async function loadRewardedAd(placement: AdPlacement): Promise<RewardedAd> {
   const unit = unitId();
   if (!unit) throw new Error("No rewarded ads on this platform yet.");
-  await initAds();
+  if (!(await initAds())) throw new Error("No ad consent yet.");
   const ad = await RevenueCatAdMob.createRewardedAd(unit, { placement, enableRewardVerification: true });
 
   return new Promise((resolve, reject) => {

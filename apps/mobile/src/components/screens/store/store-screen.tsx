@@ -208,6 +208,12 @@ export function StoreScreen() {
           <WatchAdCard busy={rewardedAd.busy} left={rewardedAd.left ?? 0} note={adNote} onWatch={() => void watchAd()} />
         ) : null}
 
+        {tab === "coins" && rewardedAd.privacyOptions ? (
+          <Pressable accessibilityRole="button" onPress={() => void rewardedAd.privacyOptions?.()} testID="store-ad-privacy">
+            <Text style={styles.body}>Ad privacy choices</Text>
+          </Pressable>
+        ) : null}
+
         {signedOut ? (
           <Text style={styles.body} testID="store-signed-out">Sign in to buy coins and tile sets.</Text>
         ) : store.balance.status === "error" ? (
