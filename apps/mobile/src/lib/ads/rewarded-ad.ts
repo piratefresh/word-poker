@@ -16,7 +16,9 @@ import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
 import mobileAds, {
   AdEventType,
   AdsConsent,
+  AdsConsentDebugGeography,
   AdsConsentPrivacyOptionsRequirementStatus,
+  type AdsConsentInfoOptions,
   RewardedAdEventType,
   TestIds,
   type RewardedAd,
@@ -44,6 +46,20 @@ export function rewardedAdsAvailable(): boolean {
   return revenuecatAvailable() && unitId() !== null;
 }
 
+/**
+ * Dev builds only: `EXPO_PUBLIC_ADS_DEBUG_GEOGRAPHY=EEA` (or `REGULATED_US_STATE`, `NOT_EEA`) makes UMP
+ * act as if the player were there, so the consent form can be tested from anywhere. Emulators and
+ * simulators count as test devices; a phone needs its hashed id (logged by UMP) in
+ * `EXPO_PUBLIC_ADS_TEST_DEVICE`.
+ */
+function consentDebug(): AdsConsentInfoOptions {
+  const geography = process.env.EXPO_PUBLIC_ADS_DEBUG_GEOGRAPHY as keyof typeof AdsConsentDebugGeography | undefined;
+  if (!__DEV__ || !geography) return {};
+  const device = process.env.EXPO_PUBLIC_ADS_TEST_DEVICE;
+
+  return { debugGeography: AdsConsentDebugGeography[geography], testDeviceIdentifiers: device ? [device] : [] };
+}
+
 let initialized: Promise<boolean> | null = null;
 
 /**
@@ -55,7 +71,7 @@ let initialized: Promise<boolean> | null = null;
  */
 async function gate(): Promise<boolean> {
   // Offline or a form error: fall back to the answer saved from an earlier session.
-  const consent = await AdsConsent.gatherConsent().catch(() => AdsConsent.getConsentInfo());
+  const consent = await AdsConsent.gatherConsent(consentDebug()).catch(() => AdsConsent.getConsentInfo());
   if (!consent.canRequestAds) return false;
   if (Platform.OS === "ios") await requestTrackingPermissionsAsync();
   // RevenueCat first: the adapter only tracks while Purchases is configured.
