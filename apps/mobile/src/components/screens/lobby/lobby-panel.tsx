@@ -5,12 +5,14 @@
 
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { type ReactElement, type ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { WELCOME_GRANT } from "@wordpoker/contracts";
+import { AD_REWARD_COINS, WELCOME_GRANT } from "@wordpoker/contracts";
 
 import { border, fonts, fontSize, nightLobby, opacity, spacing } from "@/constants/theme";
+import { adOutcomeNote, useRewardedAd } from "@/lib/ads/use-rewarded-ad";
+import { posthog } from "@/lib/analytics/posthog";
 import { formatCoins } from "@/lib/ui/format";
 import { NightLobbyButton } from "./night-lobby-button";
 
@@ -50,8 +52,20 @@ function Tile({ title, line, onPress, testID }: { title: string; line: string; o
   );
 }
 
-/** The Wallet is below `cheapest`: the store first, then quests and free practice. */
-export function OutOfCoinsPanel({ cheapest }: { cheapest: number }): ReactElement {
+/**
+ * The Wallet is below `cheapest`: the store first, then a rewarded ad (`out_of_coins_rewarded`,
+ * STO-1063) while today has views left, then quests and free practice.
+ */
+export function OutOfCoinsPanel({ cheapest, userId }: { cheapest: number; userId: string | undefined }): ReactElement {
+  const ad = useRewardedAd("out_of_coins_rewarded", userId);
+  const [note, setNote] = useState<string | null>(null);
+  const watch = async () => {
+    setNote(null);
+    const outcome = await ad.watch();
+    posthog?.capture("rewarded_ad_watched", { placement: "out_of_coins_rewarded", outcome });
+    setNote(adOutcomeNote(outcome) ?? `+${AD_REWARD_COINS} coins added.`);
+  };
+
   return (
     <Panel
       body="Here's how to get back to the tables. Practice games are free and always open."
@@ -60,6 +74,16 @@ export function OutOfCoinsPanel({ cheapest }: { cheapest: number }): ReactElemen
       title="OUT OF COINS"
     >
       <NightLobbyButton label="VISIT THE STORE" onPress={() => router.push("/store")} testID="lobby-out-of-coins-store" />
+      {ad.visible && (ad.left ?? 0) > 0 ? (
+        <NightLobbyButton
+          busy={ad.busy}
+          label={`WATCH AN AD FOR ${AD_REWARD_COINS} FREE COINS`}
+          onPress={() => void watch()}
+          tone="outline"
+          testID="lobby-out-of-coins-ad"
+        />
+      ) : null}
+      {note ? <Text accessibilityLiveRegion="polite" style={styles.note} testID="lobby-out-of-coins-ad-note">{note}</Text> : null}
       <View style={styles.tiles}>
         <Tile line="Earn coins from quests" onPress={() => router.push("/quests")} testID="lobby-out-of-coins-quests" title="QUESTS" />
         <Tile line="Free game against bots" onPress={() => router.navigate(PRACTICE)} testID="lobby-out-of-coins-practice" title="PRACTICE" />
@@ -107,6 +131,7 @@ const styles = StyleSheet.create({
   tile: { borderColor: "#e0974a", borderRadius: 14, borderWidth: border.thick, flex: 1, gap: 2, padding: spacing.sm },
   tileTitle: { color: nightLobby.text.cream, fontFamily: fonts.arcade, fontSize: fontSize.body, letterSpacing: 0.4 },
   tileLine: { color: nightLobby.text.cream, fontFamily: fonts.rubikMedium, fontSize: fontSize.caption },
+  note: { color: nightLobby.text.cream, fontFamily: fonts.rubikMedium, fontSize: fontSize.caption, textAlign: "center" },
   link: { color: nightLobby.gold.light, fontFamily: fonts.rubikSemiBold, fontSize: fontSize.body, textAlign: "center" },
   pressed: { opacity: opacity.pressed },
 });

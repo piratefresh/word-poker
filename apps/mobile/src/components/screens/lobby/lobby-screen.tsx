@@ -107,7 +107,7 @@ export function LobbyScreen() {
     refreshCoins,
   );
   // Flow B: a panel takes the hero card's place, and its table joins the rows with the rest.
-  const panel = guest ? <GuestPanel /> : broke ? <OutOfCoinsPanel cheapest={CHEAPEST_BUY_IN} /> : null;
+  const panel = guest ? <GuestPanel /> : broke ? <OutOfCoinsPanel cheapest={CHEAPEST_BUY_IN} userId={session?.user.id} /> : null;
   const featured = panel === null ? headliner : undefined;
   const listed = panel !== null && headliner !== undefined ? [headliner, ...listRooms] : listRooms;
   const selectElsewhere = (room: RoomSummary) => setSelectedRoomId(room.roomId);

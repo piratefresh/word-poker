@@ -50,6 +50,14 @@ describe("parseCurrencyEvent", () => {
     assert.equal(dashboard?.record?.productId, null);
   });
 
+  it("reads a verified rewarded ad as an ad_reward", () => {
+    const ad = parseCurrencyEvent(
+      currencyEvent({ source: "ad_reward", product_id: undefined, adjustments: [{ amount: 20, currency: { code: "COIN" } }] }),
+    );
+    assert.equal(ad?.record?.kind, "ad_reward");
+    assert.equal(ad?.record?.amount, 20);
+  });
+
   it("records nothing for a change our own server sent", () => {
     assert.deepEqual(parseCurrencyEvent(currencyEvent({ source: "admin_api", product_id: undefined })), {
       type: "VIRTUAL_CURRENCY_TRANSACTION",

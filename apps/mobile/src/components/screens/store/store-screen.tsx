@@ -9,7 +9,7 @@
 
 import { Host } from "@expo/ui";
 import { LinearGradient } from "expo-linear-gradient";
-import { isAccountEligible, TILE_SET_PRICES, type TileSetId } from "@wordpoker/contracts";
+import { AD_REWARD_COINS, isAccountEligible, TILE_SET_PRICES, type TileSetId } from "@wordpoker/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
 import Animated, { FadeInUp, FadeOut } from "react-native-reanimated";
@@ -22,6 +22,7 @@ import { HOME_NAV_RACK_OVERLAP } from "@/components/screens/home/home-nav-rack";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, layout, ledger, spacing } from "@/constants/theme";
 import { useQuests } from "@/lib/quests/quests-provider";
+import { adOutcomeNote, useRewardedAd } from "@/lib/ads/use-rewarded-ad";
 import { posthog } from "@/lib/analytics/posthog";
 import { useTileSets } from "@/lib/tile-sets/tile-sets-provider";
 import { formatCoins } from "@/lib/ui/format";
@@ -32,6 +33,7 @@ import { ConfirmSheet, PackPreview, tileSetLine } from "./components/confirm-she
 import { DailyBonusCard } from "./components/daily-bonus-card";
 import { STORE } from "./components/store-art";
 import { TILE_SET_COPY, TileSetList, TilePreview } from "./components/tile-set-list";
+import { WatchAdCard } from "./components/watch-ad-card";
 import { useCoinStore } from "./use-coin-store";
 import { useDailyBonus } from "./use-daily-bonus";
 
@@ -76,6 +78,16 @@ export function StoreScreen() {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [busy, setBusy] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
+  const rewardedAd = useRewardedAd("coin_store_rewarded", user?.id);
+  const [adNote, setAdNote] = useState<string | null>(null);
+
+  const watchAd = async () => {
+    setAdNote(null);
+    const outcome = await rewardedAd.watch();
+    posthog?.capture("rewarded_ad_watched", { placement: "coin_store_rewarded", outcome });
+    if (outcome === "rewarded") show(`+${AD_REWARD_COINS} COINS`);
+    setAdNote(adOutcomeNote(outcome));
+  };
 
   const open = (next: Sheet) => {
     setSheetError(null);
@@ -191,6 +203,10 @@ export function StoreScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DailyBonusCard bonus={daily.bonus} onClaim={daily.claim} />
+
+        {tab === "coins" && rewardedAd.visible ? (
+          <WatchAdCard busy={rewardedAd.busy} left={rewardedAd.left ?? 0} note={adNote} onWatch={() => void watchAd()} />
+        ) : null}
 
         {signedOut ? (
           <Text style={styles.body} testID="store-signed-out">Sign in to buy coins and tile sets.</Text>

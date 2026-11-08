@@ -16,6 +16,10 @@ import { fetchCoinCatalog, fetchWallet, WalletAuthError } from "@/lib/wallet/wal
 
 import { StoreScreen } from "./store-screen";
 
+jest.mock("@/lib/ads/use-rewarded-ad", () => ({
+  adOutcomeNote: () => null,
+  useRewardedAd: () => ({ visible: false, left: null, busy: false, watch: jest.fn() }),
+}));
 jest.mock("@/auth/client/auth-client", () => ({
   authClient: { useSession: jest.fn(), sendVerificationEmail: jest.fn() },
 }));

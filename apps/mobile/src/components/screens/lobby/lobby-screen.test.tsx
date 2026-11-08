@@ -7,6 +7,10 @@ import { useLobby, type LobbyView } from "@/features/online/use-lobby";
 import { lobbyView } from "@/features/online/lobby-view";
 import { LobbyScreen } from "./lobby-screen";
 
+jest.mock("@/lib/ads/use-rewarded-ad", () => ({
+  adOutcomeNote: () => null,
+  useRewardedAd: () => ({ visible: false, left: null, busy: false, watch: jest.fn() }),
+}));
 jest.mock("@/features/online/use-lobby", () => ({ useLobby: jest.fn() }));
 jest.mock("@/features/online/room-session", () => ({
   createTable: jest.fn(), joinTable: jest.fn(), useActiveRoomId: jest.fn(() => null),

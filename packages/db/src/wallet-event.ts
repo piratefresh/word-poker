@@ -186,3 +186,18 @@ export async function recordReportedEvent(
 
   return rows.length > 0;
 }
+
+/**
+ * How many rewarded ads RevenueCat paid a player since `since` (STO-1062): the positive `ad_reward`
+ * rows. A take-back is a negative row and does not count; the view it undid still does.
+ */
+export async function adRewardsSince(userId: string, since: Date, options: DbOptions = {}): Promise<number> {
+  const db = await connection(options);
+  const [row] = await db.execute<{ count: string | number }[]>(
+    `select count(*) as "count" from "wallet_event"
+      where "user_id" = ? and "kind" = 'ad_reward' and "amount" > 0 and "created_at" >= ?`,
+    [userId, since],
+  );
+
+  return Number(row?.count ?? 0);
+}

@@ -52,6 +52,12 @@ export {
   type PowerUpWindow,
 } from "./powers";
 export {
+  AD_PLACEMENTS,
+  AD_REWARD_COINS,
+  AD_REWARD_DAILY_CAP,
+  isAdRewardsResponse,
+  type AdPlacement,
+  type AdRewardsResponse,
   COIN_CURRENCY,
   COIN_PACK_IDS,
   WALLET_EVENT_KINDS,

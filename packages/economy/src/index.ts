@@ -5,6 +5,7 @@
  * client code never does (`scripts/check-boundaries.mjs` enforces that).
  */
 
+export { adRewardsLeft, enforceAdRewardCap, type AdRewardDeps } from "./ad-rewards";
 export {
   CATALOG_TTL_MS,
   clearCatalogCache,

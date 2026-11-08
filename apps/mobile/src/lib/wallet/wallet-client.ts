@@ -8,6 +8,7 @@
  */
 
 import {
+  isAdRewardsResponse,
   isCoinCatalog,
   isQuestClaimResponse,
   isQuestStateResponse,
@@ -91,6 +92,18 @@ export async function fetchCoinCatalog(): Promise<CoinCatalog> {
   if (!isCoinCatalog(body)) throw new Error("The coin store sent a catalog it could not read.");
 
   return body;
+}
+
+/** How many rewarded ads the player can still be paid for today (STO-1062). */
+export async function fetchAdRewardsLeft(): Promise<number> {
+  const response = await fetch(`${apiBaseURL}/api/ad-rewards`, await sessionInit());
+  if (response.status === 401) throw new WalletAuthError();
+  if (!response.ok) throw await questFailure(response);
+
+  const body: unknown = await response.json();
+  if (!isAdRewardsResponse(body)) throw new Error("The ad count could not be read.");
+
+  return body.left;
 }
 
 /** The server's own sentence for a 403 (quests needs a verified email), else a generic one. */
