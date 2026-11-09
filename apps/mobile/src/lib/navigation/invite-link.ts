@@ -11,7 +11,8 @@ import { Platform } from "react-native";
 
 import { apiBaseURL } from "@/lib/network/api-base-url";
 
-function webOrigin(): string {
+/** The web app's origin, which also serves the public pages (`/privacy`, `/delete-account`). */
+export function webOrigin(): string {
   const configured = process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/+$/, "");
   if (configured) return configured;
   if (Platform.OS === "web" && typeof window !== "undefined") return window.location.origin;

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "word-poker",
+    "name": "WordPoker",
     "slug": "word-poker",
     "version": "1.0.0",
     "orientation": "default",
@@ -76,6 +76,7 @@
         {
           "androidAppId": "ca-app-pub-4407207030015431~7716919393",
           "iosAppId": "ca-app-pub-4407207030015431~6721587838",
+          "userTrackingUsageDescription": "This lets Word Poker show you more relevant ads when you watch one for free coins.",
           "skAdNetworkItems": ["cstr6suwn9.skadnetwork"]
         }
       ]
