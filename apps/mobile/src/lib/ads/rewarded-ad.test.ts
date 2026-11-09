@@ -2,17 +2,62 @@ import type { RewardedAd } from "react-native-google-mobile-ads";
 import type { RewardVerificationResult } from "react-native-purchases";
 import { RevenueCatAdMob } from "react-native-purchases-admob";
 
-import { showRewardedAd } from "./rewarded-ad";
+import { loadRewardedAd, showRewardedAd } from "./rewarded-ad";
+
+/** The order the consent gate touched each SDK in. */
+const mockCalls: string[] = [];
+let mockCanRequestAds = true;
 
 jest.mock("react-native-google-mobile-ads", () => ({
   __esModule: true,
-  default: () => ({ initialize: jest.fn() }),
+  default: () => ({ initialize: async () => mockCalls.push("initialize") }),
+  AdsConsent: {
+    gatherConsent: async () => {
+      mockCalls.push("consent");
+      return { canRequestAds: mockCanRequestAds };
+    },
+  },
+  AdsConsentPrivacyOptionsRequirementStatus: { REQUIRED: "REQUIRED" },
   AdEventType: { CLOSED: "closed", ERROR: "error" },
   RewardedAdEventType: { LOADED: "rewarded_loaded" },
   TestIds: { REWARDED: "test-unit" },
 }));
-jest.mock("react-native-purchases-admob", () => ({ RevenueCatAdMob: { showWithRewardVerification: jest.fn() } }));
+jest.mock("expo-tracking-transparency", () => ({ requestTrackingPermissionsAsync: async () => mockCalls.push("att") }));
+jest.mock("react-native-purchases-admob", () => ({
+  RevenueCatAdMob: {
+    showWithRewardVerification: jest.fn(),
+    createRewardedAd: jest.fn(async () => {
+      mockCalls.push("request");
+      return {
+        addAdEventListener: (type: string, fn: () => void) => {
+          if (type === "rewarded_loaded") setTimeout(fn);
+          return () => {};
+        },
+        load: () => {},
+      };
+    }),
+  },
+}));
 jest.mock("@/lib/wallet/revenuecat", () => ({ configureRevenueCat: jest.fn(), revenuecatAvailable: () => true }));
+
+// Runs first: the gate memoizes a granted consent for the session.
+describe("loadRewardedAd consent gate (iOS)", () => {
+  beforeEach(() => {
+    mockCalls.length = 0;
+  });
+
+  it("requests no ad while UMP says ads can't be requested, and asks again next time", async () => {
+    mockCanRequestAds = false;
+    await expect(loadRewardedAd("coin_store_rewarded")).rejects.toThrow("No ad consent yet.");
+    expect(mockCalls).toEqual(["consent"]);
+  });
+
+  it("gathers consent, then tracking permission, then initializes, then requests", async () => {
+    mockCanRequestAds = true;
+    await loadRewardedAd("coin_store_rewarded");
+    expect(mockCalls).toEqual(["consent", "att", "initialize", "request"]);
+  });
+});
 
 type Options = Parameters<typeof RevenueCatAdMob.showWithRewardVerification>[1];
 

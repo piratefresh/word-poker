@@ -9,7 +9,14 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdPlacement } from "@wordpoker/contracts";
 
-import { loadRewardedAd, rewardedAdsAvailable, showRewardedAd, type AdOutcome } from "@/lib/ads/rewarded-ad";
+import {
+  adPrivacyOptionsRequired,
+  loadRewardedAd,
+  rewardedAdsAvailable,
+  showAdPrivacyOptions,
+  showRewardedAd,
+  type AdOutcome,
+} from "@/lib/ads/rewarded-ad";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { useRevenueCatReady } from "@/lib/wallet/use-revenuecat";
 import { fetchAdRewardsLeft } from "@/lib/wallet/wallet-client";
@@ -25,6 +32,8 @@ export interface RewardedAdButton {
   readonly busy: boolean;
   /** `unavailable`: no ad had loaded ("No ads available right now"). */
   watch(): Promise<AdOutcome | "unavailable">;
+  /** Reopens the consent form; set only where UMP needs a way to change the answer (EEA and similar). */
+  readonly privacyOptions: (() => Promise<void>) | null;
 }
 
 export function useRewardedAd(placement: AdPlacement, userId: string | undefined): RewardedAdButton {
@@ -34,6 +43,7 @@ export function useRewardedAd(placement: AdPlacement, userId: string | undefined
   const [left, setLeft] = useState<number | null>(null);
   const [ad, setAd] = useState<LoadedAd | null>(null);
   const [busy, setBusy] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
   // Bumped after each show: a verification token is single-use, so the next view needs a new ad.
   const [generation, setGeneration] = useState(0);
 
@@ -53,7 +63,12 @@ export function useRewardedAd(placement: AdPlacement, userId: string | undefined
     if (!available || !ready || !left) return;
     let current = true;
     loadRewardedAd(placement)
-      .then((loaded) => current && setAd(loaded))
+      .then((loaded) => {
+        if (current) setAd(loaded);
+        // Consent is gathered by now, so UMP knows whether the player needs a way back to it.
+        return adPrivacyOptionsRequired();
+      })
+      .then((required) => current && setPrivacy(required))
       .catch((error: unknown) => console.warn(`[ads] ${placement} did not load:`, error));
 
     return () => {
@@ -80,7 +95,13 @@ export function useRewardedAd(placement: AdPlacement, userId: string | undefined
     }
   }, [ad, refreshCoins]);
 
-  return { visible: available && left !== null, left, busy, watch };
+  return {
+    visible: available && left !== null,
+    left,
+    busy,
+    watch,
+    privacyOptions: privacy ? showAdPrivacyOptions : null,
+  };
 }
 
 /** The line a placement shows after a view that paid nothing; `null` after a paid one. */
