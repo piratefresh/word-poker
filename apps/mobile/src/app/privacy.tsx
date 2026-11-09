@@ -11,14 +11,14 @@ import { colors, fonts, fontSize, spacing } from "@/constants/theme";
 type Block = string | readonly [string, string];
 
 const INTRO =
-  "[COMPANY LEGAL NAME] (“we”, “us” or “our”) makes WordPoker, a word game played like Texas Hold’em with letter tiles. This policy explains what personal data the WordPoker app and website use, why, and the third-party services involved.";
+  "WordPoker Best Word Takes The Pot (“we”, “us” or “our”) makes WordPoker, a word game played like Texas Hold’em with letter tiles. This policy explains what personal data the WordPoker app and website use, why, and the third-party services involved.";
 const UPDATED = "Last updated: [DATE].";
 
 const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
     "Who we are",
     [
-      "[COMPANY LEGAL NAME], 2300 Walnut Street, Apt 519, Philadelphia, PA 19103, United States. For any privacy question, email [privacy@wordpoker.app] or call +1 (610) 247-3054.",
+      "WordPoker Best Word Takes The Pot, 2300 Walnut Street, Apt 519, Philadelphia, PA 19103, United States. For any privacy question, email [privacy@wordpoker.app] or call +1 (610) 247-3054.",
     ],
   ],
   [
@@ -131,7 +131,7 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
     "Contact",
     [
-      "[COMPANY LEGAL NAME]\n2300 Walnut Street, Apt 519\nPhiladelphia, PA 19103, United States\nEmail: [privacy@wordpoker.app]\nPhone: +1 (610) 247-3054",
+      "WordPoker Best Word Takes The Pot\n2300 Walnut Street, Apt 519\nPhiladelphia, PA 19103, United States\nEmail: [privacy@wordpoker.app]\nPhone: +1 (610) 247-3054",
     ],
   ],
 ];
