@@ -12,13 +12,13 @@ type Block = string | readonly [string, string];
 
 const INTRO =
   "WordPoker Best Word Takes The Pot (“we”, “us” or “our”) makes WordPoker, a word game played like Texas Hold’em with letter tiles. This policy explains what personal data the WordPoker app and website use, why, and the third-party services involved.";
-const UPDATED = "Last updated: [DATE].";
+const UPDATED = "Last updated: November 9, 2026.";
 
 const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
     "Who we are",
     [
-      "WordPoker Best Word Takes The Pot, 2300 Walnut Street, Apt 519, Philadelphia, PA 19103, United States. For any privacy question, email [privacy@wordpoker.app] or call +1 (610) 247-3054.",
+      "WordPoker Best Word Takes The Pot, 2300 Walnut Street, Apt 519, Philadelphia, PA 19103, United States. For any privacy question, email privacy@wordpoker.app or call +1 (610) 247-3054.",
     ],
   ],
   [
@@ -82,7 +82,7 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
       ["PostHog:", "analytics, crash reports, session replay."],
       ["Resend:", "account emails."],
       ["Cloudflare:", "avatar photo storage."],
-      ["[DATABASE HOST], [GAME SERVER HOST]:", "hosting our database and game servers."],
+      ["PlanetScale, Colyseus Cloud, Expo (EAS Hosting):", "hosting our database, game servers and website."],
       "We may also disclose data if the law requires it, or to protect players and the game from fraud and abuse.",
     ],
   ],
@@ -107,7 +107,7 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
     "Deleting your account and your rights",
     [
-      "You can delete your account at any time in the app: open the menu on your avatar, choose Settings, then Delete account. Depending on where you live, you may also have the right to access, correct, delete, export, restrict or object to the use of your personal data, and to withdraw consent. Email us at [privacy@wordpoker.app] and we will respond within the time the law requires. You can also complain to your local data protection authority.",
+      "You can delete your account at any time in the app: open the menu on your avatar, choose Settings, then Delete account. Depending on where you live, you may also have the right to access, correct, delete, export, restrict or object to the use of your personal data, and to withdraw consent. Email us at privacy@wordpoker.app and we will respond within the time the law requires. You can also complain to your local data protection authority.",
     ],
   ],
   [
@@ -131,7 +131,7 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
     "Contact",
     [
-      "WordPoker Best Word Takes The Pot\n2300 Walnut Street, Apt 519\nPhiladelphia, PA 19103, United States\nEmail: [privacy@wordpoker.app]\nPhone: +1 (610) 247-3054",
+      "WordPoker Best Word Takes The Pot\n2300 Walnut Street, Apt 519\nPhiladelphia, PA 19103, United States\nEmail: privacy@wordpoker.app\nPhone: +1 (610) 247-3054",
     ],
   ],
 ];
