@@ -182,6 +182,7 @@ export function RootLayout() {
                 <Stack.Screen name="reset-password" />
                 <Stack.Screen name="delete-account" />
                 <Stack.Screen name="privacy" />
+                <Stack.Screen name="policy" />
               </Stack>
               {restoring && !session ? (
                 <View accessibilityLabel="Signing in with Game Center" style={styles.restoring}>
