@@ -26,6 +26,12 @@
       "skillPath": "plugins/expo/skills/eas-simulator/SKILL.md",
       "computedHash": "c09dfa03d5f2988ab11f7c84eb767d7f0a9ccad7613407398b0f56c81f22c0d5"
     },
+    "expo-app-store-guideline-check": {
+      "source": "nandofalcao/expo-app-store-guideline-check",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "d8b0a4ea7914f56c0456c61840126461928365e89a63275757aeff25f0da1748"
+    },
     "expo-module": {
       "source": "expo/skills",
       "sourceType": "github",
