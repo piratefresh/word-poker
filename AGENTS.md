@@ -36,6 +36,16 @@ pnpm --filter @wordpoker/game-rules test     # node --test (same for contracts, 
 
 Edits to an Expo `+api.ts` route need a dev-server restart.
 
+# Deployment
+
+One host serves everything: **Colyseus Cloud**. Every push to `main` runs
+`.github/workflows/colyseus-cloud-deploy.yml`, which runs `expo export --platform web`, force-pushes
+`main` plus `apps/mobile/dist` to the `deploy` branch (never merge it back), and deploys that branch.
+The Colyseus server then serves the game rooms and the web export — pages and `+api.ts` routes —
+from `apps/server/src/app.config.ts`. `wordpoker.app` goes through Cloudflare's proxy;
+`api.wordpoker.app` hits the host directly. Postgres is on PlanetScale; avatars are in Cloudflare R2.
+Native apps ship through EAS (`apps/mobile/eas.json`).
+
 # Project structure
 
 ```
