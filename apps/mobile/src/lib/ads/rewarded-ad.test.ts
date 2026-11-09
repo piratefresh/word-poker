@@ -2,16 +2,21 @@ import type { RewardedAd } from "react-native-google-mobile-ads";
 import type { RewardVerificationResult } from "react-native-purchases";
 import { RevenueCatAdMob } from "react-native-purchases-admob";
 
-import { showRewardedAd } from "./rewarded-ad";
+import { AdsConsent } from "react-native-google-mobile-ads";
 
+import { loadRewardedAd, showRewardedAd } from "./rewarded-ad";
+
+const mockInitialize = jest.fn();
 jest.mock("react-native-google-mobile-ads", () => ({
   __esModule: true,
-  default: () => ({ initialize: jest.fn() }),
+  default: () => ({ initialize: mockInitialize }),
+  AdsConsent: { gatherConsent: jest.fn(), getConsentInfo: jest.fn() },
+  AdsConsentPrivacyOptionsRequirementStatus: { REQUIRED: "REQUIRED" },
   AdEventType: { CLOSED: "closed", ERROR: "error" },
   RewardedAdEventType: { LOADED: "rewarded_loaded" },
   TestIds: { REWARDED: "test-unit" },
 }));
-jest.mock("react-native-purchases-admob", () => ({ RevenueCatAdMob: { showWithRewardVerification: jest.fn() } }));
+jest.mock("react-native-purchases-admob", () => ({ RevenueCatAdMob: { createRewardedAd: jest.fn(), showWithRewardVerification: jest.fn() } }));
 jest.mock("@/lib/wallet/revenuecat", () => ({ configureRevenueCat: jest.fn(), revenuecatAvailable: () => true }));
 
 type Options = Parameters<typeof RevenueCatAdMob.showWithRewardVerification>[1];
@@ -61,5 +66,21 @@ describe("showRewardedAd", () => {
     options().onUserEarnedReward?.({ type: "coins", amount: 20 });
     options().onRewardVerificationCompleted({ failed: true, moreRewards: [] });
     await expect(outcome).resolves.toBe("failed");
+  });
+});
+
+describe("loadRewardedAd", () => {
+  it("loads nothing, and starts no ads SDK, until consent allows ads", async () => {
+    jest.mocked(AdsConsent.gatherConsent).mockResolvedValue({ canRequestAds: false } as never);
+    await expect(loadRewardedAd("coin_store_rewarded")).rejects.toThrow("consent");
+    expect(mockInitialize).not.toHaveBeenCalled();
+    expect(RevenueCatAdMob.createRewardedAd).not.toHaveBeenCalled();
+  });
+
+  it("asks again on the next load after a refusal", async () => {
+    jest.mocked(AdsConsent.gatherConsent).mockResolvedValue({ canRequestAds: true } as never);
+    jest.mocked(RevenueCatAdMob.createRewardedAd).mockRejectedValue(new Error("stop here"));
+    await expect(loadRewardedAd("coin_store_rewarded")).rejects.toThrow("stop here");
+    expect(mockInitialize).toHaveBeenCalledTimes(1);
   });
 });

@@ -68,6 +68,19 @@ jest.mock("react-native-purchases", () => {
   };
 });
 
+// The ads SDKs are native modules too; the Account sheet loads them for its Privacy choices link.
+// `rewarded-ad.test.ts` mocks both itself.
+jest.mock("react-native-google-mobile-ads", () => ({
+  __esModule: true,
+  default: () => ({ initialize: jest.fn() }),
+  AdsConsent: { requestInfoUpdate: jest.fn(async () => ({ privacyOptionsRequirementStatus: "NOT_REQUIRED" })) },
+  AdsConsentPrivacyOptionsRequirementStatus: { REQUIRED: "REQUIRED" },
+  AdEventType: {},
+  RewardedAdEventType: {},
+  TestIds: {},
+}));
+jest.mock("react-native-purchases-admob", () => ({ RevenueCatAdMob: {} }));
+
 // The XP overlay's bar is a Rive view, native-only and decoration: tests read the numbers around it.
 jest.mock("@/components/screens/results/xp-bar", () => ({ XpBar: () => null }));
 
