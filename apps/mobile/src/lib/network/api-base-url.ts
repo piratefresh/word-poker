@@ -14,6 +14,7 @@
  */
 
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 const devServerURL =
   __DEV__ && Constants.expoConfig?.hostUri
@@ -22,6 +23,10 @@ const devServerURL =
 
 /**
  * The origin this app's API routes are served from. Exported so no second module re-derives the
- * host; the order is the one the auth client has always used.
+ * host. In a browser it is the page's own origin: one build is served on both `wordpoker.app` and
+ * `api.wordpoker.app`, and each calls the API on its own host, so no request is cross-origin.
  */
-export const apiBaseURL = process.env.EXPO_PUBLIC_AUTH_URL ?? devServerURL;
+export const apiBaseURL =
+  Platform.OS === "web" && typeof window !== "undefined"
+    ? window.location.origin
+    : process.env.EXPO_PUBLIC_AUTH_URL ?? devServerURL;
