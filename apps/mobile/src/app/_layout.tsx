@@ -181,6 +181,8 @@ export function RootLayout() {
                     session is still on the device, and the reset has to win. */}
                 <Stack.Screen name="reset-password" />
                 <Stack.Screen name="delete-account" />
+                <Stack.Screen name="privacy" />
+                <Stack.Screen name="policy" />
               </Stack>
               {restoring && !session ? (
                 <View accessibilityLabel="Signing in with Game Center" style={styles.restoring}>

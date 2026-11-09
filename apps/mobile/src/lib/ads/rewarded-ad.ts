@@ -12,7 +12,14 @@
  */
 
 import { Platform } from "react-native";
-import mobileAds, { AdEventType, RewardedAdEventType, TestIds, type RewardedAd } from "react-native-google-mobile-ads";
+import mobileAds, {
+  AdEventType,
+  AdsConsent,
+  AdsConsentPrivacyOptionsRequirementStatus,
+  RewardedAdEventType,
+  TestIds,
+  type RewardedAd,
+} from "react-native-google-mobile-ads";
 import { RevenueCatAdMob } from "react-native-purchases-admob";
 
 import type { AdPlacement } from "@wordpoker/contracts";
@@ -38,12 +45,41 @@ export function rewardedAdsAvailable(): boolean {
 
 let initialized: Promise<unknown> | null = null;
 
-/** RevenueCat first, then Mobile Ads: the adapter only tracks while Purchases is configured. */
+/**
+ * Google's UMP consent message: the GDPR form where the law asks for one, and on iOS the ATT
+ * explainer and prompt when the AdMob "IDFA explainer" message is published. It shows only when
+ * needed, and remembers the answer. No ad loads until it allows one.
+ */
+async function gatherConsent(): Promise<void> {
+  const info = await AdsConsent.gatherConsent().catch(() => AdsConsent.getConsentInfo());
+  if (!info.canRequestAds) throw new Error("Ads need your consent first.");
+}
+
+/** RevenueCat first, then consent, then Mobile Ads: the adapter only tracks while Purchases is configured. */
 function initAds(): Promise<unknown> {
   configureRevenueCat();
-  initialized ??= mobileAds().initialize();
+  // A refusal or failure is not kept, so the next load asks again.
+  initialized ??= gatherConsent()
+    .then(() => mobileAds().initialize())
+    .catch((error: unknown) => {
+      initialized = null;
+      throw error;
+    });
 
   return initialized;
+}
+
+/** Whether the player's region needs a way back into the consent form (Account → Privacy choices). */
+export async function privacyOptionsRequired(): Promise<boolean> {
+  if (!rewardedAdsAvailable()) return false;
+  const info = await AdsConsent.requestInfoUpdate().catch(() => null);
+
+  return info?.privacyOptionsRequirementStatus === AdsConsentPrivacyOptionsRequirementStatus.REQUIRED;
+}
+
+/** Reopens the consent form so the player can change their ad choices. */
+export function showPrivacyOptions(): Promise<unknown> {
+  return AdsConsent.showPrivacyOptionsForm();
 }
 
 /**

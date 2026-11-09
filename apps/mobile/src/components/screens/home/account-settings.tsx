@@ -10,6 +10,7 @@
 import { isPlaceholderEmail } from "@wordpoker/contracts";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { openBrowserAsync } from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInUp, FadeOut, SlideInDown } from "react-native-reanimated";
@@ -19,7 +20,9 @@ import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, linkGameCenter } from "@/auth/client/game-center";
 import { linkSocial, SOCIAL_PROVIDERS, type SocialProvider } from "@/auth/client/social-sign-in";
 import { Field, paper } from "@/components/screens/auth/auth-shell";
+import { privacyOptionsRequired, showPrivacyOptions } from "@/lib/ads/rewarded-ad";
 import { pickAvatarPhoto, removeAvatar, uploadAvatar } from "@/lib/avatar/avatar-client";
+import { webOrigin } from "@/lib/navigation/invite-link";
 import { fonts, layout } from "@/constants/theme";
 import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { webTestID } from "@/lib/ui/web-id";
@@ -138,6 +141,14 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
     const uri = await pickAvatarPhoto().catch(() => null);
     if (uri) await changePhoto(() => uploadAvatar(uri), "PHOTO SAVED");
   };
+
+  // Ad consent (UMP): a way back into the form, only where the player's region requires one.
+  const [privacyChoices, setPrivacyChoices] = useState(false);
+  useEffect(() => {
+    let current = true;
+    void privacyOptionsRequired().then((required) => current && setPrivacyChoices(required), () => {});
+    return () => { current = false; };
+  }, []);
 
   const [deleting, setDeleting] = useState(false);
 
@@ -297,6 +308,28 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
           ) : null}
 
           {isGuest ? null : <NotificationSettings onSaved={() => flash("SAVED")} />}
+
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={8}
+            onPress={() => { void openBrowserAsync(`${webOrigin()}/privacy`).catch(() => {}); }}
+            style={styles.deleteLink}
+            testID="account-privacy-policy"
+          >
+            <Text style={styles.photoLink}>Privacy policy</Text>
+          </Pressable>
+
+          {privacyChoices ? (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => { void showPrivacyOptions().catch(() => {}); }}
+              style={styles.deleteLink}
+              testID="account-privacy-choices"
+            >
+              <Text style={styles.photoLink}>Privacy choices</Text>
+            </Pressable>
+          ) : null}
 
           {/* Waits on the sign-in methods, which guests never load: they have no account to delete. */}
           {providers ? (

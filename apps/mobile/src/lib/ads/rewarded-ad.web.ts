@@ -10,6 +10,14 @@ export function rewardedAdsAvailable(): boolean {
   return false;
 }
 
+export function privacyOptionsRequired(): Promise<boolean> {
+  return Promise.resolve(false);
+}
+
+export function showPrivacyOptions(): Promise<unknown> {
+  return Promise.resolve();
+}
+
 export function loadRewardedAd(_placement: AdPlacement): Promise<never> {
   return Promise.reject(new Error("No ads on the web."));
 }
