@@ -157,6 +157,49 @@ describe("<PowerUsePrompt />", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
+  test("asks Pickpocket's opponent among several, and passes the choice back", async () => {
+    const onAim = jest.fn();
+    const opponents = [{ id: "ellis", name: "Ellis" }, { id: "jay", name: "Jay" }];
+    const screen = await render(
+      <PowerUsePrompt
+        onAim={onAim}
+        onCancel={jest.fn()}
+        onConfirm={jest.fn()}
+        opponents={opponents}
+        power="pickpocket"
+        targeting={{ stage: "confirming", tile: TILE_A, targetId: "jay" }}
+      />,
+    );
+
+    expect(screen.getByText("Give Jay your A for one of their tiles?")).toBeTruthy();
+    expect(screen.getByText("STEAL")).toBeTruthy();
+    expect(screen.getByTestId("power-target-jay").props.accessibilityState).toMatchObject({ checked: true });
+    await fireEvent.press(screen.getByTestId("power-target-ellis"));
+    expect(onAim).toHaveBeenCalledWith("ellis");
+  });
+
+  test("names Tile Lock's only opponent without a choice, and doubles with Multiplier", async () => {
+    const lock = await render(
+      <PowerUsePrompt
+        onAim={jest.fn()}
+        onCancel={jest.fn()}
+        onConfirm={jest.fn()}
+        opponents={[{ id: "ellis", name: "Ellis" }]}
+        power="tile_lock"
+        targeting={{ stage: "confirming", tile: TILE_A, targetId: "ellis" }}
+      />,
+    );
+    expect(lock.getByText("Lock the A? Ellis can't use it this hand.")).toBeTruthy();
+    expect(lock.queryByTestId("power-target-ellis")).toBeNull();
+    await lock.unmount();
+
+    const double = await render(
+      <PowerUsePrompt onCancel={jest.fn()} onConfirm={jest.fn()} power="multiplier" targeting={{ stage: "confirming", tile: TILE_A }} />,
+    );
+    expect(double.getByText("Double your A? It scores 2x this hand.")).toBeTruthy();
+    expect(double.getByText("DOUBLE")).toBeTruthy();
+  });
+
   test("asks to confirm in the catalog's words, naming the tile", async () => {
     const onConfirm = jest.fn();
     const screen = await render(
@@ -268,6 +311,20 @@ describe("usePowerTargeting", () => {
     await act(() => table.hook.result.current.tablePick?.(TILE_A));
     await act(() => table.hook.result.current.confirm());
     expect(table.onUse).toHaveBeenCalledWith("spotlight", "A-1");
+  });
+
+  test("Tile Lock aims at the table and names the first opponent, which the confirm can change", async () => {
+    const onUse = jest.fn();
+    const opponents = [{ id: "ellis", name: "Ellis" }, { id: "jay", name: "Jay" }];
+    const hook = await renderHook(() => usePowerTargeting({ held: held({ id: "tile_lock" }), onUse, opponents }));
+
+    await act(() => hook.result.current.toggle());
+    expect(hook.result.current.ownPick).toBeUndefined();
+    await act(() => hook.result.current.tablePick?.(TILE_A));
+    expect(hook.result.current.targeting).toEqual({ stage: "confirming", tile: TILE_A, targetId: "ellis" });
+    await act(() => hook.result.current.aim("jay"));
+    await act(() => hook.result.current.confirm());
+    expect(onUse).toHaveBeenCalledWith("tile_lock", "A-1", "jay");
   });
 
   test("the chip's second tap cancels", async () => {

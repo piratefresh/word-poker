@@ -183,7 +183,8 @@ export interface OfflineGame {
    * one's place, and the discarded tile leaves the hero's draft. A use the engine refuses — off
    * the hero's turn, a tap that raced the clock — is dropped, as a stale betting tap is.
    */
-  usePower: (powerUpId: PowerUpId, tileId: string) => void;
+  /** Uses the held power on the tile it names; a hostile power (§46) also names the opponent. */
+  usePower: (powerUpId: PowerUpId, tileId: string, targetId?: string) => void;
   /** The felt has shown a "power used" card and it has cleared. */
   endPowerUsed: (event: PowerUsedEvent) => void;
   /**
@@ -648,8 +649,8 @@ export function useOfflineGame({
   );
 
   const usePower = useCallback(
-    (powerUpId: PowerUpId, tileId: string) => {
-      if (!act({ type: "usePowerUp", playerId: HERO_ID, powerUpId, tileId })) {
+    (powerUpId: PowerUpId, tileId: string, targetId?: string) => {
+      if (!act({ type: "usePowerUp", playerId: HERO_ID, powerUpId, tileId, ...(targetId === undefined ? {} : { targetId }) })) {
         // A tap the clock beat — its timer delayed or suspended — still shows the power as spent
         // rather than leaving it lit for a second tap the engine will refuse too.
         const endsAtMs = stateRef.current.endsAtMs;
@@ -657,7 +658,10 @@ export function useOfflineGame({
         return;
       }
       // The discarded tile leaves the draft the device holds between streets too; inside §19's
-      // window the engine has already taken it out of the seat's slot.
+      // window the engine has already taken it out of the seat's slot. Tile Lock and Multiplier
+      // leave the hero's own tiles where they are.
+      const family = POWER_UPS[powerUpId].family;
+      if (family === "tileLock" || family === "multiplier") return;
       setHeroDraft((draft) => {
         const kept = draft.filter((play) => play.tileId !== tileId);
         return kept.length === draft.length ? draft : kept;
@@ -772,6 +776,7 @@ function powerViewOf(
 
   const slot = powers.draw.slots.find((candidate) => candidate.playerId === HERO_ID);
   const held = powers.held[HERO_ID];
+  const traded = held?.swap ?? held?.pickpocket;
   const review = riverReview(state, HERO_ID);
   // The table's own timers settle every deadline — a turn that runs out is folded, a window that
   // runs out is closed — but a beat after it, so the clock in play is either still running or
@@ -791,15 +796,10 @@ function powerViewOf(
         : { id: held.id, used: held.used || review !== null, usable: canUsePower(state, HERO_ID, nowMs) },
     review:
       review?.map(({ word, score, submission }) => ({ word, score, plays: submission.plays })) ?? null,
-    swap:
-      held?.swap === undefined
-        ? null
-        : {
-            handId: state.hand,
-            powerUpId: held.id,
-            discardedTileId: held.swap.discardedTileId,
-            tile: held.swap.tile,
-          },
+    // Pickpocket's trade flips in the rack the way a swap does.
+    swap: traded === undefined
+      ? null
+      : { handId: state.hand, powerUpId: held!.id, discardedTileId: traded.discardedTileId, tile: traded.tile },
     used: events
       .filter((event) => event.handId === state.hand)
       .map((event) => ({

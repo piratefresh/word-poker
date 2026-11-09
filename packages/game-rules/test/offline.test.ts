@@ -1316,3 +1316,129 @@ describe("reduce — §44's Blank Tile and Spotlight", () => {
     assert.equal(canUsePower(window, "hero", window.endsAtMs - 1), false);
   });
 });
+
+describe("reduce — story mode's Pickpocket, Tile Lock, Multiplier and High Value Tile (§46)", () => {
+  /** A story hand where only the hero draws, holding `power`, walked politely until `stopAt` holds on the hero's turn. */
+  function heroHolding(power: PowerUpId, stopAt: (state: OfflineState) => boolean): OfflineState {
+    let state = dealHand({ powerUps: { deal: "choose3", offers: { hero: [power] } } });
+    state = reduce(state, { type: "pickPower", playerId: "hero", powerUpId: power }, NOW + 1);
+    for (let step = 0; !(stopAt(state) && state.toActIndex === 0); step += 1) {
+      assert.ok(step < 40, "the walk reaches the hero's turn");
+      state = reduce(state, politeAction(state), NOW + 2 + step);
+    }
+    return state;
+  }
+
+  const use = (state: OfflineState, power: PowerUpId, tileId: string, targetId?: string, nowMs = NOW + 100) =>
+    reduce(state, { type: "usePowerUp", playerId: "hero", powerUpId: power, tileId, ...(targetId === undefined ? {} : { targetId }) }, nowMs);
+  const refusedWith = (reason: PowerRejectionReason) => (error: unknown) =>
+    error instanceof PowerRejectionError && error.reason === reason;
+  const preflop = (s: OfflineState) => s.phase === "preflop";
+
+  it("Pickpocket trades the hero's named tile for one of the opponent's, the same one every time", () => {
+    const state = heroHolding("pickpocket", preflop);
+    const given = state.seats[0]!.privateTiles[0]!;
+    const robbed = use(state, "pickpocket", given.id, "ellis");
+
+    const theirs = state.seats[1]!.privateTiles;
+    const taken = robbed.seats[0]!.privateTiles[0]!;
+    assert.ok(theirs.some((tile) => tile.id === taken.id), "the hero holds one of Ellis's tiles");
+    assert.ok(robbed.seats[1]!.privateTiles.some((tile) => tile.id === given.id), "Ellis holds the hero's tile");
+    assert.equal(robbed.seats[1]!.privateTiles.length, theirs.length);
+    assert.deepEqual(robbed.powers?.held.hero?.pickpocket, { targetId: "ellis", discardedTileId: given.id, tile: taken });
+    assert.equal(robbed.toActIndex, state.toActIndex, "not a betting action");
+    assert.deepEqual(use(state, "pickpocket", given.id, "ellis").seats, robbed.seats, "fixed by the deal");
+  });
+
+  it("Pickpocket refuses the hero, a folded seat, nobody, a confirmed word and a tile not the hero's", () => {
+    const state = heroHolding("pickpocket", preflop);
+    const own = state.seats[0]!.privateTiles[0]!.id;
+    assert.throws(() => use(state, "pickpocket", own), refusedWith("not-an-opponent"));
+    assert.throws(() => use(state, "pickpocket", own, "hero"), refusedWith("not-an-opponent"));
+    assert.throws(() => use(state, "pickpocket", own, "nobody"), refusedWith("not-an-opponent"));
+    const folded = { ...state, seats: state.seats.map((seat) => (seat.id === "ellis" ? { ...seat, folded: true } : seat)) };
+    assert.throws(() => use(folded, "pickpocket", own, "ellis"), refusedWith("not-an-opponent"));
+    assert.throws(() => use(state, "pickpocket", state.seats[1]!.privateTiles[0]!.id, "ellis"), refusedWith("not-your-tile"));
+
+    const window = playToWindow(heroHolding("pickpocket", preflop), NOW + 2);
+    assert.equal(window.wordWindow?.status, "open");
+    const confirmed = cloneState(window);
+    if (confirmed.wordWindow?.status === "open") {
+      confirmed.wordWindow = {
+        ...confirmed.wordWindow,
+        slots: confirmed.wordWindow.slots.map((slot) =>
+          slot.playerId === "ellis" ? ({ ...slot, status: "confirmed" } as typeof slot) : slot,
+        ),
+      };
+    }
+    assert.throws(
+      () => use(confirmed, "pickpocket", confirmed.seats[0]!.privateTiles[0]!.id, "ellis", window.endsAtMs - 10),
+      refusedWith("target-confirmed"),
+    );
+  });
+
+  it("Tile Lock takes a dealt table tile from one opponent only, and waits for the flop", () => {
+    assert.equal(canUsePower(heroHolding("tile_lock", preflop), "hero", NOW + 100), false, "nothing dealt to lock");
+
+    const flop = heroHolding("tile_lock", (s) => s.phase === "flop");
+    assert.equal(canUsePower(flop, "hero", NOW + 100), true);
+    const tile = flop.community[0]!;
+    const locked = use(flop, "tile_lock", tile.id, "ellis");
+    const ids = (seat: number) => availableTiles(locked, seat).map((candidate) => candidate.id);
+    assert.ok(!ids(1).includes(tile.id), "Ellis can't build from it");
+    for (const seat of [0, 2, 3]) assert.ok(ids(seat).includes(tile.id), `seat ${seat} still can`);
+    assert.equal(locked.powers?.held.hero?.lock?.targetId, "ellis");
+    assert.equal(locked.powers?.held.hero?.lock?.tileId, tile.id);
+
+    assert.throws(() => use(flop, "tile_lock", flop.community[flop.revealed]!.id, "ellis"), refusedWith("not-a-table-tile"));
+    assert.throws(() => use(flop, "tile_lock", tile.id, "hero"), refusedWith("not-an-opponent"));
+  });
+
+  it("Tile Lock refuses its target a word on the locked tile", () => {
+    const probe = playToWindow(heroHolding("tile_lock", preflop), NOW + 2);
+    const tile = probe.community.find((candidate) => !("alternativeLetter" in candidate))!;
+    const own = probe.seats[1]!.privateTiles.find((candidate) => !("alternativeLetter" in candidate))!;
+    const word = `${own.letter}${tile.letter}`;
+    const window = playToWindow(heroHolding("tile_lock", preflop), NOW + 2);
+    const judged = { ...window, dictionary: testDictionary([word]) };
+    const confirm = (state: OfflineState) =>
+      reduce(state, { type: "confirmWord", playerId: "ellis", submission: { plays: [{ tileId: own.id }, { tileId: tile.id }] } }, window.endsAtMs - 10);
+
+    assert.doesNotThrow(() => confirm(judged), `${word} plays without the lock`);
+    const locked = use(judged, "tile_lock", tile.id, "ellis", window.endsAtMs - 20);
+    assert.throws(() => confirm(locked), "the locked tile is not Ellis's to play");
+  });
+
+  it("Multiplier doubles one of the hero's own tiles, and refuses a tile that already has a bonus", () => {
+    const state = heroHolding("multiplier", preflop);
+    const own = state.seats[0]!.privateTiles[0]!;
+    const doubled = use(state, "multiplier", own.id);
+    assert.equal(doubled.seats[0]!.privateTiles[0]!.multiplier, "double-letter");
+    assert.equal(doubled.powers?.held.hero?.multiplier?.tileId, own.id);
+    assert.throws(() => use(state, "multiplier", state.community[0]!.id), refusedWith("not-your-tile"));
+
+    const bonus = {
+      ...state,
+      seats: state.seats.map((seat, index) =>
+        index === 0 ? { ...seat, privateTiles: seat.privateTiles.map((t) => (t.id === own.id ? { ...t, multiplier: "triple-letter" as const } : t)) } : seat,
+      ),
+    };
+    assert.throws(() => use(bonus, "multiplier", own.id), refusedWith("already-bonus"));
+  });
+
+  it("High Value Tile swaps a private tile for an X, Z or Q at its §6 value", () => {
+    const tile = swapTile("high_value_tile", { dealSeed: SEED, seat: 0 });
+    assert.ok(["X", "Z", "Q"].includes(tile.letter));
+    const state = heroHolding("high_value_tile", preflop);
+    const swapped = use(state, "high_value_tile", state.seats[0]!.privateTiles[0]!.id);
+    assert.deepEqual(swapped.seats[0]!.privateTiles[0], tile);
+  });
+
+  it("deals a Wild table none of story mode's powers", () => {
+    for (let seed = 0; seed < 200; seed += 1) {
+      for (const offer of drawOffers(seed, 0)) {
+        assert.ok(!["pickpocket", "tile_lock", "multiplier", "high_value_tile"].includes(offer), `seed ${seed}`);
+      }
+    }
+  });
+});

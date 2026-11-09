@@ -7,12 +7,15 @@ packages:
 nodeLinker: hoisted
 
 # pnpm blocks a dependency's build scripts unless it is named here (`ERR_PNPM_IGNORED_BUILDS` fails
-# the install outright). All three only link the prebuilt binary their platform package already
-# ships (see each one's `optionalDependencies`), so nothing is compiled from source:
+# the install outright). None compiles from source: the first three link the prebuilt binary their
+# platform package already ships (see each one's `optionalDependencies`); @posthog/cli downloads its
+# prebuilt release binary from GitHub:
 #   esbuild            node install.js                      (vite/vitest's bundler)
 #   msgpackr-extract   node-gyp-build-optional-packages     (the server's msgpackr)
 #   unrs-resolver      node postinstall.js                  (eslint's resolver)
+#   @posthog/cli       node install.js                      (Hermes source-map upload in release builds)
 allowBuilds:
+  "@posthog/cli": true
   esbuild: true
   msgpackr-extract: true
   unrs-resolver: true

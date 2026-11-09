@@ -57,7 +57,13 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   const offline = useOfflineGame({ seed: 0, dictionary, session });
   const { game, words, results, powers, bossTells } = offline;
   const tell = bossTells[0];
-  const power = usePowerTargeting({ held: powers?.held, onUse: offline.usePower });
+  // A hostile power (§46) names one of the seats still in the hand.
+  const opponents = useMemo(
+    () => game.players.flatMap((player) =>
+      player === null || player.isHero || player.status === "fold" || player.status === "busted" ? [] : [{ id: player.id, name: player.name }]),
+    [game.players],
+  );
+  const power = usePowerTargeting({ held: powers?.held, onUse: offline.usePower, opponents });
   const flip = swapFlipOf(powers?.swap, power.discarded);
   const ownCardShowing = powers?.used.some((notice) => notice.mine) ?? false;
 
@@ -166,6 +172,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           balance={FREE_PLAY}
           lesson={{ stamp: `${PHASE_LABEL[game.phase]} · ${node.title.toUpperCase()}` }}
           game={{ ...game, players }}
+          communityPickAim={power.tableAim}
           onPickCommunityTile={power.tablePick}
           heroSideAccessory={
             powers === null ? null : (
@@ -190,7 +197,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
               )}
               {powers === null ? null : (
                 <>
-                  <PowerUsePrompt onCancel={power.cancel} onConfirm={power.confirm} power={powers.held?.id ?? null} targeting={power.targeting} />
+                  <PowerUsePrompt onAim={power.aim} onCancel={power.cancel} onConfirm={power.confirm} opponents={opponents} power={powers.held?.id ?? null} targeting={power.targeting} />
                   <PowerUsedCard notices={powers.used} onDone={offline.endPowerUsed} />
                 </>
               )}

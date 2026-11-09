@@ -221,6 +221,7 @@ function OfflineTable({
           // Free play (ADR 0002): the offline table's chips are local, so no Wallet is read.
           balance={FREE_PLAY}
           game={game}
+          communityPickAim={power.tableAim}
           onPickCommunityTile={power.tablePick}
           heroSideAccessory={
             powers === null ? null : (

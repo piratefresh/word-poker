@@ -80,7 +80,7 @@ import * as powerDraw from "../powers/power-draw";
 import type { DrawSeat, HeldPower, PowerDraw } from "../powers/power-draw";
 import { swapTile } from "../powers/power-swap";
 import { resolvePayout, type JudgedSeat } from "../money/pots";
-import { createRng } from "../core/rng";
+import { createRng, mixSeed } from "../core/rng";
 import { scoreWord } from "../words/scoring";
 import { DRAW_SEED_SALT, rankShowdown } from "../money/showdown";
 import * as wordWindow from "../words/word-window";
@@ -494,7 +494,7 @@ function timeoutPowerDraw(state: OfflineState, nowMs: number): OfflineState {
 }
 
 /**
- * A seat uses its held power (§44). Every v1 power swaps a private tile: the new plain tile takes
+ * A seat uses its held power (§44). The swap powers trade a private tile: the new plain tile takes
  * the discarded one's place in the rack, and — inside §19's window — the discarded tile leaves the
  * seat's draft. Using it is not a betting action: the turn, and its clock, are exactly where they
  * were, so the seat still acts afterwards.
@@ -521,13 +521,15 @@ function applyUsePower(
     throw new PowerRejectionError("not-held");
   }
 
-  if (POWER_UPS[action.powerUpId].family === "spotlight") {
-    return applySpotlight(state, powers, held, action);
-  }
+  const family = POWER_UPS[action.powerUpId].family;
+  if (family === "spotlight") return applySpotlight(state, powers, held, action);
+  if (family === "tileLock") return applyTileLock(state, powers, held, action);
 
   if (!seat.privateTiles.some((tile) => tile.id === action.tileId)) {
     throw new PowerRejectionError("not-your-tile");
   }
+  if (family === "multiplier") return applyMultiplier(state, powers, held, seatIndex, action);
+  if (family === "pickpocket") return applyPickpocket(state, powers, held, seatIndex, action);
 
   const tile = swapTile(action.powerUpId, { dealSeed: state.seed, seat: seatIndex });
   const seats = [...state.seats];
@@ -565,7 +567,7 @@ function applySpotlight(
   if (tile === undefined || index >= state.revealed) throw new PowerRejectionError("not-a-table-tile");
   if (tile.multiplier !== undefined) throw new PowerRejectionError("already-bonus");
 
-  const letter = "alternativeLetter" in tile ? `${tile.letter}/${tile.alternativeLetter}` : tile.letter;
+  const letter = printedLetter(tile);
   return {
     ...state,
     community: state.community.map((candidate, at) =>
@@ -574,6 +576,130 @@ function applySpotlight(
     powers: {
       ...powers,
       held: { ...powers.held, [action.playerId]: { ...held, used: true, spotlight: { tileId: tile.id, letter } } },
+    },
+  };
+}
+
+/**
+ * The opponent a hostile power names (§46): a seat still in the hand that is not the user, and
+ * one whose word is still open — a confirmed word's tiles are locked for its owner and its
+ * robber alike.
+ *
+ * @throws {PowerRejectionError} `not-an-opponent` for no such seat, `target-confirmed` for one
+ *   that has confirmed its word.
+ */
+function opponentOf(state: OfflineState, playerId: PlayerId, targetId: PlayerId | undefined): number {
+  const index = state.seats.findIndex((candidate) => candidate.id === targetId);
+  const target = state.seats[index];
+  if (target === undefined || target.id === playerId || target.folded || target.sittingOut) {
+    throw new PowerRejectionError("not-an-opponent");
+  }
+  const slot = state.wordWindow?.status === "open"
+    ? state.wordWindow.slots.find((candidate) => candidate.playerId === target.id)
+    : undefined;
+  if (slot !== undefined && slot.status !== "drafting") throw new PowerRejectionError("target-confirmed");
+  return index;
+}
+
+/** What a tile prints, both faces for a choice tile: "A", or "A/E". */
+function printedLetter(tile: Tile): string {
+  return "alternativeLetter" in tile ? `${tile.letter}/${tile.alternativeLetter}` : tile.letter;
+}
+
+/**
+ * Pickpocket (§46): the seat's named private tile goes to the opponent, and one of the opponent's
+ * private tiles — the seat cannot see them, so it is drawn from a stream of the seat's own, fixed
+ * by the deal — comes back in its place. Both tiles move as they are, bonus and all, and each
+ * leaves its old owner's draft.
+ */
+function applyPickpocket(
+  state: OfflineState,
+  powers: HandPowers,
+  held: HeldPower,
+  seatIndex: number,
+  action: Extract<OfflineAction, { type: "usePowerUp" }>,
+): OfflineState {
+  const targetIndex = opponentOf(state, action.playerId, action.targetId);
+  const seat = state.seats[seatIndex];
+  const target = state.seats[targetIndex];
+  const given = seat?.privateTiles.find((tile) => tile.id === action.tileId);
+  const roll = createRng(mixSeed(state.seed, seatIndex, "pickpocket"))();
+  const taken = target?.privateTiles[Math.floor(roll * target.privateTiles.length)];
+  if (seat === undefined || target === undefined || given === undefined || taken === undefined) {
+    throw new PowerRejectionError("not-an-opponent");
+  }
+
+  const seats = [...state.seats];
+  seats[seatIndex] = { ...seat, privateTiles: seat.privateTiles.map((tile) => (tile.id === given.id ? taken : tile)) };
+  seats[targetIndex] = { ...target, privateTiles: target.privateTiles.map((tile) => (tile.id === taken.id ? given : tile)) };
+
+  return {
+    ...state,
+    seats,
+    wordWindow: withoutDraftTile(withoutDraftTile(state.wordWindow, action.playerId, given.id), target.id, taken.id),
+    powers: {
+      ...powers,
+      held: {
+        ...powers.held,
+        [action.playerId]: { ...held, used: true, pickpocket: { targetId: target.id, discardedTileId: given.id, tile: taken } },
+      },
+    },
+  };
+}
+
+/**
+ * Tile Lock (§46): a dealt community tile the named opponent can no longer build from this hand
+ * (`availableTiles` leaves it out for that seat), and leaves its draft. Every other seat keeps it.
+ */
+function applyTileLock(
+  state: OfflineState,
+  powers: HandPowers,
+  held: HeldPower,
+  action: Extract<OfflineAction, { type: "usePowerUp" }>,
+): OfflineState {
+  const index = state.community.findIndex((tile) => tile.id === action.tileId);
+  const tile = state.community[index];
+  if (tile === undefined || index >= state.revealed) throw new PowerRejectionError("not-a-table-tile");
+  const target = state.seats[opponentOf(state, action.playerId, action.targetId)]!;
+
+  return {
+    ...state,
+    wordWindow: withoutDraftTile(state.wordWindow, target.id, tile.id),
+    powers: {
+      ...powers,
+      held: {
+        ...powers.held,
+        [action.playerId]: { ...held, used: true, lock: { targetId: target.id, tileId: tile.id, letter: printedLetter(tile) } },
+      },
+    },
+  };
+}
+
+/** Multiplier (§46): one of the seat's own private tiles with no bonus of its own scores double this hand. */
+function applyMultiplier(
+  state: OfflineState,
+  powers: HandPowers,
+  held: HeldPower,
+  seatIndex: number,
+  action: Extract<OfflineAction, { type: "usePowerUp" }>,
+): OfflineState {
+  const seat = state.seats[seatIndex]!;
+  const tile = seat.privateTiles.find((candidate) => candidate.id === action.tileId)!;
+  if (tile.multiplier !== undefined) throw new PowerRejectionError("already-bonus");
+
+  const seats = [...state.seats];
+  seats[seatIndex] = {
+    ...seat,
+    privateTiles: seat.privateTiles.map((candidate) =>
+      candidate.id === tile.id ? { ...candidate, multiplier: "double-letter" } : candidate,
+    ),
+  };
+  return {
+    ...state,
+    seats,
+    powers: {
+      ...powers,
+      held: { ...powers.held, [action.playerId]: { ...held, used: true, multiplier: { tileId: tile.id, letter: printedLetter(tile) } } },
     },
   };
 }
@@ -613,6 +739,8 @@ function powerUseRefusal(
   if (POWER_UPS[powerUpId].family === "spotlight" && state.phase !== "flop" && state.phase !== "turn") {
     return "outside-window";
   }
+  // Tile Lock aims at a dealt table tile, so it waits for the flop.
+  if (POWER_UPS[powerUpId].family === "tileLock" && state.revealed === 0) return "outside-window";
 
   return powerWindowRefusal(state, seatIndex, playerId, nowMs);
 }
@@ -1151,7 +1279,8 @@ function judgeWindow(state: OfflineState, slots: readonly WordSlot[]): WindowSet
 }
 
 /**
- * Every tile a seat may build from: its private tiles plus the whole community board (§12).
+ * Every tile a seat may build from: its private tiles plus the whole community board (§12),
+ * less any community tile an opponent's Tile Lock took from it (§46).
  * The seat is looked up by index because a slot names the seat it belongs to; `?? []` is
  * unreachable for a seat in the window, and is spelled out rather than cast.
  *
@@ -1160,7 +1289,11 @@ function judgeWindow(state: OfflineState, slots: readonly WordSlot[]): WindowSet
  */
 export function availableTiles(state: OfflineState, seatIndex: number): readonly Tile[] {
   const seat = state.seats[seatIndex];
-  return seat === undefined ? [] : [...seat.privateTiles, ...state.community];
+  if (seat === undefined) return [];
+  const locked = new Set(
+    Object.values(state.powers?.held ?? {}).flatMap((held) => (held.lock?.targetId === seat.id ? [held.lock.tileId] : [])),
+  );
+  return [...seat.privateTiles, ...state.community.filter((tile) => !locked.has(tile.id))];
 }
 
 /** Where the table is, for a refusal to name: the phase, and §19's window when it is open. */

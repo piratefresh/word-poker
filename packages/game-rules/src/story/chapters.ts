@@ -52,8 +52,16 @@ const HANDS_THEN_BOSS = (boss: string): readonly StoryNode[] => [
   { id: boss, kind: "boss" },
 ];
 
-// Pickpocket, Tile Lock, Multiplier and High Value Tile join these pools with STO-975.
-const LATE_POOL: readonly PowerUpId[] = ["blank_tile", "random_wild"];
+// Each chapter's draft pool adds to the one before (STO-975); Chapter 4 trades Vowel Magnet for
+// Multiplier and High Value Tile, and the final chapter's loadout picks from that same pool.
+const KITCHEN_POOL: readonly PowerUpId[] = ["blank_tile", "random_wild"];
+const LOCAL_POOL: readonly PowerUpId[] = [...KITCHEN_POOL, "vowel_magnet", "pickpocket"];
+const BACK_ROOM_POOL: readonly PowerUpId[] = [...LOCAL_POOL, "tile_lock"];
+const LATE_POOL: readonly PowerUpId[] = [
+  ...BACK_ROOM_POOL.filter((id) => id !== "vowel_magnet"),
+  "multiplier",
+  "high_value_tile",
+];
 
 export const STORY_CHAPTERS: readonly StoryChapter[] = [
   {
@@ -70,7 +78,7 @@ export const STORY_CHAPTERS: readonly StoryChapter[] = [
       { id: "bonus", kind: "bonus" },
       { id: "professor", kind: "boss" },
     ],
-    powerPool: ["blank_tile", "random_wild"],
+    powerPool: KITCHEN_POOL,
     reward: { coins: 100, xp: 50 },
   },
   {
@@ -80,7 +88,7 @@ export const STORY_CHAPTERS: readonly StoryChapter[] = [
     boss: "Vowel Vinny",
     threshold: 24,
     nodes: HANDS_THEN_BOSS("vowel-vinny"),
-    powerPool: ["blank_tile", "random_wild", "vowel_magnet"],
+    powerPool: LOCAL_POOL,
     reward: { coins: 200, xp: 100 },
   },
   {
@@ -90,7 +98,7 @@ export const STORY_CHAPTERS: readonly StoryChapter[] = [
     boss: "The Hustler",
     threshold: 30,
     nodes: HANDS_THEN_BOSS("hustler"),
-    powerPool: ["blank_tile", "random_wild", "vowel_magnet"],
+    powerPool: BACK_ROOM_POOL,
     reward: { coins: 300, xp: 150 },
   },
   {

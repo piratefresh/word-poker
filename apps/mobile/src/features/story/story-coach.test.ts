@@ -1,6 +1,6 @@
 import type { Tile } from "@wordpoker/contracts";
 
-import { bestUnusedTile, storyCoachLine } from "./story-coach";
+import { bestUnusedTile, powerIntroLine, storyCoachLine } from "./story-coach";
 
 const goals = { two: 11, three: 14 };
 const K: Tile = { id: "K-1", letter: "K", points: 5 };
@@ -36,4 +36,10 @@ test("a one-point leftover is not worth a tip", () => {
 
 test("a run of tiles that is not a word is not praised for its score", () => {
   expect(storyCoachLine({ ...base, word: "BOSKN", score: 14, valid: false })).toBe("BOSKN isn't a word. Slide the tiles around to spell one.");
+});
+
+test("the coach introduces new powers, and says nothing when none are new", () => {
+  expect(powerIntroLine([])).toBe("");
+  expect(powerIntroLine(["multiplier"])).toBe("New power! Multiplier: put it on your best letter. It scores double.");
+  expect(powerIntroLine(["pickpocket", "tile_lock"])).toMatch(/^New powers! Pickpocket: .* Tile Lock: /);
 });

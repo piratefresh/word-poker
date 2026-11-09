@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
-import { POWER_UPS, type PowerUpId, type Tile as TileData } from "@wordpoker/contracts";
+import { POWER_UPS, type PowerUpFamily, type PowerUpId, type Tile as TileData } from "@wordpoker/contracts";
 
 import { useCompactControls, useScreenScale } from "@/components/screens/game/screen-scale";
 import { GameButton } from "@/components/ui/game-button";
@@ -13,7 +13,7 @@ import type { PowerView } from "@/features/table/power-view";
 import { webTestID } from "@/lib/ui/web-id";
 
 import { POWER_CARD_ASPECT, PowerCard, PowerCardMini, powerCardLabel } from "./power-card";
-import type { PowerTargeting } from "./use-power-targeting";
+import type { PowerOpponent, PowerTargeting } from "./use-power-targeting";
 
 /**
  * The power the hero holds this hand, just left of their seat on the felt: the card the Power
@@ -63,7 +63,7 @@ export function PowerHeldChip({
       <Pressable
         accessibilityHint={
           explainsSpotlight ? "Explains when Spotlight can be used" : state === "ready"
-            ? (active ? "Cancels using it" : held.id === "spotlight" ? "Choose a table tile" : "Choose one of your tiles to swap") : undefined
+            ? (active ? "Cancels using it" : held.id === "spotlight" || held.id === "tile_lock" ? "Choose a table tile" : "Choose one of your tiles") : undefined
         }
         accessibilityLabel={`${powerCardLabel(held.id)}${held.used ? " Used." : explainsSpotlight ? " Unavailable." : ""}`}
         accessibilityRole="button"
@@ -111,29 +111,33 @@ export function PowerUsePrompt({
   targeting,
   onCancel,
   onConfirm,
+  opponents = [],
+  onAim,
 }: {
   power: PowerUpId | null;
   targeting: PowerTargeting;
   onCancel: () => void;
   onConfirm: () => void;
+  /** The seats a hostile power may name (§46); with more than one the confirm lets the hero choose. */
+  opponents?: readonly PowerOpponent[];
+  onAim?: (targetId: string) => void;
 }) {
-  const spotlight = power !== null && POWER_UPS[power].family === "spotlight";
-  const question =
-    power !== null && targeting.stage === "confirming"
-      ? spotlight
-        ? `Spotlight the ${tileLetters(targeting.tile)}? It scores double for everyone.`
-        : `Discard ${tileLetters(targeting.tile)} for ${POWER_UPS[power].receives}?`
-      : null;
-  const caption =
-    power !== null && targeting.stage === "confirming" ? tradeCaption(power, targeting.tile) : null;
+  const family = power === null ? null : POWER_UPS[power].family;
+  const aimsAtTable = family === "spotlight" || family === "tileLock";
+  const confirming = targeting.stage === "confirming" ? targeting : null;
+  const target = opponents.find((opponent) => opponent.id === confirming?.targetId)?.name ?? "them";
+  const question = power !== null && confirming !== null ? promptQuestion(power, confirming.tile, target) : null;
+  const caption = power !== null && confirming !== null ? tradeCaption(power, confirming.tile, target) : null;
   const stage = power === null ? "idle" : targeting.stage;
-  // A swap hands back a plain tile, so a 2x/3x tile loses its bonus (§44).
-  const bonusLost = !spotlight && targeting.stage === "confirming" && targeting.tile.multiplier !== undefined;
+  // A swap hands back a plain tile, so a 2x/3x tile loses its bonus (§44). Pickpocket's tile
+  // travels with its bonus, and Multiplier refuses a tile that has one.
+  const bonusLost = (family === "swapTile" || family === "blankTile") && confirming?.tile.multiplier !== undefined;
+  const picker = power !== null && POWER_UPS[power].hostile && opponents.length > 1 && onAim !== undefined;
 
   // Each stage says itself once: the rack is waiting, or the felt is asking.
   useEffect(() => {
-    if (stage === "picking") AccessibilityInfo.announceForAccessibility(spotlight ? "Choose a table tile" : "Choose one of your tiles to swap");
-  }, [stage, spotlight]);
+    if (stage === "picking") AccessibilityInfo.announceForAccessibility(aimsAtTable ? "Choose a table tile" : family === "multiplier" ? "Choose one of your tiles" : "Choose one of your tiles to swap");
+  }, [stage, aimsAtTable, family]);
   useEffect(() => {
     if (question !== null) AccessibilityInfo.announceForAccessibility(question);
   }, [question]);
@@ -161,7 +165,7 @@ export function PowerUsePrompt({
         <View pointerEvents="box-none" style={styles.hintRow}>
           <FeltSheet radius={16} style={styles.hintBar}>
             <View style={styles.hintText}>
-              <Text style={styles.hintTitle}>{spotlight ? "TAP A TABLE TILE" : "TAP A TILE TO SWAP"}</Text>
+              <Text style={styles.hintTitle}>{aimsAtTable ? "TAP A TABLE TILE" : family === "multiplier" ? "TAP ONE OF YOUR TILES" : "TAP A TILE TO SWAP"}</Text>
               <Text style={styles.caption}>{POWER_UPS[power].title.toUpperCase()}</Text>
             </View>
             <Pressable
@@ -182,10 +186,30 @@ export function PowerUsePrompt({
             <Text style={styles.question}>{question}</Text>
             {caption === null ? null : <Text style={[styles.caption, styles.tradeCaption]}>{caption}</Text>}
             {bonusLost ? <Text style={styles.warning}>This tile&apos;s bonus will be lost</Text> : null}
+            {picker ? (
+              <View accessibilityRole="radiogroup" style={styles.targets}>
+                {opponents.map((opponent) => {
+                  const on = opponent.id === confirming?.targetId;
+                  return (
+                    <Pressable
+                      accessibilityLabel={`Use it on ${opponent.name}`}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: on }}
+                      key={opponent.id}
+                      onPress={() => onAim(opponent.id)}
+                      style={[styles.target, on && styles.targetOn]}
+                      testID={`power-target-${opponent.id}`}
+                    >
+                      <Text style={[styles.targetText, on && styles.targetTextOn]}>{opponent.name.toUpperCase()}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
             <View style={styles.actions}>
-              <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" variant="wood" />
+              <GameButton label="CANCEL" onPress={onCancel} style={styles.action} testID="power-cancel" variant="dark" />
               <GameButton
-                label={spotlight ? "SPOTLIGHT" : "SWAP"}
+                label={CONFIRM_LABEL[family ?? "swapTile"]}
                 onPress={onConfirm}
                 style={styles.action}
                 testID="power-confirm"
@@ -236,11 +260,42 @@ function tilePoints(tile: TileData): string {
   return "alternativeLetter" in tile ? `${tile.points}/${tile.alternativePoints}` : `${tile.points}`;
 }
 
+/** The confirm's button, by what the power does. */
+const CONFIRM_LABEL: { readonly [Family in PowerUpFamily]: string } = {
+  swapTile: "SWAP",
+  blankTile: "SWAP",
+  spotlight: "SPOTLIGHT",
+  review: "USE",
+  pickpocket: "STEAL",
+  tileLock: "LOCK",
+  multiplier: "DOUBLE",
+};
+
+/** The confirm's question in the catalog's words: "Discard A for a random letter?". */
+function promptQuestion(power: PowerUpId, tile: TileData, target: string): string {
+  const letters = tileLetters(tile);
+  switch (POWER_UPS[power].family) {
+    case "spotlight":
+      return `Spotlight the ${letters}? It scores double for everyone.`;
+    case "tileLock":
+      return `Lock the ${letters}? ${target} can't use it this hand.`;
+    case "multiplier":
+      return `Double your ${letters}? It scores 2x this hand.`;
+    case "pickpocket":
+      return `Give ${target} your ${letters} for one of their tiles?`;
+    default:
+      return `Discard ${letters} for ${POWER_UPS[power].receives}?`;
+  }
+}
+
 /** The confirm's small print, spelling out the trade: "YOUR P (4) GOES · THE BLANK SCORES 0". */
-function tradeCaption(power: PowerUpId, tile: TileData): string {
+function tradeCaption(power: PowerUpId, tile: TileData, target: string): string {
   const named = `${tileLetters(tile)} (${tilePoints(tile)})`;
   const { family, receives } = POWER_UPS[power];
   if (family === "spotlight") return `THE ${named} SCORES DOUBLE · FOR EVERYONE`;
+  if (family === "tileLock") return `THE ${named} IS OFF LIMITS · FOR ${target.toUpperCase()}`;
+  if (family === "multiplier") return `YOUR ${named} SCORES 2X · THIS HAND`;
+  if (family === "pickpocket") return `YOUR ${named} GOES TO ${target.toUpperCase()} · A RANDOM TILE OF THEIRS COMES IN`;
   if (family === "blankTile") return `YOUR ${named} GOES · THE BLANK SCORES 0`;
   return `YOUR ${named} GOES · ${receives.toUpperCase()} COMES IN`;
 }
@@ -346,5 +401,10 @@ const styles = StyleSheet.create({
   tradeCaption: { marginTop: -spacing.sm, textAlign: "center" },
   warning: { color: ledger.goldText, fontFamily: fonts.sansMedium, fontSize: 13, textAlign: "center" },
   actions: { alignSelf: "stretch", flexDirection: "row", gap: spacing.sm },
+  targets: { alignSelf: "stretch", flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, justifyContent: "center" },
+  target: { borderColor: colors.goldDeep, borderRadius: radius.card, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 8 },
+  targetOn: { backgroundColor: colors.goldDeep, borderColor: ledger.goldText },
+  targetText: { color: ledger.goldText, fontFamily: fonts.sansMedium, fontSize: 13, letterSpacing: 1 },
+  targetTextOn: { color: palette.cream100 },
   action: { flex: 1 },
 });

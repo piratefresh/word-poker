@@ -39,8 +39,8 @@ export function createRng(seed: number): () => number {
   };
 }
 
-/** Which power stream a mixed seed feeds (§44): the Power Draw's offers, or a swap's letter. */
-export type PowerSeedSalt = "offer" | "letter";
+/** Which power stream a mixed seed feeds (§44): the Power Draw's offers, a swap's letter, or the tile Pickpocket takes (§46). */
+export type PowerSeedSalt = "offer" | "letter" | "pickpocket";
 
 /** The golden-ratio increment that spreads consecutive seats far apart before the finaliser. */
 const SEAT_STEP = 0x9e3779b9;

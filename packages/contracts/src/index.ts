@@ -40,6 +40,7 @@ export {
   POWER_UP_DEAL_MODES,
   POWER_UP_IDS,
   POWER_UPS,
+  WILD_POWER_UP_IDS,
   isPowerUpDealMode,
   isPowerUpId,
   isPowerUpSettings,

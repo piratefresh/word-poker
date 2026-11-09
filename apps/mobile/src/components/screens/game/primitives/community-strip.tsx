@@ -103,18 +103,24 @@ function SpotlightBeam({
   );
 }
 
+/** Which power is aiming at the board. */
+export type CommunityPickAim = "spotlight" | "lock";
+
 export function CommunityStrip({
   tiles,
   inTable = false,
   scale: requestedScale,
   onPick,
+  pickAim = "spotlight",
 }: {
   tiles: readonly (LetterTileData | null)[];
   /** On the tabletop the row sits in the table: no label band, undealt slots are tile backs. */
   inTable?: boolean;
   scale?: number;
-  /** Spotlight's aim: a tap on a dealt tile with no bonus picks it; other tiles stay inert. */
+  /** A power's aim at the table: a tap on a dealt tile picks it; other tiles stay inert. */
   onPick?: (tile: LetterTileData) => void;
+  /** Which power aims: Spotlight skips tiles with a bonus; Tile Lock (§46) can take any dealt tile. */
+  pickAim?: CommunityPickAim;
 }) {
   const screenScale = useScreenScale();
   const scale = requestedScale ?? screenScale;
@@ -154,9 +160,9 @@ export function CommunityStrip({
                 testID={`community-slot-${index}`}
                 tile={tile}
               >
-                {onPick !== undefined && tile.multiplier === undefined ? (
+                {onPick !== undefined && (pickAim === "lock" || tile.multiplier === undefined) ? (
                   <Pressable
-                    accessibilityLabel={`Spotlight ${tile.letter}`}
+                    accessibilityLabel={`${pickAim === "lock" ? "Lock" : "Spotlight"} ${tile.letter}`}
                     accessibilityRole="button"
                     id={webTestID(`community-tile-${tile.id}`)}
                     onPress={() => onPick(tile)}
