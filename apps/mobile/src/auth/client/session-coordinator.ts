@@ -13,6 +13,7 @@
 import * as SecureStore from "expo-secure-store";
 
 import { leaveTable } from "@/features/online/room-session";
+import { readItem, writeItem } from "@/lib/storage/claim-store";
 
 import { authClient } from "./auth-client";
 
@@ -43,15 +44,29 @@ export function changeSessionIfSignedOut<T>(change: () => Promise<T>): Promise<T
 }
 
 const RESTORE_KEY = "wordpoker.platformRestore";
+const INSTALLED_KEY = "installed";
+
+/**
+ * The iOS Keychain outlives the app, but the kv-store is deleted with it: no marker there means a
+ * fresh install, and a fresh install starts with restore on, not with a choice made before deleting it.
+ */
+async function forgetChoiceFromEarlierInstall(): Promise<void> {
+  if (readItem(INSTALLED_KEY)) return;
+  if (__DEV__) console.info("[game-center] fresh install: forgetting an earlier guest/sign-out choice");
+  await SecureStore.deleteItemAsync(RESTORE_KEY).catch(() => {});
+  writeItem(INSTALLED_KEY, "1");
+}
 
 /**
  * Persisted before the sign-out or guest choice it belongs to, so a relaunch or a foreground
  * cannot sneak a restore in between. Web has no platform restore (nor SecureStore): a no-op there.
  */
 export async function setAutoRestore(allowed: boolean): Promise<void> {
+  await forgetChoiceFromEarlierInstall();
   await (allowed ? SecureStore.deleteItemAsync(RESTORE_KEY) : SecureStore.setItemAsync(RESTORE_KEY, "off")).catch(() => {});
 }
 
 export async function autoRestoreAllowed(): Promise<boolean> {
+  await forgetChoiceFromEarlierInstall();
   return (await SecureStore.getItemAsync(RESTORE_KEY).catch(() => null)) !== "off";
 }
