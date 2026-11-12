@@ -13,7 +13,8 @@
     "export:check": "expo export --platform android --platform ios --output-dir .expo/export-check",
     "lint": "expo lint",
     "reset-project": "node ./scripts/reset-project.js",
-    "test:auth": "tsx --test \"src/auth/server/*.test.mjs\""
+    "test:auth": "tsx --test \"src/auth/server/*.test.mjs\"",
+    "eas-build-post-install": "mkdir -p ~/.posthog && ln -sf \"$PWD/../../node_modules/.bin/posthog-cli\" ~/.posthog/posthog-cli"
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.4",
