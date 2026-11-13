@@ -41,19 +41,20 @@ export interface Challenge {
 export const CHALLENGES: readonly Challenge[] = [
   {
     id: "first-hand",
-    version: 2,
+    version: 3,
     title: "First Hand",
     players: ["hero", "ellis"],
-    // Both hands are authored: Ellis's best word is SLUNK for 12 (a BOATS for 10 loses to it) and
-    // KNOBS for 14 is always the hero's way past it. No seven-letter word for either seat: the Full
-    // Rack Bonus is Word Wizard's lesson (an E and R here would hand Ellis TANKERS for 25).
-    deal: { hands: { 0: ["B", "O"], 1: ["L", "U"] }, board: ["A", "T", "S", "K", "N"] },
+    // Both hands are authored, and both best words are everyday ones: Ellis's is MAKES for 13 (a
+    // BOATS for 10 loses to it) and BANKS for 14 (BONKS and KNOBS tie it) is always the hero's way
+    // past it. No seven-letter word for either seat: the Full Rack Bonus is Word Wizard's lesson
+    // (an E and R here would hand Ellis TANKERS for 25).
+    deal: { hands: { 0: ["B", "O"], 1: ["E", "M"] }, board: ["A", "T", "S", "K", "N"] },
     goal: "Spell a word from your two tiles and the board.",
-    teachWord: "KNOBS",
+    teachWord: "BANKS",
     coach: {
       preflop: "B and O are yours alone. Call to see the board.",
       flop: "BOATS is 10, but rare letters pay more. A K is worth 5, so watch for one.",
-      turn: "There's the K, worth 5. Your B and O can carry it far.",
+      turn: "There's the K, worth 5. Put your B in front of the board's A, N, K and S.",
       river: "All five are out. Build your best word.",
       payout: "The best word takes the pot.",
     },

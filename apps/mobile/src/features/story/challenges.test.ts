@@ -29,10 +29,11 @@ test("First Hand holds no seven-letter word: the Full Rack Bonus is Word Wizard'
   expect(bestWord(CHALLENGES[0]!)?.word.length).toBeLessThan(7);
 });
 
-test("First Hand: Ellis's authored best word beats BOATS but not KNOBS, and uses no seven-letter rack", () => {
+test("First Hand: Ellis's authored best word (MAKES) beats BOATS but not BANKS, and uses no seven-letter rack", () => {
   const challenge = CHALLENGES[0]!;
   const deal = fixedDeal({ seed: 1, playerCount: challenge.players.length, spec: challenge.deal });
   const ellis = topWords({ available: [...(deal.privateTiles[1] ?? []), ...deal.community], dictionary }, 1)[0]!;
+  expect(ellis.word).toBe("MAKES");
   expect(ellis.word.length).toBeLessThan(7);
   expect(ellis.score).toBeGreaterThan(10);
   expect(ellis.score).toBeLessThan(bestWord(challenge)!.score);
