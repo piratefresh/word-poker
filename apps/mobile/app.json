@@ -79,6 +79,12 @@
           "userTrackingUsageDescription": "This lets Word Poker show you more relevant ads when you watch one for free coins.",
           "skAdNetworkItems": ["cstr6suwn9.skadnetwork"]
         }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "This lets Word Poker show you more relevant ads when you watch one for free coins."
+        }
       ]
     ],
     "experiments": {

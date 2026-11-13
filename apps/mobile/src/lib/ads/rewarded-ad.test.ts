@@ -18,6 +18,7 @@ jest.mock("react-native-google-mobile-ads", () => ({
 }));
 jest.mock("react-native-purchases-admob", () => ({ RevenueCatAdMob: { createRewardedAd: jest.fn(), showWithRewardVerification: jest.fn() } }));
 jest.mock("@/lib/wallet/revenuecat", () => ({ configureRevenueCat: jest.fn(), revenuecatAvailable: () => true }));
+jest.mock("expo-tracking-transparency", () => ({ requestTrackingPermissionsAsync: jest.fn(async () => ({ granted: false })) }));
 
 type Options = Parameters<typeof RevenueCatAdMob.showWithRewardVerification>[1];
 
@@ -82,5 +83,23 @@ describe("loadRewardedAd", () => {
     jest.mocked(RevenueCatAdMob.createRewardedAd).mockRejectedValue(new Error("stop here"));
     await expect(loadRewardedAd("coin_store_rewarded")).rejects.toThrow("stop here");
     expect(mockInitialize).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for App Tracking Transparency before Mobile Ads starts", async () => {
+    // A fresh module: the ones above already started ads, and that start is kept.
+    await jest.isolateModulesAsync(async () => {
+      const ads: typeof import("react-native-google-mobile-ads") = require("react-native-google-mobile-ads");
+      const admob: typeof import("react-native-purchases-admob") = require("react-native-purchases-admob");
+      const att: typeof import("expo-tracking-transparency") = require("expo-tracking-transparency");
+      const { loadRewardedAd: load }: typeof import("./rewarded-ad") = require("./rewarded-ad");
+      jest.mocked(ads.AdsConsent.gatherConsent).mockResolvedValue({ canRequestAds: true } as never);
+      jest.mocked(admob.RevenueCatAdMob.createRewardedAd).mockRejectedValue(new Error("stop here"));
+      mockInitialize.mockClear();
+
+      await expect(load("coin_store_rewarded")).rejects.toThrow("stop here");
+      const [asked] = jest.mocked(att.requestTrackingPermissionsAsync).mock.invocationCallOrder;
+      const [started] = mockInitialize.mock.invocationCallOrder;
+      expect(asked).toBeLessThan(started);
+    });
   });
 });
