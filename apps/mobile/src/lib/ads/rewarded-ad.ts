@@ -11,6 +11,7 @@
  * build on a device registered as an AdMob test device with the real unit.
  */
 
+import { requestTrackingPermissionsAsync } from "expo-tracking-transparency";
 import { Platform } from "react-native";
 import mobileAds, {
   AdEventType,
@@ -49,10 +50,15 @@ let initialized: Promise<unknown> | null = null;
  * Google's UMP consent message: the GDPR form where the law asks for one, and on iOS the ATT
  * explainer and prompt when the AdMob "IDFA explainer" message is published. It shows only when
  * needed, and remembers the answer. No ad loads until it allows one.
+ *
+ * Then the ATT prompt itself, so it shows before the first ad even when that AdMob message is off
+ * (App Review §5.1.2). iOS asks once; after any answer this returns at once. A denial still serves
+ * non-personalized ads.
  */
 async function gatherConsent(): Promise<void> {
   const info = await AdsConsent.gatherConsent().catch(() => AdsConsent.getConsentInfo());
   if (!info.canRequestAds) throw new Error("Ads need your consent first.");
+  if (Platform.OS === "ios") await requestTrackingPermissionsAsync().catch(() => null);
 }
 
 /** RevenueCat first, then consent, then Mobile Ads: the adapter only tracks while Purchases is configured. */

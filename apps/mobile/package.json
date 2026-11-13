@@ -16,6 +16,13 @@
     "test:auth": "tsx --test \"src/auth/server/*.test.mjs\"",
     "eas-build-post-install": "mkdir -p ~/.posthog && ln -sf \"$PWD/../../node_modules/.bin/posthog-cli\" ~/.posthog/posthog-cli"
   },
+  "expo": {
+    "autolinking": {
+      "ios": {
+        "buildFromSource": ["expo-image", "expo-image-manipulator"]
+      }
+    }
+  },
   "dependencies": {
     "@better-auth/expo": "^1.7.4",
     "@colyseus/sdk": "0.18.2",
@@ -69,6 +76,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
+    "expo-tracking-transparency": "~57.0.2",
     "expo-web-browser": "~57.0.3",
     "pg": "8.23.0",
     "posthog-react-native": "^4.85.3",
