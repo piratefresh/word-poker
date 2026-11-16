@@ -383,10 +383,12 @@ export function WordHand({
   // play (§7), with the tiles dealt so far sitting in theirs, so a hand a street short of the
   // river reads as one still filling. The strip sizes itself; this only wraps it.
   return (
-    <View testID="word-builder-hand">
+    <View pointerEvents="box-none" testID="word-builder-hand">
       {landscape ? null : preview}
       <BlankPicker />
       <View
+        // Landscape stretches the tray across the row; only its tiles take taps.
+        pointerEvents="box-none"
         style={[styles.tray, landscape && styles.trayLandscape]}
         testID="word-builder-tray"
       >

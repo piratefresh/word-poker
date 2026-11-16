@@ -371,7 +371,8 @@ function GameScreenBody({
         score={game.bestScore}
         word={game.bestWord}
       />
-      <CoachTarget id="rack" testID="game-rack">
+      {/* The rack is as wide as its row: its empty space must not swallow the hero's power chip under it. */}
+      <CoachTarget id="rack" pointerEvents="box-none" testID="game-rack">
         {rack ?? (
           <PlayerRack
             community={game.community}

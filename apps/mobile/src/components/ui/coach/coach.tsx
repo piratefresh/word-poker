@@ -27,7 +27,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, useWindowDimensions, View, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
 import { duration, palette } from "@/constants/theme";
@@ -233,11 +233,14 @@ export function CoachProvider({
 export function CoachTarget({
   id,
   children,
+  pointerEvents,
   style,
   testID,
 }: {
   id: string;
   children: ReactNode;
+  /** `box-none` lets a target wider than its content pass taps on its empty space through. */
+  pointerEvents?: ViewProps["pointerEvents"];
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }): ReactElement {
@@ -253,6 +256,7 @@ export function CoachTarget({
     <View
       collapsable={false}
       onLayout={registry?.moved}
+      pointerEvents={pointerEvents}
       ref={ref}
       style={style}
       {...(testID === undefined ? {} : { testID })}
