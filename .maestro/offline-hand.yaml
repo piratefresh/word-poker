@@ -101,7 +101,7 @@ tags:
         text: "RIVER( [1-5]/5)?"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER( [1-5]/5)?"
+          visible: "YOUR TURN|RIVER( [1-5]/5)?|FINAL STAGE"
           timeout: 40000
           optional: true
       - runFlow:
@@ -124,8 +124,11 @@ tags:
     id: "action-wager"
     containsDescendants:
       - text: "\\$20"
+# The pot plate prints chips without a dollar sign; match it through the plate.
 - assertVisible:
-    text: "\\$980"
+    id: "pot-plate-main"
+    containsDescendants:
+      - text: "980"
 - tapOn:
     id: "action-wager"
 - extendedWaitUntil:

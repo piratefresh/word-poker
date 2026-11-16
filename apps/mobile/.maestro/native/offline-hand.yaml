@@ -145,8 +145,8 @@ tags:
       - assertVisible:
           id: "action-wager"
           text: ".*\\$20"
-- assertVisible:
-    text: "\\$980"
+# The pot plate is one accessible element; iOS reads its label, not the digits inside it.
+- assertVisible: "Pot, 980 chips.*"
 - tapOn:
     id: "action-wager"
     waitToSettleTimeoutMs: 500

@@ -61,17 +61,27 @@ tags:
       id: "power-draw"
     timeout: 5000
 
-# The shipped-dictionary probe pins Mira's Wild Tile on its first turn, before its raise.
+# Mira draws Wild Tile; whether a bot spends it is a seeded roll that shifts whenever the bot's
+# inputs do (the STO-975 pools moved it), so the flow pins the draw, not the use.
 - extendedWaitUntil:
     visible:
       id: "power-used"
       containsDescendants:
         - text: "MIRA USED"
     timeout: 5000
-- assertVisible:
-    id: "seat-power-tag-mira"
-    containsDescendants:
-      - text: "WILD"
+    optional: true
+# A seat's tag names the power it has used, so it only shows once Mira spends hers.
+- runFlow:
+    when:
+      visible:
+        id: "power-used"
+        containsDescendants:
+          - text: "MIRA USED"
+    commands:
+      - assertVisible:
+          id: "seat-power-tag-mira"
+          containsDescendants:
+            - text: "WILD"
 
 # The seed's pre-flop line, now that the table runs: mira raises the blind to 60.
 - extendedWaitUntil:
@@ -104,6 +114,5 @@ tags:
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 10000
-# Mira's played swap is revealed only here, with §44's marker on the tile the swap put in her word.
-- assertVisible:
-    id: "result-card-mira-tile-2-powered"
+# The powered-tile marker at the results is pinned by offline-wild-power.yaml, where the hero
+# spends its own swap; a bot's use here is a seeded roll (see above).

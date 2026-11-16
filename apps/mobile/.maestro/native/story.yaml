@@ -16,13 +16,20 @@ tags: [native, story]
     id: "story-node-first-hand"
 - tapOn:
     id: "story-node-first-hand"
+# The node opens its brief (goals, stakes) first; DEAL seats the hand.
+- extendedWaitUntil:
+    visible:
+      id: "story-deal"
+    timeout: 15000
+- tapOn:
+    id: "story-deal"
 - extendedWaitUntil:
     visible:
       id: "poker-table"
     timeout: 90000
 - assertVisible:
     id: "story-coach"
-- assertVisible: "FIRST HAND.*"
+- assertVisible: ".*FIRST HAND.*"
 - tapOn:
     id: "hud-leave-button"
 - extendedWaitUntil:

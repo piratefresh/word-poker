@@ -3,6 +3,8 @@ name: Store tab shows the daily bonus, coin packs and tile sets (native)
 tags: [native, store]
 ---
 # STO-1045 (1a): the STORE chip and the HUD coin pill open the same tab. It buys nothing.
+# It opens the priciest set (Neon Alley): an owned set shows EQUIP instead of a buy button, and
+# ownership is the wallet_event ledger, so it is not reset between runs.
 - runFlow: _ensure-session.yaml
 - tapOn:
     id: "tab-store"
@@ -20,7 +22,7 @@ tags: [native, store]
     id: "store-tab-tiles"
 - assertVisible: "The house set"
 - tapOn:
-    id: "store-tile-buy-jade"
+    id: "store-tile-buy-neon-alley"
 - extendedWaitUntil:
     visible:
       id: "store-sheet"

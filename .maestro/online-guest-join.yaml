@@ -47,7 +47,7 @@ tags:
         text: "RIVER( [1-5]/5)?"
     commands:
       - extendedWaitUntil:
-          visible: "YOUR TURN|RIVER( [1-5]/5)?"
+          visible: "YOUR TURN|RIVER( [1-5]/5)?|FINAL STAGE"
           timeout: 40000
           optional: true
       - runFlow:

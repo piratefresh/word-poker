@@ -3,6 +3,8 @@ name: Store tab shows the daily bonus, coin packs and tile sets
 tags: [web, store]
 ---
 # STO-1045 (1a): the STORE chip and the HUD coin pill open the same tab. It buys nothing.
+# It opens the priciest set (Neon Alley), the one the E2E account is least likely to own: an owned
+# set shows EQUIP instead of a buy button. Ownership is the wallet_event ledger, so it is not reset.
 # Buttons go by their label: on the web an aria-label hides the test id from Maestro.
 - runFlow: sign-in.yaml
 - tapOn:
@@ -19,12 +21,12 @@ tags: [web, store]
     id: "store-tab-tiles"
 - assertVisible: "The house set"
 - tapOn:
-    id: "Buy Jade tiles for 2,500 coins"
+    id: "Buy Neon Alley tiles for [0-9,]+ coins"
 - extendedWaitUntil:
-    visible: "JADE TILES"
+    visible: "Neon Alley tiles"
     timeout: 10000
 - tapOn: "CANCEL"
-- assertNotVisible: "JADE TILES"
+- assertNotVisible: "Neon Alley tiles"
 - takeScreenshot: store-tiles
 - tapOn:
     id: "tab-home"
