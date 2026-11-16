@@ -14,6 +14,10 @@ jest.mock("react-native-reanimated", () => ({
   ...jest.requireActual<Record<string, unknown>>("react-native-reanimated/mock"),
   useReducedMotion: () => false,
 }));
+// The bar sizes itself to the window less its safe-area insets.
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
+);
 
 const SECOND = 1000;
 const START = 1_700_000_000_000;

@@ -19,6 +19,7 @@ beforeEach(() => {
   jest.mocked(friendList).mockResolvedValue({ friends: [], incoming: [], outgoing: [] });
   jest.mocked(userForFriendCode).mockResolvedValue("target");
   jest.mocked(referralCount).mockResolvedValue(3);
+  jest.mocked(isOnline).mockResolvedValue(true);
 });
 
 test.each([null, { id: "caller", name: "Ada", anonymous: true }])("rejects every route for missing or guest sessions: %j", async (user) => {

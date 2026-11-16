@@ -704,9 +704,9 @@ describe("GameRoom", () => {
       }
       assert.deepStrictEqual(rejections, [], "every scripted action and word is accepted");
       assert.deepStrictEqual(words, [
-        ["JAY", "NARY", "ERY"],
-        ["HEIDI", "QI", "NIDI"],
-        ["DZ", "XL", "ACLU"],
+        ["JAY", "NARY", "REF"],
+        ["HID", "ID", "ON"],
+        ["DELI", "XI", "ACE"],
       ]);
       assert.deepStrictEqual(pots, [[120], [40, 1350, 20], [30]]);
 

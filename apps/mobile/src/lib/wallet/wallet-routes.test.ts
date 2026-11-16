@@ -4,8 +4,8 @@
  * seams; their own suites judge RevenueCat's shapes and the table.
  */
 
-import { recordReportedEvent } from "@wordpoker/db";
-import { coinCatalog, getCoinBalance, retryPending } from "@wordpoker/economy";
+import { hasWelcomeEvent, recordReportedEvent } from "@wordpoker/db";
+import { coinCatalog, enforceAdRewardCap, getCoinBalance, retryPending } from "@wordpoker/economy";
 
 import { POST as webhook } from "@/app/api/revenuecat-webhook+api";
 import { GET as catalog } from "@/app/api/store-catalog+api";
@@ -13,10 +13,11 @@ import { GET as wallet } from "@/app/api/wallet+api";
 import { auth } from "@/auth/server/auth";
 
 jest.mock("@/auth/server/auth", () => ({ auth: { api: { getSession: jest.fn() } } }));
-jest.mock("@wordpoker/db", () => ({ recordReportedEvent: jest.fn() }));
+jest.mock("@wordpoker/db", () => ({ hasWelcomeEvent: jest.fn(), recordReportedEvent: jest.fn() }));
 jest.mock("@wordpoker/economy", () => ({
   parseCurrencyEvent: jest.requireActual("@wordpoker/economy").parseCurrencyEvent,
   coinCatalog: jest.fn(),
+  enforceAdRewardCap: jest.fn(),
   getCoinBalance: jest.fn(),
   retryPending: jest.fn(),
 }));
@@ -26,11 +27,14 @@ const balance = jest.mocked(getCoinBalance);
 const retry = jest.mocked(retryPending);
 const readCatalog = jest.mocked(coinCatalog);
 const record = jest.mocked(recordReportedEvent);
+const welcomed = jest.mocked(hasWelcomeEvent);
 
 const SECRET = "Bearer whsec_test";
 
 beforeEach(() => {
   jest.resetAllMocks();
+  welcomed.mockResolvedValue(true);
+  jest.mocked(enforceAdRewardCap).mockResolvedValue(null);
   jest.spyOn(console, "error").mockImplementation(() => {});
   process.env.REVENUECAT_WEBHOOK_AUTH = SECRET;
 });
@@ -67,7 +71,7 @@ describe("GET /api/wallet", () => {
     const response = await wallet(walletRequest());
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ coins: 5000 });
+    await expect(response.json()).resolves.toEqual({ coins: 5000, welcomed: true });
     expect(order).toEqual(["retry", "balance"]);
     expect(retry).toHaveBeenCalledWith("user_1");
   });

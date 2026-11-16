@@ -13,6 +13,8 @@ jest.mock("react-native-reanimated", () => {
   const mock = jest.requireActual("react-native-reanimated/mock");
   return {
     ...mock,
+    // Missing from the shipped mock (see jest-setup.js); the reduced-motion test flips the async read.
+    useReducedMotion: () => false,
     withTiming: jest.fn(mock.withTiming),
     withRepeat: jest.fn(mock.withRepeat),
   };

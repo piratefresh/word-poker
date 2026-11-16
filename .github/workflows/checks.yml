@@ -1,0 +1,40 @@
+name: Checks
+
+# Typecheck and every unit suite, on each pull request and on main. Nothing here reaches a
+# database, RevenueCat or a device: the suites mock those seams, and the Maestro smokes stay
+# local (docs/agents/e2e.md). Lint is left out until its existing errors are cleared.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version from package.json's packageManager
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm check:boundaries
+      - run: pnpm test:smoke
+      - run: pnpm --filter @wordpoker/game-rules test
+      - run: pnpm --filter @wordpoker/contracts test
+      - run: pnpm --filter @wordpoker/db test
+      - run: pnpm --filter @wordpoker/economy test
+      - run: pnpm --filter @wordpoker/mobile test --ci
+      - run: pnpm --filter @wordpoker/server test

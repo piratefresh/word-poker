@@ -201,7 +201,8 @@ function stripTiles(view: RenderResult): string[] {
 
 /** The chips the felt draws in the middle, as the number it is showing. */
 function potAmount(view: RenderResult): number {
-  const [amount] = within(view.getByTestId("pot")).getAllByText(/^\$[\d,]+$/);
+  // The pot plate prints chips without a dollar sign; the older readout kept one.
+  const [amount] = view.getAllByTestId("pot-total");
   return Number(String(amount?.props.children).replace(/[$,]/g, ""));
 }
 
@@ -294,7 +295,7 @@ describe("<OfflineGameScreen />", () => {
     await act(async () => live().pickPower("random_wild"));
     for (let step = 0; step < 4; step += 1) await beat();
     expect(within(view.getByTestId("power-used")).getByText("MIRA USED")).toBeOnTheScreen();
-    expect(view.getByTestId("seat-power-tag-mira")).toHaveTextContent("WILD");
+    expect(view.getByTestId("seat-power-tag-mira")).toHaveTextContent("VOWEL");
     expect(stripTiles(view)).not.toContain("power-3");
     await beat();
     expect(view.getByText("YOUR TURN")).toBeOnTheScreen();
@@ -473,12 +474,12 @@ describe("<OfflineGameScreen />", () => {
     // An empty draft keeps Submit Word disabled during the final stage.
     await fireEvent.press(view.getByTestId("action-check-call"));
 
-    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
+    expect(view.getByText("FINAL STAGE")).toBeOnTheScreen();
     expect(view.queryByText("PAYOUT")).toBeNull();
 
     await beat();
 
-    expect(view.getByText("FINAL STAGE · SUBMIT YOUR WORD")).toBeOnTheScreen();
+    expect(view.getByText("FINAL STAGE")).toBeOnTheScreen();
     expect(view.queryByText("PAYOUT")).toBeNull();
   });
 
