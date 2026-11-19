@@ -3,7 +3,7 @@
  * provider has something to show. `useQuests()` is the seam; its own suite judges the fetching.
  */
 
-import { render, screen, within } from "@testing-library/react-native";
+import { fireEvent, render, screen, within } from "@testing-library/react-native";
 
 import { QuestsScreen } from "./quests-screen";
 
@@ -51,7 +51,7 @@ test("pulls a fresh read on mount", async () => {
   expect(mockRefresh).toHaveBeenCalledTimes(1);
 });
 
-test("shows the wallet, the streak, open quests as notes and done quests on the Done pile", async () => {
+test("shows the wallet, the streak, and the open quests under TO DO", async () => {
   useSession.mockReturnValue({ data: { user: { id: "user_1", emailVerified: true } } });
   mockQuestsValue = {
     coins: 5250,
@@ -66,17 +66,35 @@ test("shows the wallet, the streak, open quests as notes and done quests on the 
   expect(within(screen.getByTestId("quest-wallet")).getByText("5,250")).toBeTruthy();
   expect(screen.getByText("Day 3 streak. Come back tomorrow for +125.")).toBeTruthy();
 
-  // A done quest sits on the Done pile with its tick and paid reward.
-  const done = within(screen.getByTestId("quest-row-win-word-2"));
-  expect(done.getByText("Short and sweet")).toBeTruthy();
-  expect(done.getByText("✓")).toBeTruthy();
-  expect(done.getByText("+100 PAID")).toBeTruthy();
-  expect(screen.getByText("1 of 15")).toBeTruthy();
+  // TO DO is the open tab: it counts 14 open quests and leaves the done one off.
+  expect(within(screen.getByTestId("quests-tab-todo")).getByText("14")).toBeTruthy();
+  expect(screen.queryByTestId("quest-row-win-word-2")).toBeNull();
 
   // An untouched counting quest shows 0 of its goal and its description.
   const nightOut = within(screen.getByTestId("quest-row-hands-25"));
   expect(nightOut.getByText("0/25")).toBeTruthy();
   expect(nightOut.getByText("Play 25 hands.")).toBeTruthy();
+});
+
+test("the DONE tab holds the done quests with their tick and paid reward", async () => {
+  useSession.mockReturnValue({ data: { user: { id: "user_1", emailVerified: true } } });
+  mockQuestsValue = {
+    coins: 5250,
+    state: {
+      streak: { current: 3, creditedToday: null },
+      quests: [{ id: "win-word-2", progress: 1, done: true }],
+    },
+  };
+
+  await render(<QuestsScreen />);
+  expect(within(screen.getByTestId("quests-tab-done")).getByText("1")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("quests-tab-done"));
+
+  const done = within(screen.getByTestId("quest-row-win-word-2"));
+  expect(done.getByText("Short and sweet")).toBeTruthy();
+  expect(done.getByText("✓")).toBeTruthy();
+  expect(done.getByText("+100 PAID")).toBeTruthy();
+  expect(screen.queryByTestId("quest-row-hands-25")).toBeNull();
 });
 
 test("starts the streak prompt from zero", async () => {
@@ -85,5 +103,7 @@ test("starts the streak prompt from zero", async () => {
 
   await render(<QuestsScreen />);
   expect(screen.getByText("Play today to start your streak.")).toBeTruthy();
-  expect(screen.queryByText("DONE")).toBeNull();
+
+  await fireEvent.press(screen.getByTestId("quests-tab-done"));
+  expect(screen.getByTestId("quests-done-empty")).toBeTruthy();
 });

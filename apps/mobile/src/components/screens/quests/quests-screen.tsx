@@ -3,8 +3,8 @@
  * drawn as a cream fridge door (design "Quests Screen Ideas" 1b).
  *
  * Black-and-gold tile magnets spell QUESTS, the streak is a row of chip magnets (gold for the days
- * claimed), and every catalog quest is a sticky note. Open quests sit on top; done ones move to the
- * Done pile with a tick and their paid reward. `useQuests()` already holds the state — this screen
+ * claimed), and every catalog quest is a sticky note. A TO DO / DONE switch (the Store's, in the
+ * fridge's green) splits the open quests from the done ones, which carry a tick and their paid reward. `useQuests()` already holds the state — this screen
  * only draws it, and pulls a fresh read on mount so a day's streak credit from an earlier launch is
  * not stuck showing yesterday's.
  */
@@ -13,7 +13,7 @@ import { STREAK_REWARDS, isAccountEligible } from "@wordpoker/contracts";
 import { QUEST_CATALOG } from "@wordpoker/game-rules";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -29,6 +29,8 @@ const FRIDGE = {
   seam: "#b9a988",
   chrome: ["#8d9196", "#eef1f3", "#b7bbbf", "#6e7276"],
   pill: "#1f4a33",
+  switchEdge: "rgba(224,151,74,0.6)",
+  switchLabel: ledger.goldText,
   tile: ["#34313c", "#141318"],
   tileInk: "#f2c75a",
   ink: "#2a2210",
@@ -48,6 +50,10 @@ const TITLE = [
   { letter: "S", value: 1, tilt: 2, drop: 4 },
 ] as const;
 
+type QuestTab = "todo" | "done";
+
+const TAB_LABELS: Record<QuestTab, string> = { todo: "TO DO", done: "DONE" };
+
 /** A quest title in a hand's sentence case: "SHORT AND SWEET" → "Short and sweet". */
 function handwritten(title: string): string {
   return title.charAt(0) + title.slice(1).toLowerCase();
@@ -62,6 +68,7 @@ export function QuestsScreen(): ReactElement {
   const insets = useSafeAreaInsets();
   const { data: session } = authClient.useSession();
   const { coins, state, refresh } = useQuests();
+  const [tab, setTab] = useState<QuestTab>("todo");
 
   // One pull on the way in: the provider's own read ran at launch, and a day may have turned
   // since then.
@@ -133,35 +140,60 @@ export function QuestsScreen(): ReactElement {
           <>
             <StreakMagnets current={current} />
 
-            <View style={styles.grid}>
-              {open.map(({ def, index, progress }) => (
-                <QuestNote
-                  description={def.description}
-                  goal={def.goal}
-                  id={def.id}
-                  index={index}
-                  key={def.id}
-                  progress={progress}
-                  reward={def.reward}
-                  title={def.title}
-                />
-              ))}
+            <View accessibilityRole="tablist" style={styles.switch}>
+              {(["todo", "done"] as const).map((key) => {
+                const selected = tab === key;
+                const count = key === "todo" ? open.length : done.length;
+                return (
+                  <Pressable
+                    accessibilityLabel={`${TAB_LABELS[key]}, ${count} quests`}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                    key={key}
+                    onPress={() => setTab(key)}
+                    style={styles.switchCell}
+                    testID={`quests-tab-${key}`}
+                  >
+                    <LinearGradient
+                      colors={selected ? ledger.goldButton : CLEAR}
+                      style={[styles.switchTab, selected && styles.switchTabOn]}
+                    >
+                      <Text style={[styles.switchLabel, selected && styles.switchLabelOn]}>{TAB_LABELS[key]}</Text>
+                      <Text style={[styles.switchCount, selected && styles.switchLabelOn]}>{count}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            {done.length > 0 ? (
-              <>
-                <View style={styles.doneRule}>
-                  <Text style={styles.doneLabel}>DONE</Text>
-                  <View style={styles.doneDash} />
-                  <Text style={styles.doneCount}>{`${done.length} of ${quests.length}`}</Text>
-                </View>
+            {tab === "todo" ? (
+              open.length > 0 ? (
                 <View style={styles.grid}>
-                  {done.map(({ def, index }) => (
-                    <DoneNote id={def.id} index={index} key={def.id} reward={def.reward} title={def.title} />
+                  {open.map(({ def, index, progress }) => (
+                    <QuestNote
+                      description={def.description}
+                      goal={def.goal}
+                      id={def.id}
+                      index={index}
+                      key={def.id}
+                      progress={progress}
+                      reward={def.reward}
+                      title={def.title}
+                    />
                   ))}
                 </View>
-              </>
-            ) : null}
+              ) : (
+                <Note index={3} testID="quests-todo-empty" title="Every quest done. Nice work!" wide />
+              )
+            ) : done.length > 0 ? (
+              <View style={styles.grid}>
+                {done.map(({ def, index }) => (
+                  <DoneNote id={def.id} index={index} key={def.id} reward={def.reward} title={def.title} />
+                ))}
+              </View>
+            ) : (
+              <Note index={2} testID="quests-done-empty" title="Nothing crossed off yet. Win a hand to start." wide />
+            )}
           </>
         )}
       </ScrollView>
@@ -277,6 +309,8 @@ function Reward({ amount }: { amount: number }): ReactElement {
   );
 }
 
+const CLEAR = ["transparent", "transparent"] as const;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: FRIDGE.enamel[2] },
   seam: { position: "absolute", left: 0, right: 0, height: 3, backgroundColor: FRIDGE.seam },
@@ -367,10 +401,21 @@ const styles = StyleSheet.create({
   },
   rewardText: { fontFamily: fonts.arcade, fontSize: 13, color: "#6b3416" },
 
-  doneRule: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  doneLabel: { fontFamily: fonts.arcade, fontSize: 15, letterSpacing: 1, color: "#6b3416" },
-  doneDash: { flex: 1, borderTopWidth: 2, borderStyle: "dashed", borderColor: FRIDGE.seam },
-  doneCount: { fontFamily: fonts.rubikMedium, fontSize: 13, color: ledger.inkBody },
+  switch: {
+    flexDirection: "row",
+    gap: 4,
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: FRIDGE.switchEdge,
+    backgroundColor: FRIDGE.pill,
+  },
+  switchCell: { flex: 1 },
+  switchTab: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 38, borderRadius: 10 },
+  switchTabOn: { boxShadow: "0px 3px 0px #9a5f1c" },
+  switchLabel: { fontFamily: fonts.arcade, fontSize: 16, letterSpacing: 0.8, color: FRIDGE.switchLabel },
+  switchCount: { fontFamily: fonts.rubikSemiBold, fontSize: 13, color: FRIDGE.switchLabel, fontVariant: ["tabular-nums"] },
+  switchLabelOn: { color: ledger.ink },
 
   noteDone: { minHeight: 72, paddingTop: 10, paddingBottom: 8 },
   noteDoneTitle: { fontSize: 19, paddingRight: 30 },
