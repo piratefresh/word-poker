@@ -366,6 +366,8 @@ export const fonts = {
   rubik: "Rubik_400Regular",
   rubikMedium: "Rubik_500Medium",
   rubikSemiBold: "Rubik_600SemiBold",
+  /** Marker handwriting: the titles on the Quests fridge's sticky notes. */
+  hand: "Caveat_700Bold",
 } as const;
 
 export const fontSize = {
