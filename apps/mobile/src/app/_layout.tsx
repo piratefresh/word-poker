@@ -1,4 +1,5 @@
 import { HistoryProvider } from "@/lib/history/history-provider";
+import { Caveat_700Bold } from "@expo-google-fonts/caveat";
 import { Fredoka_600SemiBold, Fredoka_700Bold } from "@expo-google-fonts/fredoka";
 import {
   Inter_400Regular,
@@ -91,6 +92,7 @@ export function RootLayout() {
     Rubik_400Regular: require("@/assets/fonts/rubik-regular.ttf"),
     Rubik_500Medium: require("@/assets/fonts/rubik-medium.ttf"),
     Rubik_600SemiBold: require("@/assets/fonts/rubik-semibold.ttf"),
+    Caveat_700Bold,
     Fredoka_600SemiBold,
     Fredoka_700Bold,
     RobotoSlab_800ExtraBold,
