@@ -18,7 +18,10 @@ export function CoinChip({ size, practice = false }: { size: number; practice?: 
 }
 
 /** Native takes a CSS gradient as `experimental_backgroundImage`; react-native-web as `backgroundImage`. */
-function radial(light: string, dark: string): ViewStyle {
-  const image = `radial-gradient(circle at 35% 35%, ${light}, ${dark})`;
+export function backgroundImage(image: string): ViewStyle {
   return (Platform.OS === "web" ? { backgroundImage: image } : { experimental_backgroundImage: image }) as ViewStyle;
+}
+
+function radial(light: string, dark: string): ViewStyle {
+  return backgroundImage(`radial-gradient(circle at 35% 35%, ${light}, ${dark})`);
 }

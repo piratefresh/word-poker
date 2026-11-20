@@ -9,9 +9,15 @@ import {
 } from "@expo/ui";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text as NativeText, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { WAITING_PHASE } from "@wordpoker/contracts";
+import { TABLE_STARTED_MESSAGE, WAITING_PHASE } from "@wordpoker/contracts";
+import { LETTER_VALUES, type Letter } from "@wordpoker/game-rules";
+
+import { Tile } from "@/components/game/word-tile";
+import { GameButton } from "@/components/ui/game-button";
+import { LoaderOverlay, type LoaderStep } from "@/components/ui/loader-overlay";
 
 import {
   border,
@@ -33,15 +39,21 @@ import {
   useSeatedRoom,
   type TableSnapshot,
 } from "@/features/online/room-session";
+import {
+  SEAT_LOST,
+  SEATED_ELSEWHERE,
+  SIGN_IN_REQUIRED,
+  TABLE_GONE,
+  TABLE_UNREACHABLE,
+} from "@/features/online/join-refusals";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { fullWidth } from "@/lib/ui/full-width";
 import { fetchWallet } from "@/lib/wallet/wallet-client";
 
 import { OnlineFelt } from "./online-felt";
 
-/** The session always names its failure; these stand in only for the impossible empty one. */
+/** The session always names its failure; this stands in only for the impossible empty one. */
 const REFUSAL_FALLBACK = "Couldn't take that seat.";
-const LOST_FALLBACK = "You're no longer at that table.";
 /** How long Leave waits on the Wallet read the lobby's coins-back counts from. */
 const BALANCE_READ_MS = 1000;
 
@@ -134,6 +146,18 @@ export function SeatedScreen() {
     router.dismissTo("/online");
   };
 
+  // A join that hangs is the player's to abandon. Giving the room up first means the seat, if it
+  // lands after all, is handed straight back rather than left at a table nobody is driving.
+  const cancelJoin = () => {
+    void leaveTable(roomId).catch(() => {});
+    toLobby();
+  };
+
+  // "Couldn't reach" is the one refusal worth asking again: the table may well still be there.
+  const retry = () => {
+    void joinTable(roomId).catch(() => {});
+  };
+
   const leave = () => {
     // Disarm on the way in rather than on the re-render: a second tap in the same frame would
     // otherwise still find the control armed and leave a table it is already leaving.
@@ -174,24 +198,29 @@ export function SeatedScreen() {
     <TableFace leaving={leaving} onLeave={leave} table={table} />
   ) : session.status === "error" ? (
     <Notice
-      message={session.error ?? REFUSAL_FALLBACK}
+      copy={noticeFor(session.error ?? REFUSAL_FALLBACK)}
       onLobby={toLobby}
+      onRetry={retry}
       testID="seated-error"
     />
   ) : session.status === "lost" ? (
     <Notice
-      message={session.error ?? LOST_FALLBACK}
+      copy={noticeFor(session.error ?? SEAT_LOST)}
       onLobby={toLobby}
+      onRetry={retry}
       testID="seated-lost"
     />
   ) : (
-    <Joining />
+    <LoaderOverlay onLeave={cancelJoin} steps={JOINING} testID="seated-joining">
+      <LobbyPill onPress={cancelJoin} />
+    </LoaderOverlay>
   );
 
   return (
     <View
       accessibilityLabel="Online table"
-      style={felt ? styles.feltScreen : styles.screen}
+      // Only the table's card sits in the padded column; the felt and the notices fill the screen.
+      style={table === undefined || felt ? styles.feltScreen : styles.screen}
       testID="seated-screen"
     >
       {body}
@@ -282,54 +311,147 @@ function Stat({
   );
 }
 
-/** The seat is being taken: nothing to show and nothing to press until the table answers. */
-function Joining() {
+/** What a notice says: four tiles that spell it, a headline, and the sentence under it. */
+interface NoticeCopy {
+  word: string;
+  title: string;
+  body: string;
+  /** The table may still be there, so the notice offers to ask again before going back. */
+  retry?: boolean;
+}
+
+/** The seat is being taken. The lobby pill is there from the start; past the slow mark the loader spells it out. */
+const JOINING: readonly LoaderStep[] = [
+  { atMs: 0, message: "Connecting", detail: "Reaching the club" },
+  { atMs: 1500, message: "Taking your seat", detail: "Waiting for the table to answer" },
+];
+
+/**
+ * The session's sentence, as a notice. The refusals a player meets most get a headline and a
+ * tile word of their own; any other sentence (a Wallet refusal, a create's validator) is shown
+ * as it is under a plain headline.
+ */
+export function noticeFor(message: string): NoticeCopy {
+  switch (message) {
+    case TABLE_GONE:
+      return {
+        word: "FULL",
+        title: "That table filled up",
+        body: "Someone took the last seat, or it closed while you were on your way.",
+      };
+    case TABLE_STARTED_MESSAGE:
+      return {
+        word: "LIVE",
+        title: "Already dealing",
+        body: "That table started without you. Pick another, or deal your own.",
+      };
+    case SEATED_ELSEWHERE:
+      return {
+        word: "BUSY",
+        title: "You’re at another table",
+        body: "Leave your other table or browser tab first. If it dropped, wait for that seat to expire.",
+      };
+    case SEAT_LOST:
+      return { word: "GONE", title: "Your seat is gone", body: message };
+    case TABLE_UNREACHABLE:
+      return {
+        word: "LOST",
+        title: "Couldn’t reach the table",
+        body: "Check your connection and try again.",
+        retry: true,
+      };
+    case SIGN_IN_REQUIRED:
+      return { word: "SIGN", title: "Sign in to play online", body: "Online tables need a signed-in account." };
+    default:
+      return { word: "NOPE", title: "No seat this time", body: message };
+  }
+}
+
+/** The tiles' resting tilt, so a refusal lands on the cloth a little askew. */
+const TILT_DEG = [-4, 2, -1.5, 5] as const;
+const TILE_STAGGER_MS = 70;
+
+/** A seat that is not there at all: the whole felt, the tiles spelling it, and the way back to the lobby at the thumb. */
+function Notice({
+  copy,
+  onLobby,
+  onRetry,
+  testID,
+}: {
+  copy: NoticeCopy;
+  onLobby: () => void;
+  onRetry?: () => void;
+  testID: string;
+}) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View
-      accessibilityLabel="Taking your seat"
-      style={styles.card}
-      testID="seated-joining"
+      style={[
+        styles.notice,
+        { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.lg },
+      ]}
+      testID={testID}
     >
-      <Host colorScheme="dark" matchContents seedColor={colors.gold}>
-        <Column alignment="start" spacing={spacing.sm}>
-          <Text textStyle={kickerText}>ONLINE TABLE</Text>
-          <Text testID="seated-joining-title" textStyle={titleText}>
-            Taking your seat…
-          </Text>
-          <Text textStyle={detailText}>Waiting for the table to answer.</Text>
-        </Column>
-      </Host>
+      <LobbyPill onPress={onLobby} />
+
+      <View accessibilityLiveRegion="polite" style={styles.noticeBody}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.tiles}
+        >
+          {[...copy.word].map((letter, index) => (
+            <View key={`${copy.word}-${index}`} style={{ transform: [{ rotate: `${TILT_DEG[index] ?? 0}deg` }] }}>
+              <Tile
+                animation="deal"
+                dealDelayMs={index * TILE_STAGGER_MS}
+                ownership="neutral"
+                side="front"
+                size="large"
+                tile={{ id: `notice-${index}`, letter, points: LETTER_VALUES[letter as Letter] ?? 0 }}
+              />
+            </View>
+          ))}
+        </View>
+        <NativeText style={styles.noticeKicker}>ONLINE TABLE</NativeText>
+        <NativeText accessibilityRole="header" style={styles.noticeTitle} testID={`${testID}-title`}>
+          {copy.title}
+        </NativeText>
+        <NativeText style={styles.noticeText} testID="seated-message">
+          {copy.body}
+        </NativeText>
+      </View>
+
+      <View style={styles.noticeActions}>
+          {copy.retry && onRetry !== undefined ? (
+            <GameButton label="Try again" onPress={onRetry} testID="seated-retry" variant="gold" />
+          ) : null}
+          <GameButton
+            label="Back to lobby"
+            onPress={onLobby}
+            testID="seated-back-to-lobby"
+            variant={copy.retry ? "dark" : "gold"}
+          />
+      </View>
     </View>
   );
 }
 
-/** A seat that is not there: the session's sentence, and the lobby it came from. */
-function Notice({
-  message,
-  onLobby,
-  testID,
-}: {
-  message: string;
-  onLobby: () => void;
-  testID: string;
-}) {
+/** The way back to the lobby, top left, there from the first frame. */
+function LobbyPill({ onPress }: { onPress: () => void }) {
   return (
-    <View accessibilityLabel={message} style={styles.card} testID={testID}>
-      <Host colorScheme="dark" matchContents seedColor={colors.gold}>
-        <Column alignment="start" spacing={spacing.sm}>
-          <Text textStyle={kickerText}>ONLINE TABLE</Text>
-          <Text testID="seated-message" textStyle={titleText}>
-            {message}
-          </Text>
-          <Spacer size={spacing.sm} />
-          <Button
-            label="Back to lobby"
-            onPress={onLobby}
-            testID="seated-back-to-lobby"
-            variant="outlined"
-          />
-        </Column>
-      </Host>
+    <View style={styles.noticeTop}>
+      <Pressable
+        accessibilityLabel="Back to lobby"
+        accessibilityRole="button"
+        hitSlop={spacing.sm}
+        onPress={onPress}
+        style={({ pressed }) => [styles.lobbyPill, pressed && styles.pressed]}
+        testID="seated-lobby-pill"
+      >
+        <NativeText style={styles.lobbyPillText}>{"‹  Lobby"}</NativeText>
+      </Pressable>
     </View>
   );
 }
@@ -338,6 +460,67 @@ const styles = StyleSheet.create({
   // The felt lays out its own column (GameScreen caps and centres it); the centred, padded frame is
   // for the table card and the notices only.
   feltScreen: { backgroundColor: colors.bg, flex: 1 },
+  notice: {
+    flex: 1,
+    paddingHorizontal: spacing.gutter,
+  },
+  /** The lobby pill's row. */
+  noticeTop: { flexDirection: "row", minHeight: 40 },
+  lobbyPill: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderColor: "rgba(255,232,196,0.45)",
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    height: 40,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  lobbyPillText: {
+    color: colors.textBright,
+    fontFamily: fonts.arcade,
+    fontSize: fontSize.body,
+    letterSpacing: 0.5,
+  },
+  pressed: { opacity: 0.7 },
+  noticeBody: {
+    alignItems: "center",
+    alignSelf: "center",
+    flex: 1,
+    justifyContent: "center",
+    maxWidth: layout.maxContentWidth,
+    width: "100%",
+  },
+  tiles: { flexDirection: "row", gap: 6, marginBottom: spacing.xxl },
+  noticeKicker: {
+    color: colors.gold,
+    fontFamily: fonts.mono,
+    fontSize: fontSize.caption,
+    letterSpacing: 3,
+    marginBottom: spacing.sm,
+  },
+  noticeTitle: {
+    color: colors.textBright,
+    fontFamily: fonts.arcade,
+    fontSize: 32,
+    lineHeight: 35,
+    marginBottom: spacing.md,
+    textAlign: "center",
+  },
+  noticeText: {
+    color: "rgba(244,228,193,0.8)",
+    fontFamily: fonts.sans,
+    fontSize: fontSize.bodyLg,
+    lineHeight: 23,
+    maxWidth: 300,
+    textAlign: "center",
+  },
+  noticeActions: {
+    alignSelf: "center",
+    gap: spacing.md,
+    maxWidth: layout.maxContentWidth,
+    width: "100%",
+  },
   screen: {
     alignItems: "center",
     backgroundColor: colors.bg,

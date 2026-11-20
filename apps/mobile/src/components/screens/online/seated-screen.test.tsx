@@ -33,6 +33,10 @@ const mockLeaveTable = jest.fn(async () => {});
 const mockDismissTo = jest.fn();
 const mockFetchWallet = jest.fn();
 
+// The notices pad themselves clear of the notch and the home bar.
+jest.mock("react-native-safe-area-context", () =>
+  jest.requireActual<{ default: unknown }>("react-native-safe-area-context/jest/mock").default,
+);
 // `useActiveRoomId` is the seat the session holds — the session's `seated` room, or none. The
 // screen asks it before joining, so a test seated at the routed room must not see a join.
 jest.mock("@/components/screens/results/simple-win-preload", () => ({ preloadSimpleWin: jest.fn() }));
@@ -135,11 +139,36 @@ describe("<SeatedScreen />", () => {
     const view = await render(<SeatedScreen />);
 
     expect(mockJoinTable).not.toHaveBeenCalled();
-    expect(textOf(view, "seated-joining-title")).toBe("Taking your seat…");
+    expect(view.getByTestId("seated-joining-message")).toHaveTextContent(/Connecting/);
+    // The lobby pill is the way back; the big button waits until the join looks stuck.
+    expect(view.getByTestId("seated-lobby-pill")).toBeOnTheScreen();
+    expect(view.queryByTestId("seated-joining-leave")).toBeNull();
     expect(view.queryByTestId("seated-table")).toBeNull();
     expect(view.queryByTestId("seated-name")).toBeNull();
     expect(view.queryByTestId("seated-buy-in")).toBeNull();
     expect(view.queryByTestId("seated-seats")).toBeNull();
+  });
+
+  test("lets a stuck join be abandoned, giving the seat up on the way out", async () => {
+    jest.useFakeTimers();
+    try {
+      mockJoinTable.mockReturnValue(new Promise(() => {}));
+      mockSession = { status: "joining", roomId: mockRoomId };
+
+      const view = await render(<SeatedScreen />);
+      await act(async () => {
+        jest.advanceTimersByTime(9000);
+      });
+
+      expect(view.getByTestId("seated-joining-message")).toHaveTextContent(/Taking your seat/);
+      expect(view.getByTestId("seated-joining-slow")).toHaveTextContent(/taking longer than usual/);
+      await fireEvent.press(view.getByTestId("seated-joining-leave"));
+
+      expect(mockLeaveTable).toHaveBeenCalledTimes(1);
+      expect(mockDismissTo).toHaveBeenCalledWith("/online");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test("shows a refused join's sentence with the way back to the lobby", async () => {
@@ -151,12 +180,34 @@ describe("<SeatedScreen />", () => {
     await reshow(view, { status: "error", roomId: mockRoomId, error: REFUSAL });
 
     expect(view.getByTestId("seated-error")).toBeOnTheScreen();
-    expect(textOf(view, "seated-message")).toBe(REFUSAL);
+    expect(view.getByTestId("seated-error-title")).toHaveTextContent("That table filled up");
+    expect(view.queryByTestId("seated-retry")).toBeNull();
 
     await fireEvent.press(view.getByTestId("seated-back-to-lobby"));
 
     expect(mockDismissTo).toHaveBeenCalledTimes(1);
     expect(mockDismissTo).toHaveBeenCalledWith("/online");
+  });
+
+  test("offers to ask again when the table could not be reached", async () => {
+    mockSession = { status: "error", roomId: mockRoomId, error: "Couldn't reach that table." };
+
+    const view = await render(<SeatedScreen />);
+    mockJoinTable.mockClear();
+
+    expect(view.getByTestId("seated-error-title")).toHaveTextContent("Couldn’t reach the table");
+    await fireEvent.press(view.getByTestId("seated-retry"));
+
+    expect(mockJoinTable).toHaveBeenCalledWith(mockRoomId);
+  });
+
+  test("shows a sentence it has no headline for as it is", async () => {
+    const wallet = "You need 5,000 coins to sit at this table.";
+    mockSession = { status: "error", roomId: mockRoomId, error: wallet };
+
+    const view = await render(<SeatedScreen />);
+
+    expect(view.getByTestId("seated-message")).toHaveTextContent(wallet);
   });
 
   test("renders the table's own face from the snapshot", async () => {

@@ -138,7 +138,7 @@ tags:
     timeout: 30000
 - extendedWaitUntil:
     visible:
-      text: "That table is full or has just closed."
+      text: "That table filled up"
     timeout: 30000
 - tapOn:
     text: "Back to lobby"
@@ -151,7 +151,7 @@ tags:
 - openLink: ${output.web}/online/no-such-table
 - extendedWaitUntil:
     visible:
-      text: "That table is full or has just closed."
+      text: "That table filled up"
     timeout: 30000
 - tapOn:
     text: "Back to lobby"

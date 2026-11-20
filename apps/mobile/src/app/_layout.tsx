@@ -24,7 +24,7 @@ import * as Notifications from "expo-notifications";
 import { DarkTheme, router, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { PostHogProvider } from "posthog-react-native";
@@ -34,7 +34,7 @@ import { GAME_CENTER_AVAILABLE, restoreWithGameCenter } from "@/auth/client/game
 import { changeSessionIfSignedOut } from "@/auth/client/session-coordinator";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { TableInviteBanner } from "@/components/ui/table-invite-banner";
-import { colors } from "@/constants/theme";
+import { LoaderOverlay } from "@/components/ui/loader-overlay";
 import { leaveTable } from "@/features/online/room-session";
 import { usePresence } from "@/lib/friends/use-presence";
 import { posthog } from "@/lib/analytics/posthog";
@@ -60,8 +60,9 @@ SplashScreen.preventAutoHideAsync();
  */
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  restoring: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
 });
+
+const RESTORING = [{ atMs: 0, message: "Signing in", detail: "Game Center" }] as const;
 
 /** How long a signed-out iOS launch hides sign-in while Game Center answers. */
 const RESTORE_COVER_MS = 15_000;
@@ -187,9 +188,7 @@ export function RootLayout() {
                 <Stack.Screen name="policy" />
               </Stack>
               {restoring && !session ? (
-                <View accessibilityLabel="Signing in with Game Center" style={styles.restoring}>
-                  <ActivityIndicator color={colors.gold} />
-                </View>
+                <LoaderOverlay steps={RESTORING} testID="game-center-restoring" tips={false} />
               ) : null}
               <AnimatedSplashOverlay />
               <TableInviteBanner invite={presence.invite} onDismiss={presence.dismiss} />

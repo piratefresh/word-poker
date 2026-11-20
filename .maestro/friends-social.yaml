@@ -31,6 +31,6 @@ tags: [web, friends]
 - tapOn:
     id: "friend-join-${TABLE_ID}"
 - extendedWaitUntil:
-    visible: "That table is full or has just closed."
+    visible: "That table filled up"
     timeout: 30000
 - stopRecording

@@ -6,7 +6,9 @@
  * the test's: `joinById` / `create` hand back a room whose events nothing here has to fire.
  */
 
-import { createTable, joinTable, leaveTable } from "./room-session";
+import { act, renderHook } from "@testing-library/react-native";
+
+import { createTable, joinTable, leaveTable, useRoomSession } from "./room-session";
 import { authenticateTableClient, tableClient } from "./game-client";
 
 jest.mock("./game-client", () => ({
@@ -82,6 +84,33 @@ test("gives back a seat that lands after the device has moved on", async () => {
   // The seat is not the abandoned request's to keep, so the connection goes back rather than
   // outliving the session that asked for it.
   expect(late.leave).toHaveBeenCalledTimes(1);
+});
+
+test("stops joining when a stuck join is cancelled, and hands the late seat back", async () => {
+  const arriving = Promise.withResolvers<HeldRoom>();
+  joinById.mockReturnValue(arriving.promise);
+  const { result } = await renderHook(() => useRoomSession());
+
+  let joining!: Promise<void>;
+  await act(async () => {
+    joining = joinTable("table-1");
+  });
+  expect(result.current.status).toBe("joining");
+
+  // The seated screen's way back: give up this one table, not every seat the device holds.
+  await act(async () => {
+    await leaveTable("table-1");
+  });
+  expect(result.current.status).toBe("idle");
+
+  const late = room("table-1");
+  await act(async () => {
+    arriving.resolve(late);
+    await joining;
+  });
+
+  expect(late.leave).toHaveBeenCalledTimes(1);
+  expect(result.current.status).toBe("idle");
 });
 
 test("gives up the seat it holds before taking another", async () => {

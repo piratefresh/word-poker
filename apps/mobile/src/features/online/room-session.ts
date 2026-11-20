@@ -29,6 +29,13 @@ import {
 import { useSyncExternalStore } from "react";
 
 import { authenticateTableClient, tableClient } from "./game-client";
+import {
+  SEAT_LOST,
+  SEATED_ELSEWHERE,
+  SIGN_IN_REQUIRED,
+  TABLE_GONE,
+  TABLE_UNREACHABLE,
+} from "./join-refusals";
 
 /** Colyseus's matchmaking codes, as named by its own error enum. */
 const MATCHMAKE_NO_HANDLER = 520;
@@ -164,20 +171,18 @@ function tableOf(state: unknown): TableSnapshot {
  */
 function joinFailure(error: unknown): string {
   const code = (error as { code?: unknown } | null)?.code;
-  if (code === 401) return "Sign in to join an online table.";
+  if (code === 401) return SIGN_IN_REQUIRED;
   if (code === 503) return "Sign-in could not be verified. Try again.";
   if (code === 409) return "Your account already has a seat at that table.";
-  if (code === UNIQUE_SESSION_LIMIT) {
-    return "Your account already has a seat. Leave your other table or browser tab before joining. If it disconnected, wait for that seat to expire.";
-  }
+  if (code === UNIQUE_SESSION_LIMIT) return SEATED_ELSEWHERE;
   if (error instanceof Error && error.message === TABLE_STARTED_MESSAGE) return TABLE_STARTED_MESSAGE;
   if (code === WALLET_REFUSED_CODE && error instanceof Error && error.message) return error.message;
-  if (code === MATCHMAKE_INVALID_ROOM_ID) return "That table is full or has just closed.";
+  if (code === MATCHMAKE_INVALID_ROOM_ID) return TABLE_GONE;
   if (code === MATCHMAKE_NO_HANDLER || code === MATCHMAKE_INVALID_CRITERIA) {
     return "That table isn't available. Try the list again.";
   }
   if (code === MATCHMAKE_EXPIRED) return "That table stopped waiting. Try again.";
-  return "Couldn't reach that table.";
+  return TABLE_UNREACHABLE;
 }
 
 /** A create's refusal is our own validator's sentence, so the server's words are the ones shown. */
@@ -214,7 +219,7 @@ function hold(room: Room, taken: number): boolean {
     heldRooms.delete(room.roomId);
     if (activeRoomId !== room.roomId) return;
     activeRoomId = null;
-    publish({ status: "lost", roomId: room.roomId, error: "You're no longer at that table." });
+    publish({ status: "lost", roomId: room.roomId, error: SEAT_LOST });
   });
 
   room.onError((code, message) => {
@@ -249,6 +254,9 @@ function giveUpRoom(roomId: string): Room | null {
   if (inFlight?.roomId === roomId) {
     attempt++;
     inFlight = null;
+    // A join given up mid-air never arrives as this session's (`hold` hands it back), so the
+    // view stops saying it is joining rather than waiting on a request nobody is driving.
+    if (view.status === "joining" && view.roomId === roomId) publish({ status: "idle" });
   }
 
   if (activeRoomId === roomId) {
