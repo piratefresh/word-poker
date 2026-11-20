@@ -35,6 +35,7 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "dictionary:prepare": "pnpm --filter @wordpoker/game-rules dictionary:prepare",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:friends": "node scripts/smoke-friends.mjs",
     "test:smoke": "node --test scripts/smoke.test.mjs"
   },
   "dependencies": {

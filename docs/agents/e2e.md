@@ -73,11 +73,30 @@ These smokes exercise specific paths, not complete feature acceptance. Before cl
 also verify native sandbox purchases and credit delivery, Apple/Google/Game Center login
 (including a Google or Apple login whose email matches an existing verified account: it must
 land in that account and show the provider under Account settings, while an unverified
-account refuses it), email verification and delivered reset links, friend request/accept/invite across two accounts,
-push delivery/preferences, story stars/drafts/boss progression and persistence, account deletion,
+account refuses it), email verification and delivered reset links, the friends tray on a second
+device, push preferences and tapping a delivered push, story stars/drafts/boss progression and persistence, account deletion,
 and online disconnect/reconnect on physical devices. The store smoke does not initiate purchases;
 the settings smoke does not change account details. Native flows must be executed on both
 platforms before counting them as release evidence.
+
+## Friends across two accounts
+
+`pnpm smoke:friends` (`scripts/smoke-friends.mjs`) drives the friends API as two seeded accounts
+(`e2e-3` and `e2e-4` by default; `FRIEND_A_EMAIL` / `FRIEND_B_EMAIL` override them). It covers
+request by code, accept, presence (online / at a table / offline), a table invite delivered once,
+removal, the refusals along the way, and push-token registration. It needs the API on 8081
+(`AUTH_API_URL` overrides) and `pnpm seed:test-users`, and leaves the pair unfriended.
+
+To check real push delivery, run it with a device's Expo push token:
+
+```bash
+PUSH_TOKEN='ExponentPushToken[…]' pnpm smoke:friends
+```
+
+The device should get a "Friend request" push and then a "Table invite" push. Tapping the invite
+should open `/online/<room>` (that room doesn't exist, so it ends on the missing-table state). The
+token moves to `e2e-4` for the run and is deleted afterwards, so relaunch the app on that device to
+register it to its own account again.
 
 ## History testing
 
