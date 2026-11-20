@@ -8,3 +8,4 @@
 export { usePhaseClock } from "./phase-clock";
 export type { PhaseClock } from "./phase-clock";
 export { useLoopsEnabled } from "./loop-gate";
+export { forceReset } from "./force-reset";

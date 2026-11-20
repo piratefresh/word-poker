@@ -26,6 +26,8 @@ import { readFileSync } from "node:fs";
 import { generateRandomString, hashPassword } from "better-auth/crypto";
 import { Pool } from "pg";
 
+import { assertNotProductionDatabase } from "../packages/db/src/production-guard.ts";
+
 const PASSWORD = process.env.TEST_USER_PASSWORD ?? "wordpoker-e2e";
 // A table seats an account once, so multi-seat smokes sign in as e2e, e2e-2, e2e-3 and e2e-4.
 const USERS = process.env.TEST_USER_EMAIL
@@ -43,6 +45,8 @@ function required(name) {
   if (!value) throw new Error(`Missing environment variable: ${name} (load apps/mobile/.env)`);
   return value;
 }
+
+assertNotProductionDatabase(process.env.DATABASE_USER);
 
 const pool = new Pool({
   host: required("DATABASE_HOST"),

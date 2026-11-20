@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: "center",
     backgroundColor: nightLobby.panel.row,
-    borderColor: nightLobby.border.subtle,
+    borderColor: nightLobby.border.row,
     borderRadius: 16,
     borderWidth: border.thin,
     flexDirection: "row",

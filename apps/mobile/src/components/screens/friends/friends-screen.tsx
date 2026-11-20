@@ -1,204 +1,266 @@
-import { Button as ExpoButton, Column, Host, RNHostView, Row, Text, type UniversalTextStyle } from "@expo/ui";
-import { isFriendCode, type Friend, type FriendsPage } from "@wordpoker/contracts";
-import * as Clipboard from "expo-clipboard";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useRef, useState, type ComponentProps } from "react";
-import { Share, StyleSheet, Text as NativeText, View } from "react-native";
+import { isFriendCode, type Friend } from "@wordpoker/contracts";
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { authClient } from "@/auth/client/auth-client";
-import { TRAY_EXIT_MS, TrayFrame } from "@/components/screens/home/components/tray-frame";
-import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
-import { acceptFriend, addFriend, getFriends, removeFriend } from "@/lib/friends/friends-client";
-import { friendLinkFor } from "@/lib/navigation/invite-link";
-import { menuFeedback } from "@/lib/ui/menu-feedback";
+import { useTrayDismiss } from "@/components/screens/home/components/use-tray-dismiss";
+import { fonts } from "@/constants/theme";
+import { useActiveRoomId } from "@/features/online/room-session";
+import { acceptFriend, addFriend, inviteFriend, nudgeFriend, removeFriend } from "@/lib/friends/friends-client";
 import { webTestID } from "@/lib/ui/web-id";
 
-const bodyText = { color: colors.textBright, fontFamily: fonts.sans, fontSize: fontSize.body } satisfies UniversalTextStyle;
-const sectionText = { color: colors.goldHi, fontFamily: fonts.monoBold, fontSize: fontSize.small, letterSpacing: 1.4 } satisfies UniversalTextStyle;
-const STATUS_LABEL = { online: "Online", "at-table": "At a table", offline: "Offline" } as const;
-/** How often an open friends list re-reads, so a friend's status follows the heartbeat. */
-const REFRESH_MS = 15_000;
-type Section = { title: string; kind: "incoming" | "friends" | "outgoing"; data: Friend[] };
+import { AddCodeCard } from "./components/add-code-card";
+import { BrickWall } from "./components/brick-wall";
+import { ClipboardBoard, LOWER_MS } from "./components/clipboard-board";
+import { FriendRow } from "./components/friend-row";
+import { InviteCard, useShareLink } from "./components/invite-card";
+import { PillButton } from "./components/pill-button";
+import { useFriendsPage } from "./hooks/use-friends-page";
+import { defaultTab, EMPTY_COPY, FRIENDS_TABS, sectionsFor, tabCounts, type FriendsTab } from "./utils/friend-lists";
+
+const TAB_LABEL: Record<FriendsTab, string> = { online: "Online", all: "All", requests: "Requests" };
+/** Rows start sliding in as the clipboard lands, one beat apart; later rows (a poll, a tab) come in at once. */
+const ROWS_START_MS = 520;
+const ROW_STAGGER_MS = 55;
+const SETTLED_MS = 1200;
+const TOAST_MS = 3000;
 
 export function FriendsScreen() {
   const { data: session } = authClient.useSession();
-  const { add } = useLocalSearchParams<{ add?: string }>();
+  const { add, tab } = useLocalSearchParams<{ add?: string; tab?: string }>();
   // An account change discards cached private rows and in-flight reads.
-  return <FriendsAccount key={session?.user.id ?? "signed-out"} anonymous={session?.user.isAnonymous === true} code={isFriendCode(add) ? add : null} />;
+  return <FriendsAccount key={session?.user.id ?? "signed-out"} anonymous={session?.user.isAnonymous === true}
+    code={isFriendCode(add) ? add : null} requestedTab={tab === "requests" ? "requests" : null} />;
 }
 
-function FriendsAccount({ anonymous, code }: { anonymous: boolean; code: string | null }) {
-  const [page, setPage] = useState<FriendsPage | null>(null);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const [showShareLink, setShowShareLink] = useState(false);
-  const sharePending = useRef(false);
-  const acting = useRef(false);
-  const generation = useRef(0);
-  useFocusEffect(useCallback(() => {
-    const load = () => {
-      const current = ++generation.current;
-      void getFriends().then((data) => {
-        if (generation.current === current) {
-          setPage(data);
-          setMessage("");
-        }
-      }).catch((error: unknown) => {
-        if (generation.current === current) setMessage(error instanceof Error ? error.message : "Friends couldn't be reached.");
-      });
-    };
-    let timer: ReturnType<typeof setInterval> | undefined;
-    if (!anonymous) {
-      load();
-      timer = setInterval(load, REFRESH_MS);
-    }
-    return () => {
-      clearInterval(timer);
-      generation.current++;
-    };
-  }, [anonymous]));
-
-  const act = async (action: () => Promise<string | void>) => {
-    if (acting.current) return;
-    acting.current = true;
-    setBusy(true);
-    const current = ++generation.current;
-    try {
-      const result = await action();
-      if (current !== generation.current) return;
-      setMessage(result ?? "Friends updated.");
-      const data = await getFriends();
-      if (current === generation.current) setPage(data);
-    } catch (error) {
-      if (current === generation.current) setMessage(error instanceof Error ? error.message : "Friends couldn't be reached.");
-    } finally {
-      acting.current = false;
-      setBusy(false);
-    }
-  };
-
-  const sections: Section[] = page && !anonymous ? [
-    { title: "REQUESTS", kind: "incoming", data: page.incoming },
-    { title: "FRIENDS", kind: "friends", data: page.friends },
-    { title: "SENT", kind: "outgoing", data: page.outgoing },
-  ] : [];
-
-  const shareLink = async () => {
-    if (!page || sharePending.current) return;
-    sharePending.current = true;
-    setSharing(true);
-    setMessage("");
-    try {
-      await Share.share({ message: friendLinkFor(page.code) });
-    } catch (error) {
-      // Browsers reject with AbortError when the player dismisses the share sheet.
-      if (error instanceof Error && error.name === "AbortError") return;
-      setShowShareLink(true);
-      setMessage("Sharing isn't available. Copy or select your link below.");
-    } finally {
-      sharePending.current = false;
-      setSharing(false);
-    }
-  };
-
-  const copyLink = async () => {
-    if (!page) return;
-    try {
-      const copied = await Clipboard.setStringAsync(friendLinkFor(page.code));
-      setMessage(copied ? "Link copied." : "Couldn't copy. Select the link instead.");
-    } catch {
-      setMessage("Couldn't copy. Select the link instead.");
-    }
-  };
-
-  // The tab is the tray: it rises when the tab gains focus and returns to Home when closed.
+function FriendsAccount({ anonymous, code, requestedTab }: { anonymous: boolean; code: string | null; requestedTab: FriendsTab | null }) {
+  const insets = useSafeAreaInsets();
+  // Only this route's own params are touched, so the narrow shape is all that's asked of the navigator.
+  const navigation = useNavigation<{ setParams: (params: { tab?: string }) => void }>();
   const reduceMotion = useReducedMotion();
-  const [shown, setShown] = useState(false);
-  const [height, setHeight] = useState(0);
-  useFocusEffect(useCallback(() => {
-    setShown(true);
-    return () => setShown(false);
-  }, []));
-  const close = useCallback(() => {
-    setShown(false);
-    setTimeout(() => router.navigate("/"), reduceMotion ? 0 : TRAY_EXIT_MS);
-  }, [reduceMotion]);
-  const online = page?.friends.filter((friend) => friend.status === "online" || friend.status === "at-table").length ?? 0;
-  const subline = anonymous ? "Play together" : !page ? "Loading friends…" : page.friends.length === 0 ? "Add friends to play together"
-    : `${page.friends.length} ${page.friends.length === 1 ? "friend" : "friends"} · ${online} online`;
+  const roomId = useActiveRoomId();
+  const { page, message, setMessage, busy, act, refresh } = useFriendsPage(anonymous);
+  const { share, sharing, showLink } = useShareLink(page?.code ?? null, setMessage);
+  const [picked, setPicked] = useState<FriendsTab | null>(null);
+  const [adding, setAdding] = useState(false);
+  // A friend link's add card closes for good once used or dismissed; `+ Add` opens an empty one.
+  const [usedCode, setUsedCode] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // Each visit remounts the clipboard so it rises again; `settled` ends the opening row stagger.
+  const [visit, setVisit] = useState(0);
+  const [settled, setSettled] = useState(false);
+  const [lowered, setLowered] = useState(false);
 
-  return <View style={styles.screen} testID="friends-screen" onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
-    {shown ? <TrayFrame id="friends" title="FRIENDS" subline={subline} closeLabel="Close friends" onClose={close}
-      // Clears the Home header, as the Offline tray does.
-      maxHeight={Math.max(180, height - 190)}>
-      <Host colorScheme="dark" matchContents={{ vertical: true }} style={{ width: "100%" }} seedColor={colors.gold}>
-        <Column alignment="start" spacing={spacing.md}>
-          {anonymous ? <>
-            <Text textStyle={bodyText}>Sign up to add friends.</Text>
-            <Button label="Create account" onPress={() => router.push("/sign-up")} />
-          </> : <>
-            {page ? <Text textStyle={bodyText}>{`YOUR CODE: ${page.code}`}</Text> : null}
-            {page && page.referrals > 0 ? <Text textStyle={bodyText} testID="friends-referrals">{`${page.referrals} ${page.referrals === 1 ? "friend" : "friends"} joined through you`}</Text> : null}
-            {page ? <Button label="SHARE" testID="friends-share" disabled={sharing} onPress={() => { void shareLink(); }} /> : null}
-            {page && showShareLink ? <>
-              <RNHostView matchContents>
-                <NativeText selectable style={bodyText} testID="friends-link" id={webTestID("friends-link")}>{friendLinkFor(page.code)}</NativeText>
-              </RNHostView>
-              <Button label="COPY LINK" testID="friends-copy" onPress={() => { void copyLink(); }} />
-            </> : null}
-            {code ? <>
-              <Text textStyle={bodyText}>{`Add the player with code ${code}?`}</Text>
-              <Button label="ADD" testID="friend-add" disabled={busy} onPress={() => { void act(() => addFriend(code)); }} />
-            </> : null}
-            <Text textStyle={bodyText} testID="friends-message">{message}</Text>
-            <Button label="REFRESH" testID="friends-refresh" disabled={busy} onPress={() => { void act(async () => {}); }} variant="outlined" />
-            {page && sections.every((section) => section.data.length === 0) ? <Text textStyle={bodyText}>Share your code to add friends.</Text> : null}
-          </>}
-        </Column>
-      </Host>
-      {/* ponytail: a plain map, fine for a friends list; virtualize if lists grow past a few hundred. */}
-      {sections.filter((section) => section.data.length).map((section) => <View key={section.kind} style={styles.section}>
-        <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark"><Text textStyle={sectionText}>{section.title}</Text></Host>
-        {section.data.map((item) => <View key={item.userId} style={styles.row}>
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme="dark" seedColor={colors.gold}>
-            <Column alignment="start" spacing={spacing.sm}>
-              <Text textStyle={bodyText} testID={`friend-name-${item.userId}`}>{item.status ? `${item.name} · ${STATUS_LABEL[item.status]}` : item.name}</Text>
-              <Row spacing={spacing.sm}>
-                {section.kind === "incoming" ? <Button label="Accept" disabled={busy} testID={`friend-accept-${item.userId}`} onPress={() => { void act(() => acceptFriend(item.userId)); }} /> : null}
-                <Button label={section.kind === "incoming" ? "Decline" : section.kind === "outgoing" ? "Cancel" : "Remove"} disabled={busy}
-                  testID={`friend-${section.kind === "incoming" ? "decline" : section.kind === "outgoing" ? "cancel" : "remove"}-${item.userId}`}
-                  onPress={() => { void act(() => removeFriend(item.userId)); }} variant="outlined" />
-              </Row>
-            </Column>
-          </Host>
-        </View>)}
-      </View>)}
-    </TrayFrame> : null}
-  </View>;
-  }
-  
-  /** Native controls keep their testID; Maestro web reads the surrounding DOM id first. */
-  function Button(props: ComponentProps<typeof ExpoButton>) {
-    const [hovered, setHovered] = useState(false);
-    const [pressed, setPressed] = useState(false);
-    return <RNHostView matchContents>
-      <View
-        id={webTestID(props.testID)}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => { setHovered(false); setPressed(false); }}
-        onPointerDown={() => setPressed(true)}
-        onPointerUp={() => setPressed(false)}
-        style={props.disabled ? undefined : menuFeedback(hovered, pressed)}
-      >
-        <Host matchContents colorScheme="dark" seedColor={colors.gold}><ExpoButton {...props} /></Host>
+  useFocusEffect(useCallback(() => {
+    setVisit((count) => count + 1);
+    setPicked(null);
+    setLowered(false);
+    setSettled(false);
+    const timer = setTimeout(() => setSettled(true), SETTLED_MS);
+    return () => {
+      clearTimeout(timer);
+      // A push's `?tab=requests` is for that landing only; the tab bar re-sends a route's params.
+      navigation.setParams({ tab: undefined });
+    };
+  }, [navigation]));
+
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(""), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [message, setMessage]);
+
+  const close = useCallback(() => {
+    setLowered(true);
+    setTimeout(() => router.navigate("/"), reduceMotion ? 0 : LOWER_MS);
+  }, [reduceMotion]);
+  useTrayDismiss(close);
+
+  const counts = page ? tabCounts(page) : null;
+  const tab = picked ?? requestedTab ?? (page ? defaultTab(page) : "online");
+  const sections = page && !anonymous ? sectionsFor(page, tab) : [];
+  const subline = anonymous ? "Play together" : !page || !counts ? "Loading friends…" : `${counts.online} of ${counts.all} friends online`;
+
+  // In a room, Invite seats them at it; otherwise it hands out the friend link (STO-584 invites need a room).
+  const invite = (friend: Friend) => async (): Promise<boolean> => {
+    if (!roomId) {
+      await share();
+      return false;
+    }
+    try {
+      await inviteFriend(friend.userId, roomId);
+      setMessage(`Invite sent to ${friend.name}`);
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The invite couldn't be sent.");
+      return false;
+    }
+  };
+
+  const nudge = (friend: Friend) => async (): Promise<boolean> => {
+    try {
+      setMessage(await nudgeFriend(friend.userId));
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The nudge couldn't be sent.");
+      return false;
+    }
+  };
+
+  // Joining a friend's table is the table's own route; it says so when the table has already started.
+  const join = (seat: string) => () => router.push({ pathname: "/online/[roomId]", params: { roomId: seat } });
+
+  let rowIndex = 0;
+  const delay = () => (settled ? 0 : ROWS_START_MS) + Math.min(rowIndex++, 12) * ROW_STAGGER_MS;
+
+  return <View style={styles.screen} testID="friends-screen">
+    <BrickWall />
+    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back to home" onPress={close} style={styles.back}
+        testID="friends-close" id={webTestID("friends-close")}>
+        <Text style={styles.backGlyph}>‹</Text>
+      </Pressable>
+      <View style={styles.headerCopy} pointerEvents="none">
+        <Text accessibilityRole="header" style={styles.title}>FRIENDS</Text>
+        <Text style={styles.subline}>{subline}</Text>
       </View>
-    </RNHostView>;
-  }
-  
-  const styles = StyleSheet.create({
-    // Transparent, so the Home street shows behind the tray.
-    screen: { flex: 1 },
-    section: { gap: spacing.sm },
-    row: { padding: spacing.md, borderRadius: radius.card, backgroundColor: "rgba(0,0,0,0.2)" },
-  });
+      {anonymous || !page ? <View style={styles.addSpacer} /> : (
+        <Pressable accessibilityRole="button" accessibilityLabel="Add a friend by code" onPress={() => setAdding((open) => !open)}
+          style={styles.add} testID="friends-add" id={webTestID("friends-add")}>
+          <Text style={styles.addLabel}>+ Add</Text>
+        </Pressable>
+      )}
+    </View>
+
+    {counts ? <View accessibilityRole="tablist" accessibilityLabel="Friends lists" style={styles.tabs}>
+      {FRIENDS_TABS.map((id) => {
+        const selected = id === tab;
+        const alert = id === "requests" && counts.requests > 0;
+        return <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setPicked(id)}
+          style={[styles.tab, selected && styles.tabSelected]} testID={`friends-tab-${id}`} id={webTestID(`friends-tab-${id}`)}>
+          <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{TAB_LABEL[id]}</Text>
+          <Text style={[styles.count, selected && styles.countSelected, alert && styles.countAlert]}>{counts[id]}</Text>
+        </Pressable>;
+      })}
+    </View> : <View style={styles.tabsSpacer} />}
+
+    <View style={styles.boardArea}>
+      <ClipboardBoard key={visit} lowered={lowered}>
+        <ScrollView contentContainerStyle={styles.paper} showsVerticalScrollIndicator={false} refreshControl={anonymous ? undefined : (
+          <RefreshControl refreshing={refreshing} onRefresh={() => {
+            setRefreshing(true);
+            void refresh().finally(() => setRefreshing(false));
+          }} />
+        )}>
+          {anonymous ? <View style={styles.empty}>
+            <Text style={styles.emptyText}>Sign up to add friends.</Text>
+            <PillButton label="Create account" tone="primary" onPress={() => router.push("/sign-up")} testID="friends-sign-up" />
+          </View> : <>
+            {page && (adding || (code && code !== usedCode)) ? <AddCodeCard initialCode={adding ? "" : code ?? ""} busy={busy}
+              onAdd={(entered) => { void act(() => addFriend(entered)); setAdding(false); setUsedCode(code); }}
+              onClose={() => { setAdding(false); setUsedCode(code); }} /> : null}
+            {sections.map((section) => <View key={section.kind} accessibilityLabel={section.title ?? TAB_LABEL[tab]} style={styles.section}>
+              {section.title ? <View style={styles.sectionHead}>
+                <Text style={[styles.sectionTitle, section.kind === "incoming" && styles.sectionAlert]}>{section.title}</Text>
+                <Text style={[styles.count, styles.countSelected, section.kind === "incoming" && styles.countAlert]}>{section.rows.length}</Text>
+                <View style={[styles.rule, section.kind === "incoming" && styles.ruleAlert]} />
+              </View> : null}
+              {section.rows.map((friend) => <FriendRow key={friend.userId} friend={friend} kind={section.kind} delay={delay()} busy={busy}
+                onAccept={() => { void act(() => acceptFriend(friend.userId)); }}
+                onRemove={() => { void act(() => removeFriend(friend.userId)); }}
+                onInvite={section.kind === "friends" && friend.status === "online" ? invite(friend) : undefined}
+                onJoin={section.kind === "friends" && friend.status === "at-table" && friend.roomId && friend.roomId !== roomId ? join(friend.roomId) : undefined}
+                onNudge={section.kind === "friends" && friend.status === "offline" ? nudge(friend) : undefined} />)}
+            </View>)}
+            {page && sections.length === 0 ? <Text style={[styles.emptyText, styles.emptyLine]}>{EMPTY_COPY[tab]}</Text> : null}
+            {page && tab !== "requests" ? <InviteCard code={page.code} referrals={page.referrals} sharing={sharing} showLink={showLink}
+              onShare={() => { void share(); }} onMessage={setMessage} /> : null}
+          </>}
+        </ScrollView>
+      </ClipboardBoard>
+    </View>
+
+    {message ? <View accessibilityLiveRegion="polite" role="status" style={styles.toast}>
+      <Text style={styles.toastText} testID="friends-message">{message}</Text>
+    </View> : null}
+  </View>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#7b3238", overflow: "hidden" },
+  header: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16 },
+  back: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "rgba(255,232,196,0.5)",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backGlyph: { fontFamily: fonts.arcade, fontSize: 26, lineHeight: 30, color: "#fff4dc" },
+  headerCopy: { flex: 1, alignItems: "center", paddingTop: 2 },
+  title: { fontFamily: fonts.arcade, fontSize: 30, letterSpacing: 4, color: "#ffe3ef", textShadowColor: "#ff2a6a", textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
+  subline: { marginTop: 4, fontFamily: fonts.rubikMedium, fontSize: 12, color: "#ffd6e4" },
+  add: { height: 36, marginTop: 2, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "#f0bd5a", boxShadow: "0px 3px 0px #9a5f1c", justifyContent: "center" },
+  addLabel: { fontFamily: fonts.arcade, fontSize: 15, letterSpacing: 0.5, color: "#3a2210" },
+  addSpacer: { width: 40 },
+  tabs: {
+    flexDirection: "row",
+    gap: 4,
+    height: 40,
+    marginTop: 14,
+    marginHorizontal: 16,
+    padding: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(20,6,12,0.55)",
+  },
+  tabsSpacer: { height: 54 },
+  tab: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderRadius: 999 },
+  tabSelected: { backgroundColor: "#fffdf6", boxShadow: "0px 2px 6px rgba(0,0,0,0.35)" },
+  tabLabel: { fontFamily: fonts.rubikSemiBold, fontSize: 14, color: "#ffe3ef" },
+  tabLabelSelected: { color: "#1e1a14" },
+  count: {
+    minWidth: 20,
+    height: 18,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    overflow: "hidden",
+    textAlign: "center",
+    fontFamily: fonts.rubikSemiBold,
+    fontSize: 11,
+    lineHeight: 18,
+    color: "#ffe3ef",
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  countSelected: { color: "#6a6152", backgroundColor: "#efe6d2" },
+  countAlert: { color: "#ffffff", backgroundColor: "#e2493a" },
+  boardArea: { flex: 1, marginTop: 20, marginHorizontal: 14, marginBottom: 8 },
+  paper: { paddingTop: 6, paddingBottom: 20 },
+  section: { marginBottom: 6 },
+  sectionHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 12, paddingHorizontal: 14, paddingBottom: 6 },
+  sectionTitle: { fontFamily: fonts.hand, fontSize: 20, color: "#6a6152" },
+  sectionAlert: { color: "#c0392b" },
+  rule: { flex: 1, height: 2, borderRadius: 1, backgroundColor: "rgba(106,97,82,0.25)" },
+  ruleAlert: { backgroundColor: "rgba(192,57,43,0.3)" },
+  empty: { alignItems: "center", gap: 14, paddingTop: 28 },
+  emptyText: { fontFamily: fonts.hand, fontSize: 22, textAlign: "center", color: "#2a2f6a" },
+  emptyLine: { marginTop: 28, marginHorizontal: 16 },
+  toast: {
+    position: "absolute",
+    bottom: 20,
+    alignSelf: "center",
+    maxWidth: "90%",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#e0974a",
+    backgroundColor: "rgba(10,16,30,0.92)",
+  },
+  toastText: { fontFamily: fonts.rubikMedium, fontSize: 13, textAlign: "center", color: "#fff4dc" },
+});

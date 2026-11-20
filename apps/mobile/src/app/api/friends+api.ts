@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     const other = await userForFriendCode(code);
     const result = other === null ? "not-found" : await requestFriend(user.id, other);
     if (other !== null && result === "requested") {
-      void notifyUsers([other], "friendRequest", { title: "Friend request", body: `${user.name} sent you a friend request` });
+      void notifyUsers([other], "friendRequest", { title: "Friend request", body: `${user.name} sent you a friend request`, url: "wordpoker://friends?tab=requests" });
     }
     const status = result === "requested" ? 201 : result === "accepted" ? 200 :
       result === "self" ? 400 : result === "guest" || result === "not-found" ? 404 : 409;

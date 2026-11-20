@@ -1,5 +1,5 @@
 import type { MikroORM } from "@mikro-orm/postgresql";
-import type { TableInvite } from "@wordpoker/contracts";
+import { NUDGE_COOLDOWN_HOURS, type NudgeResult, type TableInvite } from "@wordpoker/contracts";
 import { areFriends, PRESENCE_GRACE_MS } from "./friends";
 import { getOrm } from "./orm";
 
@@ -16,11 +16,12 @@ async function connection(options: DbOptions) {
 }
 
 /**
- * Records a heartbeat. `cameOnline`: the player was absent or stale until now. `announce`: that, and
- * they have not been announced to their friends for a few hours; the same statement stamps it, so two
- * instances never both announce.
+ * Records a heartbeat. `table`: the id of the table the player's app holds, `true` when an older app
+ * says it's at a table without naming it, `false` when it isn't at one. `cameOnline`: the player was
+ * absent or stale until now. `announce`: that, and they have not been announced to their friends for
+ * a few hours; the same statement stamps it, so two instances never both announce.
  */
-export async function beat(userId: string, atTable: boolean, options: DbOptions = {}): Promise<{ cameOnline: boolean; announce: boolean }> {
+export async function beat(userId: string, table: string | boolean, options: DbOptions = {}): Promise<{ cameOnline: boolean; announce: boolean }> {
   const db = await connection(options);
   const [row] = await db.execute<{ cameOnline: boolean; announce: boolean }[]>(
     `with prev as (select seen_at, announced_at from presence where user_id = ?),
@@ -28,20 +29,20 @@ export async function beat(userId: string, atTable: boolean, options: DbOptions 
        coalesce((select seen_at < now() - make_interval(secs => ?::double precision) from prev), true) as came,
        coalesce((select seen_at < now() - make_interval(secs => ?::double precision)
          and (announced_at is null or announced_at < now() - make_interval(hours => ?::int)) from prev), true) as announce)
-     insert into presence as p (user_id, seen_at, at_table, announced_at)
-     select ?, now(), ?::boolean, case when f.announce then now() end from f
-     on conflict (user_id) do update set seen_at = now(), at_table = excluded.at_table,
-       announced_at = case when (select announce from f) then now() else p.announced_at end
+     insert into presence as p (user_id, seen_at, last_seen_at, at_table, room_id, announced_at)
+     select ?, now(), now(), ?::boolean, ?, case when f.announce then now() end from f
+     on conflict (user_id) do update set seen_at = now(), last_seen_at = now(), at_table = excluded.at_table,
+       room_id = excluded.room_id, announced_at = case when (select announce from f) then now() else p.announced_at end
      returning (select came from f) as "cameOnline", (select announce from f) as announce`,
-    [userId, PRESENCE_GRACE_MS / 1000, PRESENCE_GRACE_MS / 1000, ANNOUNCE_HOURS, userId, atTable],
+    [userId, PRESENCE_GRACE_MS / 1000, PRESENCE_GRACE_MS / 1000, ANNOUNCE_HOURS, userId, table !== false, typeof table === "string" ? table : null],
   );
   return { cameOnline: row?.cameOnline ?? true, announce: row?.announce ?? false };
 }
 
-/** The app closed or went to the background: stale at once, keeping the announce stamp. */
+/** The app closed or went to the background: stale at once, keeping the announce stamp and last seen. */
 export async function goOffline(userId: string, options: DbOptions = {}): Promise<void> {
   const db = await connection(options);
-  await db.execute(`update presence set seen_at = 'epoch', at_table = false where user_id = ?`, [userId]);
+  await db.execute(`update presence set seen_at = 'epoch', at_table = false, room_id = null where user_id = ?`, [userId]);
 }
 
 /** Whether the player's app has beaten recently. */
@@ -77,4 +78,20 @@ export async function takeInvites(userId: string, options: DbOptions = {}): Prom
      where created_at > now() - make_interval(mins => ?::int) order by created_at`,
     [userId, INVITE_TTL_MINUTES],
   );
+}
+
+/**
+ * Records a nudge from one friend to another, at most once per pair in `NUDGE_COOLDOWN_HOURS`. The
+ * stamp and the check are one statement, so two quick taps (or two API instances) send one push.
+ */
+export async function nudge(from: string, to: string, options: DbOptions = {}): Promise<NudgeResult> {
+  if (from === to || !await areFriends(from, to, options)) return "not-friends";
+  const db = await connection(options);
+  const rows = await db.execute<{ sent_at: Date }[]>(
+    `insert into nudge as n (from_user, to_user) values (?, ?)
+     on conflict (from_user, to_user) do update set sent_at = now()
+       where n.sent_at < now() - make_interval(hours => ?::int)
+     returning sent_at`, [from, to, NUDGE_COOLDOWN_HOURS],
+  );
+  return rows.length > 0 ? "sent" : "too-soon";
 }

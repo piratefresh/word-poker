@@ -13,8 +13,10 @@ import { MikroORM } from "@mikro-orm/postgresql";
 import type { Client } from "pg";
 
 import config, { pgConnectionString } from "../mikro-orm.config";
+import { assertNotProductionDatabase } from "../src/production-guard";
 
 const rawServerUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+assertNotProductionDatabase(rawServerUrl);
 
 export const serverUrl = rawServerUrl ? pgConnectionString(rawServerUrl) : undefined;
 
@@ -84,7 +86,7 @@ export async function openRunOrm(target: RunTarget): Promise<MikroORM> {
   // Better Auth creates these tables before the package's migrations in production (email is
   // NOT NULL there; nullable here so suites can insert bare users).
   await orm.em.getConnection().execute(`create table "user" (
-    id text primary key, name text not null, email text unique, "emailVerified" boolean not null default false,
+    id text primary key, name text not null, email text unique, "emailVerified" boolean not null default false, image text,
     "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()
   )`);
   await orm.em.getConnection().execute(`create table "account" (

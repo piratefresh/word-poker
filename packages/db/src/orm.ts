@@ -11,8 +11,13 @@
 import { MikroORM } from "@mikro-orm/postgresql";
 
 import config, { pgConnectionString } from "../mikro-orm.config";
+import { assertNotProductionDatabase } from "./production-guard";
 
-const orms = new Map<string, Promise<MikroORM>>();
+// On `globalThis`, not module scope: the web export bundles every API route on its own, each with
+// its own copy of this module, and they all run in the room server's one process. A module-level
+// map would open a pool per route; this one is shared by every copy (and by the room server).
+const shared = globalThis as typeof globalThis & { __wordpokerOrms?: Map<string, Promise<MikroORM>> };
+const orms = (shared.__wordpokerOrms ??= new Map<string, Promise<MikroORM>>());
 
 /** The process's ORM instance for `url`; the configured connection's own when omitted. */
 export function getOrm(url?: string): Promise<MikroORM> {
@@ -20,6 +25,7 @@ export function getOrm(url?: string): Promise<MikroORM> {
   let orm = orms.get(key);
 
   if (orm === undefined) {
+    assertNotProductionDatabase(url ?? process.env.DATABASE_URL, url ? undefined : process.env.DATABASE_USER);
     orm =
       url === undefined
         ? MikroORM.init(config)

@@ -8,6 +8,7 @@ const KIND_COLUMN = {
   tableInvite: "notifyTableInvite",
   friendRequest: "notifyFriendRequest",
   friendOnline: "notifyFriendOnline",
+  nudge: "notifyNudge",
 } as const;
 
 export type NotificationKind = keyof typeof KIND_COLUMN;

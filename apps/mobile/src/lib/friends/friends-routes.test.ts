@@ -1,11 +1,12 @@
-import { beat, deletePushToken, inviteToTable, isOnline, notifyUsers, savePushToken, takeInvites, friendCode, friendList, referralCount, requestFriend, userForFriendCode, acceptFriend, removeFriend } from "@wordpoker/db";
+import { beat, deletePushToken, inviteToTable, isOnline, notifyUsers, nudge, savePushToken, takeInvites, friendCode, friendList, referralCount, requestFriend, userForFriendCode, acceptFriend, removeFriend } from "@wordpoker/db";
 import { GET, POST } from "@/app/api/friends+api";
 import { PUT, DELETE, POST as invitePOST } from "@/app/api/friends/[userId]+api";
 import { POST as pushPOST, DELETE as pushDELETE } from "@/app/api/friends/push-token+api";
 import { POST as presencePOST } from "@/app/api/friends/presence+api";
+import { POST as nudgePOST } from "@/app/api/friends/[userId]/nudge+api";
 import { sessionUser } from "@/auth/server/session-user";
 
-jest.mock("@wordpoker/db", () => ({ friendCode: jest.fn(), friendList: jest.fn(), referralCount: jest.fn(), beat: jest.fn(), isOnline: jest.fn(), notifyUsers: jest.fn(), savePushToken: jest.fn(), deletePushToken: jest.fn(), goOffline: jest.fn(), takeInvites: jest.fn(), inviteToTable: jest.fn(), requestFriend: jest.fn(), userForFriendCode: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
+jest.mock("@wordpoker/db", () => ({ friendCode: jest.fn(), friendList: jest.fn(), referralCount: jest.fn(), beat: jest.fn(), isOnline: jest.fn(), notifyUsers: jest.fn(), nudge: jest.fn(), savePushToken: jest.fn(), deletePushToken: jest.fn(), goOffline: jest.fn(), takeInvites: jest.fn(), inviteToTable: jest.fn(), requestFriend: jest.fn(), userForFriendCode: jest.fn(), acceptFriend: jest.fn(), removeFriend: jest.fn() }));
 jest.mock("@/auth/server/session-user", () => ({ sessionUser: jest.fn() }));
 
 function request(method: string, body?: unknown) {
@@ -95,6 +96,17 @@ describe("presence and table invites", () => {
     expect((await presencePOST(request("POST", {}))).status).toBe(403);
   });
 
+  test("a heartbeat names the table so friends can Join it, and drops a room id that isn't clean", async () => {
+    jest.mocked(beat).mockResolvedValue({ cameOnline: false, announce: false });
+    jest.mocked(takeInvites).mockResolvedValue([]);
+    await presencePOST(request("POST", { atTable: true, roomId: "room_1" }));
+    expect(beat).toHaveBeenLastCalledWith("caller", "room_1");
+    await presencePOST(request("POST", { atTable: true, roomId: "a/../b" }));
+    expect(beat).toHaveBeenLastCalledWith("caller", true);
+    await presencePOST(request("POST", { atTable: false }));
+    expect(beat).toHaveBeenLastCalledWith("caller", false);
+  });
+
   test("an invite needs a clean room id and a friend", async () => {
     jest.mocked(inviteToTable).mockResolvedValue(true);
     expect((await invitePOST(request("POST", { roomId: "room_1" }), { userId: "target" })).status).toBe(201);
@@ -126,6 +138,29 @@ describe("push notifications", () => {
     jest.mocked(isOnline).mockResolvedValue(true);
     await invitePOST(request("POST", { roomId: "room_1" }), { userId: "target" });
     expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  test("a nudge pushes the friend with a link to the lobby, once per cooldown", async () => {
+    jest.mocked(nudge).mockResolvedValue("sent");
+    const sent = await nudgePOST(request("POST", { from: "forged" }), { userId: "target" });
+    expect(sent.status).toBe(201);
+    expect(await sent.json()).toEqual({ result: "sent", message: "Nudge sent" });
+    expect(nudge).toHaveBeenCalledWith("caller", "target");
+    expect(notifyUsers).toHaveBeenCalledWith(["target"], "nudge", { title: "Nudge", body: "Ada wants to play", url: "wordpoker://online" });
+    jest.mocked(notifyUsers).mockClear();
+    jest.mocked(nudge).mockResolvedValue("too-soon");
+    expect((await nudgePOST(request("POST"), { userId: "target" })).status).toBe(429);
+    jest.mocked(nudge).mockResolvedValue("not-friends");
+    expect((await nudgePOST(request("POST"), { userId: "stranger" })).status).toBe(404);
+    expect(notifyUsers).not.toHaveBeenCalled();
+    jest.mocked(nudge).mockRejectedValue(new Error("db"));
+    expect((await nudgePOST(request("POST"), { userId: "target" })).status).toBe(503);
+  });
+
+  test.each([null, { id: "caller", name: "Ada", anonymous: true }])("refuses a nudge from a missing or guest session: %j", async (user) => {
+    jest.mocked(sessionUser).mockResolvedValue(user);
+    expect((await nudgePOST(request("POST"), { userId: "target" })).status).toBe(user ? 403 : 401);
+    expect(nudge).not.toHaveBeenCalled();
   });
 
   test("a new friend request pushes its recipient, a repeat does not", async () => {

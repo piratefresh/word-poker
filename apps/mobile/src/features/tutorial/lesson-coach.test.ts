@@ -34,7 +34,7 @@ describe("lessonCoach", () => {
 
     const press = lessonCoach(LESSON_TOUR, flop + 1, runStep, { raise: true, word: false });
     expect(press.step?.id).toBe("lesson-raise");
-    expect(press.step?.target).toBe("wager");
+    expect(press.step?.target).toBe("raise");
 
     // Sliding off the amount puts the coach back on the slider: nothing was requested past it.
     expect(lessonCoach(LESSON_TOUR, flop + 1, runStep, { raise: false, word: false }).step?.id).toBe(

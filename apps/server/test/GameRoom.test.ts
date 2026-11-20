@@ -1376,11 +1376,17 @@ describe("GameRoom", () => {
               () => reject(new Error(`timed out waiting for ${what}`)),
               5_000,
             );
-            parked.push(() => {
-              if (!condition(rows)) return;
+            // A push that does not satisfy the wait parks it again: a filter reply that still lists
+            // the table can land just before the removal, and must not use up the wait.
+            const check = () => {
+              if (!condition(rows)) {
+                parked.push(check);
+                return;
+              }
               clearTimeout(deadline);
               resolve(rows);
-            });
+            };
+            parked.push(check);
           });
         },
       };

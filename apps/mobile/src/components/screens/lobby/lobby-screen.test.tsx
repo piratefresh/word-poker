@@ -23,7 +23,7 @@ jest.mock("expo-router", () => ({
 }));
 let mockReduceMotion = true;
 jest.mock("react-native-reanimated", () => ({
-  ...jest.requireActual("react-native-reanimated/mock"), useReducedMotion: () => mockReduceMotion,
+  ...jest.requireActual("../../../../jest-reanimated"), useReducedMotion: () => mockReduceMotion,
 }));
 jest.mock("@expo/ui", () => {
   const { View } = jest.requireActual("react-native");

@@ -25,7 +25,7 @@ const ROOM_PARAM = "room";
  * a nested route this app does not have, while `/online?room=<id>` stays the lobby with an arrival.
  */
 export type Destination =
-  | { readonly pathname: "/friends"; readonly params: { readonly add: string } }
+  | { readonly pathname: "/friends"; readonly params?: { readonly add: string } | { readonly tab: "requests" } }
   | { readonly pathname: "/online" }
   | {
       readonly pathname: "/online/[roomId]";
@@ -164,6 +164,12 @@ export function destinationFromURL(
       parsed.protocol === "wordpoker:" && parsed.hostname === "friend"
         ? ["friend", ...segments]
         : segments;
+    // `wordpoker://friends` opens the list itself; a friend-request push adds `?tab=requests` (STO-585).
+    const friendsList = parsed.protocol === "wordpoker:" && parsed.hostname === "friends" ? ["friends", ...segments] : segments;
+    if (friendsList[0] === "friends") {
+      if (friendsList.length !== 1) return null;
+      return parsed.searchParams.get("tab") === "requests" ? { pathname: "/friends", params: { tab: "requests" } } : { pathname: "/friends" };
+    }
     if (friendSegments[0] === "friend") {
       const code = friendSegments[1];
       return friendSegments.length === 2 && isFriendCode(code)

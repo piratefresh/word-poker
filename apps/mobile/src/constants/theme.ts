@@ -190,9 +190,10 @@ export const nightLobby = {
     /** Flow B's panel: a lighter navy that lifts off the night sky. */
     raised: ["#2a3b85", "#1b2864"],
     headliner: ["#1b2650", "#0f1734"],
-    row: "rgba(14,22,48,0.88)",
+    /** A lobby room: lifted off the sky, so a lone table still reads as a card. */
+    row: "#1b2756",
   },
-  border: { subtle: "rgba(243,230,196,0.12)" },
+  border: { subtle: "rgba(243,230,196,0.12)", row: "rgba(243,230,196,0.3)" },
   status: { open: "#8fd19e", live: "#ff5a4a", full: "#7d86a8", seat: "#8fe3b0" },
   /** Design 1a's cream face: the way back to your seat. */
   cream: { face: "#fbefd6", edge: "#b8703a", seatInk: "#2a7a4b" },

@@ -2,7 +2,7 @@ import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { addOAuthServerContext, APIError, createAuthMiddleware, getOAuthState } from "better-auth/api";
 import { anonymous, bearer, lastLoginMethod, username } from "better-auth/plugins";
-import { adoptGuestHistory, eraseAccountData, inTransaction } from "@wordpoker/db";
+import { adoptGuestHistory, assertNotProductionDatabase, DATABASE_POOL, eraseAccountData, inTransaction } from "@wordpoker/db";
 import { deleteWallet } from "@wordpoker/economy";
 import { config } from "dotenv";
 import { Pool } from "pg";
@@ -56,14 +56,20 @@ function required(name: string): string {
   return value;
 }
 
-export const authPool = new Pool({
+assertNotProductionDatabase(process.env.DATABASE_USER);
+
+// One pool per process: every API route's bundle has its own copy of this module, and they all
+// run in the room server's process, so the pool lives on `globalThis` rather than per copy.
+const shared = globalThis as typeof globalThis & { __wordpokerAuthPool?: Pool };
+export const authPool = (shared.__wordpokerAuthPool ??= new Pool({
   host: required("DATABASE_HOST"),
   port: Number(process.env.DATABASE_PORT ?? 5432),
   user: required("DATABASE_USER"),
   password: required("DATABASE_PASSWORD"),
   database: required("DATABASE_NAME"),
   ssl: true,
-});
+  ...DATABASE_POOL,
+}));
 
 // Better Auth ranks a configured base URL over the request origin, but this
 // server must answer on several: localhost (browser), the LAN address (device),
@@ -207,6 +213,7 @@ export const auth = betterAuth({
       notifyTableInvite: { type: "boolean", defaultValue: true, required: false },
       notifyFriendRequest: { type: "boolean", defaultValue: true, required: false },
       notifyFriendOnline: { type: "boolean", defaultValue: false, required: false },
+      notifyNudge: { type: "boolean", defaultValue: true, required: false },
       // Set only by the server after it verified a Game Center or Google identity (STO-593); never
       // accepted from sign-up, updateUser or any custom body.
       primaryIdentityVerified: { type: "boolean", defaultValue: false, required: false, input: false },

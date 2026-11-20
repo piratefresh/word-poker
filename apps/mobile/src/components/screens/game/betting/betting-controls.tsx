@@ -78,7 +78,10 @@ export function BettingControls({
   const canWager = !locked && (state.canRaise || state.canBet);
   const canAllIn = !locked && state.canAllIn;
   const dirty = amount > 0;
-  const atMax = dirty && amount >= state.maxRaise;
+  // All in only when the amount takes the whole stack: a slider capped short of it (the
+  // tutorial's 60) still commits a raise at its top.
+  const committed = state.currentBet - (state.callAmount ?? 0);
+  const atMax = dirty && amount - committed >= state.allInAmount;
 
   // Measured again as the slider opens: on the web a layout fires on a resize, not a move, so the
   // row settling after its first layout (a phone on its side) would leave the tube off the button.
@@ -161,13 +164,14 @@ export function BettingControls({
         variant={quiet ? "dark" : "danger"}
       />
       {wagerButton}
-      <View
-        ref={raiseRef}
-        onLayout={measureRaise}
+      {/* The raise steps point here until the slider opens, which marks itself `raise` on top. */}
+      <CoachTarget
+        id="raise"
         // Landscape's width is a floor: CONFIRM $1.2K or ALL IN run longer than RAISE, and the
         // button grows to its label rather than eliding it.
         style={landscapeButton ? { height: landscapeButton.height, minWidth: landscapeButton.width } : styles.action}
       >
+      <View ref={raiseRef} onLayout={measureRaise}>
       <GameButton
         amount={raise.amount}
         disabled={raise.disabled}
@@ -181,6 +185,7 @@ export function BettingControls({
         variant={raise.variant}
       />
       </View>
+      </CoachTarget>
     </CoachTarget>
   );
 

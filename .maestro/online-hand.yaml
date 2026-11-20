@@ -36,7 +36,7 @@ tags:
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU · .*"
+    text: "YOU"
 
 # The opponent is ready; the browser is the second seat, and readies itself through the same
 # control a device flow taps.
@@ -103,8 +103,14 @@ tags:
     timeout: 30000
 - assertVisible:
     text: "[0-9]+ PLAYERS? · [0-9]+ FOLDS? · [0-9]+ WORDS? PLAYED"
+# Both seats played a word: the opponent's BUNK (14) takes the pot over this player's ILK (8),
+# so the summary line names BUNK and ILK shows as its scored tiles.
 - assertVisible:
-    text: ".*ILK.*"
+    text: "2 PLAYERS · 0 FOLDS · 2 WORDS PLAYED"
+- assertVisible:
+    text: ".* · BUNK · 14 PTS"
+- assertVisible:
+    text: "8 PTS · IN \\$10"
 - assertNotVisible:
     text: "The window closed"
 - tapOn:

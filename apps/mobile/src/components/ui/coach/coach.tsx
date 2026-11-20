@@ -96,7 +96,12 @@ export function useCoachTour(
 }
 
 interface CoachRegistry {
-  register: (id: string, view: View | null) => void;
+  /**
+   * A target mounted (`view`) or unmounted (`null`, with the view it had). Two targets can share
+   * an id — the RAISE button and the slider that opens over it — and the last one mounted wins
+   * until it unmounts.
+   */
+  register: (id: string, view: View | null, previous?: View | null) => void;
   /** A target laid out again: re-measure the card's anchor. */
   moved: () => void;
 }
@@ -122,16 +127,22 @@ export function CoachProvider({
   style?: StyleProp<ViewStyle>;
 }): ReactElement {
   const root = useRef<View>(null);
-  const targets = useRef(new Map<string, View>());
+  const targets = useRef(new Map<string, View[]>());
   const [tick, moved] = useReducer((count: number) => count + 1, 0);
   const window = useWindowDimensions();
   const [container, setContainer] = useState<Size | null>(null);
   const [anchor, setAnchor] = useState<{ id: string; rect: Rect } | null>(null);
   const [cardHeight, setCardHeight] = useState<number | null>(null);
 
-  const register = useCallback((id: string, view: View | null) => {
-    if (view === null) targets.current.delete(id);
-    else targets.current.set(id, view);
+  const register = useCallback((id: string, view: View | null, previous?: View | null) => {
+    const stack = (targets.current.get(id) ?? []).filter(
+      (candidate) => candidate !== view && candidate !== previous,
+    );
+    if (view !== null) stack.push(view);
+    if (stack.length === 0) targets.current.delete(id);
+    else targets.current.set(id, stack);
+    // The card re-measures: a target that stood in for another one has moved it.
+    moved();
   }, []);
   const registry = useMemo(() => ({ register, moved }), [register]);
 
@@ -143,7 +154,7 @@ export function CoachProvider({
   // the window resizes or rotates.
   useEffect(() => {
     if (targetId === undefined) return;
-    const target = targets.current.get(targetId);
+    const target = targets.current.get(targetId)?.at(-1);
     const host = root.current;
     if (target === undefined || host === null) return;
     host.measureInWindow((rootX, rootY) => {
@@ -247,8 +258,12 @@ export function CoachTarget({
   const registry = useContext(CoachContext);
   const register = registry?.register;
 
+  const mounted = useRef<View | null>(null);
   const ref = useCallback(
-    (view: View | null) => register?.(id, view),
+    (view: View | null) => {
+      register?.(id, view, mounted.current);
+      mounted.current = view;
+    },
     [id, register],
   );
 

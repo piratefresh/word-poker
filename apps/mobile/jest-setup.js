@@ -5,11 +5,7 @@
  * load in Node, so the shipped mock replaces it. Without this every suite that
  * touches an animated component dies inside `react-native-worklets` at import time.
  */
-// The mock ships `useReducedMotion` as a TODO; motion stays on unless a suite overrides it.
-jest.mock("react-native-reanimated", () => ({
-  ...require("react-native-reanimated/mock"),
-  useReducedMotion: () => false,
-}));
+jest.mock("react-native-reanimated", () => require("./jest-reanimated"));
 
 jest.mock("expo-audio", () => ({
   useAudioPlayer: () => ({

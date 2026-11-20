@@ -7,7 +7,7 @@
  * different deal (STRONG, a server-held showdown); this is rewritten against seed 999's hand.
  *
  * Targets are the `CoachTarget` ids `GameScreen` marks: `community`, `table`, `rack`, `raise`
- * (the slider's row), `actions` (the whole action row), and `check` and `wager` (one button each,
+ * (the RAISE button, or its slider while that is open), `actions` (the whole action row), and `check` and `wager` (one button each,
  * for a step that asks for that one press).
  */
 
@@ -65,8 +65,8 @@ export const HELPER_TOUR: readonly CoachStep[] = [
     icon: "4",
     title: "Bet or raise",
     body:
-      "Slide to an amount, then tap BET or RAISE. The amount is your total for the round, not " +
-      "what you add on top.",
+      "Tap BET or RAISE, slide to an amount, then tap CONFIRM. The amount is your total for the " +
+      "round, not what you add on top.",
     target: "raise",
     side: "top",
     advance: "next",
@@ -158,7 +158,7 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     icon: "E",
     title: "Raise",
     body:
-      "Jay bet 20. You have a strong word, so raise: slide to 60. That's your total for the " +
+      "Jay bet 20. You have a strong word, so raise: tap RAISE and slide to 60. That's your total for the " +
       "round, not what you add on top.",
     target: "raise",
     side: "top",
@@ -170,8 +170,8 @@ export const LESSON_TOUR: readonly LessonCoachStep[] = [
     id: "lesson-raise",
     icon: "F",
     title: "Make the raise",
-    body: "Now tap RAISE to put your 60 in.",
-    target: "wager",
+    body: "Now tap CONFIRM to put your 60 in.",
+    target: "raise",
     side: "top",
     advance: "action",
     checkpoint: "flop-hero-raise",

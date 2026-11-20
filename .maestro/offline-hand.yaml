@@ -38,24 +38,24 @@
 # on the spot, and the round's walk waits for the hero's own turn instead of tapping the row
 # while a bot holds it.
 #
-# The pinned seed's personality-policy line (also asserted by game-rules/test/bot.test.ts):
-# Mira calls preflop, called/checked around. On the flop Mira bets 60; the hero and Ellis
-# call, and Jay folds. Mira bets 240 on the turn, called by the hero and Ellis.
-# The river checks to the hero with pot 980. The hero opens for 20, Ellis calls, Mira raises
-# to 440, and the hero calls the remaining 420. Ellis calls too; pot 2,300 opens the word
-# window. The hero's Z/I/G tiles still spell ZIG for 14 points.
+# The pinned seed's line:
+# Mira calls the blind of 20 and the table limps in. On the flop Jay bets 60 and everyone calls.
+# On the turn Jay bets 240, Mira folds, and the hero and Ellis call. The river checks to the
+# hero with pot 1,040. The hero opens for 20, Ellis calls, Jay raises to 520, and the hero calls
+# the remaining 500. Ellis calls too; pot 2,600 opens the word window. The hero's H/E/M/P tiles
+# spell HEMP for 15 points (re-probe with packages/game-rules/scripts/probe-offline-hand.ts).
 #
 # The felt reaches its row by `id:` rather than by text. Its controls carry test ids
 # (`action-check-call` walks the round and, inside §19's window, is the confirm), because the
 # seat nameplates print CHECK and CALL as status too and a text selector for a control can
 # land on a seat instead — see the selector note in the native flow.
-url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=7578&turn=300000"
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=371&turn=300000"
 name: Offline hand — bet, build a word and pay out
 tags:
   - web
   - offline
 ---
-- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=7578&turn=300000"
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=371&turn=300000"
 
 # If the guard bounced a fresh profile to the sign-in screen, sign in as the
 # E2E user and come back to the table. The wait is optional: a profile that is
@@ -68,7 +68,7 @@ tags:
     when:
       visible: "TAKE YOUR SEAT"
     file: sign-in.yaml
-- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=7578&turn=300000"
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/offline?seed=371&turn=300000"
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
@@ -112,7 +112,7 @@ tags:
                 id: "action-check-call"
             - waitForAnimationToEnd
 
-# The hero can open the river. Mira answers with a raise: call it before building the word.
+# The hero can open the river. Jay answers with a raise: call it before building the word.
 - extendedWaitUntil:
     visible: "YOUR TURN"
     timeout: 20000
@@ -128,31 +128,33 @@ tags:
 - assertVisible:
     id: "pot-plate-main"
     containsDescendants:
-      - text: "980"
+      - text: "1,040"
 - tapOn:
     id: "action-wager"
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
       containsDescendants:
-        - text: "\\$420"
+        - text: "\\$500"
     timeout: 20000
 # Draft before closing river betting so UI automation does not spend the word window.
 - tapOn:
-    id: "word-builder-tile-Z-1"
+    id: "word-builder-tile-H-1"
 - tapOn:
-    id: "word-builder-tile-I-9"
+    id: "word-builder-tile-E-3"
 - tapOn:
-    id: "word-builder-tile-G-1"
+    id: "word-builder-tile-M-2"
+- tapOn:
+    id: "word-builder-tile-P-2"
 - assertVisible:
-    text: "ZIG"
+    text: "HEMP"
 - assertVisible:
-    id: "ZIG, 14 points(, valid)?"
+    id: "HEMP, 15 points(, valid)?"
 
 - tapOn:
     id: "action-check-call"
 - extendedWaitUntil:
-    visible: "2,300"
+    visible: "2,600"
     timeout: 20000
 - assertNotVisible:
     id: "action-wager"
@@ -174,9 +176,9 @@ tags:
 - tapOn:
     id: "word-builder-shuffle"
 - assertVisible:
-    text: "ZIG"
+    text: "HEMP"
 - assertVisible:
-    id: "ZIG, 14 points(, valid)?"
+    id: "HEMP, 15 points(, valid)?"
 
 # Validate Word spends one of the hand's five lookups without submitting: the count drops on
 # every tap, which is what proves the tap reached the button (the betting row used to sit over
@@ -188,7 +190,7 @@ tags:
 - assertVisible:
     text: "CHECK WORD 4/5"
 - assertVisible:
-    text: "ZIG"
+    text: "HEMP"
 
 # Submit twice in a row: the second tap must neither break the table nor skip the results.
 - tapOn:

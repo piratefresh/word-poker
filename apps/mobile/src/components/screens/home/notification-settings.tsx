@@ -21,6 +21,7 @@ const KINDS = [
   { key: "notifyTableInvite", label: "Table invites", caption: "When a friend deals you in", fallback: true },
   { key: "notifyFriendRequest", label: "Friend requests", caption: "When someone adds you", fallback: true },
   { key: "notifyFriendOnline", label: "Friends coming online", caption: "When a friend shows up on the street", fallback: false },
+  { key: "notifyNudge", label: "Nudges", caption: "When a friend wants you at the table", fallback: true },
 ] as const;
 
 type Key = (typeof KINDS)[number]["key"];

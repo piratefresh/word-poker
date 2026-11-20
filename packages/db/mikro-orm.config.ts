@@ -61,8 +61,20 @@ function connection() {
   };
 }
 
+/**
+ * One process opens three pools: Better Auth's, the API routes' ORM and the game server's ORM.
+ * A PS-5 allows 25 connections and PlanetScale holds about 12, so each pool stays small and drops
+ * idle connections (`DATABASE_POOL_MAX` overrides the cap). The auth pool reads this too.
+ */
+export const DATABASE_POOL = {
+  min: 0,
+  max: Number(process.env.DATABASE_POOL_MAX ?? 3),
+  idleTimeoutMillis: 10_000,
+};
+
 export default defineConfig({
   entities: [ResultsRating, WalletEvent, QuestProgress, QuestHandLog, PlayerProgress, GameSession, GameHand, HandSeat, HandAction],
+  pool: DATABASE_POOL,
   extensions: [Migrator],
   // Resolved from this file rather than `process.cwd()`: `pnpm --filter` runs the script from the
   // package, but a stray `node packages/db/src/cli/migrate.ts` from the workspace root would

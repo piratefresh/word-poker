@@ -1,3 +1,4 @@
+import { ROOM_ID_PATTERN } from "@wordpoker/contracts";
 import { beat, friendList, goOffline, notifyUsers, takeInvites } from "@wordpoker/db";
 import { sessionUser } from "@/auth/server/session-user";
 
@@ -8,8 +9,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!user) return Response.json({ error: "Sign in first." }, { status: 401 });
     if (user.anonymous) return Response.json({ error: "Sign up to see friends." }, { status: 403 });
     const body: unknown = await request.json().catch(() => null);
-    const atTable = typeof body === "object" && body !== null && "atTable" in body && body.atTable === true;
-    const { announce } = await beat(user.id, atTable);
+    const fields = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+    // The table's id lets friends Join it; an older app sends only `atTable`.
+    const table = typeof fields.roomId === "string" && ROOM_ID_PATTERN.test(fields.roomId) ? fields.roomId : fields.atTable === true;
+    const { announce } = await beat(user.id, table);
     if (announce) {
       // Throttled by `beat` to a few hours per player; only friends with "friend online" switched on are pushed.
       // Best-effort: the heartbeat already succeeded, so a failed lookup just skips the push.

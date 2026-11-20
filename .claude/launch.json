@@ -20,6 +20,19 @@
         "start"
       ],
       "port": 8081
+    },
+    {
+      "name": "mobile-web-local",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "EXPO_PUBLIC_LOCAL_API=1",
+        "NODE_OPTIONS=--max-old-space-size=8192",
+        "pnpm",
+        "--filter",
+        "@wordpoker/mobile",
+        "web"
+      ],
+      "port": 8081
     }
   ]
 }

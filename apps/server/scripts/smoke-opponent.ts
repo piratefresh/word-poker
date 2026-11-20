@@ -103,6 +103,30 @@ function watchForLeak(what: string, payload: unknown) {
   if (leaked !== null) console.log(`LEAK: ${what} carried ${leaked[0]} before the reveal: ${text}`);
 }
 
+/** The schema's flat tile: a plain letter carries `alternativeLetter: ""` and `multiplier: ""`. */
+type SchemaTile = {
+  id: string;
+  kind: string;
+  letter: string;
+  points: number;
+  alternativeLetter: string;
+  alternativePoints: number;
+  multiplier: string;
+};
+
+/**
+ * Back to the domain tile, as the app's `decodeTile` does. Handed over raw, every plain letter
+ * looks like a choice tile and the word names faces the server rejects as unavailable.
+ */
+function fromSchemaTile(tile: SchemaTile): Tile {
+  const multiplier =
+    tile.multiplier === "double-letter" || tile.multiplier === "triple-letter" ? { multiplier: tile.multiplier } : {};
+  const base = { id: tile.id, letter: tile.letter, points: tile.points, ...multiplier };
+  return tile.kind === "choice" || tile.alternativeLetter !== ""
+    ? ({ ...base, alternativeLetter: tile.alternativeLetter, alternativePoints: tile.alternativePoints } as Tile)
+    : (base as Tile);
+}
+
 let busy = false;
 let confirmedHand = 0;
 /** The spot this seat last acted on — hand, street and the bet it faced — so no spot is played twice. */
@@ -128,7 +152,7 @@ function decide() {
   if (state.wordWindow.status === "open") {
     if (confirmedHand === state.handCount || seatRack?.hand !== state.handCount) return;
     confirmedHand = state.handCount;
-    const board = [...state.community].map((tile) => tile.toJSON() as Tile);
+    const board = [...state.community].map((tile) => fromSchemaTile(tile.toJSON() as SchemaTile));
     const submission = chooseOfflineWord({ available: [...seatRack.rack, ...board], dictionary });
     later(() => room.send(GAME_MESSAGES.confirmWord, { submission: submission ?? { plays: [] } }), "word");
     return;

@@ -21,6 +21,7 @@ export const authClient = createAuthClient({
         notifyTableInvite: { type: "boolean", required: false },
         notifyFriendRequest: { type: "boolean", required: false },
         notifyFriendOnline: { type: "boolean", required: false },
+        notifyNudge: { type: "boolean", required: false },
         primaryIdentityVerified: { type: "boolean", required: false, input: false },
       },
     }),

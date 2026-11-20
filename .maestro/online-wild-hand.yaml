@@ -10,14 +10,14 @@
 #
 # Probe for seed 518 (`scripts/probe-wild-smoke.ts`; the browser is seat 1): the browser holds A-1
 # and E-11, every power is offered (the catalog holds two for now), and Wild Tile's letter for seat 1
-# is F. Discarding A-1 puts `power-1` in A's place, and power-1 then E-11 spells FE from the rack
-# alone. A changed seed, catalog or letter stream fails at the confirm or the word, loudly.
+# is F. Discarding A-1 puts `power-1` in A's place, and power-1 then the flop's A-7 spells FA (6).
+# A changed seed, catalog, letter stream or dictionary fails at the confirm or the word, loudly.
 #
 # Online, the hero's player id is its session id, which the flow cannot know: the nameplate's tag
 # and the result card's ⚡ are matched by test-id pattern (Maestro ids are regular expressions).
 # The opponent checks the other half — what the table hears — and the runner fails on its log.
 url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/online"
-name: Online Wild hand - pick, use Wild Tile, build FE and read results
+name: Online Wild hand - pick, use Wild Tile, build FA and read results
 tags:
   - web
   - online
@@ -65,7 +65,7 @@ tags:
 # Chip → the rack waits for a private tile → the felt asks, in the catalog's words → swap.
 - tapOn:
     id: "power-held"
-- assertVisible: "Tap one of your tiles to swap it"
+- assertVisible: "TAP A TILE TO SWAP"
 - tapOn:
     id: "word-builder-tile-A-1"
 - assertVisible: "Discard A for a random letter\\?"
@@ -100,14 +100,32 @@ tags:
     id: "word-builder-tile-A-1"
 - assertVisible: "USED"
 
-# The new letter builds like any other: power-1 then E-11 spells FE before the board is out.
+# The new letter builds like any other. FE left the cleaned dictionary, so the word is the probe's
+# FA: power-1 then the flop's A-7. Using the power did not end the turn, so play on to the flop.
+- repeat:
+    while:
+      notVisible:
+        id: "word-builder-tile-A-7"
+    commands:
+      # Short polls: a long wait here would sit out this seat's action clock and fold it.
+      - extendedWaitUntil:
+          visible: "YOUR TURN"
+          timeout: 5000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
 - tapOn:
     id: "word-builder-tile-power-1"
 - tapOn:
-    id: "word-builder-tile-E-11"
-- assertVisible: "FE"
+    id: "word-builder-tile-A-7"
+- assertVisible: "FA"
 
-# Using the power did not end the turn. Check/call answers betting, and SUBMIT WORD locks FE
+# Check/call answers betting, and SUBMIT WORD locks FA
 # in during the final stage. After acceptance, wait for the other seats without tapping again.
 - repeat:
     while:
@@ -130,10 +148,13 @@ tags:
 - extendedWaitUntil:
     visible: "HAND #1 · RESULTS"
     timeout: 30000
+# FA scores 6, its own line on this player's card (the opponent's word may take the pot).
 - assertVisible:
-    text: ".*FE.*"
+    text: "6 PTS · IN \\$10"
 - assertNotVisible:
     text: "The window closed"
+- assertNotVisible:
+    text: "Not in the dictionary"
 # The swapped tile shows the table its ⚡ once the word is revealed.
 - assertVisible:
     id: "result-card-.*-tile-.*-powered"

@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import type { MikroORM } from "@mikro-orm/postgresql";
-import type { Friend, FriendRequestResult, FriendsPage, FriendStatus } from "@wordpoker/contracts";
+import { LAST_SEEN_DAYS, type FriendRequestResult, type FriendsPage, type FriendStatus } from "@wordpoker/contracts";
 import { getOrm } from "./orm";
 
 /** A player is online for this long after their last heartbeat (the client beats every 20s). */
@@ -81,20 +81,34 @@ export async function removeFriend(me: string, other: string, options: DbOptions
 
 export async function friendList(me: string, options: DbOptions = {}): Promise<Omit<FriendsPage, "code" | "referrals">> {
   const db = await connection(options);
-  const rows = await db.execute<(Omit<Friend, "status"> & { status: string; requested_by: string; presence: FriendStatus })[]>(
-    `select u.id as "userId", u.name, f.status, f.requested_by,
+  type Row = { userId: string; name: string; image: string | null; status: string; requested_by: string;
+    presence: FriendStatus; roomId: string | null; lastSeen: Date | string | null };
+  const rows = await db.execute<Row[]>(
+    `select u.id as "userId", u.name, u.image, f.status, f.requested_by,
        case when p.seen_at > now() - make_interval(secs => ?::double precision)
-         then case when p.at_table then 'at-table' else 'online' end else 'offline' end as presence
+         then case when p.at_table then 'at-table' else 'online' end else 'offline' end as presence,
+       p.room_id as "roomId",
+       case when p.last_seen_at > now() - make_interval(days => ?::int) then p.last_seen_at end as "lastSeen"
      from friends f
      join "user" u on u.id = case when f.user_a = ? then f.user_b else f.user_a end
      left join presence p on p.user_id = u.id
      where (f.user_a = ? or f.user_b = ?) and coalesce(u."isAnonymous", false) = false
-     order by u.name, u.id`, [PRESENCE_GRACE_MS / 1000, me, me, me],
+     order by u.name, u.id`, [PRESENCE_GRACE_MS / 1000, LAST_SEEN_DAYS, me, me, me],
   );
   const result: Omit<FriendsPage, "code" | "referrals"> = { friends: [], incoming: [], outgoing: [] };
   for (const row of rows) {
-    if (row.status === "accepted") result.friends.push({ userId: row.userId, name: row.name, status: row.presence });
-    else (row.requested_by === me ? result.outgoing : result.incoming).push({ userId: row.userId, name: row.name });
+    const person = { userId: row.userId, name: row.name, ...(row.image ? { image: row.image } : {}) };
+    if (row.status !== "accepted") {
+      (row.requested_by === me ? result.outgoing : result.incoming).push(person);
+      continue;
+    }
+    // Where a friend is is for friends only: a request row says nothing about it.
+    result.friends.push({
+      ...person,
+      status: row.presence,
+      ...(row.presence === "at-table" && row.roomId ? { roomId: row.roomId } : {}),
+      ...(row.presence === "offline" && row.lastSeen ? { lastSeen: new Date(row.lastSeen).toISOString() } : {}),
+    });
   }
   return result;
 }

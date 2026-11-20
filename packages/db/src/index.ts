@@ -29,7 +29,8 @@ export {
   type WalletEventStatus,
 } from "./entities/index";
 export { closeOrm, getOrm } from "./orm";
-export { pgConnectionString } from "../mikro-orm.config";
+export { assertNotProductionDatabase } from "./production-guard";
+export { DATABASE_POOL, pgConnectionString } from "../mikro-orm.config";
 export {
   GameSession, GameHand, HandSeat, HandAction,
   type GameSessionRow, type GameHandRow, type HandSeatRow, type HandActionRow,
@@ -99,7 +100,7 @@ export async function saveResultsRating(
 }
 export { displayName, recordReferral, referrerOf, paidReferralCount, referralCount, friendCode, userForFriendCode, requestFriend, acceptFriend, removeFriend, friendList, areFriends } from "./friends";
 export { notifyUsers, savePushToken, deletePushToken, type NotificationKind } from "./notify";
-export { beat, goOffline, isOnline, inviteToTable, takeInvites, PRESENCE_GRACE_MS } from "./presence";
+export { beat, goOffline, isOnline, inviteToTable, nudge, takeInvites, PRESENCE_GRACE_MS } from "./presence";
 export { saveHistoryHand, handRecordDigest, HandRecordConflictError } from "./history";
 export { readHistoryHands, readHistoryHand } from "./history-read";
 export {

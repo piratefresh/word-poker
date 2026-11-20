@@ -71,7 +71,7 @@ tags:
 
 # The creator lands seated at the table they made, and the felt is the table from the moment the
 # seat is taken: this player's place on it with the fixed buy-in as its stack (the seat pill reads
-# "YOU · 500"), the waiting state,
+# "YOU", a coin, then "500" as separate text), the waiting state,
 # and §5's ready check where the betting row will be — nobody else is seated, so nothing deals.
 # The felt does not print the table's name; the lobby checks below are what tie it to this table.
 - extendedWaitUntil:
@@ -79,7 +79,9 @@ tags:
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU · 500"
+    text: "YOU"
+- assertVisible:
+    text: "500"
 - assertVisible:
     text: "WAITING"
 - assertVisible:
@@ -111,7 +113,7 @@ tags:
       id: "poker-table"
     timeout: 30000
 - assertVisible:
-    text: "YOU · .*"
+    text: "YOU"
 
 # And back out through the felt's own leave control — the one in the HUD, which has no label to
 # read on the felt. The seat goes, the table is down to the holder's, and the lobby shows it open

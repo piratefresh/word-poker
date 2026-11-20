@@ -26,13 +26,13 @@
 # this route sits behind the sign-in guard — so `e2e-test` sets EXPO_PUBLIC_E2E_AUTH_BYPASS
 # (src/lib/e2e.ts) and the guard lets the seat through. No account, no network, no backend.
 #
-# The pinned seed's personality-policy line (also asserted by game-rules/test/bot.test.ts):
-# Mira calls preflop, called/checked around. On the flop Mira bets 60; the hero and Ellis
-# call, and Jay folds. Mira bets 240 on the turn, called by the hero and Ellis.
-# The river checks to the hero with pot 980. The hero opens for 20, Ellis calls, Mira raises
-# to 440, and the hero calls the remaining 420. Ellis calls too; pot 2,300 opens the word
-# window. The hero's Z/I/G tiles still spell ZIG for 14 points.
-#
+# The pinned seed's line (re-probe with packages/game-rules/scripts/probe-offline-hand.ts):
+# Mira calls the blind of 20 and the table limps in. On the flop Jay bets 60 and everyone calls.
+# On the turn Jay bets 240, Mira folds, and the hero and Ellis call. The river checks to the
+# hero with pot 1,040. The hero opens for 20, Ellis calls, Jay raises to 520, and the hero calls
+# the remaining 500. Ellis calls too; pot 2,600 opens the word window. The hero's H/E/M/P tiles
+# spell HEMP for 15 points, third behind Jay (20) and Ellis (17).
+
 # The CPU plays on a beat of its own — one seat's action per `duration.cpuBeat` — so the table
 # between two hero actions moves on its own, and every step that waits for a bot waits for it
 # rather than asserting it on the spot.
@@ -78,7 +78,7 @@ tags:
 # The web flow pins the seed in its URL; a device gets the same route as a deep link. The
 # scheme is app.json's `scheme`, so expo-router reads this as /offline?seed=…
 # turn= lengthens the 60 s offline clock: a Maestro step can take 10-50 s on the emulator.
-- openLink: wordpoker://offline?seed=7578&turn=300000
+- openLink: wordpoker://offline?seed=371&turn=300000
 
 # The table holds until the dictionary has loaded (the hand is judged against it).
 - extendedWaitUntil:
@@ -146,51 +146,56 @@ tags:
           id: "action-wager"
           text: ".*\\$20"
 # The pot plate is one accessible element; iOS reads its label, not the digits inside it.
-- assertVisible: "Pot, 980 chips.*"
+- assertVisible: "Pot, 1,040 chips.*"
 - tapOn:
     id: "action-wager"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: "action-check-call"
-      text: "Call \\$420"
+      text: "Call \\$500"
     timeout: 20000
 # Draft before calling the river raise, as in cross-platform-hand.yaml. Slow native taps
 # otherwise consume §19's shared 60-second window before the word can be confirmed.
-# Build the word out of three tiles the strip holds for the seed the deep link pins. A tap toggles
+# Build the word out of four tiles the strip holds for the seed the deep link pins. A tap toggles
 # a tile where it lies, so the word is the played tiles read left to right, not the order they
-# were tapped: Z-1, I-9 and G-1 sit in that order in this deal's strip, and the draft spells ZIG. Those three
-# are the deal's own and their word is 14 points — so a changed seed or table configuration
+# were tapped: H-1, E-3, M-2 and P-2 sit in that order in this deal's strip, and the draft spells HEMP. Those four
+# are the deal's own and their word is 15 points — so a changed seed or table configuration
 # fails here, loudly, instead of silently playing some other word.
 - tapOn:
-    id: "word-builder-tile-Z-1"
+    id: "word-builder-tile-H-1"
     waitToSettleTimeoutMs: 500
 - tapOn:
-    id: "word-builder-tile-I-9"
+    id: "word-builder-tile-E-3"
     waitToSettleTimeoutMs: 500
 - tapOn:
-    id: "word-builder-tile-G-1"
+    id: "word-builder-tile-M-2"
+    waitToSettleTimeoutMs: 500
+- tapOn:
+    id: "word-builder-tile-P-2"
     waitToSettleTimeoutMs: 500
 - assertVisible:
-    text: "ZIG"
+    text: "HEMP"
 - assertVisible:
-    text: "ZIG, 14 points(, valid)?"
+    text: "HEMP, 15 points(, valid)?"
 
 # Shuffling rearranges the tiles the word does not hold, so the draft stands as built.
 - tapOn:
     id: "word-builder-shuffle"
     waitToSettleTimeoutMs: 500
 - assertVisible:
-    text: "ZIG"
+    text: "HEMP"
 - assertVisible:
-    text: "ZIG, 14 points(, valid)?"
+    text: "HEMP, 15 points(, valid)?"
 
 # Calling the raise closes betting; §19 turns the same control into the word confirm.
 - tapOn:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
+# A device reads the felt's pot plate as one sentence ("Pot, 2,600 chips. … can win it."),
+# and matches text whole.
 - extendedWaitUntil:
-    visible: "2,300"
+    visible: "Pot, 2,600 chips\\..*"
     timeout: 20000
 - extendedWaitUntil:
     visible:
@@ -208,16 +213,17 @@ tags:
     id: "all-in-button"
 
 # Check Word spends one lookup without submitting; the count dropping proves the tap landed
-# (the betting row used to sit over part of the button and swallow the press).
+# (the betting row used to sit over part of the button and swallow the press). A device reads
+# the button's accessibility label, not the "CHECK WORD 5/5" it prints.
 - assertVisible:
-    text: "CHECK WORD 5/5"
+    text: "Check Word, 5 of 5 checks remaining\\..*"
 - tapOn:
     id: "word-check-button"
     waitToSettleTimeoutMs: 500
 - assertVisible:
-    text: "CHECK WORD 4/5"
+    text: "Check Word, 4 of 5 checks remaining\\..*"
 - assertVisible:
-    text: "ZIG"
+    text: "HEMP"
 
 # Submit twice in a row: the second tap must neither break the table nor skip the results.
 - tapOn:
@@ -247,10 +253,11 @@ tags:
     timeout: 15000
 - assertVisible: "4 PLAYERS · 1 FOLD · 3 WORDS PLAYED"
 - assertNotVisible: "The window closed"
+# By test id: iOS reads the button's label ("Deal another hand"), not the DEAL ANOTHER it prints.
 - assertVisible:
-    text: "DEAL ANOTHER"
+    id: "results-deal"
 - tapOn:
-    text: "DEAL ANOTHER"
+    id: "results-deal"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible: "PREFLOP( [1-5]/5)?"

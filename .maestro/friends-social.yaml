@@ -1,0 +1,36 @@
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Friends rows — last seen, Nudge, Join
+tags: [web, friends]
+# Needs `node scripts/friends-social-fixture.mjs` running: it prints OFFLINE_ID and TABLE_ID.
+---
+- runFlow: sign-in.yaml
+- startRecording: friends-social-web
+- tapOn:
+    id: "tab-friends"
+- extendedWaitUntil:
+    visible:
+      id: "friends-tab-all"
+    timeout: 30000
+- tapOn:
+    id: "friends-tab-all"
+- extendedWaitUntil:
+    visible:
+      id: "friend-status-${OFFLINE_ID}"
+    timeout: 30000
+- assertVisible:
+    id: "friend-status-${OFFLINE_ID}"
+    text: "Seen .*"
+- tapOn:
+    id: "friend-nudge-${OFFLINE_ID}"
+- extendedWaitUntil:
+    visible: "Nudge sent|You nudged them recently.*"
+    timeout: 10000
+- assertVisible:
+    id: "friend-status-${TABLE_ID}"
+    text: "At a table"
+- tapOn:
+    id: "friend-join-${TABLE_ID}"
+- extendedWaitUntil:
+    visible: "That table is full or has just closed."
+    timeout: 30000
+- stopRecording

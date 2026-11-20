@@ -11,8 +11,10 @@
 import { MikroORM } from "@mikro-orm/postgresql";
 
 import config from "../../mikro-orm.config";
+import { assertNotProductionDatabase } from "../production-guard";
 
 async function main(): Promise<void> {
+  assertNotProductionDatabase(process.env.DATABASE_URL, process.env.DATABASE_USER);
   const orm = await MikroORM.init(config);
 
   try {

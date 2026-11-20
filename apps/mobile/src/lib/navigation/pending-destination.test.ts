@@ -17,6 +17,12 @@ describe("a link's destination", () => {
     }
     expect(destinationFromURL("wordpoker://friend/ABCI2345")).toBeNull();
     expect(destinationFromURL("https://play.wordpoker.dev/friend/ABCD2345/extra")).toBeNull();
+    expect(destinationFromURL("wordpoker://friends")).toEqual({ pathname: "/friends" });
+    expect(destinationFromURL("wordpoker:///friends")).toEqual({ pathname: "/friends" });
+    expect(destinationFromURL("wordpoker://friends/extra")).toBeNull();
+    expect(destinationFromURL("wordpoker://friends?tab=requests")).toEqual({ pathname: "/friends", params: { tab: "requests" } });
+    expect(destinationFromURL("wordpoker:///friends?tab=requests")).toEqual({ pathname: "/friends", params: { tab: "requests" } });
+    expect(destinationFromURL("wordpoker://friends?tab=bogus")).toEqual({ pathname: "/friends" });
   });
   test("is the table a lobby link names", () => {
     expect(destinationFromURL("wordpoker://online?room=abc123")).toEqual({

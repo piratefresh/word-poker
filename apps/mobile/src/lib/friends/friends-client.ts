@@ -40,9 +40,12 @@ export async function removeFriend(userId: string): Promise<void> {
   await call(`/${encodeURIComponent(userId)}`, "DELETE");
 }
 
-/** One heartbeat (STO-584): marks this account online; returns its waiting table invites and email-verified flag. */
-export async function beat(atTable: boolean): Promise<PresenceResponse> {
-  const result = await call("/presence", "POST", { atTable });
+/**
+ * One heartbeat (STO-584): marks this account online at `roomId`'s table (null in the street), so
+ * friends can Join it. Returns its waiting table invites and email-verified flag.
+ */
+export async function beat(roomId: string | null): Promise<PresenceResponse> {
+  const result = await call("/presence", "POST", roomId === null ? { atTable: false } : { atTable: true, roomId });
   if (!isPresenceResponse(result)) throw new Error("The presence reply couldn't be read.");
   return result;
 }
@@ -53,6 +56,12 @@ export async function goOffline(): Promise<void> {
 
 export async function inviteFriend(userId: string, roomId: string): Promise<void> {
   await call(`/${encodeURIComponent(userId)}`, "POST", { roomId });
+}
+
+/** Nudges a friend to come and play; the server allows one per friend every few hours. */
+export async function nudgeFriend(userId: string): Promise<string> {
+  const result = await call(`/${encodeURIComponent(userId)}/nudge`, "POST");
+  return result && typeof result === "object" && "message" in result && typeof result.message === "string" ? result.message : "Nudge sent";
 }
 
 export async function registerPushToken(token: string): Promise<void> {

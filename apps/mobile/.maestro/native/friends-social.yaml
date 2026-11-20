@@ -1,0 +1,41 @@
+appId: com.wordpoker.wordpoker
+name: Friends rows — last seen, Nudge, Join (native)
+tags: [native, friends]
+# Needs `node scripts/friends-social-fixture.mjs` running: it prints OFFLINE_ID and TABLE_ID.
+---
+- runFlow: _ensure-session.yaml
+- startRecording: friends-social
+- tapOn:
+    id: "tab-friends"
+- extendedWaitUntil:
+    visible:
+      id: "friends-tab-all"
+    timeout: 30000
+- tapOn:
+    id: "friends-tab-all"
+
+# The offline friend says when they were last seen, and offers a Nudge.
+- extendedWaitUntil:
+    visible:
+      id: "friend-status-${OFFLINE_ID}"
+    timeout: 30000
+- assertVisible:
+    id: "friend-status-${OFFLINE_ID}"
+    text: "Seen .*"
+- tapOn:
+    id: "friend-nudge-${OFFLINE_ID}"
+# A first nudge is sent; a rerun inside the cooldown is refused. Either way the toast answers.
+- extendedWaitUntil:
+    visible: "Nudge sent|You nudged them recently.*"
+    timeout: 10000
+
+# The friend at a table offers Join, which opens their table's own screen.
+- assertVisible:
+    id: "friend-status-${TABLE_ID}"
+    text: "At a table"
+- tapOn:
+    id: "friend-join-${TABLE_ID}"
+- extendedWaitUntil:
+    visible: "That table is full or has just closed."
+    timeout: 30000
+- stopRecording

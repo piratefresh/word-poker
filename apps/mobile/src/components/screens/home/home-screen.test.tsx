@@ -369,3 +369,24 @@ test("leaving the Home tab closes the tray", async () => {
   await act(async () => { if (typeof blur === "function") blur(); });
   expect(view.queryByTestId("offline-tray")).toBeNull();
 });
+
+test("leaving mid-zoom drops the slab's push", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+  const blur = jest.mocked(useFocusEffect).mock.calls[0]?.[0]();
+  await fireEvent.press(view.getByTestId("home-slab-story"));
+  await act(async () => { if (typeof blur === "function") blur(); });
+  await act(async () => jest.advanceTimersByTime(2000));
+  expect(router.push).not.toHaveBeenCalled();
+  jest.useRealTimers();
+});
+
+test("staying through the zoom still pushes the slab's screen", async () => {
+  jest.useFakeTimers();
+  const view = await render(<HomeScreen />);
+  jest.mocked(useFocusEffect).mock.calls[0]?.[0]();
+  await fireEvent.press(view.getByTestId("home-slab-story"));
+  await act(async () => jest.advanceTimersByTime(2000));
+  expect(router.push).toHaveBeenCalledWith("/story");
+  jest.useRealTimers();
+});

@@ -49,6 +49,7 @@ import { StreetLogo } from "@/components/screens/home/street-logo";
 import { ParlorBackground } from "@/components/screens/lobby/parlor-background";
 import { VerifyEmailCard } from "@/components/ui/verify-email-card";
 import { colors, fonts, fontSize, radius, spacing } from "@/constants/theme";
+import { forceReset } from "@/motion";
 import { readItem, TUTORIAL_DONE } from "@/lib/storage/claim-store";
 import { formatCoins } from "@/lib/ui/format";
 import { useQuests } from "@/lib/quests/quests-provider";
@@ -156,14 +157,25 @@ export function HomeScreen() {
   /** 0 on the street, 1 in the night sky lobby. */
   const skyRise = useSharedValue(0);
   const leaving = useRef(false);
+  /** The push waiting for the door zoom or sky rise to finish. */
+  const pendingPush = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useFocusEffect(
     useCallback(() => {
       leaving.current = false;
-      enter.set(0);
-      skyRise.set(0);
+      forceReset(enter);
+      forceReset(skyRise);
       setTutorialDone(readItem(TUTORIAL_DONE) !== null);
-      return () => setOfflineOpen(false);
+      return () => {
+        setOfflineOpen(false);
+        // Left mid-zoom (another tab, a link): the slab's push is dropped, so Store doesn't
+        // open Story a beat later, and the street is put back behind whatever is now on top.
+        if (pendingPush.current === undefined) return;
+        clearTimeout(pendingPush.current);
+        pendingPush.current = undefined;
+        forceReset(enter);
+        forceReset(skyRise);
+      };
     }, [enter, skyRise]),
   );
 
@@ -185,15 +197,21 @@ export function HomeScreen() {
       return;
     }
     leaving.current = true;
+    const pushAfter = (ms: number) => {
+      pendingPush.current = setTimeout(() => {
+        pendingPush.current = undefined;
+        router.push(href);
+      }, ms);
+    };
     if (riseToSky) {
       skyRise.set(withTiming(1, { duration: SKY_RISE_MS, easing: Easing.inOut(Easing.cubic) }));
-      setTimeout(() => router.push(href), SKY_RISE_MS);
+      pushAfter(SKY_RISE_MS);
       return;
     }
     enter.set(
       withTiming(1, { duration: ENTER_MS, easing: Easing.in(Easing.cubic) }),
     );
-    setTimeout(() => router.push(href), ENTER_MS);
+    pushAfter(ENTER_MS);
   };
 
   const street = box.width > box.height ? STREETS.landscape : STREETS.portrait;

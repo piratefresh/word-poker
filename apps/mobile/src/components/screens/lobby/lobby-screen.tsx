@@ -13,6 +13,7 @@ import { GoldButton } from "@/components/ui/gold-button";
 import { HomeNavRack, type HomeNavDestination } from "@/components/screens/home/home-nav-rack";
 import { artPoint, STREETS } from "@/components/screens/home/street-art";
 import { border, colors, fonts, fontSize, nightLobby, radius, spacing } from "@/constants/theme";
+import { forceReset } from "@/motion";
 import { authClient } from "@/auth/client/auth-client";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { posthog } from "@/lib/analytics/posthog";
@@ -72,7 +73,7 @@ export function LobbyScreen() {
   useFocusEffect(
     useCallback(() => {
       travelStarted.current = false;
-      travel.set(0);
+      forceReset(travel);
       // Back from the store or a table: the coins that gate Join may have moved.
       refreshCoins();
     }, [refreshCoins, travel]),

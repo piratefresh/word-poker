@@ -106,11 +106,12 @@ tags:
     id: "action-check-call"
     waitToSettleTimeoutMs: 500
     retryTapIfNoChange: false
+# The word window replaces the betting row: no Fold, and the main control submits the word.
 - extendedWaitUntil:
-    visible:
-      id: "action-fold"
-      enabled: false
+    visible: "FINAL STAGE"
     timeout: 20000
+- assertNotVisible:
+    id: "action-fold"
 - extendedWaitUntil:
     visible:
       id: "action-check-call"

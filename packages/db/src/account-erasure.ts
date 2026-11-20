@@ -18,6 +18,7 @@ const ERASURE = [
   `delete from referral where referee_id = $1 or referrer_id = $1`,
   `delete from presence where user_id = $1`,
   `delete from table_invite where to_user = $1 or from_user = $1`,
+  `delete from nudge where to_user = $1 or from_user = $1`,
   `delete from push_token where user_id = $1`,
   `delete from quest_progress where user_id = $1`,
   `delete from quest_hand_log where user_id = $1`,

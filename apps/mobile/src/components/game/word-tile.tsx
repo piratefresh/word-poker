@@ -437,15 +437,12 @@ export function Tile({
   ]);
 
   const shellMotion = useAnimatedStyle(() => {
+    // A lifted tile rises but keeps its size: iOS scales a text layer's drawn pixels, so even a 4%
+    // grow softened the letter's edges, plainly on dark sets such as Midnight.
     const selectedOffset = interpolate(
       selectedProgress.get(),
       [0, 1],
       [0, -4],
-    );
-    const selectedScale = interpolate(
-      selectedProgress.get(),
-      [0, 1],
-      [1, 1.04],
     );
 
     if (animation === "deal") {
@@ -464,7 +461,6 @@ export function Tile({
           {
             scale:
               pressScale.get() *
-              selectedScale *
               interpolate(progress, [0, 0.58, 1], [0.92, 1.04, 1]),
           },
         ],
@@ -484,7 +480,6 @@ export function Tile({
         {
           scale:
             pressScale.get() *
-            selectedScale *
             interpolate(flipProgress, [0, 0.5, 1], [1, 1.055, 1]),
         },
       ],

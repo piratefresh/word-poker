@@ -5,7 +5,16 @@ export interface Friend {
   readonly name: string;
   /** Accepted friends only; absent on request rows. */
   readonly status?: FriendStatus;
+  /** The avatar photo's URL; absent when the player has none, and the app draws their initial. */
+  readonly image?: string;
+  /** An `at-table` friend's table, so the player can Join it. Absent from older friend apps. */
+  readonly roomId?: string;
+  /** An `offline` friend's last heartbeat (ISO 8601); absent when longer ago than `LAST_SEEN_DAYS`. */
+  readonly lastSeen?: string;
 }
+
+/** Older than this, "last seen" says nothing useful, so it isn't sent. */
+export const LAST_SEEN_DAYS = 30;
 
 export interface FriendsPage {
   readonly code: string;
@@ -40,6 +49,9 @@ function isFriend(value: unknown): value is Friend {
   if (typeof value !== "object" || value === null) return false;
   const row = value as Record<string, unknown>;
   return (row.status === undefined || isFriendStatus(row.status)) &&
+    (row.image === undefined || (typeof row.image === "string" && row.image.length <= 2048)) &&
+    (row.roomId === undefined || (typeof row.roomId === "string" && ROOM_ID_PATTERN.test(row.roomId))) &&
+    (row.lastSeen === undefined || (typeof row.lastSeen === "string" && !Number.isNaN(Date.parse(row.lastSeen)))) &&
     typeof row.userId === "string" && row.userId.length > 0 && row.userId.length <= 256 &&
     typeof row.name === "string" && row.name.length <= 512;
 }
@@ -74,6 +86,18 @@ export interface TableInvite { readonly fromName: string; readonly roomId: strin
 
 /** `POST /api/friends/presence`: the invites waiting for this player, and whether their email is verified (STO-627). */
 export interface PresenceResponse { readonly invites: TableInvite[]; readonly emailVerified: boolean }
+
+/** How often one player may nudge the same friend. */
+export const NUDGE_COOLDOWN_HOURS = 4;
+
+/** What a nudge came to: sent, refused inside the cooldown, or refused for a non-friend. */
+export type NudgeResult = "sent" | "too-soon" | "not-friends";
+
+export const NUDGE_MESSAGES = {
+  sent: "Nudge sent",
+  "too-soon": "You nudged them recently. Try again later.",
+  "not-friends": "That friend couldn't be found.",
+} as const satisfies Record<NudgeResult, string>;
 
 export const TABLE_STARTED_MESSAGE = "That table has already started.";
 

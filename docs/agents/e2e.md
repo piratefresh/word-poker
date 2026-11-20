@@ -42,12 +42,12 @@ selection and required room variables; it does not prove that APIs, accounts or 
 | `home` | Bottom navigation on web; mode choices and practice chip settings on native | Web, native |
 | `tutorial` | Coach steps, first call, reach flop | Web, native |
 | `story` | Saved map, open First Hand, leave back to map | Web, native |
-| `friends` | Load personal code, refresh, close tray | Web, native |
+| `friends` | Load personal code, switch lists, back to Home | Web, native |
 | `quests` | Wallet/streak cards and quest catalog, return home | Web, native |
 | `store` | Real Wallet balance, return home | Web, native |
 | `settings` | Open account settings, display name field, cancel | Web, native |
 | `avatar` | Add, replace and remove the Account photo through the system picker; needs the API's R2_* env | Native |
-| `offline` | Seeded betting, word building/check/shuffle, payout, next hand | Web, native |
+| `offline` | Seeded betting, word building/check/shuffle, payout, next hand (seed 371; re-probe with `packages/game-rules/scripts/probe-offline-hand.ts`) | Web, native |
 | `wild` | Power draw and CPU power use through results | Web |
 | `wild-power` | Hero uses Vowel Magnet; result reveals powered tile | Web |
 | `history` | Completed offline hand, session, hand details and action log; native also reconnects | Web, native |
@@ -127,7 +127,10 @@ worker failed to bundle on this Windows setup, so the browser uses its native tr
 the auth-bypass E2E build has no account to own history. Run it on Android with
 `node scripts/smoke-online-native.mjs android .maestro/native/history-offline.yaml`: it signs in, plays
 the offline hand in airplane mode, sees it pending, kills the app, turns airplane mode off, cold
-starts and waits for the hand to verify. Airplane mode does not cut `adb reverse`, so the runner
+starts, taps the ledger's sync pill (sync is manual) and waits for the hand to verify. On iOS,
+`pnpm smoke history --platform ios` runs the same flow without the airplane-mode half — Maestro
+cannot toggle it there — so it plays the hand online, leaves by the table's back button, syncs and
+reads the hand. Airplane mode does not cut `adb reverse`, so the runner
 removes the game and API mappings while it is on. Native cached sessions remain readable on network failure; uploads always revalidate the
 account and use its captured bearer credential, so a cookie switch cannot mix history partitions.
 

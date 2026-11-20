@@ -191,7 +191,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
           message = FRIEND_REQUEST_MESSAGES[result];
           if (result === "requested") {
             void displayName(sender.userId, { orm }).then((name) =>
-              notifyUsers([target.userId], "friendRequest", { title: "Friend request", body: `${name} sent you a friend request` }, { orm })).catch(() => {});
+              notifyUsers([target.userId], "friendRequest", { title: "Friend request", body: `${name} sent you a friend request`, url: "wordpoker://friends?tab=requests" }, { orm })).catch(() => {});
           }
         }
       } catch {

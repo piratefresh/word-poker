@@ -1,4 +1,7 @@
 # A signed-in development build with real auth. The E2E auth-bypass build has no history owner.
+# On iOS, Maestro cannot toggle airplane mode or press Back, so that platform plays the hand online,
+# leaves through the table's own back button, and reads the hand once the API has verified it.
+# The pending-sync half (airplane mode, kill, cold-start upload) runs on Android only.
 appId: com.wordpoker.wordpoker
 name: Completed hand is readable from saved native history
 tags:
@@ -33,64 +36,89 @@ tags:
       visible: "TAKE YOUR SEAT"
     file: _sign-in.yaml
 
-# Development Metro serves routes and the dictionary as lazy chunks, so open the table once while
-# online; once loaded they stay in memory for the offline hand.
-# Pop the warm-up table before opening history. A deep link pushes another screen and leaves
-# the old table's timer running; its eventual payout modal can cover the actual test hand.
-- openLink: wordpoker://offline?seed=7578&turn=300000
-- extendedWaitUntil:
-    visible: "PREFLOP( [1-5]/5)?"
-    timeout: 90000
-- back
-- extendedWaitUntil:
-    visible: "Offline"
-    timeout: 30000
-- openLink: wordpoker://history
-- extendedWaitUntil:
-    visible: "Hand ledger"
-    timeout: 30000
-- back
-- extendedWaitUntil:
-    visible: "Offline"
-    timeout: 30000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Development Metro serves routes and the dictionary as lazy chunks, so open the table once while
+      # online; once loaded they stay in memory for the offline hand.
+      # Pop the warm-up table before opening history. A deep link pushes another screen and leaves
+      # the old table's timer running; its eventual payout modal can cover the actual test hand.
+      - openLink: wordpoker://offline?seed=371&turn=300000
+      - extendedWaitUntil:
+          visible: "PREFLOP( [1-5]/5)?"
+          timeout: 90000
+      - back
+      - extendedWaitUntil:
+          visible: "Offline"
+          timeout: 30000
+      - openLink: wordpoker://history
+      - extendedWaitUntil:
+          visible: "Hand ledger"
+          timeout: 30000
+      - back
+      - extendedWaitUntil:
+          visible: "Offline"
+          timeout: 30000
 
-# Offline: the runner removes the game and API reverse mappings while airplane mode is on.
-# Metro's separate asset connection stays up; auth and history cannot upload through it.
-- setAirplaneMode: enabled
+      # Offline: the runner removes the game and API reverse mappings while airplane mode is on.
+      # Metro's separate asset connection stays up; auth and history cannot upload through it.
+      - setAirplaneMode: enabled
 - runFlow:
     file: offline-hand.yaml
-- back
-- openLink: wordpoker://history
-- extendedWaitUntil:
-    visible: ".*ON DEVICE.*"
-    timeout: 30000
-- assertVisible: "You're offline.*"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "hud-leave-button"
+      - extendedWaitUntil:
+          visible: "Offline"
+          timeout: 30000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+      - openLink: wordpoker://history
+      - extendedWaitUntil:
+          visible: ".*ON DEVICE.*"
+          timeout: 30000
+      - assertVisible: "You're offline.*"
 
-# The hand must survive a kill before connectivity returns, then upload on the cold start.
-- killApp
-- setAirplaneMode: disabled
-# Give the runner's loop (every 3 s) time to restore the reverse mapping.
-- extendedWaitUntil:
-    visible: "never shown, only a pause"
-    timeout: 8000
-    optional: true
-- runFlow:
-    when:
-      true: ${typeof ATTACH === 'undefined'}
-    commands:
-      - launchApp
-- runFlow:
-    when:
-      true: ${typeof ATTACH !== 'undefined'}
-    commands:
-      - openLink: ${DEV_LINK}
-- extendedWaitUntil:
-    visible: "Offline"
-    timeout: 300000
+      # The hand must survive a kill before connectivity returns, then upload on the cold start.
+      - killApp
+      - setAirplaneMode: disabled
+      # Give the runner's loop (every 3 s) time to restore the reverse mapping.
+      - extendedWaitUntil:
+          visible: "never shown, only a pause"
+          timeout: 8000
+          optional: true
+      - runFlow:
+          when:
+            true: ${typeof ATTACH === 'undefined'}
+          commands:
+            - launchApp
+      - runFlow:
+          when:
+            true: ${typeof ATTACH !== 'undefined'}
+          commands:
+            - openLink: ${DEV_LINK}
+      - extendedWaitUntil:
+          visible: "Offline"
+          timeout: 300000
 - openLink: wordpoker://history
+# Sync is manual since 8eb0ebc: the ledger's pill uploads the saved hands.
+- extendedWaitUntil:
+    visible:
+      id: "history-sync"
+      enabled: true
+    timeout: 30000
+- tapOn:
+    id: "history-sync"
 - extendedWaitUntil:
     visible: ".*VERIFIED.*"
-    timeout: 10000
+    timeout: 30000
 - assertNotVisible: ".*ON DEVICE.*"
 - tapOn:
     id: "history-session-.*"
@@ -102,10 +130,11 @@ tags:
 - tapOn:
     id: "history-hand-.*"
     index: 0
-- assertVisible: "HAND #1"
+# The header is one label on iOS: "HAND #1, <date> · Offline · Normal".
+- assertVisible: "HAND #1.*"
 - assertVisible:
     text: "VERIFIED · UNRANKED"
-- assertVisible: "You,.*ZIG, 14 points.*"
+- assertVisible: "You,.*HEMP, 15 points.*"
 - scrollUntilVisible:
     element:
       text: "ACTION LOG"

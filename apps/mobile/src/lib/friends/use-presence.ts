@@ -17,7 +17,7 @@ import { beat, goOffline } from "@/lib/friends/friends-client";
 export const HEARTBEAT_MS = 20_000;
 
 export function usePresence(account: boolean): { invite: TableInvite | null; dismiss: () => void } {
-  const atTable = useActiveRoomId() !== null;
+  const roomId = useActiveRoomId();
   const [invite, setInvite] = useState<TableInvite | null>(null);
   const { data: session, refetch } = authClient.useSession();
   // Read through a ref so a session change doesn't restart the heartbeat.
@@ -30,7 +30,7 @@ export function usePresence(account: boolean): { invite: TableInvite | null; dis
     if (!account) return;
     let timer: ReturnType<typeof setInterval> | undefined;
     const tick = () => {
-      void beat(atTable)
+      void beat(roomId)
         .then(({ invites, emailVerified }) => {
           const latest = invites.at(-1);
           if (latest) setInvite(latest);
@@ -55,7 +55,7 @@ export function usePresence(account: boolean): { invite: TableInvite | null; dis
       subscription.remove();
       clearInterval(timer);
     };
-  }, [account, atTable]);
+  }, [account, roomId]);
 
   return { invite: account ? invite : null, dismiss: () => setInvite(null) };
 }
