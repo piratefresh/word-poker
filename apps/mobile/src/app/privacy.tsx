@@ -12,7 +12,7 @@ type Block = string | readonly [string, string];
 
 const INTRO =
   "WordPoker Best Word Takes The Pot (“we”, “us” or “our”) makes WordPoker, a word game played like Texas Hold’em with letter tiles. This policy explains what personal data the WordPoker app and website use, why, and the third-party services involved.";
-const UPDATED = "Last updated: November 9, 2026.";
+const UPDATED = "Last updated: November 19, 2026.";
 
 const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
@@ -39,11 +39,11 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
       ["Emails.", "We send account emails (verification, password reset) through Resend."],
       [
         "Push notifications.",
-        "If you allow notifications, we store your device’s push token to send you things like table invites. You can turn them off in your device settings.",
+        "If you allow notifications, we store your device’s push token to send you things like friend requests and table invites. Notifications are delivered through Expo’s push service and Apple or Google, which receive the push token and the message (for example, the name of the friend who invited you). You can turn them off in your device settings.",
       ],
       [
         "Analytics, crash reports and session replay.",
-        "We use PostHog to understand how the game is used and to fix crashes. It receives app events, device and app information (model, OS, app version), error reports, and on mobile a recording of a sample of sessions (about 1 in 10) showing the app’s screens. We use this only to improve WordPoker.",
+        "We use PostHog to understand how the game is used and to fix crashes. When you are signed in, it receives your account identifier, email address and display name, so events and crash reports are linked to your account. It also receives app events, device and app information (model, OS, app version), error reports, and on mobile a recording of a sample of sessions (about 1 in 10) showing the app’s screens. We use this only to improve WordPoker.",
       ],
     ],
   ],
@@ -77,9 +77,10 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
     [
       "We do not sell your personal data. We share it only with the service providers that run WordPoker for us, under contract, for the purposes above:",
       ["Apple, Google:", "sign-in, Game Center, app store purchases, push notifications."],
+      ["Expo:", "push notification delivery."],
       ["RevenueCat:", "purchases, coin balance, ad reward verification."],
       ["Google AdMob:", "rewarded ads."],
-      ["PostHog:", "analytics, crash reports, session replay."],
+      ["PostHog:", "analytics, crash reports, session replay; linked to your account when you are signed in."],
       ["Resend:", "account emails."],
       ["Cloudflare:", "website delivery and protection, avatar photo storage."],
       ["PlanetScale, Colyseus Cloud:", "hosting our database, game servers and website."],
