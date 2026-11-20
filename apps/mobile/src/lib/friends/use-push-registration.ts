@@ -12,6 +12,18 @@ import { Platform } from "react-native";
 
 import { registerPushToken, unregisterPushToken } from "@/lib/friends/friends-client";
 
+/**
+ * Shows pushes that arrive while the app is open; without a handler, expo-notifications drops
+ * them. No duplicates with the in-app invite banner: the server pushes an invite only to an offline friend.
+ */
+export const FOREGROUND_BEHAVIOR: Notifications.NotificationBehavior = {
+  shouldShowBanner: true,
+  shouldShowList: true,
+  shouldPlaySound: true,
+  shouldSetBadge: false,
+};
+Notifications.setNotificationHandler({ handleNotification: async () => FOREGROUND_BEHAVIOR });
+
 /** The token this device last registered, kept across restarts so sign-out can take it back. */
 const TOKEN_KEY = "push-token";
 
