@@ -22,6 +22,7 @@ import { CoinChip } from "@/components/chip/coin-chip";
 import { chipTones, fonts, ledger, spacing } from "@/constants/theme";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { formatCoins } from "@/lib/ui/format";
+import { webTestID } from "@/lib/ui/web-id";
 
 /** The fridge's own colours: enamel, chrome, and the sticky-note papers. */
 const FRIDGE = {
@@ -99,6 +100,7 @@ export function QuestsScreen(): ReactElement {
           accessibilityLabel="Back"
           accessibilityRole="button"
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+          id={webTestID("quests-back")}
           style={styles.pill}
           testID="quests-back"
         >
@@ -108,6 +110,7 @@ export function QuestsScreen(): ReactElement {
           <View
             accessibilityLabel={coins === null ? "Coins loading" : `${formatCoins(coins)} coins`}
             style={[styles.pill, styles.wallet]}
+            id={webTestID("quest-wallet")}
             testID="quest-wallet"
           >
             <CoinChip size={18} />
