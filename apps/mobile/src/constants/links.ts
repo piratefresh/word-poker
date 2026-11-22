@@ -17,3 +17,8 @@ export const EMAIL_VERIFIED_DEEP_LINK = "wordpoker://";
  */
 export const EMAIL_VERIFIED_CALLBACK =
   Platform.OS === "web" ? "/" : EMAIL_VERIFIED_DEEP_LINK;
+
+/**
+ * The iOS public beta: App Store Connect → TestFlight → External Testing → the group's Public Link.
+ */
+export const TESTFLIGHT_URL = "https://testflight.apple.com/join/C8V3BjDU";
