@@ -1,5 +1,21 @@
-url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
-name: Story map opens its first challenge
+# Story mode, one hand of the run end to end against the web build:
+# map → First Hand's brief → DEAL → call to the river → build BANKS (14) → win the pot →
+# the verdict's three stars → take the drafted power → back on the map with First Hand
+# completed → reload (the save is localStorage, so it must survive) → Hand 2 opens on a
+# Power Draw of the power just drafted.
+#
+#   maestro test --platform web .maestro/story.yaml      (or `pnpm smoke story`)
+#
+# First Hand's deal is authored (features/story/challenges.ts): the hero holds B, O and the
+# board is A T S K N. Ellis's best is MAKES for 13; BANKS for 14 is the hero's way past it and
+# earns ★★★. Tiles are tapped by id, never by position: the rack re-orders as a word is built.
+#
+# A headless run starts on a fresh profile (no save). A headed run reuses Maestro's Chrome
+# profile, so First Hand may already be completed and powers already held: the node selector
+# accepts both states, the table may open on a Power Draw, and a full hand turns TAKE into a
+# swap. Selector notes are in offline-hand.yaml.
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/story"
+name: Story — win First Hand, draft a power, and keep the save
 tags: [web, story]
 ---
 - runFlow: sign-in.yaml
@@ -12,22 +28,157 @@ tags: [web, story]
     element:
       id: "First Hand, (play|completed, .* stars)"
     direction: DOWN
-- assertVisible:
-    id: "First Hand, (play|completed, .* stars)"
 - tapOn:
     id: "First Hand, (play|completed, .* stars)"
 # The node opens its brief (goals, stakes) first; DEAL seats the hand.
 - extendedWaitUntil:
-    visible: "DEAL"
+    visible:
+      id: "story-deal"
     timeout: 15000
-- tapOn: "DEAL"
+- tapOn:
+    id: "story-deal"
 - extendedWaitUntil:
     visible:
       id: "poker-table"
     timeout: 90000
+
+# With powers already held the hand opens on a Power Draw: keep whichever is offered first.
+- runFlow:
+    when:
+      visible:
+        id: "power-draw"
+    file: _story-pick-power.yaml
+
 - assertVisible:
     id: "story-coach"
 - assertVisible: ".*FIRST HAND.*"
+
+# Call (or check) every hero turn until the river is dealt.
+- repeat:
+    while:
+      notVisible:
+        text: "RIVER · FIRST HAND"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|RIVER · FIRST HAND"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+
+# Build BANKS from the hero's B and the board's A, N, K, S. The word reads the strip left to
+# right (a tap toggles a tile where it lies; only a drag reorders), and Maestro's web `swipe`
+# scrolls rather than drags — so this needs B, A, N, K, S to already sit in that order on the strip.
+- extendedWaitUntil:
+    visible: "YOUR TURN"
+    timeout: 20000
+- tapOn:
+    id: "word-builder-tile-B-1"
+- tapOn:
+    id: "word-builder-tile-A-1"
+- tapOn:
+    id: "word-builder-tile-N-1"
+- tapOn:
+    id: "word-builder-tile-K-1"
+- tapOn:
+    id: "word-builder-tile-S-1"
+- assertVisible:
+    id: "BANKS, 14 points(, valid)?"
+
+# Check the river, answer any bet, then submit inside the word window — the same control each
+# time — until the verdict covers the table.
+- repeat:
+    while:
+      notVisible:
+        id: "story-verdict"
+    commands:
+      - extendedWaitUntil:
+          visible: "YOUR TURN|SUBMIT WORD"
+          timeout: 40000
+          optional: true
+      - runFlow:
+          when:
+            visible: "YOUR TURN|SUBMIT WORD"
+          commands:
+            - tapOn:
+                id: "action-check-call"
+            - waitForAnimationToEnd
+
+# The run's verdict: the pot, BANKS shown, and all three stars.
+- extendedWaitUntil:
+    visible: "FIRST HAND · WON"
+    timeout: 30000
+- assertVisible:
+    id: "3 of 3 stars"
+- assertVisible: "BANKS · 14 PTS.*"
+
+# A won hand node pays a draft (until the pool runs dry). TAKE settles it and goes back to the map;
+# with a full hand TAKE first asks which held power to swap out.
+- runFlow:
+    when:
+      visible: "Take a power into Hand 2"
+    commands:
+      - tapOn:
+          id: "story-take"
+      - runFlow:
+          when:
+            visible: "SWAP FOR .*"
+          commands:
+            - tapOn:
+                id: "story-take"
+- runFlow:
+    when:
+      visible:
+        id: "story-back"
+    commands:
+      - tapOn:
+          id: "story-back"
+
+# Back on the map, First Hand is completed with its stars and Hand 2 is open.
+- extendedWaitUntil:
+    visible:
+      id: "story-map"
+    timeout: 30000
+- assertVisible:
+    id: "First Hand, completed, 3 of 3 stars"
+- assertVisible:
+    id: "Chips on the Table, (play|completed, .* stars)"
+- assertVisible:
+    id: "([3-9]|1[0-5]) of 15 stars"
+
+# The save survives a reload: the header still counts First Hand's stars, and Hand 2 is still open.
+# (The map scrolls inside its own view and reopens centred on the next node, so this reads the
+# header rather than scrolling back down to First Hand.)
+- openLink: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}/story"
+- extendedWaitUntil:
+    visible:
+      id: "story-map"
+    timeout: 30000
+- assertVisible:
+    id: "([3-9]|1[0-5]) of 15 stars"
+
+# Hand 2 deals the power the draft paid: it opens on a Power Draw.
+- assertVisible:
+    id: "Chips on the Table, (play|completed, .* stars)"
+- tapOn:
+    id: "Chips on the Table, (play|completed, .* stars)"
+- extendedWaitUntil:
+    visible:
+      id: "story-deal"
+    timeout: 15000
+- tapOn:
+    id: "story-deal"
+- extendedWaitUntil:
+    visible:
+      id: "power-draw"
+    timeout: 90000
+- runFlow: _story-pick-power.yaml
+- assertVisible: ".*CHIPS ON THE TABLE.*"
 - tapOn:
     id: "hud-leave-button"
 - extendedWaitUntil:

@@ -39,6 +39,14 @@ test("First Hand: Ellis's authored best word (MAKES) beats BOATS but not BANKS, 
   expect(ellis.score).toBeLessThan(bestWord(challenge)!.score);
 });
 
+test("First Hand's teach word is tappable: its tiles already sit in order on the rack", () => {
+  const challenge = CHALLENGES[0]!;
+  const deal = fixedDeal({ seed: 1, playerCount: challenge.players.length, spec: challenge.deal });
+  const rack = [...(deal.privateTiles[0] ?? []), ...deal.community].map((tile) => tile.letter).join("");
+  const inOrder = new RegExp([...challenge.teachWord!].join(".*"));
+  expect(rack).toMatch(inOrder);
+});
+
 test("a challenge's teach word is one of the hero's best", () => {
   for (const challenge of CHALLENGES.filter((entry) => entry.teachWord !== undefined)) {
     const deal = fixedDeal({ seed: 1, playerCount: challenge.players.length, spec: challenge.deal });

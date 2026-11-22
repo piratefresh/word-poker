@@ -41,7 +41,7 @@ selection and required room variables; it does not prove that APIs, accounts or 
 | `registration` | New handle/account, settings, sign out | Web |
 | `home` | Bottom navigation on web; mode choices and practice chip settings on native | Web, native |
 | `tutorial` | Coach steps, first call, reach flop | Web, native |
-| `story` | Saved map, open First Hand, leave back to map | Web, native |
+| `story` | Win First Hand (BANKS, 3 stars), take the drafted power, save survives a reload, Hand 2 opens on a Power Draw | Web; native opens First Hand only |
 | `friends` | Load personal code, switch lists, back to Home | Web, native |
 | `quests` | Wallet/streak cards and quest catalog, return home | Web, native |
 | `store` | Real Wallet balance, return home | Web, native |

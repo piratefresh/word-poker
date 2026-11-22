@@ -1,0 +1,10 @@
+# A story hand that opens on a Power Draw: the offers depend on the run's drafts, so rather
+# than tap a named card the flow lets the draw's clock keep one, then waits for the table.
+url: "${typeof WEB_URL === 'undefined' ? 'http://localhost:8081' : WEB_URL}"
+name: Story — let the Power Draw keep a power
+tags: [web, story]
+---
+- extendedWaitUntil:
+    notVisible:
+      id: "power-draw"
+    timeout: 30000
