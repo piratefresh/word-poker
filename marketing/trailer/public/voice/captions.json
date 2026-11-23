@@ -154,52 +154,101 @@
   ],
   "05-score": [
     {
-      "text": "Fifteen",
-      "startMs": 100,
+      "text": "Double",
+      "startMs": 140,
+      "endMs": 420,
+      "timestampMs": 280,
+      "confidence": null
+    },
+    {
+      "text": " and",
+      "startMs": 500,
       "endMs": 600,
-      "timestampMs": 350,
+      "timestampMs": 550,
+      "confidence": null
+    },
+    {
+      "text": " triple",
+      "startMs": 740,
+      "endMs": 1020,
+      "timestampMs": 880,
+      "confidence": null
+    },
+    {
+      "text": " letters",
+      "startMs": 1100,
+      "endMs": 1440,
+      "timestampMs": 1270,
+      "confidence": null
+    },
+    {
+      "text": " boost",
+      "startMs": 1640,
+      "endMs": 1900,
+      "timestampMs": 1770,
+      "confidence": null
+    },
+    {
+      "text": " your",
+      "startMs": 1940,
+      "endMs": 2020,
+      "timestampMs": 1980,
+      "confidence": null
+    },
+    {
+      "text": " score.",
+      "startMs": 2120,
+      "endMs": 2540,
+      "timestampMs": 2330,
+      "confidence": null
+    },
+    {
+      "text": " Fifteen",
+      "startMs": 2900,
+      "endMs": 3420,
+      "timestampMs": 3160,
       "confidence": null
     },
     {
       "text": " points!",
-      "startMs": 720,
-      "endMs": 1260,
-      "timestampMs": 990,
+      "startMs": 3480,
+      "endMs": 4000,
+      "timestampMs": 3740,
       "confidence": null
     },
     {
       "text": " Best",
-      "startMs": 1640,
-      "endMs": 1860,
-      "timestampMs": 1750,
+      "startMs": 4520,
+      "endMs": 4760,
+      "timestampMs": 4640,
       "confidence": null
     },
     {
       "text": " word",
-      "startMs": 1940,
-      "endMs": 2240,
-      "timestampMs": 2090,
+      "startMs": 4820,
+      "endMs": 5120,
+      "timestampMs": 4970,
       "confidence": null
     },
     {
       "text": " takes",
-      "startMs": 2300,
-      "endMs": 2540,
-      "timestampMs": 2420,
+      "startMs": 5180,
+      "endMs": 5440,
+      "timestampMs": 5310,
       "confidence": null
     },
     {
       "text": " the",
-      "startMs": 2580,
-      "endMs": 2660,
-      "timestampMs": 2620,
+      "startMs": 5500,
+      "endMs": 5580,
+      "timestampMs": 5540,
       "confidence": null
     },
     {
       "text": " pot.",
-      "startMs": 2700,
-      "endMs": 3060,
-      "timestampMs": 2880,
+      "startMs": 5620,
+      "endMs": 6000,
+      "timestampMs": 5810,
       "confidence": null
     }
   ],
