@@ -116,7 +116,7 @@ const Captions: React.FC<{ id: string; face: string; len: number }> = ({ id, fac
         translate: `0 ${talking ? Math.sin(frame / 2.2) * 3 : 0}px`,
       }}
     >
-      <Img src={staticFile(`ellis/face-${face}.svg`)} style={{ width: "116%", marginLeft: "-8%", marginTop: "2%" }} />
+      <Img src={staticFile(`ellis/face-${face}.svg`)} style={{ display: "block", height: "84%", margin: "6% auto 0" }} />
     </div>
   );
   if (!page) return <AbsoluteFill style={{ top: "auto", bottom: 250, height: 260, padding: "0 70px", justifyContent: "flex-end" }}>{avatar}</AbsoluteFill>;
