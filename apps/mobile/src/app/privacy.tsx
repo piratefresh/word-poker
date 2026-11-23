@@ -12,7 +12,7 @@ type Block = string | readonly [string, string];
 
 const INTRO =
   "WordPoker Best Word Takes The Pot (“we”, “us” or “our”) makes WordPoker, a word game played like Texas Hold’em with letter tiles. This policy explains what personal data the WordPoker app and website use, why, and the third-party services involved.";
-const UPDATED = "Last updated: November 19, 2026.";
+const UPDATED = "Last updated: November 22, 2026.";
 
 const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
   [
@@ -127,6 +127,12 @@ const SECTIONS: readonly (readonly [string, readonly Block[]])[] = [
     "Changes to this policy",
     [
       "We may update this policy when WordPoker, our providers or the law change. We will update the date at the top and, for material changes, tell you in the app.",
+    ],
+  ],
+  [
+    "Trademarks",
+    [
+      "“WordPoker: The best word takes the pot” is a trademark of WordPoker Best Word Takes The Pot. Apple, Google and the other names above are trademarks of their owners.",
     ],
   ],
   [

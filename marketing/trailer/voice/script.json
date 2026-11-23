@@ -1,0 +1,12 @@
+[
+  {"id": "01-hello", "face": "wink", "shot": "Ellis pops in on the felt", "text": "Hi! I'm Ellis. Welcome to WordPoker."},
+  {"id": "02-deal", "face": "happy", "shot": "classic: the deal, your two tiles", "text": "It's Texas Hold'em... except you're dealt letters."},
+  {"id": "03-bet", "face": "determined", "shot": "classic: flop, turn, river, chips into the pot", "text": "Bet the flop. The turn. The river."},
+  {"id": "04-spell", "face": "thinking", "shot": "classic: tapping H, E, M, P into the rack", "text": "Then spell the best word you can."},
+  {"id": "05-score", "face": "surprised", "shot": "classic: HEMP, 15 points, the pot", "text": "Fifteen points! Biggest word takes the pot."},
+  {"id": "06-wild", "face": "wink", "shot": "wild: lobby Wild Power chip, the Power Draw and the Vowel Magnet swap", "text": "Want chaos? Switch to Wild Power mode: power-ups that bend the rules."},
+  {"id": "07-online", "face": "happy", "shot": "social: friends list (Join, Invite, Nudge), online lobby with live tables", "text": "Play online with your friends... or invite them to your table."},
+  {"id": "08-story", "face": "happy", "shot": "story: Kitchen Table chapter map with Ellis, First Hand, the coached table", "text": "New here? Join me in Story mode. I will teach you the ropes."},
+  {"id": "09-quests", "face": "determined", "shot": "quests board with coin rewards, then the store tile sets", "text": "Clear daily quests, earn coins, and unlock new tile sets."},
+  {"id": "10-cta", "face": "happy", "shot": "end card: logo, Join the iOS beta", "text": "WordPoker is in beta on TestFlight. Come take my chips!"}
+]
