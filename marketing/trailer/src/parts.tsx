@@ -349,3 +349,121 @@ export const GoldPill: React.FC<{ children: React.ReactNode; shine: number; styl
     />
   </div>
 );
+
+/**
+ * HEMP added up tile by tile, each tile landing as Ellis names it (`at`, frames), its points
+ * underneath; the E wears the 2× badge and reads "1 × 2 = 2". The total pill lands at `total`.
+ */
+export const ScoreBreakdown: React.FC<{
+  len: number;
+  top: number;
+  size: number;
+  at: { H: number; E: number; double: number; M: number; P: number; total: number };
+}> = ({ len, top, size, at }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const out = ramp(frame, len - 6, 6);
+  const tiles = [
+    { l: "H", from: at.H, label: "5" },
+    { l: "E", from: at.E, label: "1 × 2 = 2", badge: true },
+    { l: "M", from: at.M, label: "4" },
+    { l: "P", from: at.P, label: "4" },
+  ];
+  const sum = spring({ frame: frame - at.total, fps, config: { damping: 13, mass: 0.6 } });
+  return (
+    <AbsoluteFill style={{ opacity: 1 - out, filter: `blur(${out * 4}px)` }}>
+      <div
+        style={{
+          position: "absolute",
+          top: top - size * 0.45,
+          left: 60,
+          right: 60,
+          height: size * 3.55,
+          borderRadius: 56,
+          background: `linear-gradient(180deg, ${C.felt500}, ${C.felt800})`,
+          boxShadow: `0 0 0 4px ${C.border}, 0 30px 80px rgba(0,0,0,.6)`,
+          opacity: ramp(frame, 0, 8),
+          scale: interpolate(ramp(frame, 0, 10), [0, 1], [0.94, 1]),
+        }}
+      />
+      <AbsoluteFill style={{ top, bottom: "auto", flexDirection: "row", justifyContent: "center", gap: size * 0.22 }}>
+        {tiles.map((t) => {
+          const p = spring({ frame: frame - t.from, fps, config: { damping: 15, mass: 0.7 } });
+          const labelIn = ramp(frame, t.badge ? at.double : t.from + 4, 8);
+          return (
+            <div key={t.l} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: size * 0.16, width: size }}>
+              <Audio from={t.from} src={staticFile("sfx/tile.mp3")} volume={0.7} />
+              {t.badge ? <Audio from={at.double} src={staticFile("sfx/magic.mp3")} volume={0.45} /> : null}
+              <div style={{ position: "relative" }}>
+                <Tile
+                  letter={t.l}
+                  size={size}
+                  flip={p}
+                  lit={ramp(frame, at.total, 8)}
+                  style={{ opacity: ramp(frame, t.from, 7), translate: `0 ${interpolate(p, [0, 1], [-size * 0.45, 0])}px` }}
+                />
+                {t.badge ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -size * 0.2,
+                      right: -size * 0.2,
+                      fontFamily: F.tile,
+                      fontSize: size * 0.3,
+                      color: "#fff",
+                      background: "linear-gradient(135deg, #c3a6f5, #8559cc 55%, #5b3690)",
+                      borderRadius: 999,
+                      padding: `${size * 0.05}px ${size * 0.12}px ${size * 0.02}px`,
+                      boxShadow: "0 4px 0 #2c1848",
+                      opacity: ramp(frame, t.from + 4, 6),
+                      scale: interpolate(ramp(frame, t.from + 4, 8), [0, 1], [0.6, 1]),
+                    }}
+                  >
+                    2×
+                  </div>
+                ) : null}
+              </div>
+              <div
+                style={{
+                  fontFamily: F.tile,
+                  fontSize: t.badge ? size * 0.3 : size * 0.44,
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                  color: t.badge ? "#d9c3ff" : C.gold100,
+                  textShadow: "0 4px 0 rgba(0,0,0,.45)",
+                  opacity: labelIn,
+                  translate: `0 ${(1 - labelIn) * 14}px`,
+                  height: size * 0.44,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {t.label}
+              </div>
+            </div>
+          );
+        })}
+      </AbsoluteFill>
+      <AbsoluteFill style={{ top: top + size * 1.95, bottom: "auto", alignItems: "center" }}>
+        <Audio from={at.total} src={staticFile("sfx/win.mp3")} volume={0.5} />
+        <div
+          style={{
+            fontFamily: F.tile,
+            fontSize: size * 0.62,
+            lineHeight: 1,
+            color: C.onGold,
+            background: `linear-gradient(135deg, ${C.gold100}, ${C.gold300} 55%, ${C.gold500})`,
+            borderRadius: 999,
+            padding: `${size * 0.1}px ${size * 0.34}px ${size * 0.05}px`,
+            boxShadow: `inset 0 3px 0 rgba(255,255,255,.55), 0 ${size * 0.04}px 0 ${C.gold600}, 0 ${size * 0.1}px ${size * 0.2}px rgba(0,0,0,.5)`,
+            opacity: ramp(frame, at.total, 7),
+            scale: interpolate(sum, [0, 1], [0.85, 1]),
+            rotate: "-3deg",
+          }}
+        >
+          5 + 2 + 4 + 4 = 15
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};

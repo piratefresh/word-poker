@@ -2,18 +2,18 @@ import type { Caption } from "@remotion/captions";
 import { Audio, Video } from "@remotion/media";
 import type React from "react";
 import { useMemo } from "react";
-import { AbsoluteFill, Sequence, Series, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, Sequence, Series, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import captions from "../public/voice/captions.json";
 import durations from "../public/voice/durations.json";
 import script from "../voice/script.json";
-import { EASE_OUT, Felt, Pop, TileRow } from "./parts";
+import { EASE_OUT, Felt, Pop, ScoreBreakdown, TileRow } from "./parts";
 import { EndCard, Logo, Outro } from "./scenes";
 import { C, F, clamp } from "./theme";
 
 /**
  * One shot per Ellis line, each as long as its voice clip (voice/durations.json) plus a breath, so
  * re-recording a line re-times the cut. Times inside a shot use `v(seconds into the line)`.
- * Ellis is heard, not seen: the logo, then full-screen gameplay, then the end card.
+ * Ellis's face sits beside her captions; the picture is the logo, full-screen gameplay, then the end card.
  */
 export const FPS = 30;
 const LEAD = 6;
@@ -88,16 +88,38 @@ const toPages = (words: Caption[]) => {
 };
 
 /**
- * Ellis's line as burned-in captions for sound-off viewing: a phrase per page, the word she is
- * saying in gold. Mounted at the voice clip's start, so its frame 0 is the clip's 0 ms.
+ * Ellis's line as burned-in captions for sound-off viewing: her face (the line's expression) beside
+ * a phrase per page, the word she is saying in gold. Mounted at the voice clip's start, so its
+ * frame 0 is the clip's 0 ms.
  */
-const Captions: React.FC<{ id: string; len: number }> = ({ id, len }) => {
+const Captions: React.FC<{ id: string; face: string; len: number }> = ({ id, face, len }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const pages = useMemo(() => toPages((captions as Record<string, Caption[]>)[id]), [id]);
   const ms = (frame / fps) * 1000;
   const page = [...pages].reverse().find((p) => ms >= p.startMs - 60);
-  if (!page) return null;
+  const pop = spring({ frame, fps, config: { damping: 12, mass: 0.6 } });
+  const gone = interpolate(frame, [len - 5, len], [0, 1], { ...clamp, easing: EASE_OUT });
+  const talking = page ? page.tokens.some((t) => ms >= t.fromMs && ms < t.toMs) : false;
+  const avatar = (
+    <div
+      style={{
+        width: 200,
+        height: 200,
+        flex: "none",
+        borderRadius: 999,
+        overflow: "hidden",
+        background: `radial-gradient(circle at 40% 35%, ${C.felt400}, ${C.felt800})`,
+        boxShadow: `0 0 0 6px ${C.gold300}, 0 10px 0 ${C.gold600}, 0 18px 40px rgba(0,0,0,.55)`,
+        opacity: interpolate(pop, [0, 1], [0, 1]) * (1 - gone),
+        scale: interpolate(pop, [0, 1], [0.6, 1]),
+        translate: `0 ${talking ? Math.sin(frame / 2.2) * 3 : 0}px`,
+      }}
+    >
+      <Img src={staticFile(`ellis/face-${face}.svg`)} style={{ width: "116%", marginLeft: "-8%", marginTop: "2%" }} />
+    </div>
+  );
+  if (!page) return <AbsoluteFill style={{ top: "auto", bottom: 250, height: 260, padding: "0 70px", justifyContent: "flex-end" }}>{avatar}</AbsoluteFill>;
   const enter = interpolate(ms, [page.startMs - 60, page.startMs + 110], [0, 1], { ...clamp, easing: EASE_OUT });
   const out = interpolate(frame, [len - 5, len], [0, 1], { ...clamp, easing: EASE_OUT });
   return (
@@ -106,20 +128,23 @@ const Captions: React.FC<{ id: string; len: number }> = ({ id, len }) => {
         top: "auto",
         bottom: 250,
         height: 260,
-        padding: "0 80px",
+        padding: "0 70px",
+        flexDirection: "row",
         alignItems: "center",
-        justifyContent: "flex-end",
-        opacity: enter * (1 - out),
-        translate: `0 ${(1 - enter) * 16}px`,
+        gap: 36,
       }}
     >
+      {avatar}
       <div
         style={{
+          flex: 1,
+          opacity: enter * (1 - out),
+          translate: `0 ${(1 - enter) * 16}px`,
           fontFamily: F.ui,
           fontWeight: 700,
-          fontSize: 80,
+          fontSize: 70,
           lineHeight: 1.08,
-          textAlign: "center",
+          textAlign: "left",
           textWrap: "balance",
           textShadow: "0 5px 0 rgba(0,0,0,.5), 0 0 24px rgba(0,0,0,.6)",
         }}
@@ -192,7 +217,7 @@ export const Trailer: React.FC = () => {
               <Clip src="classic" at={104} />
             </Series.Sequence>
             <Series.Sequence name="Score" durationInFrames={score.len}>
-              <Clip src="classic" at={113} rate={2.8} />
+              <Clip src="classic" at={113} rate={1.3} />
             </Series.Sequence>
             <Series.Sequence name="Wild: lobby" durationInFrames={40}>
               <Clip src="lobby" at={15.5} rate={1.5} />
@@ -259,11 +284,17 @@ export const Trailer: React.FC = () => {
       <Sequence name="Points: multipliers" from={points.from + v(2.2)} durationInFrames={points.len - v(2.2)}>
         <Pop len={points.len - v(2.2)} top={500} size={120} tilt={3} tone="purple" sfx="magic">2× · 3× LETTERS</Pop>
       </Sequence>
-      <Sequence name="Score: sum" from={score.from + v(0.4)} durationInFrames={v(2.3) - v(0.4)}>
-        <Pop len={v(2.3) - v(0.4)} top={960} size={110} tilt={-4} sfx="win">5 + 2 + 4 + 4 = 15</Pop>
+      {/* "H is five. The doubled E makes two. M and P are four each. That's fifteen!" */}
+      <Sequence name="Score: breakdown" from={score.from} durationInFrames={v(7.7)}>
+        <ScoreBreakdown
+          len={v(7.7)}
+          top={430}
+          size={170}
+          at={{ H: v(0.25), E: v(1.65), double: v(2.8), M: v(3.7), P: v(4.15), total: v(5.9) }}
+        />
       </Sequence>
-      <Sequence name="Score: pot" from={score.from + v(3.1)} durationInFrames={score.len - v(3.1)}>
-        <Pop len={score.len - v(3.1)} top={790} size={140} tilt={3} sfx="chips">POT 2,600</Pop>
+      <Sequence name="Score: pot" from={score.from + v(7.85)} durationInFrames={score.len - v(7.85)}>
+        <Pop len={score.len - v(7.85)} top={790} size={140} tilt={3} sfx="chips">POT 2,600</Pop>
       </Sequence>
       <Sequence name="Wild: mode" from={wild.from + v(1.8)} durationInFrames={77 - v(1.8)}>
         <Pop len={77 - v(1.8)} top={300} size={104} tilt={-3} tone="purple" sfx="magic">WILD POWER MODE</Pop>
@@ -301,7 +332,7 @@ export const Trailer: React.FC = () => {
       {SHOTS.map((s) => (
         <Sequence key={s.id} name={`Ellis ${s.id}`} from={s.from + LEAD} durationInFrames={s.len - LEAD}>
           <Audio src={staticFile(`voice/${s.id}.mp3`)} />
-          <Captions id={s.id} len={s.len - LEAD} />
+          <Captions id={s.id} face={s.face} len={s.len - LEAD} />
         </Sequence>
       ))}
     </AbsoluteFill>

@@ -154,66 +154,150 @@
   ],
   "05-score": [
     {
-      "text": "So",
-      "startMs": 120,
-      "endMs": 320,
-      "timestampMs": 220,
+      "text": "H",
+      "startMs": 300,
+      "endMs": 400,
+      "timestampMs": 350,
       "confidence": null
     },
     {
-      "text": " HEMP",
-      "startMs": 520,
-      "endMs": 740,
-      "timestampMs": 630,
+      "text": " is",
+      "startMs": 460,
+      "endMs": 660,
+      "timestampMs": 560,
       "confidence": null
     },
     {
-      "text": " scores",
-      "startMs": 820,
-      "endMs": 1180,
-      "timestampMs": 1000,
+      "text": " five.",
+      "startMs": 740,
+      "endMs": 1200,
+      "timestampMs": 970,
       "confidence": null
     },
     {
-      "text": " fifteen.",
-      "startMs": 1360,
+      "text": " The",
+      "startMs": 1560,
+      "endMs": 1680,
+      "timestampMs": 1620,
+      "confidence": null
+    },
+    {
+      "text": " doubled",
+      "startMs": 1720,
       "endMs": 2000,
-      "timestampMs": 1680,
+      "timestampMs": 1860,
+      "confidence": null
+    },
+    {
+      "text": " E",
+      "startMs": 2180,
+      "endMs": 2380,
+      "timestampMs": 2280,
+      "confidence": null
+    },
+    {
+      "text": " makes",
+      "startMs": 2440,
+      "endMs": 2760,
+      "timestampMs": 2600,
+      "confidence": null
+    },
+    {
+      "text": " two.",
+      "startMs": 2840,
+      "endMs": 3140,
+      "timestampMs": 2990,
+      "confidence": null
+    },
+    {
+      "text": " M",
+      "startMs": 3740,
+      "endMs": 3920,
+      "timestampMs": 3830,
+      "confidence": null
+    },
+    {
+      "text": " and",
+      "startMs": 3960,
+      "endMs": 4080,
+      "timestampMs": 4020,
+      "confidence": null
+    },
+    {
+      "text": " P",
+      "startMs": 4200,
+      "endMs": 4480,
+      "timestampMs": 4340,
+      "confidence": null
+    },
+    {
+      "text": " are",
+      "startMs": 4520,
+      "endMs": 4600,
+      "timestampMs": 4560,
+      "confidence": null
+    },
+    {
+      "text": " four",
+      "startMs": 4800,
+      "endMs": 5040,
+      "timestampMs": 4920,
+      "confidence": null
+    },
+    {
+      "text": " each.",
+      "startMs": 5140,
+      "endMs": 5440,
+      "timestampMs": 5290,
+      "confidence": null
+    },
+    {
+      "text": " That's",
+      "startMs": 5740,
+      "endMs": 6040,
+      "timestampMs": 5890,
+      "confidence": null
+    },
+    {
+      "text": " fifteen!",
+      "startMs": 6080,
+      "endMs": 6800,
+      "timestampMs": 6440,
       "confidence": null
     },
     {
       "text": " Best",
-      "startMs": 2480,
-      "endMs": 2740,
-      "timestampMs": 2610,
+      "startMs": 7340,
+      "endMs": 7580,
+      "timestampMs": 7460,
       "confidence": null
     },
     {
       "text": " word",
-      "startMs": 2820,
-      "endMs": 3120,
-      "timestampMs": 2970,
+      "startMs": 7620,
+      "endMs": 7900,
+      "timestampMs": 7760,
       "confidence": null
     },
     {
       "text": " takes",
-      "startMs": 3180,
-      "endMs": 3460,
-      "timestampMs": 3320,
+      "startMs": 7960,
+      "endMs": 8200,
+      "timestampMs": 8080,
       "confidence": null
     },
     {
       "text": " the",
-      "startMs": 3500,
-      "endMs": 3580,
-      "timestampMs": 3540,
+      "startMs": 8260,
+      "endMs": 8340,
+      "timestampMs": 8300,
       "confidence": null
     },
     {
-      "text": " pot!",
-      "startMs": 3620,
-      "endMs": 4059,
-      "timestampMs": 3840,
+      "text": " pot.",
+      "startMs": 8380,
+      "endMs": 8680,
+      "timestampMs": 8530,
       "confidence": null
     }
   ],

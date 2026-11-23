@@ -4,7 +4,7 @@
   {"id": "03-bet", "face": "determined", "shot": "classic: flop, turn, river, chips into the pot", "text": "Bet the flop. The turn. The river."},
   {"id": "04-spell", "face": "thinking", "shot": "classic: tapping H, E, M, P into the rack", "text": "Then spell the best word you can."},
   {"id": "05-points", "face": "thinking", "shot": "classic: the rack, letter values and the 2× E", "text": "Every letter is worth points. Use a double or triple letter, and it counts two or three times."},
-  {"id": "05-score", "face": "surprised", "shot": "classic: HEMP = 15, the pot", "text": "So HEMP scores fifteen. Best word takes the pot!"},
+  {"id": "05-score", "face": "surprised", "shot": "classic: HEMP broken down tile by tile, = 15, the pot", "text": "H is five. The doubled E makes two. M and P are four each. That's fifteen! Best word takes the pot."},
   {"id": "06-wild", "face": "wink", "shot": "wild: lobby Wild Power chip, the Power Draw and the Vowel Magnet swap", "text": "Want chaos? Switch to Wild Power mode: power-ups that bend the rules."},
   {"id": "07-online", "face": "happy", "shot": "social: friends list (Join, Invite, Nudge), online lobby with live tables", "text": "Play online with your friends... or invite them to your table."},
   {"id": "08-story", "face": "happy", "shot": "story: Kitchen Table chapter map with Ellis, First Hand, the coached table", "text": "New here? Join me in Story mode. I will teach you the ropes."},
