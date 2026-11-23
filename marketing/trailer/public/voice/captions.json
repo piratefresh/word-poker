@@ -1,0 +1,878 @@
+{
+  "02-deal": [
+    {
+      "text": "It's",
+      "startMs": 80,
+      "endMs": 280,
+      "timestampMs": 180,
+      "confidence": null
+    },
+    {
+      "text": " Texas",
+      "startMs": 320,
+      "endMs": 660,
+      "timestampMs": 490,
+      "confidence": null
+    },
+    {
+      "text": " Hold'em...",
+      "startMs": 720,
+      "endMs": 1180,
+      "timestampMs": 950,
+      "confidence": null
+    },
+    {
+      "text": " except",
+      "startMs": 1620,
+      "endMs": 2120,
+      "timestampMs": 1870,
+      "confidence": null
+    },
+    {
+      "text": " you're",
+      "startMs": 2280,
+      "endMs": 2440,
+      "timestampMs": 2360,
+      "confidence": null
+    },
+    {
+      "text": " dealt",
+      "startMs": 2480,
+      "endMs": 2680,
+      "timestampMs": 2580,
+      "confidence": null
+    },
+    {
+      "text": " letters.",
+      "startMs": 2780,
+      "endMs": 3340,
+      "timestampMs": 3060,
+      "confidence": null
+    }
+  ],
+  "03-bet": [
+    {
+      "text": "Bet",
+      "startMs": 100,
+      "endMs": 280,
+      "timestampMs": 190,
+      "confidence": null
+    },
+    {
+      "text": " the",
+      "startMs": 320,
+      "endMs": 420,
+      "timestampMs": 370,
+      "confidence": null
+    },
+    {
+      "text": " flop.",
+      "startMs": 480,
+      "endMs": 840,
+      "timestampMs": 660,
+      "confidence": null
+    },
+    {
+      "text": " The",
+      "startMs": 1360,
+      "endMs": 1460,
+      "timestampMs": 1410,
+      "confidence": null
+    },
+    {
+      "text": " turn.",
+      "startMs": 1520,
+      "endMs": 1880,
+      "timestampMs": 1700,
+      "confidence": null
+    },
+    {
+      "text": " The",
+      "startMs": 2460,
+      "endMs": 2580,
+      "timestampMs": 2520,
+      "confidence": null
+    },
+    {
+      "text": " river.",
+      "startMs": 2620,
+      "endMs": 3000,
+      "timestampMs": 2810,
+      "confidence": null
+    }
+  ],
+  "04-spell": [
+    {
+      "text": "Then",
+      "startMs": 100,
+      "endMs": 360,
+      "timestampMs": 230,
+      "confidence": null
+    },
+    {
+      "text": " spell",
+      "startMs": 640,
+      "endMs": 860,
+      "timestampMs": 750,
+      "confidence": null
+    },
+    {
+      "text": " the",
+      "startMs": 900,
+      "endMs": 960,
+      "timestampMs": 930,
+      "confidence": null
+    },
+    {
+      "text": " best",
+      "startMs": 1180,
+      "endMs": 1460,
+      "timestampMs": 1320,
+      "confidence": null
+    },
+    {
+      "text": " word",
+      "startMs": 1540,
+      "endMs": 1740,
+      "timestampMs": 1640,
+      "confidence": null
+    },
+    {
+      "text": " you",
+      "startMs": 1780,
+      "endMs": 1880,
+      "timestampMs": 1830,
+      "confidence": null
+    },
+    {
+      "text": " can.",
+      "startMs": 1940,
+      "endMs": 2280,
+      "timestampMs": 2110,
+      "confidence": null
+    }
+  ],
+  "05-score": [
+    {
+      "text": "H",
+      "startMs": 300,
+      "endMs": 400,
+      "timestampMs": 350,
+      "confidence": null
+    },
+    {
+      "text": " is",
+      "startMs": 460,
+      "endMs": 660,
+      "timestampMs": 560,
+      "confidence": null
+    },
+    {
+      "text": " five.",
+      "startMs": 740,
+      "endMs": 1200,
+      "timestampMs": 970,
+      "confidence": null
+    },
+    {
+      "text": " The",
+      "startMs": 1560,
+      "endMs": 1680,
+      "timestampMs": 1620,
+      "confidence": null
+    },
+    {
+      "text": " doubled",
+      "startMs": 1720,
+      "endMs": 2000,
+      "timestampMs": 1860,
+      "confidence": null
+    },
+    {
+      "text": " E",
+      "startMs": 2180,
+      "endMs": 2380,
+      "timestampMs": 2280,
+      "confidence": null
+    },
+    {
+      "text": " makes",
+      "startMs": 2440,
+      "endMs": 2760,
+      "timestampMs": 2600,
+      "confidence": null
+    },
+    {
+      "text": " two.",
+      "startMs": 2840,
+      "endMs": 3140,
+      "timestampMs": 2990,
+      "confidence": null
+    },
+    {
+      "text": " M",
+      "startMs": 3740,
+      "endMs": 3920,
+      "timestampMs": 3830,
+      "confidence": null
+    },
+    {
+      "text": " and",
+      "startMs": 3960,
+      "endMs": 4080,
+      "timestampMs": 4020,
+      "confidence": null
+    },
+    {
+      "text": " P",
+      "startMs": 4200,
+      "endMs": 4480,
+      "timestampMs": 4340,
+      "confidence": null
+    },
+    {
+      "text": " are",
+      "startMs": 4520,
+      "endMs": 4600,
+      "timestampMs": 4560,
+      "confidence": null
+    },
+    {
+      "text": " four",
+      "startMs": 4800,
+      "endMs": 5040,
+      "timestampMs": 4920,
+      "confidence": null
+    },
+    {
+      "text": " each.",
+      "startMs": 5140,
+      "endMs": 5440,
+      "timestampMs": 5290,
+      "confidence": null
+    },
+    {
+      "text": " That's",
+      "startMs": 5740,
+      "endMs": 6040,
+      "timestampMs": 5890,
+      "confidence": null
+    },
+    {
+      "text": " fifteen!",
+      "startMs": 6080,
+      "endMs": 6800,
+      "timestampMs": 6440,
+      "confidence": null
+    },
+    {
+      "text": " Best",
+      "startMs": 7340,
+      "endMs": 7580,
+      "timestampMs": 7460,
+      "confidence": null
+    },
+    {
+      "text": " word",
+      "startMs": 7620,
+      "endMs": 7900,
+      "timestampMs": 7760,
+      "confidence": null
+    },
+    {
+      "text": " takes",
+      "startMs": 7960,
+      "endMs": 8200,
+      "timestampMs": 8080,
+      "confidence": null
+    },
+    {
+      "text": " the",
+      "startMs": 8260,
+      "endMs": 8340,
+      "timestampMs": 8300,
+      "confidence": null
+    },
+    {
+      "text": " pot.",
+      "startMs": 8380,
+      "endMs": 8680,
+      "timestampMs": 8530,
+      "confidence": null
+    }
+  ],
+  "01-hello": [
+    {
+      "text": "Hi!",
+      "startMs": 80,
+      "endMs": 400,
+      "timestampMs": 240,
+      "confidence": null
+    },
+    {
+      "text": " I'm",
+      "startMs": 720,
+      "endMs": 860,
+      "timestampMs": 790,
+      "confidence": null
+    },
+    {
+      "text": " Ellis.",
+      "startMs": 900,
+      "endMs": 1360,
+      "timestampMs": 1130,
+      "confidence": null
+    },
+    {
+      "text": " Welcome",
+      "startMs": 1800,
+      "endMs": 2120,
+      "timestampMs": 1960,
+      "confidence": null
+    },
+    {
+      "text": " to",
+      "startMs": 2200,
+      "endMs": 2280,
+      "timestampMs": 2240,
+      "confidence": null
+    },
+    {
+      "text": " WordPoker.",
+      "startMs": 2360,
+      "endMs": 3000,
+      "timestampMs": 2680,
+      "confidence": null
+    }
+  ],
+  "06-wild": [
+    {
+      "text": "Want",
+      "startMs": 120,
+      "endMs": 280,
+      "timestampMs": 200,
+      "confidence": null
+    },
+    {
+      "text": " chaos?",
+      "startMs": 360,
+      "endMs": 940,
+      "timestampMs": 650,
+      "confidence": null
+    },
+    {
+      "text": " Switch",
+      "startMs": 1320,
+      "endMs": 1600,
+      "timestampMs": 1460,
+      "confidence": null
+    },
+    {
+      "text": " to",
+      "startMs": 1640,
+      "endMs": 1720,
+      "timestampMs": 1680,
+      "confidence": null
+    },
+    {
+      "text": " Wild",
+      "startMs": 1860,
+      "endMs": 2140,
+      "timestampMs": 2000,
+      "confidence": null
+    },
+    {
+      "text": " Power",
+      "startMs": 2240,
+      "endMs": 2460,
+      "timestampMs": 2350,
+      "confidence": null
+    },
+    {
+      "text": " mode:",
+      "startMs": 2560,
+      "endMs": 2840,
+      "timestampMs": 2700,
+      "confidence": null
+    },
+    {
+      "text": " power-ups",
+      "startMs": 3240,
+      "endMs": 3800,
+      "timestampMs": 3520,
+      "confidence": null
+    },
+    {
+      "text": " that",
+      "startMs": 3840,
+      "endMs": 4080,
+      "timestampMs": 3960,
+      "confidence": null
+    },
+    {
+      "text": " bend",
+      "startMs": 4120,
+      "endMs": 4300,
+      "timestampMs": 4210,
+      "confidence": null
+    },
+    {
+      "text": " the",
+      "startMs": 4360,
+      "endMs": 4420,
+      "timestampMs": 4390,
+      "confidence": null
+    },
+    {
+      "text": " rules.",
+      "startMs": 4500,
+      "endMs": 4980,
+      "timestampMs": 4740,
+      "confidence": null
+    }
+  ],
+  "07-online": [
+    {
+      "text": "Play",
+      "startMs": 60,
+      "endMs": 240,
+      "timestampMs": 150,
+      "confidence": null
+    },
+    {
+      "text": " online",
+      "startMs": 300,
+      "endMs": 660,
+      "timestampMs": 480,
+      "confidence": null
+    },
+    {
+      "text": " with",
+      "startMs": 700,
+      "endMs": 800,
+      "timestampMs": 750,
+      "confidence": null
+    },
+    {
+      "text": " your",
+      "startMs": 840,
+      "endMs": 900,
+      "timestampMs": 870,
+      "confidence": null
+    },
+    {
+      "text": " friends...",
+      "startMs": 960,
+      "endMs": 1420,
+      "timestampMs": 1190,
+      "confidence": null
+    },
+    {
+      "text": " or",
+      "startMs": 1880,
+      "endMs": 2080,
+      "timestampMs": 1980,
+      "confidence": null
+    },
+    {
+      "text": " invite",
+      "startMs": 2320,
+      "endMs": 2660,
+      "timestampMs": 2490,
+      "confidence": null
+    },
+    {
+      "text": " them",
+      "startMs": 2680,
+      "endMs": 2820,
+      "timestampMs": 2750,
+      "confidence": null
+    },
+    {
+      "text": " to",
+      "startMs": 2860,
+      "endMs": 2940,
+      "timestampMs": 2900,
+      "confidence": null
+    },
+    {
+      "text": " your",
+      "startMs": 2980,
+      "endMs": 3080,
+      "timestampMs": 3030,
+      "confidence": null
+    },
+    {
+      "text": " table.",
+      "startMs": 3120,
+      "endMs": 3480,
+      "timestampMs": 3300,
+      "confidence": null
+    }
+  ],
+  "10-cta": [
+    {
+      "text": "WordPoker",
+      "startMs": 80,
+      "endMs": 620,
+      "timestampMs": 350,
+      "confidence": null
+    },
+    {
+      "text": " is",
+      "startMs": 740,
+      "endMs": 840,
+      "timestampMs": 790,
+      "confidence": null
+    },
+    {
+      "text": " in",
+      "startMs": 880,
+      "endMs": 960,
+      "timestampMs": 920,
+      "confidence": null
+    },
+    {
+      "text": " beta",
+      "startMs": 1080,
+      "endMs": 1420,
+      "timestampMs": 1250,
+      "confidence": null
+    },
+    {
+      "text": " on",
+      "startMs": 1480,
+      "endMs": 1600,
+      "timestampMs": 1540,
+      "confidence": null
+    },
+    {
+      "text": " TestFlight.",
+      "startMs": 1640,
+      "endMs": 2240,
+      "timestampMs": 1940,
+      "confidence": null
+    },
+    {
+      "text": " Come",
+      "startMs": 2600,
+      "endMs": 2760,
+      "timestampMs": 2680,
+      "confidence": null
+    },
+    {
+      "text": " take",
+      "startMs": 2840,
+      "endMs": 3000,
+      "timestampMs": 2920,
+      "confidence": null
+    },
+    {
+      "text": " my",
+      "startMs": 3040,
+      "endMs": 3180,
+      "timestampMs": 3110,
+      "confidence": null
+    },
+    {
+      "text": " chips!",
+      "startMs": 3240,
+      "endMs": 3680,
+      "timestampMs": 3460,
+      "confidence": null
+    }
+  ],
+  "08-story": [
+    {
+      "text": "New",
+      "startMs": 120,
+      "endMs": 240,
+      "timestampMs": 180,
+      "confidence": null
+    },
+    {
+      "text": " here?",
+      "startMs": 320,
+      "endMs": 500,
+      "timestampMs": 410,
+      "confidence": null
+    },
+    {
+      "text": " Join",
+      "startMs": 1060,
+      "endMs": 1260,
+      "timestampMs": 1160,
+      "confidence": null
+    },
+    {
+      "text": " me",
+      "startMs": 1300,
+      "endMs": 1440,
+      "timestampMs": 1370,
+      "confidence": null
+    },
+    {
+      "text": " in",
+      "startMs": 1500,
+      "endMs": 1580,
+      "timestampMs": 1540,
+      "confidence": null
+    },
+    {
+      "text": " Story",
+      "startMs": 1740,
+      "endMs": 2020,
+      "timestampMs": 1880,
+      "confidence": null
+    },
+    {
+      "text": " mode.",
+      "startMs": 2100,
+      "endMs": 2360,
+      "timestampMs": 2230,
+      "confidence": null
+    },
+    {
+      "text": " I",
+      "startMs": 2860,
+      "endMs": 2900,
+      "timestampMs": 2880,
+      "confidence": null
+    },
+    {
+      "text": " will",
+      "startMs": 2920,
+      "endMs": 3100,
+      "timestampMs": 3010,
+      "confidence": null
+    },
+    {
+      "text": " teach",
+      "startMs": 3180,
+      "endMs": 3360,
+      "timestampMs": 3270,
+      "confidence": null
+    },
+    {
+      "text": " you",
+      "startMs": 3400,
+      "endMs": 3480,
+      "timestampMs": 3440,
+      "confidence": null
+    },
+    {
+      "text": " the",
+      "startMs": 3520,
+      "endMs": 3600,
+      "timestampMs": 3560,
+      "confidence": null
+    },
+    {
+      "text": " ropes.",
+      "startMs": 3640,
+      "endMs": 4080,
+      "timestampMs": 3860,
+      "confidence": null
+    }
+  ],
+  "09-quests": [
+    {
+      "text": "Clear",
+      "startMs": 80,
+      "endMs": 340,
+      "timestampMs": 210,
+      "confidence": null
+    },
+    {
+      "text": " daily",
+      "startMs": 440,
+      "endMs": 680,
+      "timestampMs": 560,
+      "confidence": null
+    },
+    {
+      "text": " quests,",
+      "startMs": 780,
+      "endMs": 1260,
+      "timestampMs": 1020,
+      "confidence": null
+    },
+    {
+      "text": " earn",
+      "startMs": 1540,
+      "endMs": 1700,
+      "timestampMs": 1620,
+      "confidence": null
+    },
+    {
+      "text": " coins,",
+      "startMs": 1800,
+      "endMs": 2240,
+      "timestampMs": 2020,
+      "confidence": null
+    },
+    {
+      "text": " and",
+      "startMs": 2360,
+      "endMs": 2460,
+      "timestampMs": 2410,
+      "confidence": null
+    },
+    {
+      "text": " unlock",
+      "startMs": 2600,
+      "endMs": 2920,
+      "timestampMs": 2760,
+      "confidence": null
+    },
+    {
+      "text": " new",
+      "startMs": 3080,
+      "endMs": 3260,
+      "timestampMs": 3170,
+      "confidence": null
+    },
+    {
+      "text": " tile",
+      "startMs": 3320,
+      "endMs": 3540,
+      "timestampMs": 3430,
+      "confidence": null
+    },
+    {
+      "text": " sets.",
+      "startMs": 3640,
+      "endMs": 4059,
+      "timestampMs": 3850,
+      "confidence": null
+    }
+  ],
+  "05-points": [
+    {
+      "text": "Every",
+      "startMs": 100,
+      "endMs": 320,
+      "timestampMs": 210,
+      "confidence": null
+    },
+    {
+      "text": " letter",
+      "startMs": 420,
+      "endMs": 740,
+      "timestampMs": 580,
+      "confidence": null
+    },
+    {
+      "text": " is",
+      "startMs": 800,
+      "endMs": 900,
+      "timestampMs": 850,
+      "confidence": null
+    },
+    {
+      "text": " worth",
+      "startMs": 960,
+      "endMs": 1140,
+      "timestampMs": 1050,
+      "confidence": null
+    },
+    {
+      "text": " points.",
+      "startMs": 1280,
+      "endMs": 1740,
+      "timestampMs": 1510,
+      "confidence": null
+    },
+    {
+      "text": " Use",
+      "startMs": 2220,
+      "endMs": 2340,
+      "timestampMs": 2280,
+      "confidence": null
+    },
+    {
+      "text": " a",
+      "startMs": 2400,
+      "endMs": 2460,
+      "timestampMs": 2430,
+      "confidence": null
+    },
+    {
+      "text": " double",
+      "startMs": 2500,
+      "endMs": 2800,
+      "timestampMs": 2650,
+      "confidence": null
+    },
+    {
+      "text": " or",
+      "startMs": 2920,
+      "endMs": 2980,
+      "timestampMs": 2950,
+      "confidence": null
+    },
+    {
+      "text": " triple",
+      "startMs": 3100,
+      "endMs": 3360,
+      "timestampMs": 3230,
+      "confidence": null
+    },
+    {
+      "text": " letter,",
+      "startMs": 3440,
+      "endMs": 3740,
+      "timestampMs": 3590,
+      "confidence": null
+    },
+    {
+      "text": " and",
+      "startMs": 3900,
+      "endMs": 3980,
+      "timestampMs": 3940,
+      "confidence": null
+    },
+    {
+      "text": " it",
+      "startMs": 4019,
+      "endMs": 4080,
+      "timestampMs": 4050,
+      "confidence": null
+    },
+    {
+      "text": " counts",
+      "startMs": 4140,
+      "endMs": 4480,
+      "timestampMs": 4310,
+      "confidence": null
+    },
+    {
+      "text": " two",
+      "startMs": 4540,
+      "endMs": 4800,
+      "timestampMs": 4670,
+      "confidence": null
+    },
+    {
+      "text": " or",
+      "startMs": 4840,
+      "endMs": 4920,
+      "timestampMs": 4880,
+      "confidence": null
+    },
+    {
+      "text": " three",
+      "startMs": 5020,
+      "endMs": 5200,
+      "timestampMs": 5110,
+      "confidence": null
+    },
+    {
+      "text": " times.",
+      "startMs": 5300,
+      "endMs": 5760,
+      "timestampMs": 5530,
+      "confidence": null
+    }
+  ]
+}
