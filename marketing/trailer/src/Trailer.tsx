@@ -249,11 +249,11 @@ export const Trailer: React.FC = () => {
       <Sequence name="Spell: HEMP" from={spell.from} durationInFrames={spell.len}>
         <TileRow letters="HEMP" at={[9, TAP + 9, 2 * TAP + 9, 3 * TAP + 9]} len={spell.len} top={940} size={170} />
       </Sequence>
-      <Sequence name="Score: +15" from={score.from + v(0)} durationInFrames={v(2.3)}>
-        <Pop len={v(2.3)} top={960} size={220} tilt={-5} sfx="win">+15</Pop>
+      <Sequence name="Score: +15" from={score.from + v(0)} durationInFrames={v(2.2)}>
+        <Pop len={v(2.2)} top={960} size={220} tilt={-5} sfx="win">+15</Pop>
       </Sequence>
-      <Sequence name="Score: pot" from={score.from + v(2.75)} durationInFrames={score.len - v(2.75)}>
-        <Pop len={score.len - v(2.75)} top={790} size={140} tilt={3} sfx="chips">POT 2,600</Pop>
+      <Sequence name="Score: pot" from={score.from + v(2.65)} durationInFrames={score.len - v(2.65)}>
+        <Pop len={score.len - v(2.65)} top={790} size={140} tilt={3} sfx="chips">POT 2,600</Pop>
       </Sequence>
       <Sequence name="Wild: mode" from={wild.from + v(1.8)} durationInFrames={77 - v(1.8)}>
         <Pop len={77 - v(1.8)} top={300} size={104} tilt={-3} tone="purple" sfx="magic">WILD POWER MODE</Pop>
