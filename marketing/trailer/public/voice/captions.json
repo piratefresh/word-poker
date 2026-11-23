@@ -154,101 +154,66 @@
   ],
   "05-score": [
     {
-      "text": "Double",
-      "startMs": 140,
-      "endMs": 420,
-      "timestampMs": 280,
+      "text": "So",
+      "startMs": 120,
+      "endMs": 320,
+      "timestampMs": 220,
       "confidence": null
     },
     {
-      "text": " and",
-      "startMs": 500,
-      "endMs": 600,
-      "timestampMs": 550,
+      "text": " HEMP",
+      "startMs": 520,
+      "endMs": 740,
+      "timestampMs": 630,
       "confidence": null
     },
     {
-      "text": " triple",
-      "startMs": 740,
-      "endMs": 1020,
-      "timestampMs": 880,
+      "text": " scores",
+      "startMs": 820,
+      "endMs": 1180,
+      "timestampMs": 1000,
       "confidence": null
     },
     {
-      "text": " letters",
-      "startMs": 1100,
-      "endMs": 1440,
-      "timestampMs": 1270,
-      "confidence": null
-    },
-    {
-      "text": " boost",
-      "startMs": 1640,
-      "endMs": 1900,
-      "timestampMs": 1770,
-      "confidence": null
-    },
-    {
-      "text": " your",
-      "startMs": 1940,
-      "endMs": 2020,
-      "timestampMs": 1980,
-      "confidence": null
-    },
-    {
-      "text": " score.",
-      "startMs": 2120,
-      "endMs": 2540,
-      "timestampMs": 2330,
-      "confidence": null
-    },
-    {
-      "text": " Fifteen",
-      "startMs": 2900,
-      "endMs": 3420,
-      "timestampMs": 3160,
-      "confidence": null
-    },
-    {
-      "text": " points!",
-      "startMs": 3480,
-      "endMs": 4000,
-      "timestampMs": 3740,
+      "text": " fifteen.",
+      "startMs": 1360,
+      "endMs": 2000,
+      "timestampMs": 1680,
       "confidence": null
     },
     {
       "text": " Best",
-      "startMs": 4520,
-      "endMs": 4760,
-      "timestampMs": 4640,
+      "startMs": 2480,
+      "endMs": 2740,
+      "timestampMs": 2610,
       "confidence": null
     },
     {
       "text": " word",
-      "startMs": 4820,
-      "endMs": 5120,
-      "timestampMs": 4970,
+      "startMs": 2820,
+      "endMs": 3120,
+      "timestampMs": 2970,
       "confidence": null
     },
     {
       "text": " takes",
-      "startMs": 5180,
-      "endMs": 5440,
-      "timestampMs": 5310,
+      "startMs": 3180,
+      "endMs": 3460,
+      "timestampMs": 3320,
       "confidence": null
     },
     {
       "text": " the",
-      "startMs": 5500,
-      "endMs": 5580,
-      "timestampMs": 5540,
+      "startMs": 3500,
+      "endMs": 3580,
+      "timestampMs": 3540,
       "confidence": null
     },
     {
-      "text": " pot.",
-      "startMs": 5620,
-      "endMs": 6000,
-      "timestampMs": 5810,
+      "text": " pot!",
+      "startMs": 3620,
+      "endMs": 4059,
+      "timestampMs": 3840,
       "confidence": null
     }
   ],
@@ -695,6 +660,134 @@
       "startMs": 3640,
       "endMs": 4059,
       "timestampMs": 3850,
+      "confidence": null
+    }
+  ],
+  "05-points": [
+    {
+      "text": "Every",
+      "startMs": 100,
+      "endMs": 320,
+      "timestampMs": 210,
+      "confidence": null
+    },
+    {
+      "text": " letter",
+      "startMs": 420,
+      "endMs": 740,
+      "timestampMs": 580,
+      "confidence": null
+    },
+    {
+      "text": " is",
+      "startMs": 800,
+      "endMs": 900,
+      "timestampMs": 850,
+      "confidence": null
+    },
+    {
+      "text": " worth",
+      "startMs": 960,
+      "endMs": 1140,
+      "timestampMs": 1050,
+      "confidence": null
+    },
+    {
+      "text": " points.",
+      "startMs": 1280,
+      "endMs": 1740,
+      "timestampMs": 1510,
+      "confidence": null
+    },
+    {
+      "text": " Use",
+      "startMs": 2220,
+      "endMs": 2340,
+      "timestampMs": 2280,
+      "confidence": null
+    },
+    {
+      "text": " a",
+      "startMs": 2400,
+      "endMs": 2460,
+      "timestampMs": 2430,
+      "confidence": null
+    },
+    {
+      "text": " double",
+      "startMs": 2500,
+      "endMs": 2800,
+      "timestampMs": 2650,
+      "confidence": null
+    },
+    {
+      "text": " or",
+      "startMs": 2920,
+      "endMs": 2980,
+      "timestampMs": 2950,
+      "confidence": null
+    },
+    {
+      "text": " triple",
+      "startMs": 3100,
+      "endMs": 3360,
+      "timestampMs": 3230,
+      "confidence": null
+    },
+    {
+      "text": " letter,",
+      "startMs": 3440,
+      "endMs": 3740,
+      "timestampMs": 3590,
+      "confidence": null
+    },
+    {
+      "text": " and",
+      "startMs": 3900,
+      "endMs": 3980,
+      "timestampMs": 3940,
+      "confidence": null
+    },
+    {
+      "text": " it",
+      "startMs": 4019,
+      "endMs": 4080,
+      "timestampMs": 4050,
+      "confidence": null
+    },
+    {
+      "text": " counts",
+      "startMs": 4140,
+      "endMs": 4480,
+      "timestampMs": 4310,
+      "confidence": null
+    },
+    {
+      "text": " two",
+      "startMs": 4540,
+      "endMs": 4800,
+      "timestampMs": 4670,
+      "confidence": null
+    },
+    {
+      "text": " or",
+      "startMs": 4840,
+      "endMs": 4920,
+      "timestampMs": 4880,
+      "confidence": null
+    },
+    {
+      "text": " three",
+      "startMs": 5020,
+      "endMs": 5200,
+      "timestampMs": 5110,
+      "confidence": null
+    },
+    {
+      "text": " times.",
+      "startMs": 5300,
+      "endMs": 5760,
+      "timestampMs": 5530,
       "confidence": null
     }
   ]

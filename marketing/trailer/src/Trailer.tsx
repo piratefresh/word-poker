@@ -33,11 +33,9 @@ export const SHOTS = script.map((line) => {
 /** The closing card after the call to action: wordmark, tagline, site. */
 const OUTRO = Math.round(3 * FPS);
 export const TOTAL = cursor + OUTRO;
-const [hello, deal, bet, spell, score, wild, online, story, quests, cta] = SHOTS;
+const [hello, deal, bet, spell, points, score, wild, online, story, quests, cta] = SHOTS;
 /** The spell shot is four jump cuts, one per letter tap. */
 const TAP = Math.floor(spell.len / 4);
-/** In the score shot, "Fifteen points!" starts 2.9 s into the line. */
-const SCORE_AT = v(2.9);
 
 /**
  * A stretch of native footage (capture/record-native.mjs, iPhone 17 Pro Max at 1320×2868); `at` is
@@ -189,11 +187,11 @@ export const Trailer: React.FC = () => {
                 <Clip src="classic" at={at} />
               </Series.Sequence>
             ))}
-            {/* "Double and triple letters…" holds on the rack with the 2× E, then the score plays out. */}
-            <Series.Sequence name="Score: multipliers" durationInFrames={SCORE_AT}>
-              <Clip src="classic" at={105} />
+            {/* Holds on the rack (H, E, M placed, the 2× E) while Ellis explains letter values. */}
+            <Series.Sequence name="Points" durationInFrames={points.len}>
+              <Clip src="classic" at={104} />
             </Series.Sequence>
-            <Series.Sequence name="Score" durationInFrames={score.len - SCORE_AT}>
+            <Series.Sequence name="Score" durationInFrames={score.len}>
               <Clip src="classic" at={113} rate={2.8} />
             </Series.Sequence>
             <Series.Sequence name="Wild: lobby" durationInFrames={40}>
@@ -255,14 +253,17 @@ export const Trailer: React.FC = () => {
       <Sequence name="Spell: HEMP" from={spell.from} durationInFrames={spell.len}>
         <TileRow letters="HEMP" at={[9, TAP + 9, 2 * TAP + 9, 3 * TAP + 9]} len={spell.len} top={940} size={170} />
       </Sequence>
-      <Sequence name="Score: multipliers" from={score.from + v(0.1)} durationInFrames={v(2.7) - v(0.1)}>
-        <Pop len={v(2.7) - v(0.1)} top={500} size={120} tilt={-3} tone="purple" sfx="magic">2× · 3× LETTERS</Pop>
+      <Sequence name="Points: values" from={points.from + v(0.1)} durationInFrames={v(1.9) - v(0.1)}>
+        <Pop len={v(1.9) - v(0.1)} top={500} size={120} tilt={-3} sfx="pop">LETTERS = POINTS</Pop>
       </Sequence>
-      <Sequence name="Score: +15" from={score.from + SCORE_AT} durationInFrames={v(4.4) - SCORE_AT}>
-        <Pop len={v(4.4) - SCORE_AT} top={960} size={220} tilt={-5} sfx="win">+15</Pop>
+      <Sequence name="Points: multipliers" from={points.from + v(2.2)} durationInFrames={points.len - v(2.2)}>
+        <Pop len={points.len - v(2.2)} top={500} size={120} tilt={3} tone="purple" sfx="magic">2× · 3× LETTERS</Pop>
       </Sequence>
-      <Sequence name="Score: pot" from={score.from + v(5.1)} durationInFrames={score.len - v(5.1)}>
-        <Pop len={score.len - v(5.1)} top={790} size={140} tilt={3} sfx="chips">POT 2,600</Pop>
+      <Sequence name="Score: sum" from={score.from + v(0.4)} durationInFrames={v(2.3) - v(0.4)}>
+        <Pop len={v(2.3) - v(0.4)} top={960} size={110} tilt={-4} sfx="win">5 + 2 + 4 + 4 = 15</Pop>
+      </Sequence>
+      <Sequence name="Score: pot" from={score.from + v(3.1)} durationInFrames={score.len - v(3.1)}>
+        <Pop len={score.len - v(3.1)} top={790} size={140} tilt={3} sfx="chips">POT 2,600</Pop>
       </Sequence>
       <Sequence name="Wild: mode" from={wild.from + v(1.8)} durationInFrames={77 - v(1.8)}>
         <Pop len={77 - v(1.8)} top={300} size={104} tilt={-3} tone="purple" sfx="magic">WILD POWER MODE</Pop>
