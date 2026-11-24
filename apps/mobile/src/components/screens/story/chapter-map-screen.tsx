@@ -1,7 +1,7 @@
 /**
  * chapter-map-screen.tsx — a story chapter's map (STO-861 v3, STO-1120): the chapter's art
  * scrolled bottom to top, with the letter-tile path, the nodes, the coach bubble, the next
- * chapter's doorway, and the badge shelf drawn over it from the chapter's map data
+ * chapter's doorway, and the campaign's badge shelf drawn over it from the chapter's map data
  * (`features/story/chapter-maps.ts`). A chapter without art yet is its tint.
  *
  * The map is laid out in the art's 390-wide frame and scaled to the screen as one layer, so node
@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   MAP_WIDTH,
   bossBeaten,
-  bossNode,
   chapterStars,
   coachFor,
   maxStars,
@@ -27,6 +26,7 @@ import {
   type ChapterProgress,
   type MapNode,
 } from "@/features/story/chapter-map";
+import { chapterBadges, type StoryBadge } from "@/features/story/story-badges";
 
 import { BadgeShelf } from "./components/chapter-map/badge-shelf";
 import { BriefSheet } from "./components/chapter-map/brief-sheet";
@@ -46,19 +46,24 @@ const FOCUS_FROM_TOP = 520 / 844;
 export interface ChapterMapScreenProps {
   map: ChapterMap;
   progress: ChapterProgress;
+  /** Every badge of the campaign, as the save has them. */
+  badges: readonly StoryBadge[];
   onPlay: (node: MapNode) => void;
   onBack: () => void;
   /** Opens the next chapter; absent on the last. */
   onNextChapter?: () => void;
 }
 
-export function ChapterMapScreen({ map, progress, onPlay, onBack, onNextChapter }: ChapterMapScreenProps): ReactElement {
+export function ChapterMapScreen({ map, progress, badges, onPlay, onBack, onNextChapter }: ChapterMapScreenProps): ReactElement {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const scale = Math.min(width, MAX_MAP_WIDTH) / MAP_WIDTH;
   const coach = coachFor(map, progress);
   const tiles = useMemo(() => pathTiles(map, progress), [map, progress]);
   const won = bossBeaten(map, progress);
+  // This chapter's badges go by the progress on screen, so a preview fills its own slot.
+  const own = chapterBadges(map, won);
+  const shelf = badges.map((badge) => own.find((mine) => mine.id === badge.id) ?? badge);
   // PLAY opens the brief; DEAL on it is what starts the hand.
   const [briefing, setBriefing] = useState<MapNode | null>(null);
 
@@ -102,7 +107,7 @@ export function ChapterMapScreen({ map, progress, onPlay, onBack, onNextChapter 
       </ScrollView>
 
       <ChapterMapHeader map={map} stars={chapterStars(progress)} maxStars={maxStars(map)} topInset={insets.top} onBack={onBack} />
-      <BadgeShelf badge={map.badge} letter={bossNode(map).glyph} won={won} bottom={insets.bottom + 24} />
+      <BadgeShelf badges={shelf} bottom={insets.bottom + 24} />
       {briefing === null ? null : (
         <BriefSheet
           map={map}
