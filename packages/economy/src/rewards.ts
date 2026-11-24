@@ -18,8 +18,11 @@ import {
   type QuestClaimResponse,
   type QuestHandClaim,
   type QuestId,
+  type StoryRewardRefusal,
+  type StoryRewardResponse,
 } from "@wordpoker/contracts";
 import {
+  hasRewardEvent as hasRewardEventDb,
   paidReferralCount as paidReferralCountDb,
   playerProgress as playerProgressDb,
   questProgress as questProgressDb,
@@ -31,7 +34,7 @@ import {
   type QuestProgressMap,
   type QuestProgressRecord,
 } from "@wordpoker/db";
-import { QUEST_CATALOG, applyQuestHand, levelForXp, levelReward, xpForHand } from "@wordpoker/game-rules";
+import { QUEST_CATALOG, STORY_CHAPTERS, applyQuestHand, levelForXp, levelReward, xpForHand } from "@wordpoker/game-rules";
 
 import { applyWalletChange } from "./wallet";
 import type { WalletDeps } from "./wallet";
@@ -53,6 +56,8 @@ export interface QuestStore {
 export interface RewardsDeps extends WalletDeps {
   readonly quests?: QuestStore;
   readonly referrals?: ReferralStore;
+  /** Whether a once-only reward row exists for the player; the database's by default. */
+  readonly hasRewardEvent?: (userId: string, ref: string) => Promise<boolean>;
 }
 
 const databaseQuestStore: QuestStore = {
@@ -212,4 +217,56 @@ export async function payReferral(refereeId: string, deps: RewardsDeps = {}): Pr
   if ((await referrals.paidReferralCount(referrerId)) < REFERRAL_CAP) {
     await applyWalletChange(referrerId, "referral", REFERRAL_REFERRER_GRANT, { ref: refereeId }, deps);
   }
+}
+
+/**
+ * A Story chapter's `wallet_event` ref and `quest_hand_log` token. The coins ride the `quest` kind so
+ * the existing `wallet_event_reward_once` index holds them once per (player, chapter) with no new
+ * migration; the `story:` prefix keeps them apart from catalog quest ids. A client that claims a
+ * quest hand under this same token only forfeits its own chapter XP.
+ */
+function storyRewardRef(chapterId: string): string {
+  return `story:${chapterId}`;
+}
+
+export type StoryRewardOutcome =
+  | { readonly ok: true; readonly response: StoryRewardResponse }
+  | { readonly ok: false; readonly reason: StoryRewardRefusal };
+
+/**
+ * Pays a Story chapter's first-clear `reward` (coins + XP, STO-976) — once per player per chapter.
+ *
+ * Story progress lives on the device, so the server cannot prove a clear; what it can hold is the
+ * shape of an honest run: one payout per chapter, each only after the chapter before it was paid,
+ * so a player's lifetime take is capped at the sum of the chapters' rewards. The amounts are the
+ * chapter config's. XP goes first, through the quest hand log (deduped by token), then the coins,
+ * so a coin row means the XP is already in; a retry after a crash between the two finishes the
+ * coins and pays nothing twice.
+ */
+export async function claimStoryReward(
+  userId: string,
+  chapterId: string,
+  deps: RewardsDeps = {},
+): Promise<StoryRewardOutcome> {
+  const quests = deps.quests ?? databaseQuestStore;
+  const paid = deps.hasRewardEvent ?? ((id: string, ref: string) => hasRewardEventDb(id, "quest", ref));
+  const index = STORY_CHAPTERS.findIndex((chapter) => chapter.id === chapterId);
+  const chapter = STORY_CHAPTERS[index];
+  if (chapter === undefined) return { ok: false, reason: "unknown_chapter" };
+
+  const previous = STORY_CHAPTERS[index - 1];
+  if (previous !== undefined && !(await paid(userId, storyRewardRef(previous.id)))) {
+    return { ok: false, reason: "out_of_order" };
+  }
+
+  const ref = storyRewardRef(chapter.id);
+  const before = await quests.playerProgress(userId);
+  const { xp } = await quests.recordQuestHand(userId, ref, (map) => ({ next: map, completed: [] }), chapter.reward.xp);
+  const coins = await applyWalletChange(userId, "quest", chapter.reward.coins, { ref }, deps);
+  const { level } = levelForXp(xp);
+  await payLevelUps(quests, userId, before.levelPaid, level, deps);
+
+  const duplicate = !coins.applied && coins.reason === "already_recorded";
+
+  return { ok: true, response: { duplicate, xp, level } };
 }

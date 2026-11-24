@@ -100,11 +100,16 @@ export {
   isQuestHandClaim,
   isQuestId,
   isQuestStateResponse,
+  isStoryRewardClaim,
+  isStoryRewardResponse,
   type QuestClaimResponse,
   type QuestHandClaim,
   type QuestHandFacts,
   type QuestId,
   type QuestStateResponse,
+  type StoryRewardClaim,
+  type StoryRewardRefusal,
+  type StoryRewardResponse,
 } from "./quests";
 export type {
   BlankTile,

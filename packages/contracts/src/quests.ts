@@ -162,3 +162,38 @@ export function isQuestClaimResponse(value: unknown): value is QuestClaimRespons
   }
   return isXpCount(value.xp) && isXpCount(value.level) && value.level >= 1 && value.completed.every(isQuestId);
 }
+
+/**
+ * `POST /api/story-rewards` (STO-976): a Story chapter's first-clear reward. The body names the
+ * chapter only — what it pays is `@wordpoker/game-rules`' chapter config, never the request's.
+ */
+export interface StoryRewardClaim {
+  readonly chapterId: string;
+}
+
+/** A story claim's answer. `duplicate`: this chapter was already paid; `xp`/`level` are the player's after the call. */
+export interface StoryRewardResponse {
+  readonly duplicate: boolean;
+  readonly xp: number;
+  readonly level: number;
+}
+
+/** Why a story claim paid nothing: no such chapter, or the chapter before it was never paid. */
+export type StoryRewardRefusal = "unknown_chapter" | "out_of_order";
+
+/** A chapter id is a short slug (`kitchen-table`); anything longer is not worth looking up. */
+const STORY_CHAPTER_ID_MAX_LENGTH = 64;
+
+/** Whether an untrusted body has the shape of a `POST /api/story-rewards` claim. */
+export function isStoryRewardClaim(value: unknown): value is StoryRewardClaim {
+  return (
+    isRecord(value) &&
+    typeof value.chapterId === "string" &&
+    value.chapterId.length > 0 &&
+    value.chapterId.length <= STORY_CHAPTER_ID_MAX_LENGTH
+  );
+}
+
+export function isStoryRewardResponse(value: unknown): value is StoryRewardResponse {
+  return isRecord(value) && typeof value.duplicate === "boolean" && isXpCount(value.xp) && isXpCount(value.level) && value.level >= 1;
+}

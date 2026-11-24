@@ -7,11 +7,12 @@ import { describe, it } from "node:test";
 
 import type { QuestHandClaim, QuestId } from "@wordpoker/contracts";
 import type { OpenWalletEventInput, PlayerProgressRecord, QuestProgressMap, QuestProgressRecord, SettleWalletEventInput, WalletEventRecord } from "@wordpoker/db";
-import { emptyQuestProgress } from "@wordpoker/game-rules";
+import { emptyQuestProgress, levelReward } from "@wordpoker/game-rules";
 import { randomUUID } from "node:crypto";
 
 import {
   claimQuestHand,
+  claimStoryReward,
   createRevenueCatClient,
   creditDailyStreak,
   payCompletedQuests,
@@ -390,5 +391,90 @@ describe("payReferral", () => {
     const d = deps([balances(500)]);
     await payReferral("friend", { ...d, referrals: referrals("host", 20) });
     assert.deepEqual(d.store.rows.map((row) => row.userId), ["friend"]);
+  });
+});
+
+describe("claimStoryReward", () => {
+  /** `deps` plus the database's `hasRewardEvent`, read off the same in-memory wallet rows. */
+  function storyDeps(replies: Reply[], quests: QuestStore = memoryQuestStore()) {
+    const d = deps(replies, quests);
+    const hasRewardEvent = async (userId: string, ref: string) =>
+      d.store.rows.some((row) => row.userId === userId && row.kind === "quest" && row.ref === ref);
+
+    return { ...d, hasRewardEvent };
+  }
+
+  it("pays the first chapter's config reward on the first claim", async () => {
+    const quests = memoryQuestStore();
+    const d = storyDeps([balances(100)], quests);
+
+    const result = await claimStoryReward("u1", "kitchen-table", d);
+
+    assert.deepEqual(result, { ok: true, response: { duplicate: false, xp: 50, level: 1 } });
+    assert.deepEqual(
+      d.store.rows.map((row) => [row.kind, row.amount, row.ref, row.status]),
+      [["quest", 100, "story:kitchen-table", "applied"]],
+    );
+    assert.deepEqual(quests.hands, ["story:kitchen-table"]);
+  });
+
+  it("pays nothing on a second claim of the same chapter", async () => {
+    const d = storyDeps([balances(100)]);
+    await claimStoryReward("u1", "kitchen-table", d);
+
+    const second = await claimStoryReward("u1", "kitchen-table", d);
+
+    assert.deepEqual(second, { ok: true, response: { duplicate: true, xp: 50, level: 1 } });
+    assert.equal(d.store.rows.length, 1, "no second wallet_event row");
+    assert.equal(d.requests.length, 1, "no second RevenueCat call");
+  });
+
+  it("refuses a chapter whose previous chapter was never paid", async () => {
+    const d = storyDeps([]);
+
+    const result = await claimStoryReward("u1", "the-local", d);
+
+    assert.deepEqual(result, { ok: false, reason: "out_of_order" });
+    assert.equal(d.store.rows.length, 0);
+    assert.equal(d.requests.length, 0);
+  });
+
+  it("refuses an unknown chapter id", async () => {
+    const d = storyDeps([]);
+
+    const result = await claimStoryReward("u1", "secret-chapter", d);
+
+    assert.deepEqual(result, { ok: false, reason: "unknown_chapter" });
+    assert.equal(d.store.rows.length, 0);
+  });
+
+  it("pays the next chapter once the one before it is paid, and any level its XP crosses", async () => {
+    const d = storyDeps([balances(100), balances(300), balances(350)]);
+    await claimStoryReward("u1", "kitchen-table", d);
+
+    const result = await claimStoryReward("u1", "the-local", d);
+
+    // 50 + 100 XP crosses level 2 (100 XP), which pays its own level reward.
+    assert.deepEqual(result, { ok: true, response: { duplicate: false, xp: 150, level: 2 } });
+    assert.deepEqual(
+      d.store.rows.map((row) => [row.kind, row.amount, row.ref]),
+      [
+        ["quest", 100, "story:kitchen-table"],
+        ["quest", 200, "story:the-local"],
+        ["level", levelReward(2), "level-2"],
+      ],
+    );
+  });
+
+  it("finishes the coins on a retry when the XP was already recorded", async () => {
+    const quests = memoryQuestStore();
+    const d = storyDeps([balances(100)], quests);
+    // A crash after the XP commit and before the coin row opened.
+    await quests.recordQuestHand("u1", "story:kitchen-table", (map) => ({ next: map, completed: [] }), 50);
+
+    const result = await claimStoryReward("u1", "kitchen-table", d);
+
+    assert.deepEqual(result, { ok: true, response: { duplicate: false, xp: 50, level: 1 } });
+    assert.equal(d.store.rows.length, 1);
   });
 });
