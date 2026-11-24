@@ -13,6 +13,7 @@ import {
   type RecordedHand,
 } from "@wordpoker/game-rules";
 
+import { authClient } from "@/auth/client/auth-client";
 import { PowerDrawReveal, PowerHeldChip, PowerUsePrompt, PowerUsedCard, swapFlipOf, usePowerTargeting } from "@/components/powers";
 import { FREE_PLAY, PHASE_LABEL } from "@/components/hud";
 import { GameScreen } from "@/components/screens/game/game-screen";
@@ -24,6 +25,8 @@ import { challengeById, storySession, storyTable } from "@/features/story/challe
 import { bestUnusedTile, storyCoachLine } from "@/features/story/story-coach";
 import { FRIENDS, type ChapterMap, type Expression, type FriendId, type MapNode } from "@/features/story/chapter-map";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
+import { settleStoryRewards, type StoryPayout } from "@/features/story/story-reward";
+import { useQuests } from "@/lib/quests/quests-provider";
 
 import { StoryMeter } from "./story-meter";
 import { StoryRoom } from "./story-room";
@@ -71,10 +74,16 @@ export function StoryTable({ map, node, dictionary, onLeave }: StoryTableProps):
   // The word on the rack as the hand ended: a fold-out has no submitted word, but the player still built one.
   const builtRef = useRef<BuiltWord | null>(null);
   const [built, setBuilt] = useState<BuiltWord | null>(null);
-  const recorded = useRef<typeof results>(null);
+  // Once per hand, not per `results`: the snapshot is rebuilt as the payout's chips land, and a second
+  // record would count a boss loss twice and find a first clear already spent.
+  const recorded = useRef(false);
+  // A first clear's coins and XP are claimed as the hand settles (STO-1129); the map retries one that did not land.
+  const [payout, setPayout] = useState<StoryPayout | null>(null);
+  const userId = authClient.useSession().data?.user.id;
+  const { refresh, refreshCoins } = useQuests();
   useEffect(() => {
-    if (results === null || recorded.current === results) return;
-    recorded.current = results;
+    if (results === null || recorded.current) return;
+    recorded.current = true;
     const hero = results.seats.find((seat) => seat.isYou);
     const won = hero?.takesPot ?? false;
     // Every rival folded: no showdown judged a word, and a boss folding concedes the hand (STO-1107).
@@ -84,11 +93,20 @@ export function StoryTable({ map, node, dictionary, onLeave }: StoryTableProps):
     saveStoryProgress(next.progress);
     setBuilt(builtRef.current);
     setVerdict(next);
-    // game.players is read as the hand settles, alongside results.
+    if (next.reward !== null) {
+      void settleStoryRewards(next.progress, userId).then(({ status, fresh }) => {
+        setPayout(status);
+        if (!fresh) return;
+        refresh();
+        void refreshCoins();
+      });
+    }
+    // game.players and the session are read as the hand settles, alongside results.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter.id, node.id, results]);
 
   const replay = () => {
+    recorded.current = false;
     setVerdict(null);
     setBuilt(null);
     builtRef.current = null;
@@ -231,6 +249,7 @@ export function StoryTable({ map, node, dictionary, onLeave }: StoryTableProps):
           verdict={verdict}
           winner={winner}
           hint={hint}
+          payout={payout}
           onReplay={replay}
           onLeave={onLeave}
         />

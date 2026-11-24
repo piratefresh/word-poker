@@ -20,6 +20,9 @@ import { authClient } from "@/auth/client/auth-client";
 import { GAME_CENTER_AVAILABLE, linkGameCenter } from "@/auth/client/game-center";
 import { linkSocial, SOCIAL_PROVIDERS, type SocialProvider } from "@/auth/client/social-sign-in";
 import { Field, paper } from "@/components/screens/auth/auth-shell";
+import { BadgeMedal } from "@/components/screens/story/components/chapter-map/badge-medal";
+import { storyBadges } from "@/features/story/story-badges";
+import { useStoryProgress } from "@/features/story/story-progress";
 import { privacyOptionsRequired, showPrivacyOptions } from "@/lib/ads/rewarded-ad";
 import { pickAvatarPhoto, removeAvatar, uploadAvatar } from "@/lib/avatar/avatar-client";
 import { webOrigin } from "@/lib/navigation/invite-link";
@@ -49,6 +52,8 @@ export function displayNameError(value: string): string | null {
 export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
   const insets = useSafeAreaInsets();
   const { data: session } = authClient.useSession();
+  // The story badges this device's run has won (STO-1129); the section waits for the first one.
+  const badges = storyBadges(useStoryProgress());
   const isGuest = !!session?.user.isAnonymous;
   const userId = isGuest ? null : session?.user.id;
 
@@ -279,6 +284,17 @@ export function AccountSettings({ onDismiss }: { onDismiss: () => void }) {
             value={name}
           />
 
+          {badges.some((badge) => badge.won) ? (
+            <View style={styles.section} testID="account-story-badges">
+              <SectionLabel>Story badges</SectionLabel>
+              <View style={styles.badges}>
+                {badges.map((badge) => (
+                  <BadgeMedal key={badge.id} badge={badge} size={36} />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           {providers ? (
             <View style={styles.section}>
               <SectionLabel>Sign-in</SectionLabel>
@@ -403,6 +419,7 @@ const styles = StyleSheet.create({
   subtitle: { color: paper.body, fontFamily: fonts.rubik, fontSize: 13 },
   saved: { color: "#2f7a52", fontFamily: fonts.rubikSemiBold, fontSize: 12, letterSpacing: 0.72 },
   section: { gap: 6 },
+  badges: { flexDirection: "row", gap: 10 },
   error: { color: paper.error, fontFamily: fonts.rubikMedium, fontSize: 13, lineHeight: 18 },
   danger: { paddingTop: 6 },
   deleteLink: { alignSelf: "center", paddingHorizontal: 12, paddingVertical: 8 },
