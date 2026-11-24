@@ -3,25 +3,27 @@ import type { ReactElement } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { Dictionary, SlotSpellerState, SlotWord } from "@wordpoker/game-rules";
+import { canLock, type Dictionary, type SlotSpellerState, type SlotWord } from "@wordpoker/game-rules";
 
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, fontSize, radius, spacing, type } from "@/constants/theme";
 import { payoutRows, randomSlotSeed } from "@/features/slot-speller/slot-speller-model";
+import { useSlotRecords, type SlotRecords } from "@/features/slot-speller/slot-speller-save";
 import { useSlotSpeller, type SlotSpeller } from "@/features/slot-speller/use-slot-speller";
 import { useDictionary } from "@/features/table/use-dictionary";
 import { webTestID } from "@/lib/ui/web-id";
 
-import { RoundClearedPanel } from "./round-cleared-panel";
 import { SlotGrid } from "./slot-grid";
 import { SlotHud } from "./slot-hud";
 import { OutOfSpinsPanel, RunOverPanel } from "./slot-outcome-panels";
 import { SlotPayoutList } from "./slot-payout-list";
+import { SlotLineChips, SlotPowersPanel, SlotRecordsBlock, SlotSeedRow } from "./slot-run-info";
+import { SlotShopPanel } from "./slot-shop-panel";
 
 export interface SlotSpellerScreenProps {
   /** A saved run to resume (persistence hangs off this and `onChange`). */
   initialState?: SlotSpellerState;
-  onChange?: (state: SlotSpellerState) => void;
+  onChange?: (state: SlotSpellerState, previous: SlotSpellerState) => void;
 }
 
 /** Slot Speller (§47): one solo run on the engine, in-process, held until the dictionary loads. */
@@ -64,7 +66,8 @@ interface SlotSpellerTableProps extends SlotSpellerScreenProps {
 
 function SlotSpellerTable({ dictionary, initialState, onChange, bottomInset }: SlotSpellerTableProps): ReactElement {
   const game = useSlotSpeller({ dictionary, initialState, onChange });
-  const { state, payout, revealStep, preview, selected, revealing, dispatch } = game;
+  const { state, payout, revealStep, preview, selected, held, revealing, dispatch } = game;
+  const records = useSlotRecords();
 
   const shown = payoutRows(payout).slice(0, revealStep);
   const lit: SlotWord[] = [];
@@ -75,27 +78,37 @@ function SlotSpellerTable({ dictionary, initialState, onChange, bottomInset }: S
 
   return (
     <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + spacing.xxl }]}>
+      <SlotSeedRow
+        seed={state.seed}
+        onRestart={() => dispatch({ type: "newRun", seed: state.seed })}
+        onNewRun={() => dispatch({ type: "newRun", seed: randomSlotSeed() })}
+      />
       <SlotHud state={state} preview={preview?.total ?? 0} />
       <SlotGrid
         state={state}
         outlined={preview?.words ?? []}
         lit={lit}
         selected={selected}
+        held={held}
         revealing={revealing}
         onTapCell={(cell) => dispatch({ type: "tapCell", cell })}
         onNudge={(reel, direction) => dispatch({ type: "nudge", reel, direction })}
+        onToggleLock={(reel) => dispatch({ type: "toggleLock", reel })}
         onSkipReveal={() => dispatch({ type: "skipReveal" })}
       />
-      {revealing ? <Text style={styles.hint}>Tap the reels to skip</Text> : <SlotActions game={game} />}
+      <SlotLineChips state={state} />
+      {revealing ? <Text style={styles.hint}>Tap the reels to skip</Text> : <SlotActions game={game} records={records} />}
       {payout !== null ? (
         <SlotPayoutList payout={payout} rows={shown} powerMultiplier={state.config.scoringPowerMultiplier} />
       ) : null}
+      <SlotPowersPanel state={state} />
+      {state.phase === "over" ? null : <SlotRecordsBlock records={records} />}
     </ScrollView>
   );
 }
 
 /** What the phase asks for next: spin, pay, or the end-of-spin panel. */
-function SlotActions({ game }: { game: SlotSpeller }): ReactElement {
+function SlotActions({ game, records }: { game: SlotSpeller; records: SlotRecords }): ReactElement {
   const { state, preview, dispatch } = game;
   const toGo = Math.max(state.target - state.roundScore, 0);
   const spinButton = (
@@ -129,6 +142,9 @@ function SlotActions({ game }: { game: SlotSpeller }): ReactElement {
       return (
         <View style={styles.actions}>
           <Text style={styles.hint}>{`${toGo} to go · ${state.spinsLeft} ${state.spinsLeft === 1 ? "spin" : "spins"} left`}</Text>
+          {canLock(state) ? (
+            <Text style={styles.hint}>{`Reel Lock: hold up to ${state.config.lockReels} reels through the next spin.`}</Text>
+          ) : null}
           {spinButton}
         </View>
       );
@@ -141,9 +157,24 @@ function SlotActions({ game }: { game: SlotSpeller }): ReactElement {
         />
       );
     case "over":
-      return <RunOverPanel state={state} onNewRun={() => dispatch({ type: "newRun", seed: randomSlotSeed() })} />;
+      return (
+        <RunOverPanel
+          state={state}
+          records={<SlotRecordsBlock records={records} />}
+          onReplay={() => dispatch({ type: "newRun", seed: state.seed })}
+          onNewRun={() => dispatch({ type: "newRun", seed: randomSlotSeed() })}
+        />
+      );
     case "shop":
-      return <RoundClearedPanel state={state} onNextRound={() => dispatch({ type: "nextRound" })} />;
+      return (
+        <SlotShopPanel
+          state={state}
+          onBuyPower={(power) => dispatch({ type: "buyPower", power })}
+          onBuyReel={() => dispatch({ type: "buyReel" })}
+          onReroll={() => dispatch({ type: "reroll" })}
+          onNextRound={() => dispatch({ type: "nextRound" })}
+        />
+      );
   }
 }
 

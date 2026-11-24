@@ -6,13 +6,17 @@
 
 import {
   buyExtraSpin,
+  buyPower,
+  buyReel,
   createSlotRun,
   endRun,
   nextRound,
   nudge,
   pay,
+  rerollShop,
   spin,
   swap,
+  toggleLock,
   type Dictionary,
   type NudgeDirection,
   type SlotActionResult,
@@ -30,6 +34,8 @@ export interface SlotSpellerModel {
   readonly payout: SlotEvaluation | null;
   /** How many of `payoutRows(payout)` are on screen. */
   readonly revealStep: number;
+  /** Reels Reel Lock held through the last spin: they stay still instead of stopping in. */
+  readonly held: readonly number[];
 }
 
 export type SlotSpellerAction =
@@ -40,6 +46,10 @@ export type SlotSpellerAction =
   | { readonly type: "extraSpin" }
   | { readonly type: "endRun" }
   | { readonly type: "nextRound" }
+  | { readonly type: "buyPower"; readonly power: SlotPowerId }
+  | { readonly type: "buyReel" }
+  | { readonly type: "reroll" }
+  | { readonly type: "toggleLock"; readonly reel: number }
   | { readonly type: "newRun"; readonly seed: string }
   | { readonly type: "revealNext" }
   | { readonly type: "skipReveal" };
@@ -63,7 +73,7 @@ export function randomSlotSeed(random: () => number = Math.random): string {
 }
 
 export function createSlotModel(state: SlotSpellerState): SlotSpellerModel {
-  return { state, selected: null, payout: null, revealStep: 0 };
+  return { state, selected: null, payout: null, revealStep: 0, held: [] };
 }
 
 export function payoutRows(payout: SlotEvaluation | null): SlotPayoutRow[] {
@@ -100,7 +110,7 @@ export function reduceSlotSpeller(
   switch (action.type) {
     case "spin": {
       const result = spin(state);
-      return result.ok ? createSlotModel(result.state) : model;
+      return result.ok ? { ...createSlotModel(result.state), held: state.locks } : model;
     }
     case "nudge": {
       const next = applied(model, nudge(state, action.reel, action.direction));
@@ -114,7 +124,7 @@ export function reduceSlotSpeller(
     }
     case "pay": {
       const result = pay(state, dictionary);
-      return result.ok ? { state: result.state, selected: null, payout: result.payout, revealStep: 0 } : model;
+      return result.ok ? { ...createSlotModel(result.state), payout: result.payout } : model;
     }
     case "extraSpin":
       return applied(model, buyExtraSpin(state));
@@ -124,6 +134,14 @@ export function reduceSlotSpeller(
       const result = nextRound(state);
       return result.ok ? createSlotModel(result.state) : model;
     }
+    case "buyPower":
+      return applied(model, buyPower(state, action.power));
+    case "buyReel":
+      return applied(model, buyReel(state));
+    case "reroll":
+      return applied(model, rerollShop(state));
+    case "toggleLock":
+      return applied(model, toggleLock(state, action.reel));
     case "newRun":
       return createSlotModel(createSlotRun(action.seed));
     case "revealNext":

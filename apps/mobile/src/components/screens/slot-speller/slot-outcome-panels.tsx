@@ -43,11 +43,14 @@ export function OutOfSpinsPanel({ state, onExtraSpin, onEndRun }: OutOfSpinsPane
 
 export interface RunOverPanelProps {
   state: SlotSpellerState;
+  /** The device's records, drawn under the run's own summary. */
+  records: ReactNode;
+  onReplay: () => void;
   onNewRun: () => void;
 }
 
 /** The run's summary: how far it got, its best word and the build it ended with. */
-export function RunOverPanel({ state, onNewRun }: RunOverPanelProps): ReactElement {
+export function RunOverPanel({ state, records, onReplay, onNewRun }: RunOverPanelProps): ReactElement {
   const held = SLOT_POWERS.filter((power) => powerCount(state.powers, power.id) > 0).map((power) => {
     const count = powerCount(state.powers, power.id);
     return count > 1 ? `${power.name} ×${count}` : power.name;
@@ -62,8 +65,10 @@ export function RunOverPanel({ state, onNewRun }: RunOverPanelProps): ReactEleme
       <Stat label="Build" value={`${state.reels} reels × ${rowCount(state.config, state.powers)} rows`} />
       <Stat label="Powers" value={held.length === 0 ? "None" : held.join(", ")} />
       <View style={styles.actions}>
+        <GameButton label={`Replay seed ${state.seed}`} variant="dark" onPress={onReplay} testID="slot-replay-seed" />
         <GameButton label="New run" variant="gold" onPress={onNewRun} testID="slot-new-run" />
       </View>
+      {records}
     </OutcomeCard>
   );
 }

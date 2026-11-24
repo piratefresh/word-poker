@@ -60,6 +60,61 @@ describe("reduceSlotSpeller", () => {
   });
 });
 
+describe("the shop and Reel Lock", () => {
+  const empty = testDictionary([]);
+  /** A run standing in a freshly opened shop with tokens to spend. */
+  function shopModel(tokens: number) {
+    const state = createSlotRun("SHOP01");
+    return createSlotModel({
+      ...state,
+      phase: "shop",
+      tokens,
+      shop: { stock: ["lock", "extraRow", "heavy"], sold: [], rerolls: 0, earned: tokens },
+    });
+  }
+
+  it("buys a power, marks it sold, and grows the grid for Extra Row", () => {
+    let model = reduceSlotSpeller(shopModel(20), { type: "buyPower", power: "extraRow" }, empty);
+    expect(model.state.tokens).toBe(12);
+    expect(model.state.shop?.sold).toEqual(["extraRow"]);
+    expect(model.state.grid[0]).toHaveLength(4);
+    const bought = model;
+    model = reduceSlotSpeller(model, { type: "buyPower", power: "extraRow" }, empty);
+    expect(model).toBe(bought);
+  });
+
+  it("refuses what the tokens do not cover", () => {
+    const model = shopModel(2);
+    expect(reduceSlotSpeller(model, { type: "buyPower", power: "lock" }, empty)).toBe(model);
+    expect(reduceSlotSpeller(model, { type: "buyReel" }, empty)).toBe(model);
+  });
+
+  it("adds a reel and rerolls the stock for tokens", () => {
+    let model = reduceSlotSpeller(shopModel(20), { type: "buyReel" }, empty);
+    expect(model.state.reels).toBe(6);
+    expect(model.state.grid).toHaveLength(6);
+    const tokens = model.state.tokens;
+    model = reduceSlotSpeller(model, { type: "reroll" }, empty);
+    expect(model.state.tokens).toBeLessThan(tokens);
+    expect(model.state.shop?.rerolls).toBe(1);
+  });
+
+  it("holds a locked reel through the next spin and remembers it was held", () => {
+    let model = reduceSlotSpeller(shopModel(20), { type: "buyPower", power: "lock" }, empty);
+    model = reduceSlotSpeller(model, { type: "nextRound" }, empty);
+    model = reduceSlotSpeller(model, { type: "spin" }, empty);
+    model = reduceSlotSpeller(model, { type: "pay" }, empty);
+    expect(model.state.phase).toBe("between");
+
+    model = reduceSlotSpeller(model, { type: "toggleLock", reel: 2 }, empty);
+    expect(model.state.locks).toEqual([2]);
+    const kept = model.state.grid[2];
+    model = reduceSlotSpeller(model, { type: "spin" }, empty);
+    expect(model.held).toEqual([2]);
+    expect(model.state.grid[2]).toEqual(kept);
+  });
+});
+
 describe("randomSlotSeed", () => {
   it("draws six characters without look-alikes", () => {
     expect(randomSlotSeed(() => 0)).toBe("AAAAAA");

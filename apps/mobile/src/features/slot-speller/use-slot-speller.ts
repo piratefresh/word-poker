@@ -27,7 +27,8 @@ export interface UseSlotSpellerOptions {
   readonly dictionary: Dictionary;
   /** A run to resume; a fresh one is dealt otherwise. */
   readonly initialState?: SlotSpellerState;
-  readonly onChange?: (state: SlotSpellerState) => void;
+  /** Every run-state change, with the state it replaced (records compare the two). */
+  readonly onChange?: (state: SlotSpellerState, previous: SlotSpellerState) => void;
 }
 
 export interface SlotSpeller extends SlotSpellerModel {
@@ -49,9 +50,9 @@ export function useSlotSpeller({ dictionary, initialState, onChange }: UseSlotSp
     if (next === model) return;
     setModel(next);
     if (next.state === model.state) return;
-    onChange?.(next.state);
+    onChange?.(next.state, model.state);
     if (action.type === "spin" || action.type === "nudge") haptic("lift");
-    else if (action.type === "tapCell") haptic("settle");
+    else if (action.type === "tapCell" || action.type === "toggleLock") haptic("settle");
     else if (action.type === "pay" && next.payout !== null && next.payout.total > 0) haptic("success");
   };
 
