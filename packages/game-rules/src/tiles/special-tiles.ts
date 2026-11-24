@@ -39,7 +39,7 @@ export const TWO_LETTER_TILE_LIMIT = 3;
  * §9's high-value tier: a tile whose best printed face is worth this much or more, which §6
  * lists as F, H, V, W, Y, K (5), J, X (8) and Q, Z (10).
  */
-const HIGH_VALUE_POINTS = 5;
+export const HIGH_VALUE_POINTS = 5;
 
 /**
  * §10: how many community tiles the flop holds. The board is the flop's three tiles followed by
