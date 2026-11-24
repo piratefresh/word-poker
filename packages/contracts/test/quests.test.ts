@@ -10,6 +10,8 @@ import {
   isQuestHandClaim,
   isQuestId,
   isQuestStateResponse,
+  isStoryRewardClaim,
+  isStoryRewardResponse,
   type QuestHandFacts,
 } from "../src/index";
 
@@ -140,5 +142,26 @@ describe("isQuestClaimResponse", () => {
     assert.ok(!isQuestClaimResponse({ completed: ["nope"], duplicate: false, xp: 37, level: 1 }));
     assert.ok(!isQuestClaimResponse({ completed: [], duplicate: false }));
     assert.ok(!isQuestClaimResponse({ completed: [], duplicate: true, xp: 0 }));
+  });
+});
+
+describe("story reward claims (STO-976)", () => {
+  it("accepts a chapter id and nothing else is needed", () => {
+    assert.equal(isStoryRewardClaim({ chapterId: "kitchen-table" }), true);
+  });
+
+  it("refuses a missing, empty, overlong, or non-string chapter id", () => {
+    assert.equal(isStoryRewardClaim(null), false);
+    assert.equal(isStoryRewardClaim({}), false);
+    assert.equal(isStoryRewardClaim({ chapterId: "" }), false);
+    assert.equal(isStoryRewardClaim({ chapterId: "x".repeat(65) }), false);
+    assert.equal(isStoryRewardClaim({ chapterId: 1 }), false);
+  });
+
+  it("reads a response with a duplicate flag, an XP total, and a level of at least 1", () => {
+    assert.equal(isStoryRewardResponse({ duplicate: false, xp: 50, level: 1 }), true);
+    assert.equal(isStoryRewardResponse({ duplicate: "no", xp: 50, level: 1 }), false);
+    assert.equal(isStoryRewardResponse({ duplicate: false, xp: -1, level: 1 }), false);
+    assert.equal(isStoryRewardResponse({ duplicate: false, xp: 50, level: 0 }), false);
   });
 });

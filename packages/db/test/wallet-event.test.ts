@@ -15,6 +15,7 @@ import { Client } from "pg";
 
 import {
   buyInFor,
+  hasRewardEvent,
   hasWelcomeEvent,
   openWalletEvent,
   pendingWalletEvents,
@@ -68,6 +69,21 @@ describe(
 
       const other = await openWalletEvent({ userId: `user-${randomUUID()}`, kind: "welcome", amount: 5000 }, { orm });
       assert.ok(other, "another user still gets theirs");
+    });
+
+    it("holds a story chapter's quest row once per user and reports it", async () => {
+      const userId = `user-${randomUUID()}`;
+      const ref = "story:kitchen-table";
+
+      assert.equal(await hasRewardEvent(userId, "quest", ref, { orm }), false);
+      const first = await openWalletEvent({ userId, kind: "quest", amount: 100, ref }, { orm });
+      const second = await openWalletEvent({ userId, kind: "quest", amount: 100, ref }, { orm });
+
+      assert.ok(first, "the first claim opens a row");
+      assert.equal(second, null, "the reward-once index holds the second");
+      assert.equal(await hasRewardEvent(userId, "quest", ref, { orm }), true);
+      assert.equal(await hasRewardEvent(userId, "quest", "story:the-local", { orm }), false, "another chapter is not paid");
+      assert.equal(await hasRewardEvent(`user-${randomUUID()}`, "quest", ref, { orm }), false, "another user is not paid");
     });
 
     it("lets a user hold several rows of any other kind", async () => {

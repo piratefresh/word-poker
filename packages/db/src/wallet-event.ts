@@ -166,6 +166,22 @@ export async function hasWelcomeEvent(userId: string, options: DbOptions = {}): 
   return rows.length > 0;
 }
 
+/** Whether a once-only reward row (`kind`, `ref`) has been opened for a player, in any status. */
+export async function hasRewardEvent(
+  userId: string,
+  kind: WalletEventKind,
+  ref: string,
+  options: DbOptions = {},
+): Promise<boolean> {
+  const db = await connection(options);
+  const rows = await db.execute<{ id: string }[]>(
+    `select "id" from "wallet_event" where "user_id" = ? and "kind" = ? and "ref" = ? limit 1`,
+    [userId, kind, ref],
+  );
+
+  return rows.length > 0;
+}
+
 /**
  * Logs a change RevenueCat made itself (a purchase or a refund), as `applied`. Resolves `false`
  * when the webhook event was already recorded — RevenueCat redelivers until it sees a 200.
