@@ -15,6 +15,7 @@ import {
   pay,
   rerollPrice,
   rerollShop,
+  roundTarget,
   spin,
   windowAt,
   type SlotActionResult,
@@ -39,7 +40,7 @@ function reason(result: SlotActionResult | SlotPayResult): string {
 
 /** A seeded run whose every pay clears (target 0), standing in its first shop. */
 function inShop(seed = "shop", tokens = 100): SlotSpellerState {
-  const run = createSlotRun(seed, { ...DEFAULT_SLOT_SPELLER_CONFIG, baseTarget: 0 });
+  const run = createSlotRun(seed, { ...DEFAULT_SLOT_SPELLER_CONFIG, targets: [0] });
   const shop = ok(pay(ok(spin(run)), empty));
   assert.equal(shop.phase, "shop");
   return { ...shop, tokens };
@@ -218,6 +219,11 @@ describe("Slot Speller shop", () => {
 
   it("sets the next round's target from the config", () => {
     const next = ok(nextRound(ok(pay(pigs(2, 10), dictionary))));
-    assert.equal(next.target, 25);
+    assert.equal(next.target, roundTarget(DEFAULT_SLOT_SPELLER_CONFIG, 2));
+  });
+
+  it("reads targets from the table, then grows the last one by targetGrowth a round", () => {
+    const config = { ...DEFAULT_SLOT_SPELLER_CONFIG, targets: [20, 40, 100], targetGrowth: 0.2 };
+    assert.deepEqual([1, 2, 3, 4, 5].map((round) => roundTarget(config, round)), [20, 40, 100, 120, 144]);
   });
 });

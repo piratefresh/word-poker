@@ -53,7 +53,7 @@ function between(seed: string, powers: SlotSpellerState["powers"]): SlotSpellerS
 
 /** A seeded run in its first shop with `tokens`, offering `stock`. */
 function inShop(seed: string, stock: SlotPowerId[]): SlotSpellerState {
-  const run = createSlotRun(seed, { ...DEFAULT_SLOT_SPELLER_CONFIG, baseTarget: 0 });
+  const run = createSlotRun(seed, { ...DEFAULT_SLOT_SPELLER_CONFIG, targets: [0] });
   const shop = ok(pay(ok(spin(run)), empty));
   assert.equal(shop.phase, "shop");
   return { ...shop, tokens: 100, shop: { stock, sold: [], rerolls: 0, earned: 0 } };

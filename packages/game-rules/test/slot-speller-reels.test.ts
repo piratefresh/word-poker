@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   DEFAULT_SLOT_SPELLER_CONFIG,
+  buildStrip,
   createSlotRun,
   nudge,
   payLines,
@@ -38,6 +39,17 @@ describe("Slot Speller reels", () => {
     assert.equal(run.target, 20);
     assert.equal(run.grid.length, 5);
     assert.equal(run.grid[0]?.length, 3);
+  });
+
+  it("rolls DL and TL at roughly the configured rates", () => {
+    const tiles = Array.from({ length: 400 }, (_, i) => buildStrip("rates", i, DEFAULT_SLOT_SPELLER_CONFIG)).flat();
+    const share = (pred: (t: (typeof tiles)[number]) => boolean, pool = tiles) => pool.filter(pred).length / pool.length;
+    const low = tiles.filter((t) => t.points < 5);
+    const high = tiles.filter((t) => t.points >= 5);
+    // 12,000 tiles: TL 3%, DL 15% on low letters and 20% on letters worth 5 or more.
+    assert.ok(Math.abs(share((t) => t.multiplier === "triple-letter") - 0.03) < 0.01);
+    assert.ok(Math.abs(share((t) => t.multiplier === "double-letter", low) - 0.15) < 0.02);
+    assert.ok(Math.abs(share((t) => t.multiplier === "double-letter", high) - 0.2) < 0.06);
   });
 
   it("replays the same grid from the same seed and actions", () => {

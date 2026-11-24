@@ -97,8 +97,9 @@ a nudge or the next spin brings plain tiles back. Which tiles split comes from t
 land on the same position, leaving one blank), and the grid refreshes to show them. A reel
 bought afterwards gets its 2 blanks too. Where the blanks land comes from the run's seed.
 
-**Rounds.** Round 1's target is 20; each round's target is 25% above the last, rounded
-(20, 25, 31, …). A round starts with 0 points and 3 spins. After each payout:
+**Rounds.** Rounds 1–10 have fixed targets: 20, 40, 70, 110, 160, 230, 320, 450, 620, 820.
+From round 11 each target is 20% above the last, rounded (984, 1181, 1417, …). A round starts
+with 0 points and 3 spins. After each payout:
 
 - the round score reaches the target: the round is **cleared** and the shop opens;
 - otherwise, with spins left, the player spins again;
@@ -123,3 +124,70 @@ grants one more spin. Otherwise the run is **over**. A new run starts again from
 The shop's cards come from the run's seed, so leaving and reopening the game shows the same
 cards. Leaving the shop starts the next round; locks are cleared and the Extra Spin is on offer
 again.
+
+## Tuning
+
+Measured with `pnpm --filter @wordpoker/game-rules exec tsx scripts/probe-slot-speller.ts [firstSeed] [runs] [all|runs|powers|min]`
+(STO-1165). The bot is greedy: each step it tries every nudge and swap (swaps sampled to 200 on
+wide grids), takes the best grid total, and pays when nothing improves. It locks the best
+word's reels when it holds Reel Lock and buys the Extra Spin when short. People find much less
+than this bot (maybe 30–50% of it), so these numbers are a ceiling, not a target.
+
+**Starting 5×3 grid**, 200 seeds × 3 spins:
+
+| Word rule | Mean spin |
+| --------- | --------- |
+| 3-letter words at ×0.5 (shipped) | 30.6 |
+| 4+ letters only | 23.7 |
+| 3-letter words at ×1 | 35.6 |
+
+This confirms the prototype's "about 31 a spin (24 with 4+ only)".
+
+**Each power alone** on a 7×3 grid (baseline 44.2 a spin), 200 seeds × a 3-spin round:
+
+| Power | Spin | Δ | Δ per token |
+| ----- | ---- | - | ----------- |
+| Zigzag Lines | 73.4 | +29.2 | 4.9 |
+| Wave Lines | 60.0 | +15.8 | 2.6 |
+| Twins | 55.7 | +11.6 | 2.9 |
+| Extra Row | 55.3 | +11.2 | 1.4 |
+| Extra Row ×2 | 62.8 | +18.6 | 1.2 |
+| Heavy | 54.2 | +10.1 | 2.5 |
+| Action | 50.8 | +6.6 | 1.7 |
+| +1 reel (3 tokens) | 50.6 | +6.5 | 2.2 |
+| Extra Move | 50.1 | +5.9 | 1.2 |
+| Wild Reel | 50.0 | +5.9 | 1.2 |
+| Long Haul | 47.3 | +3.1 | 0.8 |
+| Split Tiles | 46.9 | +2.7 | 0.5 |
+| Reel Lock | 45.1 | +1.0 | 0.2 |
+
+Long Haul grows with grid width (more 6–7 letter words); Reel Lock is weak for a bot that
+replays greedily but may matter more to people. Zigzag is the standout; it stays as is.
+
+**Whole runs**, 200 seeds, shop policy "power" (buy offered powers in the order of the table
+above, then reels with what is left):
+
+| Round | Target | Reached | Clear % | Mean spin | Tokens earned | Reels | Rows |
+| ----- | ------ | ------- | ------- | --------- | ------------- | ----- | ---- |
+| 1 | 20 | 200 | 100 | 30 | 8.8 | 5.0 | 3.0 |
+| 3 | 70 | 200 | 100 | 64 | 7.7 | 5.8 | 3.3 |
+| 5 | 160 | 200 | 100 | 118 | 7.2 | 6.0 | 3.6 |
+| 7 | 320 | 196 | 96 | 199 | 6.7 | 6.2 | 4.1 |
+| 9 | 620 | 183 | 91 | 297 | 5.9 | 6.3 | 4.8 |
+| 10 | 820 | 167 | 85 | 361 | 5.8 | 6.5 | 4.9 |
+| 11 | 984 | 142 | 79 | 422 | 5.9 | 7.2 | 4.9 |
+| 13 | 1417 | 92 | 75 | 530 | 5.5 | 9.0 | 5.0 |
+| 15 | 2040 | 45 | 56 | 596 | 5.0 | 10.5 | 5.0 |
+| 17 | 2938 | 9 | 22 | 688 | 5.0 | 11.4 | 5.0 |
+
+The bot's runs end in round 12 at the median (10th percentile 9, 90th 16). Other policies die
+sooner: "reel" (reels first) median 7, "row" (save for Extra Row) median 8 — Add Reel buys
+fewer points per token than the line and Scoring powers. The bot holds 1–2 tokens after each
+shop and owns every power by about round 10, so the shop is neither buy-everything early nor
+buy-nothing; prices and token income are unchanged.
+
+**Why this curve.** The table rises about as fast as the bot's build adds points (its mean
+spin roughly doubles every three rounds through round 10), asking for a growing share of the
+bot's three spins: ~0.2× in round 1, ~0.75× by round 10. Past round 10 a full build plateaus
+near 600 a spin, so +20% a round turns a finished build into a few more rounds rather than a
+wall.

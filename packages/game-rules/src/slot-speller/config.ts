@@ -39,8 +39,9 @@ export interface SlotSpellerConfig {
   readonly longHaulMultipliers: readonly LengthMultiplier[];
   /** What each triggered Scoring power multiplies a word by. */
   readonly scoringPowerMultiplier: number;
-  readonly baseTarget: number;
-  /** Round n's target is `baseTarget × (1 + targetGrowth)^(n − 1)`, rounded. */
+  /** Round n's target for the first `targets.length` rounds (round 1 first); see `roundTarget`. */
+  readonly targets: readonly number[];
+  /** Past the table, each round's target is the last one's × (1 + targetGrowth), rounded. */
   readonly targetGrowth: number;
   readonly clearTokens: number;
   readonly tokensPerUnusedSpin: number;
@@ -79,8 +80,9 @@ export const DEFAULT_SLOT_SPELLER_CONFIG: SlotSpellerConfig = {
     { minLength: 7, multiplier: 3 },
   ],
   scoringPowerMultiplier: 2,
-  baseTarget: 20,
-  targetGrowth: 0.25,
+  // Tuned with scripts/probe-slot-speller.ts (docs/rules/slot-speller.md, Tuning).
+  targets: [20, 40, 70, 110, 160, 230, 320, 450, 620, 820],
+  targetGrowth: 0.2,
   clearTokens: 5,
   tokensPerUnusedSpin: 2,
   extraSpinCost: 3,
@@ -100,7 +102,9 @@ export const DEFAULT_SLOT_SPELLER_CONFIG: SlotSpellerConfig = {
 
 /** The target score of `round` (1-based). */
 export function roundTarget(config: SlotSpellerConfig, round: number): number {
-  return Math.round(config.baseTarget * (1 + config.targetGrowth) ** (round - 1));
+  const { targets, targetGrowth } = config;
+  const listed = targets[Math.min(round, targets.length) - 1] ?? 0;
+  return Math.round(listed * (1 + targetGrowth) ** Math.max(0, round - targets.length));
 }
 
 /** The multiplier of the last tier `length` reaches, or 0 below every tier. */
