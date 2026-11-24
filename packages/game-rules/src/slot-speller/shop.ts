@@ -2,8 +2,8 @@
 
 import { weightedSampleWithoutReplacement } from "../core/sample";
 import { refuse, type SlotActionResult } from "./actions";
-import { SLOT_POWERS, type SlotPowerId } from "./powers";
-import { buildStrip, rowCount, windowAt } from "./reels";
+import { SLOT_POWERS, hasPower, type SlotPowerId } from "./powers";
+import { addWildBlanks, buildStrip, rowCount, windowAt } from "./reels";
 import { slotRng } from "./seed";
 import type { SlotSpellerState } from "./state";
 
@@ -32,7 +32,8 @@ export function rerollPrice(state: SlotSpellerState): number {
 
 /**
  * Buys one stock card: the power's count goes up and the card is sold. Extra Row refills every
- * column from its strip at its current top, so the grid stays one row taller everywhere.
+ * column from its strip at its current top, so the grid stays one row taller everywhere. Wild
+ * Reel writes its blanks onto every strip, then refreshes the columns the same way so they show.
  */
 export function buyPower(state: SlotSpellerState, id: SlotPowerId): SlotActionResult {
   const shop = state.shop;
@@ -44,23 +45,30 @@ export function buyPower(state: SlotSpellerState, id: SlotPowerId): SlotActionRe
 
   const powers = { ...state.powers, [id]: (state.powers[id] ?? 0) + 1 };
   const rows = rowCount(state.config, powers);
+  const strips = id === "wild" ? state.strips.map((strip, reel) => addWildBlanks(strip, state.seed, reel, state.config)) : state.strips;
   const grid =
-    id === "extraRow" ? state.strips.map((strip, reel) => windowAt(strip, state.top[reel] ?? 0, rows)) : state.grid;
+    id === "extraRow" || id === "wild"
+      ? strips.map((strip, reel) => windowAt(strip, state.top[reel] ?? 0, rows))
+      : state.grid;
 
   return {
     ok: true,
-    state: { ...state, powers, grid, tokens: state.tokens - power.cost, shop: { ...shop, sold: [...shop.sold, id] } },
+    state: { ...state, powers, strips, grid, tokens: state.tokens - power.cost, shop: { ...shop, sold: [...shop.sold, id] } },
   };
 }
 
-/** Buys a reel: a new seeded strip at top 0 joins on the right. Always on sale, up to `maxReels`. */
+/**
+ * Buys a reel: a new seeded strip at top 0 joins on the right, with Wild Reel's blanks when held.
+ * Always on sale, up to `maxReels`.
+ */
 export function buyReel(state: SlotSpellerState): SlotActionResult {
   if (state.phase !== "shop") return refuse(state, "wrong-phase");
   if (state.reels >= state.config.maxReels) return refuse(state, "max-reels");
   const price = addReelPrice(state);
   if (state.tokens < price) return refuse(state, "not-enough-tokens");
 
-  const strip = buildStrip(state.seed, state.reels, state.config);
+  const built = buildStrip(state.seed, state.reels, state.config);
+  const strip = hasPower(state.powers, "wild") ? addWildBlanks(built, state.seed, state.reels, state.config) : built;
   return {
     ok: true,
     state: {

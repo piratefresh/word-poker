@@ -79,6 +79,7 @@ export function nextRound(state: SlotSpellerState): SlotActionResult {
       spinsLeft: state.config.spinsPerRound,
       extraSpinUsed: false,
       locks: [],
+      lockUsed: false,
       shop: null,
       phase: "ready",
     },

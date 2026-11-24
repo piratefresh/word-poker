@@ -2,10 +2,14 @@
 
 import type { Tile } from "@wordpoker/contracts";
 
-import { powerCount } from "./powers";
+import { weightedSampleWithoutReplacement } from "../core/sample";
+import { LETTER_VALUES, type Letter } from "../tiles/letters";
+import { DEFAULT_SPECIAL_TILES } from "../tiles/special-tiles";
+import { hasPower, powerCount } from "./powers";
 import { rowCount, stripAt, windowAt, wrap } from "./reels";
 import { slotRng } from "./seed";
 import type { SlotCell, SlotSpellerState } from "./state";
+import { isBlank, isChoice } from "./word-score";
 
 export type SlotRejectionReason =
   | "wrong-phase"
@@ -17,7 +21,10 @@ export type SlotRejectionReason =
   | "not-on-sale"
   | "sold"
   | "max-reels"
-  | "extra-spin-used";
+  | "extra-spin-used"
+  | "no-power"
+  | "lock-used"
+  | "lock-full";
 
 /** Either the next state, or the reason the action was refused with the state handed back unchanged. */
 export type SlotActionResult =
@@ -39,7 +46,8 @@ export function movesPerSpin(state: SlotSpellerState): number {
 /**
  * Spins every unlocked reel to a new random top and refills its column from the strip; a locked
  * reel keeps its column (unless the row count changed under it). Only from `ready` or `between`.
- * Consumes the locks and a spin, and opens `moving` with a fresh set of moves.
+ * Consumes the locks and a spin, and opens `moving` with a fresh set of moves. With Split Tiles,
+ * the landed grid then gains its second faces.
  */
 export function spin(state: SlotSpellerState): SlotActionResult {
   if (state.phase !== "ready" && state.phase !== "between") return refuse(state, "wrong-phase");
@@ -68,14 +76,68 @@ export function spin(state: SlotSpellerState): SlotActionResult {
     state: {
       ...state,
       top,
-      grid,
+      grid: hasPower(state.powers, "split") ? splitTiles(state, grid) : grid,
       locks: [],
+      lockUsed: state.lockUsed || state.locks.length > 0,
       phase: "moving",
       moves: movesPerSpin(state),
       spinsLeft: state.spinsLeft - 1,
       spinCount: state.spinCount + 1,
     },
   };
+}
+
+/** Letters Split Tiles picks from for a letter in no choice pair. */
+const SPLIT_FALLBACK_LETTERS = ["A", "E", "I", "O", "R", "S", "T", "N"] as const;
+
+/**
+ * Split Tiles: `splitTilesPerSpin` random plain grid tiles (not blank, not already a choice tile,
+ * not on a locked reel) gain a second face — the letter's partner in the first choice pair
+ * holding it, else a random one of `SPLIT_FALLBACK_LETTERS` other than itself. Grid only.
+ */
+function splitTiles(state: SlotSpellerState, grid: Tile[][]): Tile[][] {
+  const rng = slotRng(state.seed, "split", state.spinCount);
+  const eligible: SlotCell[] = [];
+  grid.forEach((column, reel) => {
+    if (state.locks.includes(reel)) return;
+    column.forEach((tile, row) => {
+      if (!isBlank(tile) && !isChoice(tile)) eligible.push([reel, row]);
+    });
+  });
+
+  const next = grid.map((column) => [...column]);
+  for (const [reel, row] of weightedSampleWithoutReplacement(eligible, () => 1, state.config.splitTilesPerSpin, rng)) {
+    const column = next[reel];
+    const tile = column?.[row];
+    if (column === undefined || tile === undefined) continue;
+    const pair = DEFAULT_SPECIAL_TILES.choicePairs.find((entry) => entry.includes(tile.letter));
+    const others = SPLIT_FALLBACK_LETTERS.filter((letter) => letter !== tile.letter);
+    const alternative = pair
+      ? pair[0] === tile.letter
+        ? pair[1]
+        : pair[0]
+      : (others[Math.floor(rng() * others.length)] ?? "E");
+    column[row] = { ...tile, alternativeLetter: alternative, alternativePoints: LETTER_VALUES[alternative as Letter] ?? 0 };
+  }
+  return next;
+}
+
+/** Whether Reel Lock can hold reels now: between spins, with the power, not yet spent this round. */
+export function canLock(state: SlotSpellerState): boolean {
+  return state.phase === "between" && hasPower(state.powers, "lock") && !state.lockUsed;
+}
+
+/** Reel Lock: holds or releases `reel` for the next spin, up to `lockReels` reels. */
+export function toggleLock(state: SlotSpellerState, reel: number): SlotActionResult {
+  if (state.phase !== "between") return refuse(state, "wrong-phase");
+  if (!hasPower(state.powers, "lock")) return refuse(state, "no-power");
+  if (state.lockUsed) return refuse(state, "lock-used");
+  if (!Number.isInteger(reel) || reel < 0 || reel >= state.reels) return refuse(state, "out-of-range");
+  if (state.locks.includes(reel)) {
+    return { ok: true, state: { ...state, locks: state.locks.filter((held) => held !== reel) } };
+  }
+  if (state.locks.length >= state.config.lockReels) return refuse(state, "lock-full");
+  return { ok: true, state: { ...state, locks: [...state.locks, reel] } };
 }
 
 function moveRefusal(state: SlotSpellerState): SlotRejectionReason | null {

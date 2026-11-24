@@ -47,6 +47,20 @@ export function buildStrip(seed: string, reel: number, config: SlotSpellerConfig
   return strip;
 }
 
+/**
+ * Wild Reel: `wildBlanksPerStrip` blanks written over random positions of reel `reel`'s strip,
+ * with replacement (two draws may land on one position), each keeping that position's tile id.
+ */
+export function addWildBlanks(strip: readonly Tile[], seed: string, reel: number, config: SlotSpellerConfig): Tile[] {
+  const rng = slotRng(seed, "wild", reel);
+  const next = [...strip];
+  for (let i = 0; i < config.wildBlanksPerStrip && next.length > 0; i += 1) {
+    const position = Math.floor(rng() * next.length);
+    next[position] = { id: stripTileId(reel, position), letter: "?", points: 0, blank: true };
+  }
+  return next;
+}
+
 /** `index` wrapped onto a strip of `length`. */
 export function wrap(index: number, length: number): number {
   return ((index % length) + length) % length;

@@ -9,8 +9,7 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 Slot Speller is a solo, endless slot-machine word mode. There is no table, no betting and no
 bots: the player spins a grid of letter reels, rearranges it with a few moves, and every word
 the pay lines spell scores. Every number below is config
-(`packages/game-rules/src/slot-speller/config.ts`), to tune after playtesting. Reel Lock, Split
-Tiles and Wild Reel's effects are specified separately as they land.
+(`packages/game-rules/src/slot-speller/config.ts`), to tune after playtesting.
 
 **Strips.** Each reel is a strip of 30 tiles. Every strip tile is drawn on its own, with
 replacement, from the normal bag's letter distribution (§7), so a strip can repeat letters the
@@ -79,6 +78,24 @@ base × length mult × powers, rounded to the nearest whole number.
 | Heavy | Scoring | 4 | Words with J, Q, X or Z ×2 |
 | Twins | Scoring | 4 | Words with a double letter ×2 |
 | Long Haul | Scoring | 4 | Length mult ×2 at 6 letters, ×3 at 7+ |
+
+**Reel Lock.** Once a round, between spins, the player may hold up to 2 reels; tapping a held
+reel releases it. The next spin leaves held reels' columns as they are, swapped tiles included,
+and spends the lock for the round, even if the player held only one reel. A spin with no reel
+held does not spend it. Holding is refused outside the between-spins phase, without the power,
+after this round's lock is spent, or for a third reel. The next round brings the lock back.
+
+**Split Tiles.** After every spin lands, 2 random tiles in the grid gain a second face and
+become choice tiles, playing either face (Paying a line, above). Only plain tiles qualify: not
+a blank, not already a choice tile, and not on a reel Reel Lock held. The second face is the
+letter's partner in the first choice pair holding it (§10: A/E, E/I, O/U, A/I, T/S, R/N, D/T,
+S/L, Q/K, Z/X, J/H, so A gains E and T gains S); a letter in no pair gains a random one of A,
+E, I, O, R, S, T, N. The tile keeps its multiplier. Only the grid changes, never the strips, so
+a nudge or the next spin brings plain tiles back. Which tiles split comes from the run's seed.
+
+**Wild Reel.** Buying it writes 2 blanks over random positions of every strip (two draws can
+land on the same position, leaving one blank), and the grid refreshes to show them. A reel
+bought afterwards gets its 2 blanks too. Where the blanks land comes from the run's seed.
 
 **Rounds.** Round 1's target is 20; each round's target is 25% above the last, rounded
 (20, 25, 31, …). A round starts with 0 points and 3 spins. After each payout:
