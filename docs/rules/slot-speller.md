@@ -9,8 +9,8 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 Slot Speller is a solo, endless slot-machine word mode. There is no table, no betting and no
 bots: the player spins a grid of letter reels, rearranges it with a few moves, and every word
 the pay lines spell scores. Every number below is config
-(`packages/game-rules/src/slot-speller/config.ts`), to tune after playtesting. Rounds, targets,
-tokens, the shop and Reel Lock, Split Tiles and Wild Reel are specified separately as they land.
+(`packages/game-rules/src/slot-speller/config.ts`), to tune after playtesting. Reel Lock, Split
+Tiles and Wild Reel's effects are specified separately as they land.
 
 **Strips.** Each reel is a strip of 30 tiles. Every strip tile is drawn on its own, with
 replacement, from the normal bag's letter distribution (§7), so a strip can repeat letters the
@@ -22,7 +22,8 @@ strips and, given the same actions, the same spins.
 **Grid.** A run starts with 5 reels and 3 rows. Each reel shows 3 consecutive tiles of its
 strip, wrapping from the end back to the start. Extra Row adds a row (at most 2).
 
-**Spins.** A spin sends every reel to a new random place on its strip and refills its column. A
+**Spins.** A spin is allowed at the start of a round or between spins, while spins are left. A
+spin sends every reel to a new random place on its strip and refills its column. A
 reel held by Reel Lock keeps its column, and the lock is spent. A round has 3 spins; each spin
 grants 4 moves (6 with Extra Move).
 
@@ -35,6 +36,9 @@ grants 4 moves (6 with Extra Move).
 
 A move is refused, with nothing changed, when no moves are left, outside a spin's move phase,
 on a cell or reel off the grid, or when a swap names the same cell twice.
+
+**Payout.** When the player is done moving, the grid pays: every pay line's words (below) are
+scored and their total joins the round score. The run remembers its best-scoring word.
 
 **Pay lines.** Every row is a pay line, read left to right. Wave Lines adds a line that weaves
 down and up through the rows (row 1, 2, 3, 2, 1, … on three rows) and its mirror. Zigzag Lines
@@ -75,3 +79,30 @@ base × length mult × powers, rounded to the nearest whole number.
 | Heavy | Scoring | 4 | Words with J, Q, X or Z ×2 |
 | Twins | Scoring | 4 | Words with a double letter ×2 |
 | Long Haul | Scoring | 4 | Length mult ×2 at 6 letters, ×3 at 7+ |
+
+**Rounds.** Round 1's target is 20; each round's target is 25% above the last, rounded
+(20, 25, 31, …). A round starts with 0 points and 3 spins. After each payout:
+
+- the round score reaches the target: the round is **cleared** and the shop opens;
+- otherwise, with spins left, the player spins again;
+- otherwise the player is **short**.
+
+**Tokens.** Tokens are the run's currency; a run starts with none, and they carry from round to
+round. A clear pays 5 tokens plus 2 for each spin left unused.
+
+**Extra Spin.** When short, the player may buy one Extra Spin for 3 tokens, once a round: it
+grants one more spin. Otherwise the run is **over**. A new run starts again from round 1.
+
+**Shop.** A clear opens the shop, which offers:
+
+- **Power cards.** 3 powers drawn at random, without repeats, from the powers the run does not
+  already hold at their max (Extra Row is offered until held twice). Each card sells once, at the
+  power's cost.
+- **Add Reel**, always on sale: a new reel with its own strip joins on the right. It costs 3
+  tokens, then 1 more for each reel bought this run (3, 4, 5, …), up to 12 reels.
+- **Reroll**: a fresh set of 3 power cards. It costs 1 token, then 1 more for each reroll in this
+  shop (1, 2, 3, …); the next shop starts again at 1.
+
+The shop's cards come from the run's seed, so leaving and reopening the game shows the same
+cards. Leaving the shop starts the next round; locks are cleared and the Extra Spin is on offer
+again.

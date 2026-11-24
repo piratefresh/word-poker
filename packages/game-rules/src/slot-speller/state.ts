@@ -7,10 +7,28 @@
 import type { Tile } from "@wordpoker/contracts";
 
 import { DEFAULT_SLOT_SPELLER_CONFIG, roundTarget, type SlotSpellerConfig } from "./config";
-import type { SlotPowerCounts } from "./powers";
+import type { SlotPowerCounts, SlotPowerId } from "./powers";
 import { buildStrip, rowCount, windowAt } from "./reels";
 
 export type SlotPhase = "ready" | "moving" | "between" | "shop" | "short" | "over";
+
+/** The run's best-scoring word so far. */
+export interface SlotBestWord {
+  readonly word: string;
+  readonly score: number;
+}
+
+/** The shop opened by a clear, kept in the state so reopening the app cannot reroll it. */
+export interface SlotShop {
+  /** The power cards on offer. */
+  readonly stock: readonly SlotPowerId[];
+  /** Stock cards already bought this roll. */
+  readonly sold: readonly SlotPowerId[];
+  /** Rerolls paid for in this shop. */
+  readonly rerolls: number;
+  /** Tokens the clear that opened this shop paid. */
+  readonly earned: number;
+}
 
 /** A grid position: `[reel, row]`. */
 export type SlotCell = readonly [reel: number, row: number];
@@ -37,6 +55,15 @@ export interface SlotSpellerState {
   readonly locks: readonly number[];
   /** Every spin of the run so far: the index of the next spin's generator. */
   readonly spinCount: number;
+  /** Whether this round's one Extra Spin has been bought. */
+  readonly extraSpinUsed: boolean;
+  /** Open only in phase `shop`. */
+  readonly shop: SlotShop | null;
+  /** Every shop stock rolled so far (clears and rerolls): the index of the next roll's generator. */
+  readonly shopRolls: number;
+  /** Reels bought with Add Reel; sets its price. */
+  readonly reelsBought: number;
+  readonly bestWord: SlotBestWord | null;
 }
 
 /** Starts a run: strips built from the seed, every reel at strip index 0, round 1, phase `ready`. */
@@ -63,5 +90,10 @@ export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_
     tokens: 0,
     locks: [],
     spinCount: 0,
+    extraSpinUsed: false,
+    shop: null,
+    shopRolls: 0,
+    reelsBought: 0,
+    bestWord: null,
   };
 }

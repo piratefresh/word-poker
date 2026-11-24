@@ -7,7 +7,17 @@ import { rowCount, stripAt, windowAt, wrap } from "./reels";
 import { slotRng } from "./seed";
 import type { SlotCell, SlotSpellerState } from "./state";
 
-export type SlotRejectionReason = "wrong-phase" | "no-spins" | "no-moves" | "out-of-range" | "same-cell";
+export type SlotRejectionReason =
+  | "wrong-phase"
+  | "no-spins"
+  | "no-moves"
+  | "out-of-range"
+  | "same-cell"
+  | "not-enough-tokens"
+  | "not-on-sale"
+  | "sold"
+  | "max-reels"
+  | "extra-spin-used";
 
 /** Either the next state, or the reason the action was refused with the state handed back unchanged. */
 export type SlotActionResult =
@@ -17,7 +27,7 @@ export type SlotActionResult =
 /** Up (`-1`) brings the next strip tile in at the bottom; down (`1`) the previous one in at the top. */
 export type NudgeDirection = -1 | 1;
 
-function refuse(state: SlotSpellerState, reason: SlotRejectionReason): SlotActionResult {
+export function refuse(state: SlotSpellerState, reason: SlotRejectionReason): SlotActionResult {
   return { ok: false, state, reason };
 }
 
@@ -28,11 +38,11 @@ export function movesPerSpin(state: SlotSpellerState): number {
 
 /**
  * Spins every unlocked reel to a new random top and refills its column from the strip; a locked
- * reel keeps its column (unless the row count changed under it). Consumes the locks and a spin,
- * and opens `moving` with a fresh set of moves.
+ * reel keeps its column (unless the row count changed under it). Only from `ready` or `between`.
+ * Consumes the locks and a spin, and opens `moving` with a fresh set of moves.
  */
 export function spin(state: SlotSpellerState): SlotActionResult {
-  if (state.phase !== "ready" && state.phase !== "moving") return refuse(state, "wrong-phase");
+  if (state.phase !== "ready" && state.phase !== "between") return refuse(state, "wrong-phase");
   if (state.spinsLeft <= 0) return refuse(state, "no-spins");
 
   const rng = slotRng(state.seed, "spin", state.spinCount);

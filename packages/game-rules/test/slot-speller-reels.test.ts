@@ -23,7 +23,7 @@ function play(seed: string): SlotSpellerState {
   let state = ok(spin(createSlotRun(seed)));
   state = ok(nudge(state, 1, -1));
   state = ok(swap(state, [0, 0], [4, 2]));
-  return ok(spin(state));
+  return ok(spin({ ...state, phase: "between" }));
 }
 
 describe("Slot Speller reels", () => {
@@ -49,7 +49,8 @@ describe("Slot Speller reels", () => {
     let state = ok(spin(createSlotRun("save")));
     state = ok(nudge(state, 2, 1));
     const copy = JSON.parse(JSON.stringify(state)) as SlotSpellerState;
-    assert.deepEqual(ok(spin(copy)), ok(spin(state)));
+    const between = (s: SlotSpellerState): SlotSpellerState => ({ ...s, phase: "between" });
+    assert.deepEqual(ok(spin(between(copy))), ok(spin(between(state))));
   });
 
   it("spins to a fresh grid, grants moves and spends a spin", () => {
@@ -69,7 +70,7 @@ describe("Slot Speller reels", () => {
     let state = ok(spin(createSlotRun("lock")));
     state = ok(swap(state, [1, 0], [3, 0]));
     const held = state.grid[1];
-    const next = ok(spin({ ...state, locks: [1] }));
+    const next = ok(spin({ ...state, phase: "between", locks: [1] }));
     assert.deepEqual(next.grid[1], held);
     assert.deepEqual(next.locks, []);
   });
@@ -87,7 +88,8 @@ describe("Slot Speller reels", () => {
     const spent = { ...moving, moves: 0 };
     cases.push([nudge(spent, 0, 1), "no-moves", spent]);
     cases.push([swap(spent, [0, 0], [1, 0]), "no-moves", spent]);
-    const dry = { ...moving, spinsLeft: 0 };
+    cases.push([spin(moving), "wrong-phase", moving]);
+    const dry: SlotSpellerState = { ...moving, phase: "between", spinsLeft: 0 };
     cases.push([spin(dry), "no-spins", dry]);
     const shop: SlotSpellerState = { ...run, phase: "shop" };
     cases.push([spin(shop), "wrong-phase", shop]);
