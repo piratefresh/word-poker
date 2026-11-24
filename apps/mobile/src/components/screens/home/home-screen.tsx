@@ -128,7 +128,9 @@ const SLABS: readonly Slab[] = [
     tilt: 0.8,
     href: "/tutorial",
   },
-  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: -0.8 },
+  // The solo endless slot run (STO-1159), in-process like Offline.
+  { key: "slot-speller", label: "Slot Speller", letter: "R", width: 170, tilt: -0.8, href: "/slot-speller" },
+  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: 0.8 },
 ];
 const SLAB_MAX_WIDTH = Math.max(...SLABS.map((slab) => slab.width));
 
