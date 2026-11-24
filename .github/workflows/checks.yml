@@ -28,6 +28,8 @@ jobs:
           node-version: "24.x"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Expo writes this gitignored file on start; without it tsc misses expo/types (CSS modules, web styles).
+      - run: echo '/// <reference types="expo/types" />' > apps/mobile/expo-env.d.ts
 
       - run: pnpm typecheck
       - run: pnpm check:boundaries
