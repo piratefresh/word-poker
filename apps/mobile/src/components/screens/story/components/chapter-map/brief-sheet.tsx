@@ -1,26 +1,28 @@
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { nodeStarGoals, storyChapter, storyNode } from "@wordpoker/game-rules";
+import type { PowerUpId } from "@wordpoker/contracts";
+import { chapterRecord, newPowers, nodeStarGoals, seePowers, setLoadout, storyNode } from "@wordpoker/game-rules";
 
 import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
-import { KITCHEN_TABLE, type MapNode } from "@/features/story/kitchen-table-map";
+import type { ChapterMap, MapNode } from "@/features/story/chapter-map";
+import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
 
 import { gradient, ink, lilita } from "./chapter-map-ink";
 import { FriendAvatar } from "./friend-avatar";
-
-const CHAPTER = storyChapter("kitchen-table");
+import { LoadoutPicker } from "./loadout-picker";
 
 export interface BriefSheetProps {
+  map: ChapterMap;
   node: MapNode;
   onDeal: () => void;
   onDismiss: () => void;
 }
 
 /** The three star goals of a node, read off the chapter's own rules. */
-export function starGoals(node: MapNode): { stars: number; label: string }[] {
-  const { two, three } = nodeStarGoals(CHAPTER, storyNode(CHAPTER, node.id));
+export function starGoals(map: ChapterMap, node: MapNode): { stars: number; label: string }[] {
+  const { two, three } = nodeStarGoals(map.chapter, storyNode(map.chapter, node.id));
   return [
     { stars: 1, label: "Win the hand" },
     { stars: 2, label: `Score ${two}+` },
@@ -31,9 +33,18 @@ export function starGoals(node: MapNode): { stars: number; label: string }[] {
 /**
  * What a map node asks before the deal: who sits across, the goal as three stars, and what is at
  * stake (nothing). It opens over the map when PLAY is tapped, and DEAL is what starts the hand.
+ * The final chapter's boss asks for its loadout here first; DEAL saves it.
  */
-export function BriefSheet({ node, onDeal, onDismiss }: BriefSheetProps): ReactElement {
-  const number = KITCHEN_TABLE.nodes.filter((entry) => entry.kind === "hand").indexOf(node) + 1;
+export function BriefSheet({ map, node, onDeal, onDismiss }: BriefSheetProps): ReactElement {
+  const { chapter } = map;
+  const number = map.nodes.filter((entry) => entry.kind === "hand").indexOf(node) + 1;
+  const loadout = node.kind === "boss" ? chapter.loadout : undefined;
+  const [picked, setPicked] = useState<PowerUpId[]>(() => chapterRecord(storyProgress(), chapter.id).powers.filter((id) => chapter.powerPool.includes(id)));
+  const [fresh] = useState(() => newPowers(storyProgress(), chapter.powerPool));
+  const deal = () => {
+    if (loadout !== undefined) saveStoryProgress(seePowers(setLoadout(storyProgress(), chapter.id, picked), chapter.powerPool));
+    onDeal();
+  };
   const kicker = node.kind === "hand" ? `HAND ${number} · VS ${node.opponent.toUpperCase()}` : `VS ${node.opponent.toUpperCase()}`;
   return (
     <View style={styles.layer} testID="story-brief">
@@ -52,7 +63,7 @@ export function BriefSheet({ node, onDeal, onDismiss }: BriefSheetProps): ReactE
         <Text style={styles.title}>{node.title}</Text>
         <Text style={styles.opener}>{`“${node.opener}”`}</Text>
         <View style={styles.goals}>
-          {starGoals(node).map((goal) => (
+          {starGoals(map, node).map((goal) => (
             <View accessibilityLabel={`${goal.stars} stars: ${goal.label}`} key={goal.stars} style={styles.goal} testID={`story-goal-${goal.stars}`}>
               <Text style={styles.stars}>
                 {"★".repeat(goal.stars)}
@@ -62,11 +73,14 @@ export function BriefSheet({ node, onDeal, onDismiss }: BriefSheetProps): ReactE
             </View>
           ))}
         </View>
+        {loadout === undefined ? null : (
+          <LoadoutPicker fresh={fresh} onChange={setPicked} picked={picked} pool={chapter.powerPool} size={loadout} />
+        )}
         <Text style={styles.stakes}>No clock · Practice chips · Retry free</Text>
         <GameButton
           label="DEAL"
           labelStyle={styles.dealLabel}
-          onPress={onDeal}
+          onPress={deal}
           style={styles.deal}
           testID="story-deal"
           variant="gold"

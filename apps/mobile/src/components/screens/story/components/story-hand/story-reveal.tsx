@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
 import type { ResultsSeat } from "@/components/screens/results/results-types";
-import type { MapNode } from "@/features/story/kitchen-table-map";
+import type { ChapterMap, MapNode } from "@/features/story/chapter-map";
 
 import { ink, lilita, gradient } from "../chapter-map/chapter-map-ink";
 import { FriendAvatar } from "../chapter-map/friend-avatar";
@@ -12,6 +12,7 @@ import { StoryStage } from "./story-stage";
 import { StoryWord } from "./story-word";
 
 export interface StoryRevealProps {
+  map: ChapterMap;
   node: MapNode;
   /** Whoever took the pot, and you. */
   winner: ResultsSeat | null;
@@ -28,10 +29,10 @@ export interface StoryRevealProps {
  * A lost hand: both words face off, winner's on top, and then the coach shows the best word the
  * player's tiles could have made. TRY AGAIN is the way on; there is no power pick here.
  */
-export function StoryReveal({ node, winner, hero, teach, hint, onReplay, onLeave }: StoryRevealProps): ReactElement {
+export function StoryReveal({ map, node, winner, hero, teach, hint, onReplay, onLeave }: StoryRevealProps): ReactElement {
   const line = hint ?? (teach === null ? null : teachLine(teach));
   return (
-    <StoryStage room={node.room}>
+    <StoryStage map={map} room={node.room}>
       <ScrollView contentContainerStyle={styles.scroll} testID="story-verdict">
         <Text style={styles.chip}>SHOWDOWN</Text>
         {winner === null ? null : (

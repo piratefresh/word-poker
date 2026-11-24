@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
-import { FRIENDS, MAP_WIDTH, discSize, type CoachLine } from "@/features/story/kitchen-table-map";
+import { FRIENDS, MAP_WIDTH, discSize, type CoachLine } from "@/features/story/chapter-map";
 
 import { ink, lilita } from "./chapter-map-ink";
 import { FriendAvatar } from "./friend-avatar";

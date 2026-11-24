@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import type { PathTile as Tile } from "@/features/story/kitchen-table-map";
+import type { PathTile as Tile } from "@/features/story/chapter-map";
 
 import { lilita } from "./chapter-map-ink";
 

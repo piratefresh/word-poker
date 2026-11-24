@@ -1,15 +1,15 @@
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { FRIENDS, KITCHEN_TABLE } from "@/features/story/kitchen-table-map";
+import { FRIENDS } from "@/features/story/chapter-map";
 
 import { gradient, ink, lilita } from "./chapter-map-ink";
 
-/** One slot per boss; Chapter 1 has the Professor's. Fixed to the corner, over the scroll. */
-export function BadgeShelf({ won, bottom }: { won: boolean; bottom: number }): ReactElement {
+/** The chapter's boss badge slot, marked with the boss's letter. Fixed to the corner, over the scroll. */
+export function BadgeShelf({ badge, letter, won, bottom }: { badge: string; letter: string; won: boolean; bottom: number }): ReactElement {
   return (
     <View
-      accessibilityLabel={won ? `Badge shelf: ${KITCHEN_TABLE.badge}` : "Badge shelf, empty"}
+      accessibilityLabel={won ? `Badge shelf: ${badge}` : "Badge shelf, empty"}
       pointerEvents="none"
       style={[styles.shelf, { bottom }]}
       testID="story-badge-shelf"
@@ -20,7 +20,7 @@ export function BadgeShelf({ won, bottom }: { won: boolean; bottom: number }): R
             <View style={[styles.ribbon, { left: 12, backgroundColor: FRIENDS.jay.color, transform: [{ skewX: "12deg" }] }]} />
             <View style={[styles.ribbon, { right: 12, backgroundColor: FRIENDS.ellis.color, transform: [{ skewX: "-12deg" }] }]} />
             <View style={[styles.medal, gradient("radial-gradient(circle at 35% 30%, #ffe9a0, #e0a23a 65%, #b57a22)")]}>
-              <Text style={styles.medalLetter}>P</Text>
+              <Text style={styles.medalLetter}>{letter}</Text>
             </View>
           </View>
         ) : (
@@ -30,7 +30,7 @@ export function BadgeShelf({ won, bottom }: { won: boolean; bottom: number }): R
         )}
       </View>
       <View style={styles.board} />
-      <Text numberOfLines={1} style={styles.label}>{won ? KITCHEN_TABLE.badge.toUpperCase() : "BADGE SHELF"}</Text>
+      <Text numberOfLines={1} style={styles.label}>{won ? badge.toUpperCase() : "BADGE SHELF"}</Text>
     </View>
   );
 }

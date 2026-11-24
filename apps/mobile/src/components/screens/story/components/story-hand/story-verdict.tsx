@@ -8,7 +8,7 @@ import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 import type { ResultsSeat } from "@/components/screens/results/results-types";
 import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
-import { KITCHEN_TABLE, type MapNode } from "@/features/story/kitchen-table-map";
+import type { ChapterMap, MapNode } from "@/features/story/chapter-map";
 
 import { gradient, ink, lilita } from "../chapter-map/chapter-map-ink";
 import { StoryDraft } from "./story-draft";
@@ -24,7 +24,7 @@ export interface BuiltWord {
 }
 
 export interface StoryVerdictProps {
-  chapterId: string;
+  map: ChapterMap;
   node: MapNode;
   verdict: RecordedHand;
   hero: ResultsSeat | null;
@@ -55,26 +55,26 @@ function useFilledStars(total: number): number {
 
 /** The run's verdict on a settled hand: a loss is revealed and dealt again; a win fills its stars and pays a power. */
 export function StoryVerdict(props: StoryVerdictProps): ReactElement {
-  const { node, verdict, hero, winner, teach, onReplay, onLeave } = props;
+  const { map, node, verdict, hero, winner, teach, onReplay, onLeave } = props;
   const won = hero?.takesPot ?? false;
   if (!won) {
-    return <StoryReveal hero={hero} hint={verdict.coachHint ? (props.hint ?? undefined) : undefined} node={node} onLeave={onLeave} onReplay={onReplay} teach={teach} winner={winner} />;
+    return <StoryReveal map={map} hero={hero} hint={verdict.coachHint ? (props.hint ?? undefined) : undefined} node={node} onLeave={onLeave} onReplay={onReplay} teach={teach} winner={winner} />;
   }
   return <StoryResult {...props} />;
 }
 
-function StoryResult({ chapterId, node, verdict, hero, built, into, hint, onReplay, onLeave }: StoryVerdictProps): ReactElement {
+function StoryResult({ map, node, verdict, hero, built, into, hint, onReplay, onLeave }: StoryVerdictProps): ReactElement {
   // The draft waits in the save, so it survives leaving here; taking one settles it and goes back.
   const { draft } = verdict;
   const filled = useFilledStars(verdict.replayBoss ? 0 : verdict.stars);
-  const title = verdict.bossBeaten ? `${KITCHEN_TABLE.boss.toUpperCase()} BEATEN` : verdict.replayBoss ? "NOT THIS TIME" : `${node.title.toUpperCase()} · WON`;
+  const title = verdict.bossBeaten ? `${map.boss.toUpperCase()} BEATEN` : verdict.replayBoss ? "NOT THIS TIME" : `${node.title.toUpperCase()} · WON`;
   const chips = hero?.net ?? 0;
   // A fold-out submits no word: show the one the player had built, if it was a real word.
   const folded = hero?.word == null;
   const shown = hero?.word != null ? { word: hero.word, score: hero.total, tiles: hero.tiles } : built;
 
   return (
-    <StoryStage dim={0.45} room={node.room}>
+    <StoryStage dim={0.45} map={map} room={node.room}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.card, gradient("radial-gradient(ellipse at 50% 0%, #2f4a3c, #18231e 70%)")]} testID="story-verdict">
           <Text style={styles.kicker}>{title}</Text>
@@ -98,7 +98,7 @@ function StoryResult({ chapterId, node, verdict, hero, built, into, hint, onRepl
           {verdict.coachHint && hint !== null ? <Text style={styles.hint}>{hint}</Text> : null}
           <View style={styles.rule} />
           {draft !== null ? (
-            <StoryDraft chapterId={chapterId} into={into} offers={draft} onSettled={onLeave} />
+            <StoryDraft chapterId={map.chapter.id} into={into} offers={draft} onSettled={onLeave} />
           ) : verdict.replayBoss ? (
             <>
               <GameButton label="PLAY AGAIN" onPress={onReplay} testID="story-replay" variant="gold" />

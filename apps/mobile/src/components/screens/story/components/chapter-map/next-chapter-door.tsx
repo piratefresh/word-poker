@@ -1,37 +1,60 @@
 import type { ReactElement } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { STORY_CHAPTERS } from "@wordpoker/game-rules";
 
 import { fonts } from "@/constants/theme";
-import { KITCHEN_TABLE } from "@/features/story/kitchen-table-map";
+import type { ChapterMap } from "@/features/story/chapter-map";
 
 import { gradient, ink, lilita } from "./chapter-map-ink";
 import { Padlock } from "./padlock";
 
-/** Chapter 2's pub doorway at the top of the map: shut and padlocked until the boss falls. */
-export function NextChapterDoor({ open }: { open: boolean }): ReactElement {
+export interface NextChapterDoorProps {
+  /** The chapter the door leads out of; its `door` places it. */
+  map: ChapterMap;
+  open: boolean;
+  /** Goes through the open door. */
+  onEnter?: () => void;
+}
+
+/** The next chapter's doorway at the top of the map: shut and padlocked until the boss falls, then the way in. */
+export function NextChapterDoor({ map, open, onEnter }: NextChapterDoorProps): ReactElement | null {
+  const next = STORY_CHAPTERS[STORY_CHAPTERS.indexOf(map.chapter) + 1];
+  if (map.door === undefined || next === undefined) return null;
+  const { x, y } = map.door;
+  // The door and its card both go through; only the door is announced, so the way in reads once.
+  const press = { disabled: !open || onEnter === undefined, onPress: onEnter };
   return (
     <>
-      <View style={[styles.frame, { boxShadow: open ? "0px 0px 60px 12px rgba(255,190,110,0.5)" : "0px 0px 0px 3px #3a1a14" }]}>
+      <Pressable
+        {...press}
+        accessibilityLabel={`Chapter ${next.number}, ${next.venue}, ${open ? "open" : "locked"}`}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !open }}
+        style={[styles.frame, { left: x, top: y, boxShadow: open ? "0px 0px 60px 12px rgba(255,190,110,0.5)" : "0px 0px 0px 3px #3a1a14" }]}
+        testID="story-next-chapter"
+      >
         <View style={[styles.door, gradient(open ? "linear-gradient(180deg, #ffe9b8, #f0b462)" : "linear-gradient(180deg, #2f7a52, #1f4a33)")]}>
           <View style={[styles.panel, { top: 40, height: 34 }]} />
           <View style={[styles.panel, { top: 84, height: 44 }]} />
         </View>
         {open ? null : <Padlock size={17} style={styles.lock} />}
-      </View>
-      <View style={[styles.card, { borderColor: open ? ink.gold : "rgba(125,131,152,0.7)" }]}>
-        <Text style={styles.kicker}>{`CHAPTER ${KITCHEN_TABLE.number + 1}`}</Text>
-        <Text style={styles.title}>{KITCHEN_TABLE.nextChapter}</Text>
-        <Text style={styles.copy}>{open ? "Unlocked. Opening soon." : `Beat ${KITCHEN_TABLE.boss} to unlock.`}</Text>
-      </View>
+      </Pressable>
+      <Pressable {...press} accessible={false} style={[styles.card, { top: y + CARD_DROP, borderColor: open ? ink.gold : "rgba(125,131,152,0.7)" }]}>
+        <Text style={styles.kicker}>{`CHAPTER ${next.number}`}</Text>
+        <Text style={styles.title}>{next.venue}</Text>
+        <Text style={styles.copy}>{open ? "Unlocked. Tap the door." : `Beat ${map.boss} to unlock.`}</Text>
+      </Pressable>
     </>
   );
 }
 
+/** The card sits this far below the door frame's top. */
+const CARD_DROP = 46;
+
 const styles = StyleSheet.create({
   frame: {
     position: "absolute",
-    left: 140,
-    top: 104,
     width: 110,
     height: 150,
     paddingTop: 7,
@@ -46,7 +69,6 @@ const styles = StyleSheet.create({
   card: {
     position: "absolute",
     left: 14,
-    top: 150,
     width: 118,
     paddingVertical: 8,
     paddingHorizontal: 10,

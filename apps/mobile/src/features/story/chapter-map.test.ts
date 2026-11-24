@@ -1,22 +1,24 @@
 import {
-  KITCHEN_TABLE,
-  MAP_HEIGHT,
   MAP_WIDTH,
-  ROOMS,
   ROOM_ZOOM,
   chapterStars,
   coachFor,
   discSize,
-  nodeState,
+  maxStars,
+  nodeState as mapNodeState,
   pathTiles,
   previewProgress,
   type ChapterProgress,
-  type MapNodeId,
-} from "./kitchen-table-map";
+  type MapNode,
+} from "./chapter-map";
+import { KITCHEN_TABLE } from "./kitchen-table-map";
 
-const node = (id: MapNodeId) => KITCHEN_TABLE.nodes.find((entry) => entry.id === id)!;
-const states = (progress: ChapterProgress) =>
-  Object.fromEntries(KITCHEN_TABLE.nodes.map((entry) => [entry.id, nodeState(entry, progress)]));
+// Chapter 1 reads exactly as it did before the maps were split per chapter (STO-1120).
+const map = KITCHEN_TABLE;
+const node = (id: string) => map.nodes.find((entry) => entry.id === id)!;
+const nodeState = (entry: MapNode, progress: ChapterProgress) => mapNodeState(map, entry, progress);
+const preview = (step: number) => previewProgress(map, step);
+const states = (progress: ChapterProgress) => Object.fromEntries(map.nodes.map((entry) => [entry.id, nodeState(entry, progress)]));
 
 test("a fresh chapter opens only the first hand", () => {
   expect(states({})).toEqual({
@@ -33,49 +35,51 @@ test("a hand lost for 0 stars still counts as cleared and opens the next", () =>
 });
 
 test("the third hand opens the bonus and the boss together", () => {
-  const progress = previewProgress(3);
+  const progress = preview(3);
   expect(nodeState(node("bonus"), progress)).toBe("available");
   expect(nodeState(node("professor"), progress)).toBe("available");
-  expect(coachFor(progress).node.id).toBe("professor");
+  expect(coachFor(map, progress).node.id).toBe("professor");
 });
 
 test("the boss can be beaten with the bonus skipped", () => {
-  const progress = { ...previewProgress(3), professor: 2 };
+  const progress = { ...preview(3), professor: 2 };
   expect(nodeState(node("bonus"), progress)).toBe("available");
-  expect(coachFor(progress).line).toMatch(/The Local/);
+  expect(coachFor(map, progress).line).toMatch(/The Local/);
 });
 
 test("stars add up to the chapter total", () => {
-  expect(chapterStars(previewProgress(5))).toBe(12);
+  expect(chapterStars(preview(5))).toBe(12);
   expect(chapterStars({})).toBe(0);
+  expect(maxStars(map)).toBe(15);
 });
 
-test("the coach points at each hand in turn", () => {
-  expect([0, 1, 2].map((step) => coachFor(previewProgress(step)).friend)).toEqual(["ellis", "jay", "mira"]);
+test("the coach points at each hand in turn, then names the threshold once the bonus is played", () => {
+  expect([0, 1, 2].map((step) => coachFor(map, preview(step)).friend)).toEqual(["ellis", "jay", "mira"]);
+  expect(coachFor(map, preview(4)).line).toBe("He sweats when he’s pushed. Beat 15 points to win.");
 });
 
 test("the tile path never sits under a disc, and lights up as the player walks it", () => {
-  const tiles = pathTiles({});
-  for (const entry of KITCHEN_TABLE.nodes) {
+  const tiles = pathTiles(map, {});
+  for (const entry of map.nodes) {
     const radius = discSize(entry) / 2;
     expect(tiles.some((tile) => Math.hypot(tile.x - entry.x, tile.y - entry.y) < radius)).toBe(false);
   }
-  const lit = (step: number) => pathTiles(previewProgress(step)).filter((tile) => tile.lit).length;
+  const lit = (step: number) => pathTiles(map, preview(step)).filter((tile) => tile.lit).length;
   expect(lit(0)).toBeGreaterThan(0);
   expect(lit(1)).toBeGreaterThan(lit(0));
-  expect(lit(5)).toBe(pathTiles({}).length);
+  expect(lit(5)).toBe(tiles.length);
 });
 
 test("every node is played in a room of the map, and the first hand on the porch", () => {
-  for (const entry of KITCHEN_TABLE.nodes) expect(ROOMS[entry.room]).toBeDefined();
+  for (const entry of map.nodes) expect(map.rooms[entry.room!]).toBeDefined();
   expect(node("first-hand").room).toBe("porch");
   expect(node("word-wizard").room).toBe(node("bonus").room);
   expect(node("professor").room).toBe("study");
 });
 
 test("each room's crop stays inside the map at the table's zoom", () => {
-  for (const origin of Object.values(ROOMS)) {
+  for (const origin of Object.values(map.rooms)) {
     expect(origin.x + MAP_WIDTH / ROOM_ZOOM).toBeLessThanOrEqual(MAP_WIDTH);
-    expect(origin.y + 844 / ROOM_ZOOM).toBeLessThanOrEqual(MAP_HEIGHT);
+    expect(origin.y + 844 / ROOM_ZOOM).toBeLessThanOrEqual(map.height);
   }
 });

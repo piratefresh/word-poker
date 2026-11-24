@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { FRIENDS, KITCHEN_TABLE, type CoachLine, type FriendId } from "@/features/story/kitchen-table-map";
+import { FRIENDS, type ChapterMap, type CoachLine, type FriendId } from "@/features/story/chapter-map";
 
 import { ink, lilita } from "./chapter-map-ink";
 import { FriendAvatar } from "./friend-avatar";
@@ -9,9 +9,9 @@ import { FriendAvatar } from "./friend-avatar";
 const BOSS_WATCHERS: readonly [number, number, FriendId][] = [[-96, 6, "ellis"], [96, 6, "jay"], [92, -70, "mira"]];
 
 /** The friends around their nodes, and all three watching the boss; the one coaching sits in the bubble instead. */
-export function MapFriends({ coach }: { coach: CoachLine }): ReactElement[] {
+export function MapFriends({ coach, map }: { coach: CoachLine; map: ChapterMap }): ReactElement[] {
   const seats: { friend: FriendId; x: number; y: number }[] = [];
-  for (const node of KITCHEN_TABLE.nodes) {
+  for (const node of map.nodes) {
     if (node.kind === "boss") {
       for (const [dx, dy, friend] of BOSS_WATCHERS) {
         if (!(coach.node === node && coach.friend === friend)) seats.push({ friend, x: node.x + dx, y: node.y + dy });

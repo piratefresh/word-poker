@@ -3,18 +3,18 @@ import type { ReactElement, ReactNode } from "react";
 import { Modal, StyleSheet, View } from "react-native";
 
 import { gradients } from "@/constants/theme";
-import type { RoomId } from "@/features/story/kitchen-table-map";
+import type { ChapterMap } from "@/features/story/chapter-map";
 import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 
 import { gradient } from "../chapter-map/chapter-map-ink";
 import { StoryRoom } from "./story-room";
 
 /** The full-screen page a hand ends on: the hand's room behind the felt, and the card laid on it. */
-export function StoryStage({ room, dim = 0, children }: { room: RoomId; dim?: number; children: ReactNode }): ReactElement {
+export function StoryStage({ map, room, dim = 0, children }: { map: ChapterMap; room: string | undefined; dim?: number; children: ReactNode }): ReactElement {
   return (
     <Modal supportedOrientations={MODAL_ORIENTATIONS} animationType="fade" statusBarTranslucent transparent visible>
       <View style={styles.page}>
-        <StoryRoom room={room} />
+        <StoryRoom map={map} room={room} />
         <View style={[styles.felt, gradient("radial-gradient(ellipse at 50% 38%, #3fa369, #27804f 55%, #1b5e3a)")]} />
         <LinearGradient {...gradients.felt} pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: dim }]} />
         {children}

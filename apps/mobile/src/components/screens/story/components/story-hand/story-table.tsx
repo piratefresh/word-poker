@@ -8,7 +8,6 @@ import {
   nodeStarGoals,
   nodeStars,
   recordHand,
-  storyChapter,
   storyNode,
   type Dictionary,
   type RecordedHand,
@@ -23,7 +22,7 @@ import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { BOSS_COPY, bossCoachLine } from "@/features/story/bosses";
 import { challengeById, storySession, storyTable } from "@/features/story/challenges";
 import { bestUnusedTile, storyCoachLine } from "@/features/story/story-coach";
-import { FRIENDS, KITCHEN_TABLE, type Expression, type FriendId, type MapNode } from "@/features/story/kitchen-table-map";
+import { FRIENDS, type ChapterMap, type Expression, type FriendId, type MapNode } from "@/features/story/chapter-map";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
 
 import { StoryMeter } from "./story-meter";
@@ -31,8 +30,6 @@ import { StoryRoom } from "./story-room";
 import { StorySpeech } from "./story-speech";
 import { StoryVerdict, type BuiltWord } from "./story-verdict";
 import { BossTell } from "./boss-tell";
-
-const CHAPTER = storyChapter("kitchen-table");
 
 /** Which face the opponent wears: determined when betting, thinking while the player builds a word, and a smile or a wink at the end. */
 function expressionAt({ status, phase, building, heroWon }: { status: string; phase: string; building: boolean; heroWon: boolean | null }): Expression {
@@ -44,15 +41,17 @@ function expressionAt({ status, phase, building, heroWon }: { status: string; ph
 const COACH_TOP = 115;
 
 export interface StoryTableProps {
+  map: ChapterMap;
   node: MapNode;
   dictionary: Dictionary;
   onLeave: () => void;
 }
 
 /** The offline table at a map node, with the node's coach line over the felt, and the run's verdict once it settles. */
-export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): ReactElement {
+export function StoryTable({ map, node, dictionary, onLeave }: StoryTableProps): ReactElement {
+  const { chapter } = map;
   // The powers the hand opens with are the run's as the hand is dealt; a boss replay keeps them.
-  const [powersHeld] = useState(() => chapterRecord(storyProgress(), CHAPTER.id).powers);
+  const [powersHeld] = useState(() => chapterRecord(storyProgress(), chapter.id).powers);
   const session = useMemo(() => storySession(storyTable(node), dictionary, powersHeld), [node, dictionary, powersHeld]);
   const offline = useOfflineGame({ seed: 0, dictionary, session });
   const { game, words, results, powers, bossTells } = offline;
@@ -78,11 +77,11 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     recorded.current = results;
     const hero = results.seats.find((seat) => seat.isYou);
     const outcome = { won: hero?.takesPot ?? false, score: hero?.total ?? 0 };
-    const next = recordHand(storyProgress(), CHAPTER.id, node.id, outcome, randomSeed());
+    const next = recordHand(storyProgress(), chapter.id, node.id, outcome, randomSeed());
     saveStoryProgress(next.progress);
     setBuilt(builtRef.current);
     setVerdict(next);
-  }, [node.id, results]);
+  }, [chapter.id, node.id, results]);
 
   const replay = () => {
     setVerdict(null);
@@ -92,7 +91,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   };
 
   const challenge = challengeById(node.challengeId);
-  const goals = nodeStarGoals(CHAPTER, storyNode(CHAPTER, node.id));
+  const goals = nodeStarGoals(chapter, storyNode(chapter, node.id));
   // The coach reads the word on the rack; the authored line for the street is what it says before there is one.
   const handTiles = [...game.privateTiles, ...game.community.filter((tile) => tile !== null)];
   const wordIsReal = dictionary.isWord(words?.word ?? "");
@@ -138,9 +137,9 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     // handTiles is rebuilt each render from the same settled hand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, dictionary, goals.two, challenge?.teachWord]);
-  const hands = KITCHEN_TABLE.nodes.filter((entry) => entry.kind === "hand");
+  const hands = map.nodes.filter((entry) => entry.kind === "hand");
   const following = hands[hands.indexOf(node) + 1];
-  const into = following === undefined ? KITCHEN_TABLE.boss : `Hand ${hands.indexOf(following) + 1}`;
+  const into = following === undefined ? map.boss : `Hand ${hands.indexOf(following) + 1}`;
 
   // A friend with art shows it in their seat, in the face the moment calls for.
   const players = game.players.map((player) => {
@@ -168,7 +167,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     >
       <View style={styles.table}>
         <GameScreen
-          backdrop={<StoryRoom room={node.room} />}
+          backdrop={<StoryRoom map={map} room={node.room} />}
           balance={FREE_PLAY}
           lesson={{ stamp: `${PHASE_LABEL[game.phase]} · ${node.title.toUpperCase()}` }}
           game={{ ...game, players }}
@@ -218,7 +217,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
       </View>
       {game.phase === "payout" && results !== null && verdict !== null ? (
         <StoryVerdict
-          chapterId={CHAPTER.id}
+          map={map}
           node={node}
           hero={hero}
           built={built}

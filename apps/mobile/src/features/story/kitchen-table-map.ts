@@ -1,243 +1,56 @@
 /**
- * kitchen-table-map.ts — Chapter 1's map as data (STO-861 v3): the nodes, the rule that opens
- * them, the coach's line, and the letter-tile path, all in the art's own 390 × 1760 frame.
+ * kitchen-table-map.ts — Chapter 1's map as data (STO-861 v3): the nodes, the rooms, the coach's
+ * lines, and the path, all in the art's own 390 × 1760 frame. The rules that read it are
+ * `chapter-map.ts`'s.
  *
  * The art (`assets/images/story/kitchen-table-map.svg`) is text-free; everything that changes
- * with progress is drawn over it from here. Its SVG filters (paper grain, wobbly ink) are beyond
+ * with progress is drawn over it. Its SVG filters (paper grain, wobbly ink) are beyond
  * react-native-svg, so the app ships a 2x JPEG rendered from it:
  *   chrome --headless --force-device-scale-factor=2 --window-size=390,1760 --screenshot …
- *
- * Progress is the stars each played node earned: the chapter run's save (`story-progress.ts`),
- * whose rules (`nodeState`, thresholds) are game-rules' `chapter-run.ts`, or `previewProgress` in
- * development.
  */
 
-import {
-  EMPTY_STORY_PROGRESS,
-  chapterRecord,
-  nodeState as runNodeState,
-  storyChapter,
-  storyNode,
-  type StoryProgress,
-} from "@wordpoker/game-rules";
+import { storyChapter } from "@wordpoker/game-rules";
+
+import { scaledTo, type ChapterMap, type MapNode } from "./chapter-map";
 
 const CHAPTER = storyChapter("kitchen-table");
-
-export const MAP_WIDTH = 390;
-export const MAP_HEIGHT = 1760;
-
-export type FriendId = "ellis" | "jay" | "mira";
-
-/** How a friend's portrait looks: neutral by default, and what the table makes of the moment. */
-export type Expression = "neutral" | "thinking" | "happy" | "wink" | "determined" | "surprised";
-
-/** Ellis's faces (the user's own art kit); a friend with none shows their initial. */
-const ELLIS_FACES: Record<Expression, number> = {
-  neutral: require("@/assets/images/story/ellis/face-neutral.svg"),
-  thinking: require("@/assets/images/story/ellis/face-thinking.svg"),
-  happy: require("@/assets/images/story/ellis/face-happy.svg"),
-  wink: require("@/assets/images/story/ellis/face-wink.svg"),
-  determined: require("@/assets/images/story/ellis/face-determined.svg"),
-  surprised: require("@/assets/images/story/ellis/face-surprised.svg"),
-};
-
-export const FRIENDS: Record<FriendId, { name: string; color: string; faces?: Record<Expression, number> }> = {
-  ellis: { name: "Ellis", color: "#d9603f", faces: ELLIS_FACES },
-  jay: { name: "Jay", color: "#2f7fc8" },
-  mira: { name: "Mira", color: "#8a4cc4" },
-};
-
-/** The rooms of the house a hand's table can be laid in; each is a crop of the map's own art. */
-export type RoomId = "porch" | "living-room" | "kitchen" | "study";
-
-/** How far the table zooms into the map's art. */
-export const ROOM_ZOOM = 2.6;
-
-/** Where each room's crop starts, in map points (the art's own 390 × 1760 frame). */
-export const ROOMS: Record<RoomId, { x: number; y: number }> = {
-  porch: { x: 120, y: 1420 },
-  "living-room": { x: 115, y: 1120 },
-  kitchen: { x: 45, y: 830 },
-  study: { x: 120, y: 300 },
-};
-
-export type MapNodeId = "first-hand" | "chips-on-the-table" | "word-wizard" | "bonus" | "professor";
-export type MapNodeKind = "hand" | "bonus" | "boss";
-export type MapNodeState = "locked" | "available" | "completed";
-
-export interface MapNode {
-  id: MapNodeId;
-  kind: MapNodeKind;
-  title: string;
-  /** What the disc shows until it is cleared. */
-  glyph: string;
-  /** Centre, in map points. */
-  x: number;
-  y: number;
-  /** The friend sitting beside a hand node, and which side of it (points from centre). */
-  friend?: { id: FriendId; dx: number };
-  /** The room this node's hand is played in: the table is laid where the node sits on the map. */
-  room: RoomId;
-  /** Who sits across at this node, as the brief sheet names them. */
-  opponent: string;
-  /** The opponent's one line on the brief sheet, before the deal. */
-  opener: string;
-  /** The playable challenge in `challenges.ts`, where one is authored. */
-  challengeId?: string;
-}
-
+const HEIGHT = 1760;
 /** Node centres from the v3 spec's normalised path, scaled to the art. */
-const at = (x: number, y: number) => ({ x: x * MAP_WIDTH, y: y * MAP_HEIGHT });
+const at = scaledTo(HEIGHT);
 
-export const KITCHEN_TABLE = {
-  number: 1,
-  title: "Kitchen Table",
+export const KITCHEN_TABLE: ChapterMap = {
+  chapter: CHAPTER,
   boss: "The Professor",
-  /** The boss hand's word score to beat. */
-  threshold: CHAPTER.threshold,
-  maxStars: 15,
-  nextChapter: "The Local",
   badge: "Professor Badge",
+  art: require("@/assets/images/story/kitchen-table-map.jpg"),
+  tint: ["#131a2c", "#131a2c"],
+  height: HEIGHT,
+  // The rooms of the house a hand's table can be laid in: each is a crop of the map's own art.
+  rooms: {
+    porch: { x: 120, y: 1420 },
+    "living-room": { x: 115, y: 1120 },
+    kitchen: { x: 45, y: 830 },
+    study: { x: 120, y: 300 },
+  },
   nodes: [
     { id: "first-hand", kind: "hand", title: "First Hand", glyph: "1", ...at(0.5, 0.885), friend: { id: "ellis", dx: 80 }, challengeId: "first-hand", room: "porch", opponent: "Ellis", opener: "Pull up a chair. Spell a word with your two tiles and the board. Best word takes the pot." },
     { id: "chips-on-the-table", kind: "hand", title: "Chips on the Table", glyph: "2", ...at(0.28, 0.72), friend: { id: "jay", dx: 80 }, room: "living-room", opponent: "Jay", opener: "Chips on the table. Let’s see what you bet." },
     { id: "word-wizard", kind: "hand", title: "Word Wizard", glyph: "3", ...at(0.7, 0.565), friend: { id: "mira", dx: -80 }, challengeId: "word-wizard", room: "kitchen", opponent: "Mira", opener: "Long words win big. Use all seven tiles for the Full Rack Bonus." },
     { id: "bonus", kind: "bonus", title: "Bonus Puzzle", glyph: "?", ...at(0.2, 0.42), room: "kitchen", opponent: "Mira", opener: "A little extra, just for you." },
     { id: "professor", kind: "boss", title: "The Professor", glyph: "P", ...at(0.56, 0.26), room: "study", opponent: "The Professor", opener: "So you think you can spell?" },
-  ] satisfies MapNode[] as readonly MapNode[],
-} as const;
-
-/** Where the path enters (the porch) and leaves (the Chapter 2 doorway). */
-const PATH_START = at(0.5, 0.985);
-const PATH_END = at(0.5, 0.145);
-
-export type ChapterProgress = Partial<Record<MapNodeId, number>>;
-
-const HANDS = KITCHEN_TABLE.nodes.filter((node) => node.kind === "hand");
-
-/** The chapter run's rule: hands one after another, then the bonus and the boss together. */
-export function nodeState(node: MapNode, progress: ChapterProgress): MapNodeState {
-  const save: StoryProgress = { chapters: { [CHAPTER.id]: { ...chapterRecord(EMPTY_STORY_PROGRESS, CHAPTER.id), stars: progress } } };
-  return runNodeState(save, CHAPTER, storyNode(CHAPTER, node.id));
-}
-
-function handsCleared(progress: ChapterProgress): number {
-  return HANDS.filter((hand) => progress[hand.id] !== undefined).length;
-}
-
-export function chapterStars(progress: ChapterProgress): number {
-  return Object.values(progress).reduce<number>((sum, stars) => sum + (stars ?? 0), 0);
-}
-
-export function bossBeaten(progress: ChapterProgress): boolean {
-  return progress.professor !== undefined;
-}
-
-export interface CoachLine {
-  friend: FriendId;
-  line: string;
-  /** The node the bubble points at. */
-  node: MapNode;
-}
-
-/** The coach points at the next hand, then at the boss (not the optional bonus). */
-export function coachFor(progress: ChapterProgress): CoachLine {
-  const [first, second, third] = HANDS;
-  const boss = KITCHEN_TABLE.nodes.find((node) => node.kind === "boss")!;
-  const next = HANDS.find((hand) => nodeState(hand, progress) === "available");
-  if (next === first) return { friend: "ellis", line: "Pull up a chair. Make a word from your tiles and the table.", node: next! };
-  if (next === second) return { friend: "jay", line: "Chips on the table. Let’s see what you bet.", node: next! };
-  if (next === third) return { friend: "mira", line: "Long words win big. Try your first power.", node: next! };
-  if (bossBeaten(progress)) return { friend: "mira", line: "You beat Uncle Prof! The Local’s open. First round’s on Jay.", node: boss };
-  if (progress.bonus !== undefined) {
-    return { friend: "mira", line: `He sweats when he’s pushed. Beat ${KITCHEN_TABLE.threshold} points to win.`, node: boss };
-  }
-  return { friend: "mira", line: "Uncle Prof crashed game night. Watch the bar over his seat.", node: boss };
-}
-
-export interface PathTile {
-  x: number;
-  y: number;
-  /** Degrees. */
-  rotation: number;
-  letter: string;
-  /** Walked: on a stretch of path the player has already cleared. */
-  lit: boolean;
-}
-
-const TILE_STEP = 38;
-const TILE_LETTERS = "WORDPOKER";
-
-type Point = { x: number; y: number };
-
-/** Points every `step` along a Catmull-Rom curve through `points`, tagged with their segment. */
-function samplePath(points: readonly Point[], step: number): (Point & { segment: number })[] {
-  const out: (Point & { segment: number })[] = [];
-  let travelled = step * 0.5;
-  let previous = points[0]!;
-  for (let segment = 0; segment < points.length - 1; segment++) {
-    const p0 = points[Math.max(segment - 1, 0)]!;
-    const p1 = points[segment]!;
-    const p2 = points[segment + 1]!;
-    const p3 = points[Math.min(segment + 2, points.length - 1)]!;
-    const curve = (a: number, b: number, c: number, d: number, t: number) =>
-      0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
-    for (let t = 0; t <= 1; t += 0.004) {
-      const point = { x: curve(p0.x, p1.x, p2.x, p3.x, t), y: curve(p0.y, p1.y, p2.y, p3.y, t) };
-      travelled += Math.hypot(point.x - previous.x, point.y - previous.y);
-      previous = point;
-      if (travelled >= step) {
-        travelled = 0;
-        out.push({ ...point, segment });
-      }
-    }
-  }
-  return out;
-}
-
-/** Disc diameter in map points: 66, and 92 for the boss. */
-export function discSize(node: MapNode): number {
-  return node.kind === "boss" ? 92 : 66;
-}
-
-/** A tile would sit under a node's disc or its labels. */
-function underNode(point: Point): boolean {
-  return KITCHEN_TABLE.nodes.some((node) => {
-    const radius = discSize(node) / 2;
-    const above = node.kind === "boss" ? 56 : 10;
-    return Math.abs(point.x - node.x) < 64 && point.y > node.y - radius - above && point.y < node.y + radius + 64;
-  });
-}
-
-/**
- * The letter-tile path from the porch, through the hands and the boss, to the doorway. The bonus
- * sits off the path. Stretches up to the furthest cleared stop are lit.
- */
-export function pathTiles(progress: ChapterProgress): PathTile[] {
-  const stops = KITCHEN_TABLE.nodes.filter((node) => node.kind !== "bonus");
-  const walked = handsCleared(progress) + (bossBeaten(progress) ? 1 : 0);
-  return samplePath([PATH_START, ...stops, PATH_END], TILE_STEP)
-    .filter((point) => !underNode(point))
-    .map((point, index) => ({
-      x: point.x,
-      y: point.y,
-      rotation: ((index * 37) % 17) - 8,
-      letter: TILE_LETTERS[index % TILE_LETTERS.length]!,
-      lit: point.segment <= walked,
-    }));
-}
-
-/**
- * Development only: the v3 mock's progress slider, 0–5 (0–3 hands cleared, 4 the bonus too, 5
- * the boss beaten), with its sample stars.
- */
-export function previewProgress(step: number): ChapterProgress {
-  const order: [MapNodeId, number][] = [
-    ["first-hand", 3],
-    ["chips-on-the-table", 2],
-    ["word-wizard", 3],
-    ["bonus", 1],
-    ["professor", 3],
-  ];
-  return Object.fromEntries(order.slice(0, Math.max(0, Math.min(5, step))));
-}
+  ] satisfies MapNode[],
+  // The porch, and the Chapter 2 doorway.
+  pathStart: at(0.5, 0.985),
+  pathEnd: at(0.5, 0.145),
+  door: { x: 140, y: 104 },
+  coach: {
+    hands: [
+      { friend: "ellis", line: "Pull up a chair. Make a word from your tiles and the table." },
+      { friend: "jay", line: "Chips on the table. Let’s see what you bet." },
+      { friend: "mira", line: "Long words win big. Try your first power." },
+    ],
+    boss: { friend: "mira", line: "Uncle Prof crashed game night. Watch the bar over his seat." },
+    bonus: { friend: "mira", line: `He sweats when he’s pushed. Beat ${CHAPTER.threshold} points to win.` },
+    beaten: { friend: "mira", line: "You beat Uncle Prof! The Local’s open. First round’s on Jay." },
+  },
+};
