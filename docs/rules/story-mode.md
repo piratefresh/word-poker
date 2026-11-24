@@ -32,8 +32,9 @@ chapter's unless the node sets its own):
 A node keeps its best stars and best score. A lost regular hand still records 0 stars, so the
 path stays open; it can be replayed any time.
 
-**The boss.** The boss hand counts only when the hero takes the pot **and** scores at or over the
-threshold. Anything else records nothing and deals the boss hand again, with the drafted powers
+**The boss.** The boss hand counts when the hero takes the pot **and** scores at or over the
+threshold, or when the boss folds (folding concedes the hand; its stars still go by the word
+score, so a fold with no word judged earns 1). Anything else records nothing and deals the boss hand again, with the drafted powers
 kept. After 2 boss losses in a row the coach offers a hint about the boss's tell. The first win
 pays the chapter's coins and XP; later wins pay stars only.
 
