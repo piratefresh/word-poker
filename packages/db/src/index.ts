@@ -52,6 +52,7 @@ export { eraseAccountData } from "./account-erasure";
 export {
   adRewardsSince,
   buyInFor,
+  hasRewardEvent,
   hasWelcomeEvent,
   openWalletEvent,
   pendingWalletEvents,

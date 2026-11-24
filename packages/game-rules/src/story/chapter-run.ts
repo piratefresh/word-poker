@@ -108,6 +108,8 @@ export interface HandOutcome {
   readonly won: boolean;
   /** The hero's word score for the hand; 0 with no word. */
   readonly score: number;
+  /** The pot came to the hero because every rival folded: no showdown, so no word was judged. */
+  readonly byFold?: boolean;
 }
 
 export interface RecordedHand {
@@ -126,8 +128,8 @@ export interface RecordedHand {
 }
 
 /**
- * Records a hand at an open node. Stars keep their best; a boss hand counts only when won at
- * the threshold, and is otherwise dealt again. A hand node won opens a draft.
+ * Records a hand at an open node. Stars keep their best; a boss hand counts when won at the
+ * threshold or when the boss folds, and is otherwise dealt again. A hand node won opens a draft.
  *
  * @param seed Seeds the draft's offers.
  * @throws {RangeError} For an unknown chapter or node, or a node still locked.
@@ -153,7 +155,8 @@ export function recordHand(
   });
 
   if (node.kind === "boss") {
-    const bossBeaten = outcome.won && outcome.score >= threshold;
+    // Folding is the boss conceding: the hand counts as beaten whatever word was on the rack.
+    const bossBeaten = outcome.won && (outcome.byFold === true || outcome.score >= threshold);
     if (!bossBeaten) {
       const bossLosses = record.bossLosses + 1;
       return {

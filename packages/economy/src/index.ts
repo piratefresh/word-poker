@@ -35,6 +35,7 @@ export {
 } from "./wallet";
 export {
   claimQuestHand,
+  claimStoryReward,
   creditDailyStreak,
   payCompletedQuests,
   payReferral,
@@ -42,6 +43,7 @@ export {
   type QuestStore,
   type ReferralStore,
   type RewardsDeps,
+  type StoryRewardOutcome,
 } from "./rewards";
 export {
   buyTileSet,

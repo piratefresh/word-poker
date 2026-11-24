@@ -123,6 +123,17 @@ describe("recordHand — the boss", () => {
     assert.equal(play(ready, "professor", WIN(15)).bossBeaten, true);
   });
 
+  it("counts the boss folding as beaten, with stars by the word judged (STO-1107)", () => {
+    const folded = play(throughHands(), "professor", { won: true, score: 0, byFold: true });
+    assert.equal(folded.bossBeaten, true);
+    assert.equal(folded.replayBoss, false);
+    assert.equal(folded.stars, 1);
+    assert.equal(chapterRecord(folded.progress, "kitchen-table").bossCleared, true);
+
+    // The hero folding is a lost hand, whatever the flag says.
+    assert.equal(play(throughHands(), "professor", { won: false, score: 0, byFold: true }).bossBeaten, false);
+  });
+
   it("deals a lost boss hand again, keeping the drafted powers, and hints after two in a row", () => {
     const ready = setPowers(throughHands(), ["blank_tile"]);
 

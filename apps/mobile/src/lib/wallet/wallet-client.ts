@@ -107,7 +107,7 @@ export async function fetchAdRewardsLeft(): Promise<number> {
 }
 
 /** The server's own sentence for a 403 (quests needs a verified email), else a generic one. */
-async function questFailure(response: Response): Promise<Error> {
+export async function questFailure(response: Response): Promise<Error> {
   if (response.status === 403) {
     const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
     return new WalletUnverifiedError(
