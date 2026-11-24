@@ -77,11 +77,16 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     if (results === null || recorded.current === results) return;
     recorded.current = results;
     const hero = results.seats.find((seat) => seat.isYou);
-    const outcome = { won: hero?.takesPot ?? false, score: hero?.total ?? 0 };
+    const won = hero?.takesPot ?? false;
+    // Every rival folded: no showdown judged a word, and a boss folding concedes the hand (STO-1107).
+    const byFold = won && game.players.every((player) => player === null || player.isHero || player.status === "fold" || player.status === "busted");
+    const outcome = { won, score: hero?.total ?? 0, byFold };
     const next = recordHand(storyProgress(), CHAPTER.id, node.id, outcome, randomSeed());
     saveStoryProgress(next.progress);
     setBuilt(builtRef.current);
     setVerdict(next);
+    // game.players is read as the hand settles, alongside results.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.id, results]);
 
   const replay = () => {
