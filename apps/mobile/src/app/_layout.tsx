@@ -47,6 +47,7 @@ import {
   type Destination,
 } from "@/lib/navigation/pending-destination";
 import { QuestsProvider } from "@/lib/quests/quests-provider";
+import { TierUpOverlay } from "@/components/screens/vip/tier-up-overlay";
 import { TileSetsProvider } from "@/lib/tile-sets/tile-sets-provider";
 import { E2E_AUTH_BYPASS } from "@/lib/testing/e2e";
 import { useRevenueCatIdentity } from "@/lib/wallet/use-revenuecat";
@@ -176,6 +177,8 @@ export function RootLayout() {
                   <Stack.Screen name="online" />
                   <Stack.Screen name="friend/[code]" />
                   <Stack.Screen name="online/[roomId]" />
+                  {/* The VIP back room brings its own velvet-curtain transition (STO-1170). */}
+                  <Stack.Screen name="vip" options={{ animation: "none" }} />
                 </Stack.Protected>
                 <Stack.Protected guard={__DEV__}>
                   <Stack.Screen name="dev-ledger" />
@@ -193,6 +196,7 @@ export function RootLayout() {
               ) : null}
               <AnimatedSplashOverlay />
               <TableInviteBanner invite={presence.invite} onDismiss={presence.dismiss} />
+              <TierUpOverlay />
             </HistoryProvider>
           </TileSetsProvider>
           </QuestsProvider>

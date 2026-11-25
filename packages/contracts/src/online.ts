@@ -37,6 +37,7 @@ import {
   type WordRejectionReason,
   type WordSubmission,
 } from "./words";
+import type { VipAward } from "./vip";
 
 /** A betting action as sent by a client; the room supplies the seat from `client.sessionId`. */
 type WithoutPlayerId<Action> = Action extends { playerId: PlayerId } ? Omit<Action, "playerId"> : never;
@@ -125,6 +126,8 @@ export interface GameEventMap {
   readonly powerSwap: PrivatePowerSwap;
   /** Broadcast: a seat used a power. It never says what the power gave. */
   readonly powerUsed: PowerUsedEvent;
+  /** Targeted to one seat after a settled hand: the VIP Points it earned and any tier it reached (STO-1170). */
+  readonly vipAwarded: VipAward;
 }
 
 export const GAME_EVENTS = {
@@ -134,6 +137,7 @@ export const GAME_EVENTS = {
   powerDraw: "powerDraw",
   powerSwap: "powerSwap",
   powerUsed: "powerUsed",
+  vipAwarded: "vipAwarded",
 } as const satisfies { [Name in keyof GameEventMap]: Name };
 
 /**

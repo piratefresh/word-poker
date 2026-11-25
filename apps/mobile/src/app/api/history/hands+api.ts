@@ -1,6 +1,7 @@
 import { HAND_RECORD_MAX_BYTES, parseHandRecord, historyHand, isHistoryCursor } from "@wordpoker/contracts";
 import { HandRecordConflictError, readHistoryHands, saveHistoryHand } from "@wordpoker/db";
-import { loadDictionary, verifyHandRecord } from "@wordpoker/game-rules";
+import { awardVipHand, awardVipMatch } from "@wordpoker/economy";
+import { loadDictionary, verifyHandRecord, vipFactsFromReplay } from "@wordpoker/game-rules";
 import { sessionUser } from "@/auth/server/session-user";
 
 function json(value: unknown, status = 200): Response {
@@ -21,8 +22,9 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const userId = (await sessionUser(request))?.id;
-  if (!userId) return json({ error: "Sign in to save your history." }, 401);
+  const user = await sessionUser(request);
+  const userId = user?.id;
+  if (!user || !userId) return json({ error: "Sign in to save your history." }, 401);
   // Bound the streamed body before allocating/parsing an uploaded action log.
   const reader = request.body?.getReader();
   if (!reader) return json({ error: "Missing hand." }, 400);
@@ -55,6 +57,18 @@ export async function POST(request: Request): Promise<Response> {
     const result = await saveHistoryHand(canonical, { ownerId: userId });
     const hero = record.seats.find((seat) => seat.userId === userId);
     if (!hero) return json({ error: "Missing player." }, 400);
+    // VIP Points come from the verified replay, never the client's claim (STO-1170). Offline
+    // hands never earn betting points; a failure here never fails the upload.
+    if (user.eligible === true) {
+      const facts = vipFactsFromReplay(verified, hero.playerId, { betting: false, handInSession: record.handNo });
+      const token = `offline:${record.sessionId}:${record.handNo}`;
+      try {
+        if (facts) await awardVipHand(userId, token, facts);
+        if (verified.state.sessionOver) await awardVipMatch(userId, `offline:${record.sessionId}`);
+      } catch (error) {
+        console.error("[history] vip award failed", error);
+      }
+    }
     return json(historyHand(canonical, result.id, hero.playerId), result.status === "recorded" ? 201 : 200);
   } catch (error) {
     if (error instanceof HandRecordConflictError) return json({ error: "This hand identity already contains a different result." }, 409);

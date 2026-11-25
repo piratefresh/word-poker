@@ -38,8 +38,8 @@ import {
 } from "react";
 import { AppState } from "react-native";
 
-import { isAccountEligible, type QuestHandFacts, type QuestId, type QuestStateResponse } from "@wordpoker/contracts";
-import { levelReward, xpForHand } from "@wordpoker/game-rules";
+import { isAccountEligible, type QuestHandFacts, type QuestId, type QuestStateResponse, type VipAward, type VipState } from "@wordpoker/contracts";
+import { levelReward, vipTierRewards, xpForHand } from "@wordpoker/game-rules";
 
 import { authClient } from "@/auth/client/auth-client";
 import { readItem, writeItem } from "@/lib/storage/claim-store";
@@ -63,6 +63,12 @@ function crossingReward(from: number, to: number): number {
   for (let level = from + 1; level <= to; level += 1) reward += levelReward(level);
 
   return reward;
+}
+
+/** A reached VIP tier and the coins its crossing paid — the tier-up screen (STO-1170). */
+export interface TierUpBanner {
+  readonly tier: number;
+  readonly coins: number;
 }
 
 /** How the server answered one claim: its totals (a duplicate included), or "never" (unreadable). */
@@ -105,6 +111,13 @@ export interface QuestsValue {
    * with the coins read, or null when the read failed.
    */
   readonly refreshCoins: () => Promise<number | null>;
+  /** VIP standing (STO-1170); `null` until the first read lands. */
+  readonly vip: VipState | null;
+  /** The most recent tier crossing; set once per crossing, cleared by `dismissTierUp`. */
+  readonly tierUp: TierUpBanner | null;
+  readonly dismissTierUp: () => void;
+  /** An online table's `vipAwarded` message: patch the standing and celebrate a new tier. */
+  readonly applyVipAward: (award: VipAward) => void;
 }
 
 const DEFAULT_VALUE: QuestsValue = {
@@ -119,6 +132,10 @@ const DEFAULT_VALUE: QuestsValue = {
   reportHand: () => null,
   refresh: () => {},
   refreshCoins: async () => null,
+  vip: null,
+  tierUp: null,
+  dismissTierUp: () => {},
+  applyVipAward: () => {},
 };
 
 const QuestsContext = createContext<QuestsValue>(DEFAULT_VALUE);
@@ -171,6 +188,21 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
   const [streakBanner, setStreakBanner] = useState<StreakBanner | null>(null);
   const [levelUp, setLevelUp] = useState<LevelUpBanner | null>(null);
   const [claimOutcomes, setClaimOutcomes] = useState<Readonly<Record<string, ClaimOutcome>>>({});
+  const [vip, setVip] = useState<VipState | null>(null);
+  const [tierUp, setTierUp] = useState<TierUpBanner | null>(null);
+  // The highest tier this session has seen, moved with `vip` like `levelRef` moves with the level.
+  const tierRef = useRef<number | null>(null);
+  const seeVip = useCallback((next: VipState | null | undefined, paid?: TierUpBanner | null) => {
+    if (!next) return;
+    const previous = tierRef.current;
+    tierRef.current = Math.max(previous ?? 0, next.tier);
+    setVip((current) => (current && current.points > next.points ? current : next));
+    if (paid) setTierUp(paid);
+    else if (previous !== null && next.tier > previous) {
+      const coins = vipTierRewards(previous, next.tier).reduce((sum, reward) => sum + reward.coins, 0);
+      setTierUp({ tier: next.tier, coins });
+    }
+  }, []);
   // The highest level this session has seen — moved in the handlers that move `state`, so a
   // celebration always compares against the level the player last actually had (null = unknown).
   const levelRef = useRef<number | null>(null);
@@ -194,6 +226,7 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
         const previous = levelRef.current;
         levelRef.current = next.level;
         setState(next);
+        seeVip(next.vip);
         if (next.streak.creditedToday !== null) {
           setStreakBanner({ day: next.streak.current, reward: next.streak.creditedToday });
         }
@@ -204,7 +237,7 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
       })
       .catch(() => {});
     readWallet();
-  }, [readWallet]);
+  }, [readWallet, seeVip]);
 
   useEffect(() => {
     if (!authorized) {
@@ -214,7 +247,10 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
       setStreakBanner(null);
       setLevelUp(null);
       setClaimOutcomes({});
+      setVip(null);
+      setTierUp(null);
       levelRef.current = null;
+      tierRef.current = null;
       return;
     }
 
@@ -295,6 +331,15 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
 
   const dismissStreakBanner = useCallback(() => setStreakBanner(null), []);
   const dismissLevelUp = useCallback(() => setLevelUp(null), []);
+  const dismissTierUp = useCallback(() => setTierUp(null), []);
+  const applyVipAward = useCallback(
+    (award: VipAward) => {
+      if (award.tierUp) tierRef.current = Math.max(tierRef.current ?? 0, award.tierUp.tier);
+      seeVip(award.state, award.tierUp);
+      if (award.tierUp) readWallet();
+    },
+    [readWallet, seeVip],
+  );
 
   const value = useMemo<QuestsValue>(
     () => ({
@@ -309,8 +354,12 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
       reportHand,
       refresh,
       refreshCoins: readWallet,
+      vip,
+      tierUp,
+      dismissTierUp,
+      applyVipAward,
     }),
-    [claimOutcomes, coins, dismissLevelUp, dismissStreakBanner, lastCompletions, levelUp, readWallet, reportHand, refresh, state, streakBanner],
+    [applyVipAward, claimOutcomes, coins, dismissLevelUp, dismissStreakBanner, dismissTierUp, lastCompletions, levelUp, readWallet, reportHand, refresh, state, streakBanner, tierUp, vip],
   );
 
   return <QuestsContext.Provider value={value}>{children}</QuestsContext.Provider>;

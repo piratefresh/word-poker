@@ -34,6 +34,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   GameRejectionEvent,
+  VipAward,
   LetterMultiplier,
   LetterTile,
   OnlineBettingAction,
@@ -60,6 +61,7 @@ import {
   WAITING_PHASE,
   isGameRejectionEvent,
   isPowerUpId,
+  isVipAward,
   isWordSubmission,
   WORD_CHECKS_PER_HAND,
 } from "@wordpoker/contracts";
@@ -281,6 +283,7 @@ export function useOnlineGame({
   dictionary,
   displayName,
   onReject,
+  onVipAward,
 }: {
   room: GameRoomLike;
   dictionary: Dictionary;
@@ -288,8 +291,13 @@ export function useOnlineGame({
   displayName?: string | null;
   /** A refused action, for a screen that wants to surface the server's "no" (STO-406). */
   onReject?: (event: GameRejectionEvent) => void;
+  /** VIP Points the room awarded this seat after a settled hand (STO-1170). */
+  onVipAward?: (award: VipAward) => void;
 }): OnlineGame {
   const heroId = room.sessionId;
+  // Read through a ref so the room's listeners are not re-registered when the callback changes.
+  const onVipAwardRef = useRef(onVipAward);
+  onVipAwardRef.current = onVipAward;
   const [view, setView] = useState<RoomView | null>(() => decodeRoom(room.state));
   const [received, setPriv] = useState<PrivateView | null>(null);
   // The draw's deadline as this device reads it, fixed the first time each draw is seen: the
@@ -405,6 +413,9 @@ export function useOnlineGame({
     room.onStateChange(handleState);
     const offPrivate = room.onMessage(GAME_EVENTS.privateState, handlePrivate);
     const offRejected = room.onMessage(GAME_EVENTS.rejected, handleRejected);
+    const offVip = room.onMessage(GAME_EVENTS.vipAwarded, (payload: unknown) => {
+      if (isVipAward(payload)) onVipAwardRef.current?.(payload);
+    });
     const offPowerUsed = room.onMessage(GAME_EVENTS.powerUsed, (payload: unknown) => {
       const event = decodePowerUsed(payload);
       if (event === null) return;
@@ -432,6 +443,7 @@ export function useOnlineGame({
       offPrivate();
       offRejected();
       offPowerUsed();
+      offVip();
       room.onReconnect?.remove(resend);
     };
   }, [room]);

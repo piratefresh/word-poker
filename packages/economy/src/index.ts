@@ -51,4 +51,15 @@ export {
   type TileSetOutcome,
   type TileSetStore,
 } from "./tile-sets";
+export {
+  awardVipHand,
+  awardVipMatch,
+  awardVipPurchase,
+  creditVipDaily,
+  payVipTierUps,
+  vipDay,
+  vipState,
+  type VipDeps,
+  type VipStore,
+} from "./vip";
 export { CURRENCY_EVENT_TYPE, parseCurrencyEvent, type ParsedWebhook } from "./webhook";

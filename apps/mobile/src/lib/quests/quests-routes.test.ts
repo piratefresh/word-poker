@@ -17,6 +17,8 @@ jest.mock("@wordpoker/economy", () => ({
   creditDailyStreak: jest.fn(),
   payCompletedQuests: jest.fn(),
   claimQuestHand: jest.fn(),
+  creditVipDaily: jest.fn(),
+  vipState: jest.fn(),
 }));
 
 const getSession = jest.mocked(auth.api.getSession) as unknown as jest.Mock;

@@ -10,7 +10,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { recordReportedEvent } from "@wordpoker/db";
-import { enforceAdRewardCap, parseCurrencyEvent } from "@wordpoker/economy";
+import { awardVipPurchase, enforceAdRewardCap, parseCurrencyEvent } from "@wordpoker/economy";
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -53,6 +53,16 @@ export async function POST(request: Request): Promise<Response> {
       await enforceAdRewardCap(parsed.record).catch((error: unknown) =>
         console.error(`[revenuecat-webhook] ${parsed.record?.userId}: could not enforce the ad cap:`, error),
       );
+    }
+    if (parsed.record.kind === "purchase") {
+      // VIP Points and the tier's bonus coins, once per event (STO-1170). Runs on redelivery too,
+      // so a bonus that failed first time is retried; the event id keeps it from paying twice.
+      const { userId, rcEventId, productId, amount } = parsed.record;
+      try {
+        await awardVipPurchase(userId, { eventId: rcEventId, productId, coins: amount });
+      } catch (error) {
+        console.error(`[revenuecat-webhook] ${userId}: could not award VIP for the purchase:`, error);
+      }
     }
 
     return json({ received: true, recorded }, 200);

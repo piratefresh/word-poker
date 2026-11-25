@@ -32,6 +32,9 @@ export const WALLET_EVENT_KINDS = [
   "referral",
   "tile_set",
   "ad_reward",
+  "vip_tier",
+  "vip_daily",
+  "vip_purchase_bonus",
 ] as const;
 
 export type WalletEventKind = (typeof WALLET_EVENT_KINDS)[number];

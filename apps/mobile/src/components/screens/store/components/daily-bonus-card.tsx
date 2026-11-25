@@ -8,6 +8,8 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
 import { formatCoins } from "@/lib/ui/format";
+import { useQuests } from "@/lib/quests/quests-provider";
+import { vipTier } from "@wordpoker/game-rules";
 
 import { formatCountdown, type DailyBonus } from "../daily-bonus";
 import { Chest, GoldButton, STORE } from "./store-art";
@@ -22,20 +24,26 @@ function countdownWords(ms: number): string {
   return hours > 0 ? `${part(hours, "hour")}, ${part(rest, "minute")}` : part(rest, "minute");
 }
 
-function caption(bonus: DailyBonus): string {
+/** The tier's daily bonus rides on top of the streak (STO-1170); `null` before VIP is read. */
+function caption(bonus: DailyBonus, tier: number | null): string {
   if (bonus.status === "locked") return bonus.caption;
   if (bonus.status === "claimed") return "Claimed. Come back tomorrow.";
+  if (tier !== null) {
+    const { name, dailyBonus } = vipTier(tier);
+    return `${formatCoins(bonus.reward)} streak + ${formatCoins(dailyBonus)} ${name} bonus`;
+  }
 
   return `${formatCoins(bonus.reward)} coins, free every day`;
 }
 
 export function DailyBonusCard({ bonus, onClaim }: { bonus: DailyBonus; onClaim: () => void }) {
+  const { vip } = useQuests();
   return (
     <LinearGradient colors={["#1f4a33", "#12301f"]} style={styles.card} testID="store-daily-bonus">
       <Chest />
       <View style={styles.copy}>
         <Text style={styles.title}>DAILY BONUS</Text>
-        <Text numberOfLines={1} style={styles.caption}>{caption(bonus)}</Text>
+        <Text numberOfLines={1} style={styles.caption}>{caption(bonus, vip?.tier ?? null)}</Text>
       </View>
       {bonus.status === "ready" ? (
         <GoldButton

@@ -35,6 +35,7 @@ import {
   type StartHandOptions,
 } from "../src/table/offline";
 import { RULES_VERSION, summarizeHand, verifyHandRecord } from "../src/table/replay";
+import { vipFactsFromReplay } from "../src/vip";
 import { TEST_WORDS, testDictionary } from "./fixtures";
 
 const SEATS = ["hero", "ellis", "jay", "mira"] as const;
@@ -597,5 +598,44 @@ describe("replayHand / verifyHandRecord (STO-454)", () => {
 
   it("summarizeHand refuses a hand that has not paid out", () => {
     assert.throws(() => summarizeHand(dealt()), OfflineActionError);
+  });
+});
+
+describe("vipFactsFromReplay (STO-1170)", () => {
+  it("reads a showdown seat's word, best-word place and committed chips off the replay", () => {
+    const { record, confirmed } = recordedShowdown();
+    const verified = verifyHandRecord(record, DICTIONARY);
+    if (!verified.ok) assert.fail(verified.refusal.reason);
+
+    const winnerId = verified.summary.seats.find((seat) => seat.place === 1)?.playerId;
+    assert.ok(winnerId && confirmed.includes(winnerId));
+    const facts = vipFactsFromReplay(verified, winnerId, { betting: true, handInSession: 4 });
+    const standing = verified.summary.seats.find((seat) => seat.playerId === winnerId);
+
+    assert.ok(facts);
+    assert.equal(facts.completed, true);
+    assert.equal(facts.showdown, true);
+    assert.equal(facts.wordLength, standing?.word?.length);
+    assert.equal(facts.bestWord, true);
+    assert.equal(facts.handInSession, 4);
+    assert.ok(facts.committed > 0);
+  });
+
+  it("marks a pre-river fold as not completed, with no word", () => {
+    const hand = new RecordedHand(dealt(), NOW);
+    hand.apply({ type: "fold", playerId: "mira" }, NOW + 1_000);
+    hand.apply({ type: "timeoutTurn" }, hand.state.endsAtMs, "timeout");
+    hand.apply({ type: "foldTurn" }, hand.state.endsAtMs + 1, "disconnect");
+    const verified = verifyHandRecord(toRecord(hand), DICTIONARY);
+    if (!verified.ok) assert.fail(verified.refusal.reason);
+
+    assert.equal(verified.foldedOn.mira, "preflop");
+    const facts = vipFactsFromReplay(verified, "mira", { betting: true, handInSession: 1 });
+    assert.equal(facts?.completed, false);
+    assert.equal(facts?.showdown, false);
+    // The survivor of a fold-out completed the hand without a showdown.
+    const jay = vipFactsFromReplay(verified, "jay", { betting: true, handInSession: 1 });
+    assert.equal(jay?.completed, true);
+    assert.equal(jay?.showdown, false);
   });
 });

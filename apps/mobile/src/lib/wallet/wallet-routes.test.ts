@@ -5,7 +5,7 @@
  */
 
 import { hasWelcomeEvent, recordReportedEvent } from "@wordpoker/db";
-import { coinCatalog, enforceAdRewardCap, getCoinBalance, retryPending } from "@wordpoker/economy";
+import { awardVipPurchase, coinCatalog, enforceAdRewardCap, getCoinBalance, retryPending } from "@wordpoker/economy";
 
 import { POST as webhook } from "@/app/api/revenuecat-webhook+api";
 import { GET as catalog } from "@/app/api/store-catalog+api";
@@ -20,6 +20,7 @@ jest.mock("@wordpoker/economy", () => ({
   enforceAdRewardCap: jest.fn(),
   getCoinBalance: jest.fn(),
   retryPending: jest.fn(),
+  awardVipPurchase: jest.fn(),
 }));
 
 const getSession = jest.mocked(auth.api.getSession) as unknown as jest.Mock;
@@ -27,6 +28,7 @@ const balance = jest.mocked(getCoinBalance);
 const retry = jest.mocked(retryPending);
 const readCatalog = jest.mocked(coinCatalog);
 const record = jest.mocked(recordReportedEvent);
+const awardVip = jest.mocked(awardVipPurchase);
 const welcomed = jest.mocked(hasWelcomeEvent);
 
 const SECRET = "Bearer whsec_test";
@@ -170,6 +172,16 @@ describe("POST /api/revenuecat-webhook", () => {
       rcEventId: "evt-1",
       rcTransactionId: "vatx1",
     });
+    // VIP Points and the tier bonus ride on the same event, keyed by its id (STO-1170).
+    expect(awardVip).toHaveBeenCalledWith("user_1", { eventId: "evt-1", productId: "coins_small", coins: 2000 });
+  });
+
+  test("still answers 200 when the VIP award fails", async () => {
+    record.mockResolvedValue(true);
+    awardVip.mockRejectedValueOnce(new Error("RevenueCat down"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    expect((await hook(PURCHASE)).status).toBe(200);
   });
 
   test("answers 200 to a redelivered event the store already holds", async () => {

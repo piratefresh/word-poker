@@ -38,6 +38,8 @@ import { Client as PgClient } from "pg";
 import appConfig from "../src/app.config.js";
 import { GameRoom } from "../src/rooms/GameRoom.js";
 import type { BuyInResult, TableWallet } from "../src/wallet/table-wallet.js";
+import type { VipAwarder } from "../src/vip/vip-awarder.js";
+import type { VipAward, VipHandFacts } from "@wordpoker/contracts";
 import { createRunTarget, openRunOrm, serverUrl } from "../../../packages/db/test/run-target.js";
 
 // The room draws its deal seed server-side; the explicit `seed` option is honored only behind
@@ -1586,6 +1588,51 @@ describe("GameRoom", () => {
         calls.map((call) => [call.kind, call.amount, call.ref]).sort(),
         [first, second].map((client) => ["cash_out", 500, `${room.roomId}:${client.sessionId}`]).sort(),
       );
+    });
+  });
+
+  describe("VIP Points (STO-1170)", () => {
+    const originalVip = GameRoom.vipFromEnv;
+    let hands: Array<{ userId: string; token: string; facts: VipHandFacts }>;
+    const award: VipAward = {
+      added: 10, play: 10, word: 0, bet: 0, state: { points: 10, tier: 0, playToday: 10 }, tierUp: null,
+    };
+    const vip: VipAwarder = {
+      hand: async (userId, token, facts) => {
+        hands.push({ userId, token, facts });
+        return award;
+      },
+      match: async () => award,
+    };
+
+    beforeEach(() => {
+      hands = [];
+      GameRoom.vipFromEnv = async () => vip;
+    });
+    afterEach(() => {
+      GameRoom.vipFromEnv = originalVip;
+    });
+
+    it("awards every seat of a settled hand from the replayed record, and tells the seat", async () => {
+      const room = await colyseus.createRoom("game", { name: "VIP", buyIn: 500, maxSeats: 2 });
+      const leaver = await colyseus.connectTo(room);
+      const winner = await colyseus.connectTo(room);
+      const received: unknown[] = [];
+      winner.onMessage(GAME_EVENTS.vipAwarded, (payload) => received.push(payload));
+      await readyUp(room, [leaver, winner]);
+      await leaver.leave();
+      for (let tick = 0; tick < 50 && hands.length < 2; tick += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+      for (let tick = 0; tick < 50 && received.length < 1; tick += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+
+      assert.equal(hands.length, 2);
+      assert.ok(hands.every((hand) => hand.token.endsWith(":1")), "one token per hand");
+      const survivor = hands.find((hand) => hand.facts.completed);
+      const folder = hands.find((hand) => !hand.facts.completed);
+      assert.ok(survivor && folder, "the survivor completed the hand; the pre-river fold did not");
+      assert.equal(survivor.facts.showdown, false, "a fold-out has no showdown");
+      assert.equal(survivor.facts.handInSession, 1);
+      assert.deepEqual(received, [award]);
+      await room.disconnect();
     });
   });
 
