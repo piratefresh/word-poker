@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import type { ReactElement } from "react";
+import { useRef, type ReactElement } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -7,7 +7,7 @@ import { canLock, type Dictionary, type SlotSpellerState, type SlotWord } from "
 
 import { GameButton } from "@/components/ui/game-button";
 import { colors, fonts, fontSize, radius, spacing, type } from "@/constants/theme";
-import { payoutRows, randomSlotSeed } from "@/features/slot-speller/slot-speller-model";
+import { payoutRows, randomSlotSeed, type SlotSpellerAction } from "@/features/slot-speller/slot-speller-model";
 import { useSlotRecords, type SlotRecords } from "@/features/slot-speller/slot-speller-save";
 import { useSlotSpeller, type SlotSpeller } from "@/features/slot-speller/use-slot-speller";
 import { useDictionary } from "@/features/table/use-dictionary";
@@ -66,7 +66,13 @@ interface SlotSpellerTableProps extends SlotSpellerScreenProps {
 
 function SlotSpellerTable({ dictionary, initialState, onChange, bottomInset }: SlotSpellerTableProps): ReactElement {
   const game = useSlotSpeller({ dictionary, initialState, onChange });
-  const { state, payout, revealStep, preview, selected, held, revealing, dispatch } = game;
+  const scroll = useRef<ScrollView>(null);
+  // A new round or run starts at the top (seed row, HUD), not wherever the shop left the scroll.
+  const dispatch = (action: SlotSpellerAction): void => {
+    game.dispatch(action);
+    if (action.type === "nextRound" || action.type === "newRun") scroll.current?.scrollTo({ y: 0, animated: true });
+  };
+  const { state, payout, revealStep, preview, selected, held, revealing } = game;
   const records = useSlotRecords();
 
   const shown = payoutRows(payout).slice(0, revealStep);
@@ -77,7 +83,7 @@ function SlotSpellerTable({ dictionary, initialState, onChange, bottomInset }: S
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + spacing.xxl }]}>
+    <ScrollView ref={scroll} contentContainerStyle={[styles.content, { paddingBottom: bottomInset + spacing.xxl }]}>
       <SlotSeedRow
         seed={state.seed}
         onRestart={() => dispatch({ type: "newRun", seed: state.seed })}
@@ -97,7 +103,7 @@ function SlotSpellerTable({ dictionary, initialState, onChange, bottomInset }: S
         onSkipReveal={() => dispatch({ type: "skipReveal" })}
       />
       <SlotLineChips state={state} />
-      {revealing ? <Text style={styles.hint}>Tap the reels to skip</Text> : <SlotActions game={game} records={records} />}
+      {revealing ? <Text style={styles.hint}>Tap the reels to skip</Text> : <SlotActions game={game} dispatch={dispatch} records={records} />}
       {payout !== null ? (
         <SlotPayoutList payout={payout} rows={shown} powerMultiplier={state.config.scoringPowerMultiplier} />
       ) : null}
@@ -108,8 +114,16 @@ function SlotSpellerTable({ dictionary, initialState, onChange, bottomInset }: S
 }
 
 /** What the phase asks for next: spin, pay, or the end-of-spin panel. */
-function SlotActions({ game, records }: { game: SlotSpeller; records: SlotRecords }): ReactElement {
-  const { state, preview, dispatch } = game;
+function SlotActions({
+  game,
+  dispatch,
+  records,
+}: {
+  game: SlotSpeller;
+  dispatch: SlotSpeller["dispatch"];
+  records: SlotRecords;
+}): ReactElement {
+  const { state, preview } = game;
   const toGo = Math.max(state.target - state.roundScore, 0);
   const spinButton = (
     <GameButton label="Spin" variant="gold" onPress={() => dispatch({ type: "spin" })} style={styles.wide} testID="slot-spin" />
