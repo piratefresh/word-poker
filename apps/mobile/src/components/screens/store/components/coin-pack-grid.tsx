@@ -11,7 +11,9 @@ import { fonts, ledger } from "@/constants/theme";
 import { formatCoins } from "@/lib/ui/format";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { packVipPoints, tierColor } from "@/lib/vip/vip-look";
-import { vipPurchaseBonus } from "@wordpoker/game-rules";
+import { vipPurchaseBonus, vipTier as vipTierAt } from "@wordpoker/game-rules";
+
+const vipTierName = (tier: number) => vipTierAt(tier).name;
 
 import type { CoinPackRow } from "../coin-packs";
 import { CoinPile, STORE } from "./store-art";
@@ -94,10 +96,13 @@ function PackCard({
       {vipTier !== null && vipPoints > 0 ? (
         <View style={[styles.vip, { borderColor: tierColor(vipTier) }]} testID={`store-vip-${row.productId}`}>
           <View style={[styles.vipDiamond, { backgroundColor: tierColor(vipTier) }]} />
-          <Text style={styles.vipLabel}>
-            {`+${formatCoins(vipPoints)} VIP${tierBonus > 0 ? ` · +${formatCoins(tierBonus)} coins` : ""}`}
-          </Text>
+          <Text numberOfLines={1} style={styles.vipLabel}>{`+${formatCoins(vipPoints)} VIP`}</Text>
         </View>
+      ) : null}
+      {vipTier !== null && tierBonus > 0 ? (
+        <Text numberOfLines={1} style={styles.bonus} testID={`store-tier-bonus-${row.productId}`}>
+          {`+${formatCoins(tierBonus)} ${vipTierName(vipTier)} bonus`}
+        </Text>
       ) : null}
       <LinearGradient colors={ledger.goldButton} style={styles.price} testID={`store-buy-${row.productId}`}>
         <Text style={styles.priceLabel}>{buying ? "BUYING…" : row.priceString}</Text>
