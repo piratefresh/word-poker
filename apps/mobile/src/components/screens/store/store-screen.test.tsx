@@ -70,6 +70,10 @@ function questsWith(overrides: Partial<QuestsValue> = {}): QuestsValue {
     reportHand: jest.fn(() => null),
     refresh: jest.fn(),
     refreshCoins: jest.fn(async () => 5000),
+    vip: null,
+    tierUp: null,
+    dismissTierUp: jest.fn(),
+    applyVipAward: jest.fn(),
     ...overrides,
   };
 }

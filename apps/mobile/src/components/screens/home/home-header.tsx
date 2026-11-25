@@ -13,6 +13,8 @@ import { unregisterPush } from "@/lib/friends/use-push-registration";
 import { useQuests } from "@/lib/quests/quests-provider";
 import { levelForXp } from "@wordpoker/game-rules";
 
+import { VipChip } from "@/components/screens/vip/vip-chip";
+
 import { AccountMenu } from "./account-menu";
 import { AccountSettings } from "./account-settings";
 
@@ -92,6 +94,7 @@ export function HomeHeader({ width }: { width: number }) {
               <Text style={styles.pillText}>{`LV ${standing.level}`}</Text>
             </Pressable>
           ) : null}
+          <VipChip />
           <Animated.View style={[styles.coinPill, bump]}>
           <Pressable
             accessibilityLabel={coins == null ? "Wallet unavailable" : `Wallet, ${formatCoins(coins)} coins`}

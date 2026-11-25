@@ -23,6 +23,7 @@ import { Migration20261029120000_table_wallet } from "./Migration20261029120000_
 import { Migration20261030120000_username } from "./Migration20261030120000_username";
 import { Migration20261105120000_tile_sets } from "./Migration20261105120000_tile_sets";
 import { Migration20261120120000_friends_social } from "./Migration20261120120000_friends_social";
+import { Migration20261125120000_vip } from "./Migration20261125120000_vip";
 export { Migration20261029120000_table_wallet } from "./Migration20261029120000_table_wallet";
 export { Migration20261030120000_username } from "./Migration20261030120000_username";
 export { Migration20261105120000_tile_sets } from "./Migration20261105120000_tile_sets";
@@ -67,4 +68,5 @@ export const migrations: Constructor<Migration>[] = [
   Migration20261030120000_username,
   Migration20261105120000_tile_sets,
   Migration20261120120000_friends_social,
+  Migration20261125120000_vip,
 ];

@@ -82,6 +82,14 @@ _Avoid_: power phase (it is a window, not a phase), roll.
 
 **Held Power**: the power a seat kept at the Power Draw; lost unused at a fold or the end of the hand.
 
+## Loyalty
+
+**VIP Points**: lifetime loyalty points earned by completing hands, long words, betting at online tables and buying coins; they never reset (§47).
+
+**VIP Tier**: one of seven lifetime ranks (Rookie … Royal Flush) a VIP Points total reaches; it pays a one-time coin reward, a daily bonus, a purchase bonus and a points multiplier, and is never lost.
+
+**Play Cap**: the 600 play points a player can earn per UTC day; word and bet points are not capped.
+
 ## The felt
 
 **Hero View**: the table as one seat sees it — its rack, its turn, its draft — mapped to what the felt draws and the word builder reads; both the offline and online adapters decode into it (`apps/mobile/src/features/table/hero-view.ts`).

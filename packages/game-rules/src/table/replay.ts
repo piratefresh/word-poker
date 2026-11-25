@@ -34,7 +34,7 @@
  * record replays to the same settlement every time.
  */
 
-import type { HandRecord, HandRecordSummary, HandRecordStanding } from "@wordpoker/contracts";
+import type { HandRecord, HandRecordSummary, HandRecordStanding, RoundPhase } from "@wordpoker/contracts";
 
 import { OfflineActionError } from "../core/errors";
 import type { Dictionary } from "../words/dictionary";
@@ -78,6 +78,8 @@ export interface ReplayVerified {
   readonly ok: true;
   readonly state: OfflineState;
   readonly summary: HandRecordSummary;
+  /** The street each folded seat folded on, by player id — a fold after the river still completes the hand. */
+  readonly foldedOn: Readonly<Record<string, RoundPhase>>;
 }
 
 /** A replay that refused: nothing was derived, and `refusal` says where and why. */
@@ -175,6 +177,7 @@ export function replayHand(record: HandRecord, dictionary: Dictionary): ReplayOu
     return { ok: false, refusal: refusedBy(error, "unstartable") };
   }
 
+  const foldedOn: Record<string, RoundPhase> = {};
   let previousMs = record.startedAtMs;
   for (const [sequence, entry] of record.actions.entries()) {
     if (entry.atMs < previousMs || entry.atMs > record.endedAtMs) {
@@ -192,7 +195,11 @@ export function replayHand(record: HandRecord, dictionary: Dictionary): ReplayOu
     previousMs = entry.atMs;
 
     try {
+      const before = state;
       state = reduce(state, entry.action, entry.atMs);
+      state.seats.forEach((seat, index) => {
+        if (seat.folded && !before.seats[index]?.folded) foldedOn[seat.id] = before.phase;
+      });
     } catch (error) {
       return { ok: false, refusal: refusedBy(error, "illegal-action", sequence) };
     }
@@ -208,7 +215,7 @@ export function replayHand(record: HandRecord, dictionary: Dictionary): ReplayOu
     };
   }
 
-  return { ok: true, state, summary: summarizeHand(state) };
+  return { ok: true, state, summary: summarizeHand(state), foldedOn };
 }
 
 /**

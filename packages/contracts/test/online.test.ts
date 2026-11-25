@@ -37,6 +37,7 @@ describe("online message vocabulary", () => {
       powerDraw: "powerDraw",
       powerSwap: "powerSwap",
       powerUsed: "powerUsed",
+      vipAwarded: "vipAwarded",
     });
 
     const actions: readonly OnlineBettingAction[] = [

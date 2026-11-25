@@ -25,6 +25,7 @@ keeps its number for life: new material is appended as a new number, never slott
 | [Formats: Rooms, Tournaments & Cash Games](rules/formats.md) | 40–42 | Room variations, tournaments, cash-game stakes |
 | [Power-Ups](rules/power-ups.md) | 44 | The Power Draw, the held power, activation windows, the v1 powers, swapping a tile, visibility |
 | [Story Mode](rules/story-mode.md) | 46 | The chapter run: chapters and nodes, thresholds and stars, the boss retry, the power draft |
+| [Loyalty: VIP Points & Tiers](rules/loyalty.md) | 47 | Earning VIP Points, the daily play cap, lifetime tiers, tier-up, daily and purchase bonuses |
 
 ## Reading the Product Spec
 

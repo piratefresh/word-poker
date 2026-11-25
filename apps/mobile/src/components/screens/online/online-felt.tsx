@@ -67,6 +67,7 @@ import {
   type RoomConnectionLike,
 } from "@/features/online/use-room-connection";
 import { useBalanceView } from "@/lib/wallet/use-balance-view";
+import { useQuests } from "@/lib/quests/quests-provider";
 import { posthog } from "@/lib/analytics/posthog";
 
 import { InviteSheet } from "./invite-sheet";
@@ -88,6 +89,7 @@ export function OnlineFelt({
   onLeave: () => void;
 }) {
   const { data: session } = authClient.useSession();
+  const { applyVipAward } = useQuests();
   const {
     game,
     results,
@@ -106,7 +108,7 @@ export function OnlineFelt({
     pickPower,
     usePower,
     endPowerUsed,
-  } = useOnlineGame({ room, dictionary, displayName: session?.user.name });
+  } = useOnlineGame({ room, dictionary, displayName: session?.user.name, onVipAward: applyVipAward });
   // The header's chip is the signed-in player's Wallet (STO-562) — the one economy a real
   // online table touches. The read follows the hand: dealt, and again when it reaches payout
   // and the pot posts. STO-444's payouts replace the re-read with the real grant event.

@@ -137,6 +137,24 @@ export {
   xpToReach,
 } from "./xp";
 export type { LevelStanding } from "./xp";
+export {
+  VIP_DAILY_PLAY_CAP,
+  VIP_MATCH_MIN_HANDS,
+  VIP_MATCH_POINTS,
+  VIP_PURCHASE_POINTS,
+  VIP_TIERS,
+  applyVipEarn,
+  vipPointsForHand,
+  vipProgress,
+  vipPurchaseBonus,
+  vipStreakPoints,
+  vipTier,
+  vipTierFor,
+  vipTierRewards,
+  vipFactsFromReplay,
+  vipWordLengthPoints,
+} from "./vip";
+export type { VipTier } from "./vip";
 export { STORY_CHAPTERS, STORY_RULES, nodeStarGoals, nodeThreshold, storyChapter, storyNode } from "./story/chapters";
 export type { StoryChapter, StoryNode, StoryNodeKind } from "./story/chapters";
 export {

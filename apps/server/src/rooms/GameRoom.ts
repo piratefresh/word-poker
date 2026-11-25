@@ -33,13 +33,17 @@ import {
   PowerRejectionError,
   WordRejectionError,
   OFFLINE_TURN_MS,
+  VIP_MATCH_MIN_HANDS,
   loadDictionary,
+  replayHand,
+  vipFactsFromReplay,
   type Dictionary,
 } from "@wordpoker/game-rules";
 
 import {
   AuthoritativeGame,
   type AuthoritativePlayer,
+  type SettledHand,
 } from "./AuthoritativeGame.js";
 import {
   GameRoomProjection,
@@ -53,6 +57,7 @@ import { onlineAccount, type OnlineAccount } from "../auth/online-account.js";
 import { displayName, notifyUsers, requestFriend } from "@wordpoker/db";
 import { serverOrm } from "../database.js";
 import { tableWalletFromEnv, type TableWallet } from "../wallet/table-wallet.js";
+import { vipAwarderFromEnv, type VipAwarder } from "../vip/vip-awarder.js";
 
 const DEFAULT_RECONNECT_SECONDS = 180;
 /** The fewest seats a hand is dealt to: a table of one is a waiting room, not a game. */
@@ -78,6 +83,8 @@ interface SeatBinding {
   seenResults: boolean;
   /** The Table Stack has gone back to the Wallet (§5); set once, so it never goes twice. */
   cashedOut: boolean;
+  /** Hands this seat completed here (showdown, or folded after the river): VIP's session count. */
+  completedHands: number;
 }
 
 /**
@@ -119,6 +126,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
   /** Where the Wallet comes from; a test swaps in a fake. */
   static walletFromEnv: () => Promise<TableWallet | null> = tableWalletFromEnv;
+  /** Where VIP Points go; a test swaps in a fake. Null awards nothing (STO-1170). */
+  static vipFromEnv: () => Promise<VipAwarder | null> = vipAwarderFromEnv;
 
   private dictionary!: Dictionary;
   /** Null when no Wallet is configured: free tables outside production, no seats in it. */
@@ -128,6 +137,9 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
   private readonly bindings = new Map<string, SeatBinding>();
   /** Cash-outs still being recorded, so shutdown waits on seats already removed too. */
   private readonly cashOuts = new Set<Promise<void>>();
+  private vip: VipAwarder | null = null;
+  /** VIP awards still being written, so shutdown waits on them like cash-outs. */
+  private readonly vipAwards = new Set<Promise<void>>();
   /** Internal host identity; only its public display name reaches room metadata. */
   private hostPlayerId?: string;
   private hostName = "A player";
@@ -336,6 +348,8 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
         : "wallet: RevenueCat or WORDPOKER_DATABASE_URL is not set; seats at this table cost nothing");
     }
 
+    this.vip = await GameRoom.vipFromEnv();
+
     const history = await HistoryService.fromEnv();
     if (history === null) {
       console.log("history: WORDPOKER_DATABASE_URL is not set; hands at this table are not recorded");
@@ -360,6 +374,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       powerUps: this.table.powerUps,
       onSettled: (hand) => {
         this.settlements.observe(hand);
+        this.awardVip(engine, hand);
         const winner = hand.state.result?.standings[0];
         const binding = winner === undefined ? undefined : this.bindings.get(winner.playerId);
         if (winner?.word !== null && winner?.word !== undefined && binding !== undefined) {
@@ -406,6 +421,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
       ready: false,
       seenResults: false,
       cashedOut: false,
+      completedHands: 0,
     };
     this.bindings.set(client.sessionId, binding);
     if (this.hostPlayerId === undefined) {
@@ -460,6 +476,11 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
 
   /** §5: the seat is gone for good, so what is left of its Table Stack goes back to the Wallet. */
   private cashOut(binding: SeatBinding): Promise<void> {
+    if (!binding.cashedOut && binding.completedHands >= VIP_MATCH_MIN_HANDS && this.vip !== null) {
+      // Leaving after a full session finishes the match: the +40 (STO-1170), once per seat.
+      const vip = this.vip;
+      this.trackVip(vip.match(binding.userId, this.walletRef(binding.playerId)).then(() => {}));
+    }
     if (binding.cashedOut || this.wallet === null) return Promise.resolve();
     binding.cashedOut = true;
     const cashOut = this.wallet.cashOut(binding.userId, binding.tableStack, this.walletRef(binding.playerId));
@@ -526,6 +547,43 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.closeIfEmpty();
   }
 
+  /**
+   * VIP Points for every seat of a settled hand (STO-1170). The hand is replayed off its own
+   * record so the facts come from the engine, never a client; a failure is logged, never fatal.
+   */
+  private awardVip(engine: AuthoritativeGame, hand: SettledHand): void {
+    if (this.vip === null) return;
+    const vip = this.vip;
+    const record = engine.handRecord(hand, {
+      sessionId: this.sessionId,
+      userIdFor: (playerId) => this.bindings.get(playerId)?.userId ?? null,
+    });
+    const replay = replayHand(record, this.dictionary);
+    if (!replay.ok) {
+      console.error("vip: the settled hand did not replay", replay.refusal);
+      return;
+    }
+    for (const seat of record.seats) {
+      const binding = this.bindings.get(seat.playerId);
+      if (binding === undefined) continue;
+      const probe = vipFactsFromReplay(replay, seat.playerId, { betting: true, handInSession: 0 });
+      if (probe === null) continue;
+      if (probe.completed) binding.completedHands += 1;
+      const facts = { ...probe, handInSession: binding.completedHands };
+      this.trackVip(
+        vip.hand(binding.userId, `${this.sessionId}:${record.handNo}`, facts).then((award) => {
+          if (award.added > 0 || award.tierUp !== null) binding.client.send(GAME_EVENTS.vipAwarded, award);
+        }),
+      );
+    }
+  }
+
+  private trackVip(work: Promise<void>): void {
+    const tracked = work.catch((error: unknown) => console.error("vip: award failed", error));
+    this.vipAwards.add(tracked);
+    void tracked.finally(() => this.vipAwards.delete(tracked));
+  }
+
   /** Nobody left at the table (reconnect holds included): close the room instead of idling. */
   private closeIfEmpty() {
     if (this.presentBindings().length === 0) void this.drainAndDisconnect();
@@ -552,7 +610,7 @@ export class GameRoom extends Room<{ state: GameRoomState; metadata: GameRoomMet
     this.syncStacks();
     for (const binding of this.bindings.values()) void this.cashOut(binding);
     return Promise.race([
-      Promise.all([this.settlements?.idle() ?? Promise.resolve(), ...this.cashOuts]).then(() => {}),
+      Promise.all([this.settlements?.idle() ?? Promise.resolve(), ...this.cashOuts, ...this.vipAwards]).then(() => {}),
       giveUp,
     ]);
   }

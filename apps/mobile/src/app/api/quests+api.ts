@@ -13,7 +13,7 @@
 
 import { isAccountEligible, isQuestHandClaim, type QuestClaimResponse, type QuestStateResponse } from "@wordpoker/contracts";
 import { playerProgress, questProgress } from "@wordpoker/db";
-import { claimQuestHand, creditDailyStreak, payCompletedQuests } from "@wordpoker/economy";
+import { claimQuestHand, creditDailyStreak, creditVipDaily, payCompletedQuests, vipState } from "@wordpoker/economy";
 import { QUEST_CATALOG, levelForXp } from "@wordpoker/game-rules";
 
 import { auth } from "@/auth/server/auth";
@@ -43,11 +43,30 @@ export async function GET(request: Request): Promise<Response> {
     console.error(`[quests] ${userId}: could not credit the daily streak:`, error);
   }
 
+  // The tier's daily bonus rides on the streak's day, once per UTC day (STO-1170).
+  let vipDaily: QuestStateResponse["vipDaily"] = null;
+  if (streak.current > 0) {
+    try {
+      const daily = await creditVipDaily(userId, streak.current);
+      vipDaily = { coins: daily.coins, points: daily.award.added };
+    } catch (error) {
+      console.error(`[quests] ${userId}: could not credit the VIP daily bonus:`, error);
+    }
+  }
+
   try {
     await payCompletedQuests(userId);
   } catch (error) {
     // Heals a crash between a progress commit and its wallet call; a failed heal just retries next time.
     console.error(`[quests] ${userId}: could not pay completed quests:`, error);
+  }
+
+  let vip: QuestStateResponse["vip"] = null;
+  try {
+    vip = await vipState(userId);
+  } catch (error) {
+    // Also heals an unpaid tier reward; VIP is never worth failing the quests screen over.
+    console.error(`[quests] ${userId}: could not read VIP standing:`, error);
   }
 
   try {
@@ -56,6 +75,8 @@ export async function GET(request: Request): Promise<Response> {
     const byId = new Map(rows.map((row) => [row.questId, row]));
     const body: QuestStateResponse = {
       streak,
+      vip,
+      vipDaily,
       xp: progress.xp,
       level: levelForXp(progress.xp).level,
       quests: QUEST_CATALOG.map((def) => ({

@@ -8,6 +8,7 @@
  */
 
 import { SHOWDOWN_DECIDERS, type ShowdownDecider } from "./showdown";
+import { isVipState, type VipState } from "./vip";
 
 /** Every quest the catalog can pay, in the order `QUEST_CATALOG` defines them. */
 export const QUEST_IDS = [
@@ -73,6 +74,10 @@ export interface QuestStateResponse {
   readonly xp: number;
   readonly level: number;
   readonly quests: readonly { readonly id: QuestId; readonly progress: number; readonly done: boolean }[];
+  /** VIP standing (STO-1170); `null` when it could not be read. Absent from older servers. */
+  readonly vip?: VipState | null;
+  /** The tier's daily bonus this GET paid (`coins` null when already paid today) and the streak's VIP Points. */
+  readonly vipDaily?: { readonly coins: number | null; readonly points: number } | null;
 }
 
 /** `POST /api/quests`. */
@@ -152,7 +157,8 @@ export function isQuestStateResponse(value: unknown): value is QuestStateRespons
     isXpCount(value.xp) &&
     isXpCount(value.level) &&
     value.level >= 1 &&
-    value.quests.every(isQuestProgressEntry)
+    value.quests.every(isQuestProgressEntry) &&
+    (value.vip === undefined || value.vip === null || isVipState(value.vip))
   );
 }
 

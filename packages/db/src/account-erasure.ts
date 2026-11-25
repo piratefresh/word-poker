@@ -23,6 +23,8 @@ const ERASURE = [
   `delete from quest_progress where user_id = $1`,
   `delete from quest_hand_log where user_id = $1`,
   `delete from player_progress where user_id = $1`,
+  `delete from vip_progress where user_id = $1`,
+  `delete from vip_point_log where user_id = $1`,
   `delete from guest_adoption where user_id = $1`,
   `delete from platform_auth_attempt where user_id = $1`,
   `update wallet_event set status = 'failed', last_error = 'account_deleted', updated_at = now()
