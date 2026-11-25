@@ -3,8 +3,7 @@
  *
  * Behind the green door: your tier, how far to the next, today's play-point cap, and two tabs —
  * every tier with what it pays, and how points are earned. A velvet curtain opens on arrival and
- * closes again before going back. The back room's painted art is still to come; until then a
- * warm wood-panel gradient stands in for it.
+ * closes again before going back.
  */
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,6 +18,7 @@ import { useQuests } from "@/lib/quests/quests-provider";
 import { formatCoins } from "@/lib/ui/format";
 import { tierColor, tierLabel } from "@/lib/vip/vip-look";
 
+import { BackRoom } from "./back-room";
 import { Curtain } from "./curtain";
 
 const PERKS = ["", "", "Gold name tag", "1 free Swap a day", "Card back and felt", "Monthly VIP tournament", "Priority support"];
@@ -231,25 +231,11 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Stand-in for the back room's painted art: panelled walls, a wainscot rail and a lamp's glow. */
-function BackRoom() {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <LinearGradient colors={["#4a2219", "#341510", "#24100b"]} style={StyleSheet.absoluteFill} />
-      <LinearGradient colors={["rgba(255,214,140,0.42)", "rgba(255,190,110,0.1)", "transparent"]} style={styles.glow} />
-      <LinearGradient colors={["#7a4220", "#4a2410"]} style={styles.wainscot} />
-      <LinearGradient colors={["transparent", "rgba(10,6,4,0.35)", "rgba(10,6,4,0.6)"]} style={StyleSheet.absoluteFill} />
-    </View>
-  );
-}
-
 const CARD_BG = "rgba(8, 12, 28, 0.82)";
 const RIM = "rgba(243, 230, 196, 0.16)";
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: "#24100b", flex: 1 },
-  glow: { height: "45%", left: 0, position: "absolute", right: 0, top: 0 },
-  wainscot: { borderTopColor: "#b87442", borderTopWidth: 3, bottom: 0, height: "26%", left: 0, position: "absolute", right: 0 },
   content: { gap: 14, paddingHorizontal: 18 },
   back: {
     alignItems: "center",
