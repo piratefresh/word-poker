@@ -1,8 +1,9 @@
 import { BottomSheet, RNHostView } from "@expo/ui";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect, useState, type ReactElement, type ReactNode } from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -32,11 +33,15 @@ import { useDictionary } from "@/features/table/use-dictionary";
 
 import {
   ARTBOARD,
+  landscapeLayout,
+  portraitLayout,
   SlotDeck,
   SlotHeader,
   SlotHint,
+  SlotPanel,
   SlotPlaques,
   SlotPowerShelf,
+  type CabinetLayout,
   type SlotDeckProps,
 } from "./slot-cabinet";
 import { SlotCellKey, SlotGrid } from "./slot-grid";
@@ -64,33 +69,73 @@ export interface SlotSpellerScreenProps {
   onChange?: (state: SlotSpellerState, previous: SlotSpellerState) => void;
 }
 
+/** The reels a run starts with, for the loading stage. */
+const ARTBOARD_REELS = 5;
+/** The most reels the portrait cabinet holds; past this the screen turns to landscape. */
+const PORTRAIT_MAX_REELS = 8;
+
 /**
- * The G1 stage: the 390 × 844 artboard scaled to fit the device, centred across, sat on the
- * bottom edge (the power shelf runs down to it), and its header kept clear of the status bar.
+ * Whether the run wants landscape: past eight reels. It follows the reels outside the shop only,
+ * so buying a ninth reel turns the screen once the shop closes, not under the open sheet. On a
+ * phone the screen is locked to match; the web follows the window.
  */
-function useStage() {
+function useLandscape(state: SlotSpellerState | null): boolean {
+  const wants = state !== null && state.reels > PORTRAIT_MAX_REELS;
+  const [landscape, setLandscape] = useState(wants);
+  if (landscape !== wants && state?.phase !== "shop") setLandscape(wants);
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    void ScreenOrientation.lockAsync(
+      landscape ? ScreenOrientation.OrientationLock.LANDSCAPE : ScreenOrientation.OrientationLock.PORTRAIT_UP,
+    );
+  }, [landscape]);
+  useEffect(
+    () => () => {
+      if (Platform.OS !== "web") void ScreenOrientation.unlockAsync();
+    },
+    [],
+  );
+  return landscape;
+}
+
+/** The stage: the whole screen, and where every piece of the cabinet sits on it. */
+interface Stage {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  layout: CabinetLayout;
+}
+
+/**
+ * Portrait: the 390 × 844 artboard scaled to fit the device, centred across, sat on the bottom edge
+ * (the power shelf runs down to it), and its header kept clear of the status bar. Landscape (wanted,
+ * and the window is wider than tall): the whole screen, the controls in a column on the left.
+ */
+function useStage(landscape: boolean, reels: number): Stage {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  if (landscape && width > height) {
+    return { left: 0, top: 0, width, height, layout: landscapeLayout(width, height, insets, reels) };
+  }
   const unit = Math.min(
     width / ARTBOARD.width,
     height / ARTBOARD.height,
     (height - insets.top - spacing.sm) / (ARTBOARD.height - HEADER_TOP),
   );
   return {
-    unit,
     left: (width - ARTBOARD.width * unit) / 2,
     top: height - ARTBOARD.height * unit,
     width: ARTBOARD.width * unit,
     height: ARTBOARD.height * unit,
+    layout: portraitLayout(unit),
   };
 }
 
 const goBack = (): void =>
   router.canGoBack() ? router.back() : router.replace("/");
 
-type Stage = ReturnType<typeof useStage>;
-
-/** The painted cabinet at the stage's size; everything drawn on the art goes inside it. */
+/** The cabinet at the stage's size: the painted art in portrait, the art blurred to a backdrop in landscape. */
 function CabinetStage({
   stage,
   children,
@@ -98,6 +143,7 @@ function CabinetStage({
   stage: Stage;
   children: ReactNode;
 }): ReactElement {
+  const { painted } = stage.layout;
   return (
     <View
       style={[
@@ -112,10 +158,13 @@ function CabinetStage({
     >
       <Image
         accessible={false}
-        contentFit="fill"
+        blurRadius={painted ? undefined : 24}
+        contentFit={painted ? "fill" : "cover"}
         source={CABINET_ART}
         style={StyleSheet.absoluteFill}
       />
+      {painted ? null : <View style={[StyleSheet.absoluteFill, styles.dim]} />}
+      <SlotPanel layout={stage.layout} />
       {children}
     </View>
   );
@@ -127,20 +176,20 @@ export function SlotSpellerScreen({
   onChange,
 }: SlotSpellerScreenProps): ReactElement {
   const dictionary = useDictionary();
-  const stage = useStage();
+  const landscape = useLandscape(initialState ?? null);
+  const stage = useStage(landscape, initialState?.reels ?? ARTBOARD_REELS);
 
   return (
     <View style={styles.screen}>
       {dictionary === null ? (
         <CabinetStage stage={stage}>
-          <SlotHint unit={stage.unit}>Loading the reels…</SlotHint>
+          <SlotHint layout={stage.layout}>Loading the reels…</SlotHint>
         </CabinetStage>
       ) : (
         <SlotSpellerTable
           dictionary={dictionary}
           initialState={initialState}
           onChange={onChange}
-          stage={stage}
         />
       )}
     </View>
@@ -149,17 +198,17 @@ export function SlotSpellerScreen({
 
 interface SlotSpellerTableProps extends SlotSpellerScreenProps {
   dictionary: Dictionary;
-  stage: Stage;
 }
 
 function SlotSpellerTable({
   dictionary,
   initialState,
   onChange,
-  stage,
 }: SlotSpellerTableProps): ReactElement {
-  const { unit } = stage;
   const game = useSlotSpeller({ dictionary, initialState, onChange });
+  const stage = useStage(useLandscape(game.state), game.state.reels);
+  const { layout } = stage;
+  const { unit } = layout;
   const {
     state,
     payout,
@@ -195,15 +244,16 @@ function SlotSpellerTable({
     <>
       <CabinetStage stage={stage}>
         <SlotHeader
-          unit={unit}
+          layout={layout}
           state={state}
           preview={livePreview}
           onBack={goBack}
           onMenu={() => setMenuOpen(true)}
         />
-        <SlotPlaques unit={unit} state={state} />
+        <SlotPlaques layout={layout} state={state} />
         <SlotGrid
           state={state}
+          box={layout.window}
           unit={unit}
           outlined={preview?.words ?? []}
           lit={lit}
@@ -218,15 +268,15 @@ function SlotSpellerTable({
           onSkipReveal={() => dispatch({ type: "skipReveal" })}
           onSpinLanded={setLandedSpin}
         />
-        <SlotHint unit={unit}>{hintFor(game, rolling)}</SlotHint>
-        <SlotCellKey state={state} unit={unit} top={CELL_KEY_TOP} width={ARTBOARD.width * unit} />
+        <SlotHint layout={layout}>{hintFor(game, rolling)}</SlotHint>
+        <SlotCellKey state={state} unit={unit} box={layout.cellKey} />
         <SlotDeck
-          unit={unit}
+          layout={layout}
           moves={state.phase === "moving" ? state.moves : null}
           tokens={state.tokens}
           {...deckButton(game, rolling, sheet.reopen)}
         />
-        <SlotPowerShelf unit={unit} state={state} />
+        <SlotPowerShelf layout={layout} state={state} />
       </CabinetStage>
       {/* The sheets sit outside the clipped, fixed-size stage so they measure against the screen. */}
       <SlotRoundSheet
@@ -267,9 +317,6 @@ function SlotSpellerTable({
     </>
   );
 }
-
-/** The cell key's top, in artboard px: between the hint line and the control deck. */
-const CELL_KEY_TOP = 603;
 
 /** The line under the reels, by phase. */
 function hintFor({ state, revealing, refusedCell }: SlotSpeller, rolling: boolean): string {
@@ -438,6 +485,7 @@ function RoundPanel({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: CABINET_GROUND },
   stage: { position: "absolute", overflow: "hidden" },
+  dim: { backgroundColor: "rgba(10,30,18,0.35)" },
   menu: {
     alignSelf: "stretch",
     width: "100%",

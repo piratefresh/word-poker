@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactElement, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
@@ -8,62 +9,224 @@ import { SLOT_POWERS, powerCount, type SlotSpellerState } from "@wordpoker/game-
 import { fonts } from "@/constants/theme";
 import { webTestID } from "@/lib/ui/web-id";
 
+import { FRAME_ACROSS, type Box } from "./slot-grid";
+
 /**
- * The G1 cabinet's live layer, drawn over its painted art (`glossy-reels.jpg`). Every box is the
- * artboard's own, in artboard px (390 × 844), multiplied by `unit` to reach the device.
+ * The G1 cabinet's live layer. In portrait it sits on the painted art (`glossy-reels.jpg`) and every
+ * box is the artboard's own, in artboard px (390 × 844), times `unit`. In landscape (past eight
+ * reels) there is no art for it, so each piece draws its own chrome in a column left of the reels.
  */
 export const ARTBOARD = { width: 390, height: 844 } as const;
-const BACK = { left: 9, top: 71, width: 53, height: 54 };
-const MENU = { left: 328, top: 71, width: 53, height: 54 };
-const TITLE = { left: 102, top: 71, width: 188, height: 30 };
-const METER = { left: 130, top: 116, width: 142, height: 19 };
-const TARGET = { left: 56, top: 193, width: 127, height: 36 };
-const SPINS = { left: 206, top: 193, width: 128, height: 36 };
-const HINT_TOP = 586;
-const PAY = { left: 125, top: 626, width: 144, height: 47 };
-const MOVES = { left: 37, top: 653, width: 67, height: 25 };
-const TOKENS = { left: 286, top: 653, width: 67, height: 25 };
-/** The power shelf's four sockets: their centres, their top, their size. */
-const SOCKETS = [90.4, 160, 229.5, 299.6];
-const SOCKET_TOP = 701;
-const SOCKET = 46;
-const SHELF_CAPTION_TOP = 768;
 
-const INK = "#fffaf0";
-const BROWN = "#8a4b12";
-const GOLD_NUMERAL = "#ffd25a";
-
-interface Box {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
+/** Where every live piece of the cabinet sits on the stage, in device px. */
+export interface CabinetLayout {
+  /** Artboard px to device px: the scale every piece's lettering and chrome is drawn at. */
+  unit: number;
+  /** The art paints the chrome (portrait); otherwise each piece draws its own. */
+  painted: boolean;
+  back: Box;
+  menu: Box;
+  title: Box;
+  meter: Box;
+  target: Box;
+  spins: Box;
+  window: Box;
+  hint: Box;
+  cellKey: Box;
+  moves: Box;
+  pay: Box;
+  tokens: Box;
+  sockets: readonly Box[];
+  caption: Box;
+  /** The drawn control column behind the pieces, in landscape. */
+  panel: Box | null;
 }
 
-const place = (box: Box, unit: number) => ({
-  position: "absolute" as const,
-  left: box.left * unit,
-  top: box.top * unit,
+const scaled = (box: Box, unit: number, dx = 0, dy = 0): Box => ({
+  left: dx + box.left * unit,
+  top: dy + box.top * unit,
   width: box.width * unit,
   height: box.height * unit,
 });
 
-/** A transparent hit target over one of the painted round header buttons. */
-function HeaderButton({ box, unit, label, onPress, testID }: { box: Box; unit: number; label: string; onPress: () => void; testID: string }): ReactElement {
+/** The power shelf's four sockets on the artboard: their centres, their top, their size. */
+const SOCKET_CENTRES = [90.4, 160, 229.5, 299.6];
+const SOCKET = 46;
+
+/** The painted G1 artboard's boxes. The window box covers the painted 5 × 3 window, corners and all. */
+const PORTRAIT = {
+  back: { left: 9, top: 71, width: 53, height: 54 },
+  menu: { left: 328, top: 71, width: 53, height: 54 },
+  title: { left: 102, top: 71, width: 188, height: 30 },
+  meter: { left: 130, top: 116, width: 142, height: 19 },
+  target: { left: 56, top: 193, width: 127, height: 36 },
+  spins: { left: 206, top: 193, width: 128, height: 36 },
+  window: { left: 6, top: 241, width: 378, height: 346 },
+  hint: { left: 0, top: 586, width: 390, height: 18 },
+  cellKey: { left: 0, top: 603, width: 390, height: 14 },
+  pay: { left: 125, top: 626, width: 144, height: 47 },
+  moves: { left: 37, top: 653, width: 67, height: 25 },
+  tokens: { left: 286, top: 653, width: 67, height: 25 },
+  sockets: SOCKET_CENTRES.map((centre) => ({ left: centre - SOCKET / 2, top: 701, width: SOCKET, height: SOCKET })),
+  caption: { left: 0, top: 768, width: 390, height: 18 },
+} as const;
+
+/** The painted cabinet, scaled by `unit`, in the stage's own px. */
+export function portraitLayout(unit: number): CabinetLayout {
+  const place = (box: Box): Box => scaled(box, unit);
+  return {
+    unit,
+    painted: true,
+    back: place(PORTRAIT.back),
+    menu: place(PORTRAIT.menu),
+    title: place(PORTRAIT.title),
+    meter: place(PORTRAIT.meter),
+    target: place(PORTRAIT.target),
+    spins: place(PORTRAIT.spins),
+    window: place(PORTRAIT.window),
+    hint: place(PORTRAIT.hint),
+    cellKey: place(PORTRAIT.cellKey),
+    moves: place(PORTRAIT.moves),
+    pay: place(PORTRAIT.pay),
+    tokens: place(PORTRAIT.tokens),
+    sockets: PORTRAIT.sockets.map(place),
+    caption: place(PORTRAIT.caption),
+    panel: null,
+  };
+}
+
+/**
+ * The landscape control column, in its own px at unit 1 (220 wide): header, meter, the two plaques,
+ * the deck, the shelf, then the hint and the cell key at the foot.
+ */
+const COLUMN = {
+  width: 220,
+  height: 334,
+  back: { left: 8, top: 8, width: 40, height: 40 },
+  menu: { left: 172, top: 8, width: 40, height: 40 },
+  title: { left: 50, top: 12, width: 120, height: 30 },
+  meter: { left: 14, top: 54, width: 192, height: 18 },
+  target: { left: 10, top: 80, width: 96, height: 54 },
+  spins: { left: 114, top: 80, width: 96, height: 54 },
+  moves: { left: 8, top: 152, width: 54, height: 28 },
+  pay: { left: 66, top: 144, width: 88, height: 44 },
+  tokens: { left: 158, top: 152, width: 54, height: 28 },
+  sockets: [32.5, 84.2, 135.8, 187.5].map((centre) => ({ left: centre - 21, top: 198, width: 42, height: 42 })),
+  caption: { left: 0, top: 244, width: 220, height: 16 },
+  hint: { left: 8, top: 270, width: 204, height: 36 },
+  cellKey: { left: 8, top: 310, width: 204, height: 14 },
+} as const;
+/** Between the column and the reel window, and around the screen's edges. */
+const GUTTER = 12;
+
+/** The smallest the landscape column shrinks to, to give the reels their width. */
+const MIN_COLUMN_UNIT = 0.72;
+
+/**
+ * The landscape screen: the control column on the left, the reel window filling the rest. The
+ * column shrinks (down to `MIN_COLUMN_UNIT`) until every reel's nudge arrow gets a 44pt column.
+ */
+export function landscapeLayout(
+  width: number,
+  height: number,
+  insets: { top: number; right: number; bottom: number; left: number },
+  reels: number,
+): CabinetLayout {
+  const left = Math.max(insets.left, GUTTER);
+  const right = Math.max(insets.right, GUTTER);
+  const top = Math.max(insets.top, GUTTER);
+  const bottom = Math.max(insets.bottom, GUTTER / 2);
+  const tall = height - top - bottom;
+  const roomForReels = (width - left - right - GUTTER - reels * MIN_TARGET) / (COLUMN.width + FRAME_ACROSS);
+  const unit = Math.min(tall / COLUMN.height, (width * 0.3) / COLUMN.width, 1.15, Math.max(roomForReels, MIN_COLUMN_UNIT));
+  const columnWidth = COLUMN.width * unit;
+  const dy = top + (tall - COLUMN.height * unit) / 2;
+  const place = (box: Box): Box => scaled(box, unit, left, dy);
+  const windowLeft = left + columnWidth + GUTTER;
+  return {
+    unit,
+    painted: false,
+    back: place(COLUMN.back),
+    menu: place(COLUMN.menu),
+    title: place(COLUMN.title),
+    meter: place(COLUMN.meter),
+    target: place(COLUMN.target),
+    spins: place(COLUMN.spins),
+    window: { left: windowLeft, top, width: width - right - windowLeft, height: tall },
+    hint: place(COLUMN.hint),
+    cellKey: place(COLUMN.cellKey),
+    moves: place(COLUMN.moves),
+    pay: place(COLUMN.pay),
+    tokens: place(COLUMN.tokens),
+    sockets: COLUMN.sockets.map(place),
+    caption: place(COLUMN.caption),
+    panel: { left, top: dy, width: columnWidth, height: COLUMN.height * unit },
+  };
+}
+
+const INK = "#fffaf0";
+const BROWN = "#8a4b12";
+const GOLD = "#eaa93b";
+const GOLD_NUMERAL = "#ffd25a";
+/** Every control is at least this big to the finger. */
+const MIN_TARGET = 44;
+
+const at = (box: Box) => ({ position: "absolute" as const, ...box });
+
+/** A box grown about its centre to at least the finger's 44pt. */
+function hitBox(box: Box): Box {
+  const width = Math.max(box.width, MIN_TARGET);
+  const height = Math.max(box.height, MIN_TARGET);
+  return { left: box.left - (width - box.width) / 2, top: box.top - (height - box.height) / 2, width, height };
+}
+
+/** The drawn control column behind the landscape pieces: G1's deck panel, gold rim on green. */
+export function SlotPanel({ layout }: { layout: CabinetLayout }): ReactElement | null {
+  if (layout.panel === null) return null;
+  return (
+    <LinearGradient
+      colors={["#3b8f39", "#2b752c", "#215f24"]}
+      pointerEvents="none"
+      style={[at(layout.panel), styles.panel, { borderRadius: 18 * layout.unit, borderWidth: 4 * layout.unit }]}
+    />
+  );
+}
+
+interface HeaderButtonProps {
+  box: Box;
+  layout: CabinetLayout;
+  icon: "arrow-back" | "menu";
+  label: string;
+  onPress: () => void;
+  testID: string;
+}
+
+/** A round header button: a hit target over the painted one, or a drawn gold button. */
+function HeaderButton({ box, layout, icon, label, onPress, testID }: HeaderButtonProps): ReactElement {
+  const target = layout.painted ? box : hitBox(box);
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
       id={webTestID(testID)}
       onPress={onPress}
-      style={({ pressed }) => [place(box, unit), styles.round, pressed && styles.pressed]}
+      style={({ pressed }) => [at(target), styles.round, styles.centred, pressed && styles.pressed]}
       testID={testID}
-    />
+    >
+      {layout.painted ? null : (
+        <LinearGradient
+          colors={["#ffd76a", "#f2a531", "#d9821c"]}
+          style={[styles.centred, { width: box.width, height: box.height, borderRadius: box.width / 2, borderWidth: 2 * layout.unit, borderColor: BROWN }]}
+        >
+          <Ionicons color={INK} name={icon} size={box.width * 0.55} />
+        </LinearGradient>
+      )}
+    </Pressable>
   );
 }
 
 export interface SlotHeaderProps {
-  unit: number;
+  layout: CabinetLayout;
   state: SlotSpellerState;
   /** The live grid's total while moving: the meter's lighter fill and its `+n`. */
   preview: number;
@@ -72,19 +235,20 @@ export interface SlotHeaderProps {
 }
 
 /** Back, the round's title on the painted ribbon, the progress meter, and the Run menu. */
-export function SlotHeader({ unit, state, preview, onBack, onMenu }: SlotHeaderProps): ReactElement {
+export function SlotHeader({ layout, state, preview, onBack, onMenu }: SlotHeaderProps): ReactElement {
+  const { unit } = layout;
   const { round, roundScore, target } = state;
   const scoreFill = Math.min(roundScore / target, 1);
   const previewFill = Math.min((roundScore + preview) / target, 1);
-  const meterWidth = METER.width * unit;
+  const meterWidth = layout.meter.width;
   return (
     <>
-      <HeaderButton box={BACK} unit={unit} label="Back" onPress={onBack} testID="slot-back" />
-      <HeaderButton box={MENU} unit={unit} label="Run menu" onPress={onMenu} testID="slot-menu" />
+      <HeaderButton box={layout.back} layout={layout} icon="arrow-back" label="Back" onPress={onBack} testID="slot-back" />
+      <HeaderButton box={layout.menu} layout={layout} icon="menu" label="Run menu" onPress={onMenu} testID="slot-menu" />
       <Text
         accessibilityRole="header"
         maxFontSizeMultiplier={1}
-        style={[place(TITLE, unit), styles.title, outlined(22 * unit, 30 * unit, BROWN)]}
+        style={[at(layout.title), styles.title, outlined(22 * unit, layout.title.height, BROWN)]}
       >
         {`Round ${round}`}
       </Text>
@@ -92,7 +256,7 @@ export function SlotHeader({ unit, state, preview, onBack, onMenu }: SlotHeaderP
         accessibilityLabel={`${roundScore} of ${target} points`}
         accessibilityRole="progressbar"
         accessibilityValue={{ min: 0, max: target, now: Math.min(roundScore, target) }}
-        style={[place(METER, unit), styles.meter, { borderRadius: 10 * unit }]}
+        style={[at(layout.meter), styles.meter, { borderRadius: 10 * unit }, !layout.painted && [styles.meterTrack, { borderWidth: 2 * unit }]]}
         testID="slot-meter"
       >
         {previewFill > scoreFill ? (
@@ -103,7 +267,7 @@ export function SlotHeader({ unit, state, preview, onBack, onMenu }: SlotHeaderP
           locations={[0, 0.55, 1]}
           style={[styles.fill, { width: meterWidth * scoreFill, borderRadius: 9 * unit }]}
         />
-        <Text maxFontSizeMultiplier={1} style={[styles.meterText, { fontSize: 13 * unit, lineHeight: 19 * unit }]} testID="slot-score">
+        <Text maxFontSizeMultiplier={1} style={[styles.meterText, { fontSize: 13 * unit, lineHeight: layout.meter.height - (layout.painted ? 0 : 4 * unit) }]} testID="slot-score">
           {`${roundScore}`}
           {preview > 0 ? <Text style={styles.meterPlus}>{` +${preview}`}</Text> : null}
           {` / ${target}`}
@@ -113,33 +277,54 @@ export function SlotHeader({ unit, state, preview, onBack, onMenu }: SlotHeaderP
   );
 }
 
-/** The two painted counter plaques: the target and the spins left, in gold numerals. */
-export function SlotPlaques({ unit, state }: { unit: number; state: SlotSpellerState }): ReactElement {
+/** A counter plaque: gold numerals on the painted plaque, or on a drawn one under its label. */
+function Plaque({ box, layout, label, value, accessibilityLabel, testID }: { box: Box; layout: CabinetLayout; label: string; value: number; accessibilityLabel: string; testID: string }): ReactElement {
+  const { unit, painted } = layout;
   const numeral = [styles.numeral, { fontSize: 30 * unit, lineHeight: 36 * unit }];
+  if (painted) {
+    return (
+      <Text accessibilityLabel={accessibilityLabel} maxFontSizeMultiplier={1} style={[at(box), numeral]} testID={testID}>
+        {value}
+      </Text>
+    );
+  }
+  return (
+    <View accessibilityLabel={accessibilityLabel} accessible style={[at(box), styles.plaque, { borderRadius: 10 * unit, borderWidth: 2.5 * unit }]}>
+      <Text maxFontSizeMultiplier={1} style={[styles.plaqueLabel, { fontSize: 12 * unit, lineHeight: 15 * unit }]}>
+        {label}
+      </Text>
+      <Text maxFontSizeMultiplier={1} style={numeral} testID={testID}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/** The two counter plaques: the target and the spins left, in gold numerals. */
+export function SlotPlaques({ layout, state }: { layout: CabinetLayout; state: SlotSpellerState }): ReactElement {
   return (
     <>
-      <Text accessibilityLabel={`Target ${state.target}`} maxFontSizeMultiplier={1} style={[place(TARGET, unit), numeral]} testID="slot-target">
-        {state.target}
-      </Text>
-      <Text
+      <Plaque box={layout.target} layout={layout} label="TARGET" value={state.target} accessibilityLabel={`Target ${state.target}`} testID="slot-target" />
+      <Plaque
+        box={layout.spins}
+        layout={layout}
+        label="SPINS"
+        value={state.spinsLeft}
         accessibilityLabel={`${state.spinsLeft} ${state.spinsLeft === 1 ? "spin" : "spins"} left`}
-        maxFontSizeMultiplier={1}
-        style={[place(SPINS, unit), numeral]}
         testID="slot-spins"
-      >
-        {state.spinsLeft}
-      </Text>
+      />
     </>
   );
 }
 
 /** The line under the reels that says what to do next. */
-export function SlotHint({ unit, children }: { unit: number; children: string }): ReactElement {
+export function SlotHint({ layout, children }: { layout: CabinetLayout; children: string }): ReactElement {
+  const { unit } = layout;
   return (
     <Text
       accessibilityLiveRegion="polite"
       maxFontSizeMultiplier={1.2}
-      style={[styles.hint, { top: HINT_TOP * unit, width: ARTBOARD.width * unit, fontSize: 14 * unit, lineHeight: 18 * unit }]}
+      style={[styles.hint, { left: layout.hint.left, top: layout.hint.top, width: layout.hint.width, fontSize: 14 * unit, lineHeight: 18 * unit }]}
       testID="slot-hint"
     >
       {children}
@@ -148,7 +333,7 @@ export function SlotHint({ unit, children }: { unit: number; children: string })
 }
 
 export interface SlotDeckProps {
-  unit: number;
+  layout: CabinetLayout;
   /** Moves left, or null outside a spin. */
   moves: number | null;
   tokens: number;
@@ -161,12 +346,15 @@ export interface SlotDeckProps {
 }
 
 /** The control deck: moves with the blue gem, the green button, tokens with the coin. */
-export function SlotDeck({ unit, moves, tokens, label, accessibilityLabel, disabled, onPress, testID }: SlotDeckProps): ReactElement {
-  const row = [styles.counterRow, { gap: 5 * unit }];
+export function SlotDeck({ layout, moves, tokens, label, accessibilityLabel, disabled, onPress, testID }: SlotDeckProps): ReactElement {
+  const { unit, painted } = layout;
+  const well = painted ? null : [styles.well, { borderRadius: 8 * unit }];
+  const row = [styles.counterRow, { gap: 5 * unit }, well];
   const counter = [styles.counter, { fontSize: 18 * unit, lineHeight: 25 * unit }];
+  const payFont = Math.min(26 * unit, (layout.pay.width / Math.max(label.length, 4)) * 1.6);
   return (
     <>
-      <View accessibilityLabel={moves === null ? "No moves until the next spin" : `${moves} ${moves === 1 ? "move" : "moves"} left`} accessible style={[place(MOVES, unit), row]}>
+      <View accessibilityLabel={moves === null ? "No moves until the next spin" : `${moves} ${moves === 1 ? "move" : "moves"} left`} accessible style={[at(layout.moves), row]}>
         <Gem size={15 * unit} />
         <Text maxFontSizeMultiplier={1} style={counter}>{moves === null ? "–" : moves}</Text>
       </View>
@@ -177,14 +365,20 @@ export function SlotDeck({ unit, moves, tokens, label, accessibilityLabel, disab
         disabled={disabled}
         id={webTestID(testID)}
         onPress={onPress}
-        style={({ pressed }) => [place(PAY, unit), styles.pay, { borderRadius: 14 * unit }, disabled && styles.payDisabled, pressed && styles.pressed]}
+        style={({ pressed }) => [at(layout.pay), styles.pay, { borderRadius: 14 * unit }, disabled && styles.payDisabled, pressed && styles.pressed]}
         testID={testID}
       >
-        <Text maxFontSizeMultiplier={1} style={[styles.payLabel, outlined(26 * unit, 30 * unit, "#1f6b1c")]}>
+        {painted ? null : (
+          <LinearGradient
+            colors={["#8ff06a", "#45c23a", "#2c9a2a"]}
+            style={[StyleSheet.absoluteFill, { borderRadius: 14 * unit, borderWidth: 3 * unit, borderColor: "#e6f6ff" }]}
+          />
+        )}
+        <Text maxFontSizeMultiplier={1} style={[styles.payLabel, outlined(payFont, layout.pay.height, "#1f6b1c")]}>
           {label}
         </Text>
       </Pressable>
-      <View accessibilityLabel={`${tokens} tokens`} accessible style={[place(TOKENS, unit), row]}>
+      <View accessibilityLabel={`${tokens} tokens`} accessible style={[at(layout.tokens), row]}>
         <Text maxFontSizeMultiplier={1} style={counter} testID="slot-tokens">
           {tokens}
         </Text>
@@ -195,29 +389,31 @@ export function SlotDeck({ unit, moves, tokens, label, accessibilityLabel, disab
 }
 
 /** The power shelf's four sockets: a held power's orb, or the lock on an empty socket. */
-export function SlotPowerShelf({ unit, state }: { unit: number; state: SlotSpellerState }): ReactElement {
+export function SlotPowerShelf({ layout, state }: { layout: CabinetLayout; state: SlotSpellerState }): ReactElement {
+  const { unit, painted } = layout;
   const held = SLOT_POWERS.filter((power) => powerCount(state.powers, power.id) > 0);
-  const size = Math.max(SOCKET * unit, 44);
   return (
     <>
-      {SOCKETS.map((centre, index) => {
+      {layout.sockets.map((socket, index) => {
         const power = held[index];
         return (
           <Pressable
-            key={centre}
+            key={index}
             accessibilityLabel={power === undefined ? `Locked power slot ${index + 1}` : `${power.name} power, ready`}
             accessibilityRole="button"
             id={webTestID(`slot-socket-${index}`)}
-            style={[styles.socket, { left: centre * unit - size / 2, top: (SOCKET_TOP + SOCKET / 2) * unit - size / 2, width: size, height: size }]}
+            style={[at(hitBox(socket)), styles.socket]}
             testID={`slot-socket-${index}`}
           >
-            {power === undefined ? <Padlock size={28 * unit} /> : <Orb size={42 * unit} />}
+            <View style={[styles.centred, { width: socket.width, height: socket.height, borderRadius: socket.width / 2 }, !painted && [styles.socketWell, { borderWidth: 3 * unit }]]}>
+              {power === undefined ? <Padlock size={socket.width * 0.6} /> : <Orb size={socket.width * 0.9} />}
+            </View>
           </Pressable>
         );
       })}
       <Text
         maxFontSizeMultiplier={1.2}
-        style={[styles.caption, { top: SHELF_CAPTION_TOP * unit, width: ARTBOARD.width * unit, fontSize: 14 * unit, lineHeight: 18 * unit }]}
+        style={[styles.caption, { left: layout.caption.left, top: layout.caption.top, width: layout.caption.width, fontSize: 14 * unit, lineHeight: 18 * unit }]}
       >
         {`Powers · ${held.length} ready`}
       </Text>
@@ -286,6 +482,13 @@ function Padlock({ size }: { size: number }): ReactElement {
 
 const styles = StyleSheet.create({
   round: { borderRadius: 999 },
+  centred: { alignItems: "center", justifyContent: "center" },
+  panel: { position: "absolute", borderColor: GOLD },
+  meterTrack: { backgroundColor: "#173a2a", borderColor: GOLD },
+  plaque: { alignItems: "center", justifyContent: "center", backgroundColor: "#1c3b3a", borderColor: GOLD },
+  plaqueLabel: { fontFamily: fonts.ui, color: INK, letterSpacing: 0.5 },
+  well: { backgroundColor: "rgba(90,48,14,0.75)" },
+  socketWell: { backgroundColor: "#6b3f15", borderColor: GOLD },
   pressed: { opacity: 0.7 },
   title: { margin: 0, textAlign: "center", fontFamily: fonts.ui, color: INK },
   meter: { overflow: "hidden" },
