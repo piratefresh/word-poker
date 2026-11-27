@@ -6,6 +6,7 @@
 import type { Tile } from "@wordpoker/contracts";
 
 import type { Dictionary } from "../words/dictionary";
+import { cellAt, type SlotPremiumCell } from "./cells";
 import type { SlotSpellerConfig } from "./config";
 import type { PayLine } from "./lines";
 import type { SlotPowerCounts } from "./powers";
@@ -25,6 +26,8 @@ export interface PayLineContext {
   readonly dictionary: Dictionary;
   readonly config: SlotSpellerConfig;
   readonly powers: SlotPowerCounts;
+  /** The grid's premium cells; they count on a line with `premium` set. */
+  readonly cells: readonly SlotPremiumCell[];
 }
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -46,14 +49,19 @@ interface Candidate {
 }
 
 /** The best-scoring word starting at `start` for each end, found by walking prefixes. */
-function candidatesFrom(start: number, options: readonly PlayedFace[][], context: PayLineContext): Map<number, Candidate> {
+function candidatesFrom(
+  start: number,
+  options: readonly PlayedFace[][],
+  premiums: readonly (SlotPremiumCell | undefined)[],
+  context: PayLineContext,
+): Map<number, Candidate> {
   const { dictionary, config, powers } = context;
   const best = new Map<number, Candidate>();
   const path: PlayedFace[] = [];
 
   const walk = (index: number, prefix: string, blanks: number): void => {
     if (path.length >= config.minWordLength && dictionary.isWord(prefix)) {
-      const breakdown = scoreSlotWord(path, config, powers);
+      const breakdown = scoreSlotWord(path, config, powers, premiums.slice(start, index));
       const held = best.get(index);
       if (held === undefined || breakdown.score > held.breakdown.score) {
         best.set(index, { start, end: index, faces: [...path], breakdown });
@@ -80,7 +88,8 @@ function candidatesFrom(start: number, options: readonly PlayedFace[][], context
 export function payLine(tiles: readonly Tile[], line: PayLine, context: PayLineContext): SlotWord[] {
   const options = tiles.map(facesOf);
   const n = tiles.length;
-  const starts = Array.from({ length: n }, (_, start) => [...candidatesFrom(start, options, context).values()]);
+  const premiums = line.premium ? line.cells.map((cell) => cellAt(context.cells, cell)) : [];
+  const starts = Array.from({ length: n }, (_, start) => [...candidatesFrom(start, options, premiums, context).values()]);
 
   // dp[i]: the best total from position i on; choice[i]: the word taken at i, or null to skip it.
   const dp = new Array<number>(n + 1).fill(0);

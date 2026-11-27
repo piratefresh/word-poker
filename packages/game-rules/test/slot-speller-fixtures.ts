@@ -2,7 +2,7 @@
 
 import type { Tile } from "@wordpoker/contracts";
 
-import { LETTER_VALUES, createSlotRun, DEFAULT_SLOT_SPELLER_CONFIG, type Letter, type SlotPowerCounts, type SlotSpellerState } from "../src/index";
+import { LETTER_VALUES, createSlotRun, DEFAULT_SLOT_SPELLER_CONFIG, type Letter, type SlotPowerCounts, type SlotPremiumCell, type SlotSpellerState } from "../src/index";
 
 /**
  * One tile from a short spec: `"C"` a letter, `"C2"` / `"C3"` Double / Triple Letter, `"?"` a
@@ -32,10 +32,19 @@ export function gridFromRows(rows: readonly (string | readonly string[])[]): Til
   );
 }
 
-/** A run in `moving` showing exactly `rows`, with these powers held. */
-export function fixedRun(rows: readonly (string | readonly string[])[], powers: SlotPowerCounts = {}): SlotSpellerState {
+/** A premium cell from a short spec: `"2L"`, `"3L"`, `"2W"`, `"3W"`. */
+export function premium(reel: number, row: number, spec: string): SlotPremiumCell {
+  return { reel, row, kind: spec.endsWith("W") ? "word" : "letter", multiplier: Number(spec.charAt(0)) };
+}
+
+/** A run in `moving` showing exactly `rows`, with these powers held and only these premium cells. */
+export function fixedRun(
+  rows: readonly (string | readonly string[])[],
+  powers: SlotPowerCounts = {},
+  cells: readonly SlotPremiumCell[] = [],
+): SlotSpellerState {
   const grid = gridFromRows(rows);
   const config = { ...DEFAULT_SLOT_SPELLER_CONFIG, reels: grid.length, rows: rows.length - (powers.extraRow ?? 0) };
   const run = createSlotRun("fixed", config);
-  return { ...run, powers, grid, phase: "moving", moves: config.movesPerSpin };
+  return { ...run, powers, grid, cells, phase: "moving", moves: config.movesPerSpin };
 }

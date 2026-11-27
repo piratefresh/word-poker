@@ -2,6 +2,7 @@
 
 import { weightedSampleWithoutReplacement } from "../core/sample";
 import { refuse, type SlotActionResult } from "./actions";
+import { rollCells } from "./cells";
 import { SLOT_POWERS, hasPower, type SlotPowerId } from "./powers";
 import { addWildBlanks, buildStrip, rowCount, windowAt } from "./reels";
 import { slotRng } from "./seed";
@@ -32,7 +33,8 @@ export function rerollPrice(state: SlotSpellerState): number {
 
 /**
  * Buys one stock card: the power's count goes up and the card is sold. Extra Row refills every
- * column from its strip at its current top, so the grid stays one row taller everywhere. Wild
+ * column from its strip at its current top, so the grid stays one row taller everywhere, and lays
+ * the cells again so the new row has its own. Wild
  * Reel writes its blanks onto every strip, then refreshes the columns the same way so they show.
  */
 export function buyPower(state: SlotSpellerState, id: SlotPowerId): SlotActionResult {
@@ -53,12 +55,21 @@ export function buyPower(state: SlotSpellerState, id: SlotPowerId): SlotActionRe
 
   return {
     ok: true,
-    state: { ...state, powers, strips, grid, tokens: state.tokens - power.cost, shop: { ...shop, sold: [...shop.sold, id] } },
+    state: {
+      ...state,
+      powers,
+      strips,
+      grid,
+      ...(id === "extraRow" ? rollCells(state, state.reels, rows) : {}),
+      tokens: state.tokens - power.cost,
+      shop: { ...shop, sold: [...shop.sold, id] },
+    },
   };
 }
 
 /**
- * Buys a reel: a new seeded strip at top 0 joins on the right, with Wild Reel's blanks when held.
+ * Buys a reel: a new seeded strip at top 0 joins on the right, with Wild Reel's blanks when held,
+ * and the cells are laid again over the wider grid.
  * Always on sale, up to `maxReels`.
  */
 export function buyReel(state: SlotSpellerState): SlotActionResult {
@@ -77,6 +88,7 @@ export function buyReel(state: SlotSpellerState): SlotActionResult {
       top: [...state.top, 0],
       grid: [...state.grid, windowAt(strip, 0, rowCount(state.config, state.powers))],
       reels: state.reels + 1,
+      ...rollCells(state, state.reels + 1, rowCount(state.config, state.powers)),
       reelsBought: state.reelsBought + 1,
       tokens: state.tokens - price,
     },

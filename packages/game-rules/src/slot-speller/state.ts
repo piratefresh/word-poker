@@ -6,6 +6,7 @@
 
 import type { Tile } from "@wordpoker/contracts";
 
+import { rollCells, type SlotPremiumCell } from "./cells";
 import { DEFAULT_SLOT_SPELLER_CONFIG, roundTarget, type SlotSpellerConfig } from "./config";
 import type { SlotPowerCounts, SlotPowerId } from "./powers";
 import { buildStrip, rowCount, windowAt } from "./reels";
@@ -44,6 +45,10 @@ export interface SlotSpellerState {
   /** `grid[reel][row]`. Stored, not derived: a swap changes the grid but not the strips. */
   readonly grid: readonly (readonly Tile[])[];
   readonly reels: number;
+  /** The premium cells on the grid now. They belong to the grid: a nudge or swap moves tiles, not cells. */
+  readonly cells: readonly SlotPremiumCell[];
+  /** Every cell layout rolled so far: the index of the next roll's generator. */
+  readonly cellRolls: number;
   readonly phase: SlotPhase;
   readonly moves: number;
   readonly round: number;
@@ -68,7 +73,7 @@ export interface SlotSpellerState {
   readonly bestWord: SlotBestWord | null;
 }
 
-/** Starts a run: strips built from the seed, every reel at strip index 0, round 1, phase `ready`. */
+/** Starts a run: strips built from the seed, every reel at strip index 0, cells laid, round 1, phase `ready`. */
 export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_SLOT_SPELLER_CONFIG): SlotSpellerState {
   const powers: SlotPowerCounts = {};
   const strips = Array.from({ length: config.reels }, (_, reel) => buildStrip(seed, reel, config));
@@ -83,6 +88,7 @@ export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_
     top,
     grid: strips.map((strip) => windowAt(strip, 0, rows)),
     reels: config.reels,
+    ...rollCells({ seed, config, locks: [], cells: [], cellRolls: 0 }, config.reels, rows),
     phase: "ready",
     moves: 0,
     round: 1,

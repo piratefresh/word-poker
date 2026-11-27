@@ -7,7 +7,7 @@
 import { createRng } from "../core/rng";
 
 /** Which event a generator feeds; `index` tells events of one stream apart (reel, spin count…). */
-export type SlotSeedStream = "strip" | "spin" | "split" | "shop" | "wild";
+export type SlotSeedStream = "strip" | "spin" | "split" | "shop" | "wild" | "cells";
 
 /** FNV-1a over UTF-16 code units, then murmur3's finaliser so close inputs land far apart. */
 export function hashSeed(text: string): number {

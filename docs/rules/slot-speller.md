@@ -13,13 +13,52 @@ the pay lines spell scores. Every number below is config
 
 **Strips.** Each reel is a strip of 30 tiles. Every strip tile is drawn on its own, with
 replacement, from the normal bag's letter distribution (§7), so a strip can repeat letters the
-bag holds once. Each tile then takes one multiplier roll: under 3% it is a Triple Letter tile;
-otherwise under 15% (20% for a letter worth 5 or more) it is a Double Letter tile (§9's rates).
-Strips hold no choice tiles. A run's strips come from its seed: the same seed gives the same
+bag holds once. Strips hold no choice tiles and no Double or Triple Letter tiles: premium
+cells (below) took their place. (The old rule is still config, off: `tileRates` gives each strip
+tile one multiplier roll, Triple Letter first, then Double Letter with a bonus for a letter
+worth 5 or more.) A run's strips come from its seed: the same seed gives the same
 strips and, given the same actions, the same spins.
 
 **Grid.** A run starts with 5 reels and 3 rows. Each reel shows 3 consecutive tiles of its
 strip, wrapping from the end back to the start. Extra Row adds a row (at most 2).
+
+**Premium cells.** Some cells of the grid are premium, as on a Scrabble board. They belong to
+the grid, not to the tiles: a nudge or a swap moves tiles across them.
+
+- A **letter cell** (2L, 3L) doubles or triples the tile on it.
+- A **word cell** (2W, 3W) doubles or triples every paying word that covers it. Two word cells
+  under one word multiply together.
+
+Which cells a grid has comes from one pattern drawn for the full 12 × 5 board; the grid in play
+has the cells of the part it covers, so a new reel or row brings its own. The pattern is
+diagonals four reels apart. Rows 1, 3 and 5 hold letter cells and rows 2 and 4 word cells.
+Every second diagonal's letter cells are 3L, and the third diagonal's word cell is the board's
+one 3W:
+
+| Row | Reel 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+| --- | ------ | - | - | - | - | - | - | - | - | -- | -- | -- |
+| 1 | | 2L | | | | 3L | | | | 2L | | |
+| 2 | | | 2W | | | | 2W | | | | 3W | |
+| 3 | | | | 2L | | | | 3L | | | | 2L |
+| 4 | 2W | | | | 2W | | | | 2W | | | |
+| 5 | | 3L | | | | 2L | | | | 3L | | |
+
+The starting 5 × 3 grid therefore has three cells: 2L, 2W, 2L.
+
+The table says which cells each row has, not where they sit. When a run starts, on every spin,
+and when a reel or row is bought, each row's cells land on random reels of that row, one cell
+to a reel, from the run's seed. Between spins they stay put. A reel held through a spin keeps
+its cells, and the row's other cells land on reels that are not held.
+
+Premium cells count on **row lines only**. Wave and zigzag lines read the letters and ignore
+the cells under them.
+
+A tile on a **word cell** cannot be swapped in or out: only nudging that reel changes the
+letter on it.
+
+Config (`cells`): no cells at all, cells fixed where the pattern draws them instead of moving,
+which cells refuse swaps (word cells, all cells, none), the diagonal spacing and each
+multiplier.
 
 **Spins.** A spin is allowed at the start of a round or between spins, while spins are left. A
 spin sends every reel to a new random place on its strip and refills its column. A
@@ -33,8 +72,9 @@ grants 4 moves (6 with Extra Move).
   Tiles swapped into the column ride along.
 - **Swap** any two grid cells. A swap changes the grid only, never the strips.
 
-A move is refused, with nothing changed, when no moves are left, outside a spin's move phase,
-on a cell or reel off the grid, or when a swap names the same cell twice.
+A move is refused, with nothing changed and no move spent, when no moves are left, outside a
+spin's move phase, on a cell or reel off the grid, when a swap names the same cell twice, or
+when either tile of a swap sits on a word cell.
 
 **Payout.** When the player is done moving, the grid pays: every pay line's words (below) are
 scored and their total joins the round score. The run remembers its best-scoring word.
@@ -49,8 +89,10 @@ candidate. A blank plays any letter for 0 (a word may hold at most 2 blanks); a 
 plays either face; each candidate plays its highest-scoring reading. The line then pays the
 best-scoring set of candidates that share no tile.
 
-**Word score.** Base is the sum of each tile's face value, doubled on a Double Letter tile and
-tripled on a Triple Letter tile (blanks 0). The length multiplier is:
+**Word score.** Base is the sum of each tile's face value, multiplied by the letter cell under
+it on a row line (blanks 0, on a letter cell too). The base is then multiplied by every word
+cell the word covers on a row line; a blank on a word cell still counts. The length multiplier
+is:
 
 | Letters | Length mult | With Long Haul |
 | ------- | ----------- | -------------- |
@@ -61,7 +103,11 @@ tripled on a Triple Letter tile (blanks 0). The length multiplier is:
 
 Then each Scoring power the word triggers doubles it, and they stack: Action (ends in ING or
 ED), Heavy (holds J, Q, X or Z), Twins (two identical letters side by side). The score is
-base × length mult × powers, rounded to the nearest whole number.
+base × word cells × length mult × powers, rounded to the nearest whole number (a half rounds
+up). For example CAT with the A on a 3L cell: C4 + A1×3 + T2 = 9, ×0.5 for length = 4.5, pays 5.
+CATS with the C on a 2L cell and the S on a 2W cell: C4×2 + A1 + T2 + S2 = 13, ×2 = 26. The
+payout carries each word's working: every letter's value and cell, the word cells, the length
+multiplier, the powers and the unrounded score.
 
 **Powers.**
 
@@ -80,8 +126,8 @@ base × length mult × powers, rounded to the nearest whole number.
 | Long Haul | Scoring | 4 | Length mult ×2 at 6 letters, ×3 at 7+ |
 
 **Reel Lock.** Once a round, between spins, the player may hold up to 2 reels; tapping a held
-reel releases it. The next spin leaves held reels' columns as they are, swapped tiles included,
-and spends the lock for the round, even if the player held only one reel. A spin with no reel
+reel releases it. The next spin leaves held reels' columns and premium cells as they are,
+swapped tiles included, and spends the lock for the round, even if the player held only one reel. A spin with no reel
 held does not spend it. Holding is refused outside the between-spins phase, without the power,
 after this round's lock is spent, or for a third reel. The next round brings the lock back.
 
@@ -129,7 +175,9 @@ again.
 
 Measured with `pnpm --filter @wordpoker/game-rules exec tsx scripts/probe-slot-speller.ts [firstSeed] [runs] [all|runs|powers|min]`
 (STO-1165). The bot is greedy: each step it tries every nudge and swap (swaps sampled to 200 on
-wide grids), takes the best grid total, and pays when nothing improves. It locks the best
+wide grids), takes the best grid total, and pays when nothing improves. **These numbers were
+measured before premium cells (STO-1180), with DL/TL tiles on the strips; STO-1188 re-runs
+them.** It locks the best
 word's reels when it holds Reel Lock and buys the Extra Spin when short. People find much less
 than this bot (maybe 30–50% of it), so these numbers are a ceiling, not a target.
 

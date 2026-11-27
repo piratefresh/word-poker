@@ -41,8 +41,14 @@ describe("Slot Speller reels", () => {
     assert.equal(run.grid[0]?.length, 3);
   });
 
-  it("rolls DL and TL at roughly the configured rates", () => {
-    const tiles = Array.from({ length: 400 }, (_, i) => buildStrip("rates", i, DEFAULT_SLOT_SPELLER_CONFIG)).flat();
+  it("puts no DL or TL tiles on the strips by default", () => {
+    const tiles = Array.from({ length: 50 }, (_, i) => buildStrip("rates", i, DEFAULT_SLOT_SPELLER_CONFIG)).flat();
+    assert.ok(tiles.every((t) => t.multiplier === undefined));
+  });
+
+  it("rolls DL and TL at roughly the configured rates when they are turned on", () => {
+    const tileRates = { doubleLetterChance: 0.15, tripleLetterChance: 0.03, highValueDoubleBonus: 0.05 };
+    const tiles = Array.from({ length: 400 }, (_, i) => buildStrip("rates", i, { ...DEFAULT_SLOT_SPELLER_CONFIG, tileRates })).flat();
     const share = (pred: (t: (typeof tiles)[number]) => boolean, pool = tiles) => pool.filter(pred).length / pool.length;
     const low = tiles.filter((t) => t.points < 5);
     const high = tiles.filter((t) => t.points >= 5);
