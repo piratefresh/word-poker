@@ -344,8 +344,9 @@ function RoundPanel({
       return (
         <SlotShopPanel
           state={state}
-          onBuyPower={(power) => dispatch({ type: "buyPower", power })}
+          onBuyPower={(power, pair) => dispatch(pair === undefined ? { type: "buyPower", power } : { type: "buyPower", power, pair })}
           onBuyReel={() => dispatch({ type: "buyReel" })}
+          onBuyRow={() => dispatch({ type: "buyRow" })}
           onReroll={() => dispatch({ type: "reroll" })}
           onNextRound={() => dispatch({ type: "nextRound" })}
         />

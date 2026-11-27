@@ -21,7 +21,7 @@ import { payLine } from "../src/slot-speller/pay-line";
 import { SLOT_POWERS, type SlotPowerCounts, type SlotPowerId } from "../src/slot-speller/powers";
 import { addWildBlanks, buildStrip, rowCount, windowAt } from "../src/slot-speller/reels";
 import { buyExtraSpin, endRun, nextRound, pay } from "../src/slot-speller/run";
-import { addReelPrice, buyPower, buyReel } from "../src/slot-speller/shop";
+import { addReelPrice, addRowPrice, buyPower, buyReel, buyRow, freeZigzagPairs } from "../src/slot-speller/shop";
 import { slotRng } from "../src/slot-speller/seed";
 import { createSlotRun, type SlotSpellerState } from "../src/slot-speller/state";
 
@@ -175,7 +175,7 @@ function bestLineWords(state: SlotSpellerState): number[] {
 // ---------------------------------------------------------------- shop policies
 
 const PRIORITY: readonly SlotPowerId[] = [
-  "zigzag", "wave", "twins", "extraRow", "heavy", "action", "extraMove", "wild", "longHaul", "split", "bigHold",
+  "zigzag", "wave", "jackpot", "twins", "hot", "heavy", "action", "extraMove", "wild", "longHaul", "bigHold",
 ];
 const cost = (id: SlotPowerId): number => SLOT_POWERS.find((power) => power.id === id)!.cost;
 
@@ -183,7 +183,7 @@ function buyPowers(state: SlotSpellerState, reserve = 0): SlotSpellerState {
   for (const id of PRIORITY) {
     if (!state.shop?.stock.includes(id) || state.shop.sold.includes(id)) continue;
     if (state.tokens - cost(id) < reserve) continue;
-    const bought = buyPower(state, id);
+    const bought = buyPower(state, id, freeZigzagPairs(state)[0]);
     if (bought.ok) state = bought.state;
   }
   return state;
@@ -201,13 +201,11 @@ function buyReels(state: SlotSpellerState, reserve = 0): SlotSpellerState {
 const POLICIES: Record<string, (state: SlotSpellerState) => SlotSpellerState> = {
   power: (state) => buyReels(buyPowers(state)),
   reel: (state) => buyPowers(buyReels(state)),
-  /** Buys Extra Row whenever offered; otherwise spends only above an 8-token savings floor. */
+  /** Buys Add Row whenever it can; otherwise spends only above the next row's price. */
   row: (state) => {
-    if (state.shop?.stock.includes("extraRow")) {
-      const bought = buyPower(state, "extraRow");
-      if (bought.ok) state = bought.state;
-    }
-    const floor = (state.powers.extraRow ?? 0) >= 2 ? 0 : cost("extraRow");
+    const bought = buyRow(state);
+    if (bought.ok) state = bought.state;
+    const floor = rowCount(state) >= state.config.maxRows ? 0 : addRowPrice(state);
     return buyReels(buyPowers(state, floor), floor);
   },
 };
@@ -233,7 +231,7 @@ function playRun(seed: number, policy: (state: SlotSpellerState) => SlotSpellerS
   for (;;) {
     if (log === null) {
       log = { round: state.round, target: state.target, spins: [], cleared: false, earned: 0, heldAtStart: state.tokens,
-        reels: state.reels, rows: rowCount(state.config, state.powers), powers: { ...state.powers } };
+        reels: state.reels, rows: rowCount(state), powers: { ...state.powers } };
     }
     if (state.phase === "ready" || state.phase === "between") {
       const played = playSpin(state);
@@ -301,7 +299,7 @@ function reportRuns(name: string, config: SlotSpellerConfig): void {
 /** A fresh run with `reels` reels and `powers`, ready to spin, with an unreachable target. */
 function build(seed: number, reels: number, powers: SlotPowerCounts, config: SlotSpellerConfig): SlotSpellerState {
   const base = createSlotRun(`grid-${seed}`, config);
-  const rows = rowCount(config, powers);
+  const rows = config.rows;
   const strips = Array.from({ length: reels }, (_, reel) => {
     const strip = buildStrip(base.seed, reel, config);
     return powers.wild ? addWildBlanks(strip, base.seed, reel, config) : strip;
@@ -331,11 +329,12 @@ function reportPowers(): void {
   console.log(" power        spin    delta   per token");
   const conditions: [string, SlotPowerCounts, number][] = [
     ...SLOT_POWERS.map((power): [string, SlotPowerCounts, number] => [power.id, { [power.id]: 1 }, power.cost]),
-    ["extraRow×2", { extraRow: 2 }, cost("extraRow") * 2],
     ["+1 reel", {}, DEFAULT_SLOT_SPELLER_CONFIG.addReelBaseCost],
+    ["+1 row", {}, DEFAULT_SLOT_SPELLER_CONFIG.addRowCosts[0] ?? 0],
   ];
+  const tallerConfig = { ...DEFAULT_SLOT_SPELLER_CONFIG, rows: DEFAULT_SLOT_SPELLER_CONFIG.rows + 1 };
   for (const [name, powers, price] of conditions) {
-    const score = meanSpin(name === "+1 reel" ? reels + 1 : reels, powers);
+    const score = meanSpin(name === "+1 reel" ? reels + 1 : reels, powers, name === "+1 row" ? tallerConfig : undefined);
     console.log(` ${name.padEnd(11)} ${pad(fmt(score), 6)} ${pad(fmt(score - none), 7)} ${pad(fmt((score - none) / price, 2), 8)}`);
   }
   console.log(` (${fmt((performance.now() - t0) / 1000)}s)`);

@@ -44,7 +44,7 @@ export function fixedRun(
   cells: readonly SlotPremiumCell[] = [],
 ): SlotSpellerState {
   const grid = gridFromRows(rows);
-  const config = { ...DEFAULT_SLOT_SPELLER_CONFIG, reels: grid.length, rows: rows.length - (powers.extraRow ?? 0) };
+  const config = { ...DEFAULT_SLOT_SPELLER_CONFIG, reels: grid.length, rows: rows.length };
   const run = createSlotRun("fixed", config);
   return { ...run, powers, grid, cells, phase: "moving", moves: config.movesPerSpin };
 }

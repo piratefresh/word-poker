@@ -58,12 +58,12 @@ describe("updateRecords", () => {
   });
 
   it("keeps the further round and orders discoveries by the pool", () => {
-    const records = { furthestRound: 5, bestWord: null, discovered: ["heavy", "extraRow"] as const };
+    const records = { furthestRound: 5, bestWord: null, discovered: ["heavy", "hot"] as const };
     const shop = inShop(start, 2);
     expect(updateRecords(records, start, shop)).toEqual({
       furthestRound: 5,
       bestWord: null,
-      discovered: ["extraRow", "wave", "bigHold", "heavy"],
+      discovered: ["hot", "wave", "bigHold", "heavy"],
     });
   });
 

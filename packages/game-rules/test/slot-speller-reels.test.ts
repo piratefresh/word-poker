@@ -153,11 +153,10 @@ describe("Slot Speller reels", () => {
 describe("Slot Speller pay lines", () => {
   const rowsOf = (cells: readonly (readonly [number, number])[]): number[] => cells.map(([, row]) => row);
 
-  it("pays one line per row, plus one per Extra Row", () => {
+  it("pays one line per row, plus one per row bought", () => {
     assert.deepEqual(payLines(5, 3, {}).map((l) => l.name), ["Row 1", "Row 2", "Row 3"]);
     const run = createSlotRun("rows");
-    assert.equal(slotLines({ ...run, powers: { extraRow: 2 } }).length, 5);
-    assert.equal(slotLines({ ...run, powers: { extraRow: 5 } }).length, 5);
+    assert.equal(slotLines({ ...run, rowsBought: 2 }).length, 5);
   });
 
   it("weaves Wave lines and their mirror for 3, 4 and 5 rows", () => {
@@ -179,7 +178,7 @@ describe("Slot Speller pay lines", () => {
 
   it("zigzags between every neighbouring row pair in both phases", () => {
     const zig = (rows: number): number[][] =>
-      payLines(5, rows, { zigzag: 1 }).filter((l) => l.name.startsWith("Zigzag")).map((l) => rowsOf(l.cells));
+      payLines(5, rows, { zigzag: 1 }, [0, 1, 2, 3]).filter((l) => l.name.startsWith("Zigzag")).map((l) => rowsOf(l.cells));
     assert.deepEqual(zig(3), [
       [0, 1, 0, 1, 0],
       [1, 0, 1, 0, 1],
@@ -189,6 +188,11 @@ describe("Slot Speller pay lines", () => {
     assert.equal(zig(4).length, 6);
     assert.equal(zig(5).length, 8);
     assert.deepEqual(zig(5)[7], [4, 3, 4, 3, 4]);
-    assert.equal(payLines(5, 5, { wave: 1, zigzag: 1 }).length, 5 + 2 + 8);
+    assert.equal(payLines(5, 5, { wave: 1, zigzag: 4 }, [0, 1, 2, 3]).length, 5 + 2 + 8);
+    assert.deepEqual(
+      payLines(5, 3, { zigzag: 1 }, [1]).map((l) => l.name),
+      ["Row 1", "Row 2", "Row 3", "Zigzag 2-3", "Zigzag 2-3 alt"],
+    );
+    assert.equal(payLines(5, 3, { zigzag: 1 }, [3]).length, 3);
   });
 });

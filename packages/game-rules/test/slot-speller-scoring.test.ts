@@ -68,7 +68,7 @@ describe("Slot Speller word scoring", () => {
   });
 
   it("pays every line, including Wave and Zigzag shapes", () => {
-    const run = fixedRun(["CVCVC", "VAVAV", "VVVVV"], { zigzag: 1 });
+    const run = { ...fixedRun(["CVCVC", "VAVAV", "VVVVV"], { zigzag: 1 }), zigzagPairs: [0] };
     const result = evaluateSlotGrid(run, testDictionary(["CAC"]));
     assert.deepEqual(result.words.map((w) => w.line), ["Zigzag 1-2"]);
   });
@@ -115,8 +115,8 @@ describe("Slot Speller Scoring powers", () => {
 describe("Slot Speller evaluation speed", () => {
   it("evaluates a 12×5 grid with blanks and every line against the full dictionary", async () => {
     const dictionary = await loadDictionary();
-    const config = { ...createSlotRun("speed").config, reels: 12 };
-    const run = spin({ ...createSlotRun("speed", config), powers: { extraRow: 2, wave: 1, zigzag: 1 } });
+    const config = { ...createSlotRun("speed").config, reels: 12, rows: 5 };
+    const run = spin({ ...createSlotRun("speed", config), powers: { wave: 1, zigzag: 4 }, zigzagPairs: [0, 1, 2, 3] });
     assert.equal(run.ok, true);
     const grid = run.state.grid.map((column, reel) =>
       column.map((t, row) => ((reel + row) % 5 === 0 ? { id: t.id, letter: "?", points: 0 as const, blank: true as const } : t)),

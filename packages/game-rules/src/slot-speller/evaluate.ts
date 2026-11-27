@@ -15,7 +15,7 @@ export interface SlotEvaluation {
 
 /** The lines this state's grid pays. */
 export function slotLines(state: SlotSpellerState): PayLine[] {
-  return payLines(state.reels, rowCount(state.config, state.powers), state.powers);
+  return payLines(state.reels, rowCount(state), state.powers, state.zigzagPairs);
 }
 
 export function evaluateSlotGrid(state: SlotSpellerState, dictionary: Dictionary): SlotEvaluation {

@@ -20,7 +20,7 @@ worth 5 or more.) A run's strips come from its seed: the same seed gives the sam
 strips and, given the same actions, the same spins.
 
 **Grid.** A run starts with 5 reels and 3 rows. Each reel shows 3 consecutive tiles of its
-strip, wrapping from the end back to the start. Extra Row adds a row (at most 2).
+strip, wrapping from the end back to the start. Add Row adds a row (at most 5 rows).
 
 **Premium cells.** Some cells of the grid are premium, as on a Scrabble board. They belong to
 the grid, not to the tiles: a nudge or a swap moves tiles across them.
@@ -52,6 +52,14 @@ its cells, and the row's other cells land on reels that are not held.
 
 Premium cells count on **row lines only**. Wave and zigzag lines read the letters and ignore
 the cells under them.
+
+**Permanent cells.** Hot Cell and Jackpot Cell (Powers, below) each add a triple cell that
+never moves: Hot Cell a 3L, Jackpot Cell a 3W. It lands on a random cell of the grid that has no
+premium cell at the time of purchase, from the run's seed. Rolled cells never land on a
+permanent cell's spot: a row's rolled cells skip the reel it sits on. A pattern cell drawn under
+a permanent cell (cells fixed, a reel or row bought later) gives way to it. Permanent cells are
+marked in the run's state so the grid can draw them apart. They count on row lines only, like
+every premium cell, and a permanent 3W cell refuses swaps like any word cell.
 
 A tile on a **word cell** cannot be swapped in or out: only nudging that reel changes the
 letter on it.
@@ -89,9 +97,9 @@ when either tile of a swap sits on a word cell.
 scored and their total joins the round score. The run remembers its best-scoring word.
 
 **Pay lines.** Every row is a pay line, read left to right. Wave Lines adds a line that weaves
-down and up through the rows (row 1, 2, 3, 2, 1, … on three rows) and its mirror. Zigzag Lines
-adds, for each pair of neighbouring rows, the two lines that alternate between them. A cell can
-pay on more than one line.
+down and up through the rows (row 1, 2, 3, 2, 1, … on three rows) and its mirror. Each Zigzag
+Lines purchase pays one pair of neighbouring rows, chosen by the buyer: the two lines that
+alternate between them. A cell can pay on more than one line.
 
 **Paying a line.** Every run of 3 or more consecutive tiles on the line that spells a word is a
 candidate. A blank plays any letter for 0 (a word may hold at most 2 blanks); a choice tile
@@ -122,12 +130,12 @@ multiplier, the powers and the unrounded score.
 
 | Power | Type | Cost | Effect |
 | ----- | ---- | ---- | ------ |
-| Extra Row | Grid | 8 | +1 row and paying line. Max 2 |
+| Hot Cell | Grid | 4 | A permanent 3L cell. Can be bought again |
+| Jackpot Cell | Grid | 7 | A permanent 3W cell. Can be bought again |
 | Wave Lines | Lines | 6 | Two weaving lines, and their mirror, pay |
-| Zigzag Lines | Lines | 6 | Lines alternating between neighbouring rows pay |
+| Zigzag Lines | Lines | 6 | The two lines zigzagging between a chosen pair of neighbouring rows pay. Again for another pair |
 | Extra Move | Moves | 5 | +2 moves every spin |
 | Big Hold | Moves | 5 | Hold up to 3 reels between spins instead of 1 |
-| Split Tiles | Tiles | 5 | Each spin, 2 tiles gain a second face and play as the better word |
 | Wild Reel | Tiles | 5 | Blanks on the strips: any letter, scores 0 |
 | Action | Scoring | 4 | Words ending ING or ED ×2 |
 | Heavy | Scoring | 4 | Words with J, Q, X or Z ×2 |
@@ -137,13 +145,9 @@ multiplier, the powers and the unrounded score.
 **Big Hold.** Adds 2 reels to the free hold (Holds, above), so up to 3 reels can be held
 between spins, every spin of every round.
 
-**Split Tiles.** After every spin lands, 2 random tiles in the grid gain a second face and
-become choice tiles, playing either face (Paying a line, above). Only plain tiles qualify: not
-a blank, not already a choice tile, and not on a held reel. The second face is the
-letter's partner in the first choice pair holding it (§10: A/E, E/I, O/U, A/I, T/S, R/N, D/T,
-S/L, Q/K, Z/X, J/H, so A gains E and T gains S); a letter in no pair gains a random one of A,
-E, I, O, R, S, T, N. The tile keeps its multiplier. Only the grid changes, never the strips, so
-a nudge or the next spin brings plain tiles back. Which tiles split comes from the run's seed.
+**Zigzag Lines.** Buying it asks which pair of neighbouring rows it pays (rows 1–2, 2–3, …);
+a pair it already pays is not offered. It stays in the shop's pool while a pair is free, so a
+row bought later makes a new pair to buy.
 
 **Wild Reel.** Buying it writes 2 blanks over random positions of every strip (two draws can
 land on the same position, leaving one blank), and the grid refreshes to show them. A reel
@@ -165,13 +169,19 @@ grants one more spin. Otherwise the run is **over**. A new run starts again from
 
 **Shop.** A clear opens the shop, which offers:
 
-- **Power cards.** 3 powers drawn at random, without repeats, from the powers the run does not
-  already hold at their max (Extra Row is offered until held twice). Each card sells once, at the
-  power's cost.
+- **Power cards.** 3 powers drawn at random, without repeats, from the pool of 11 less what the
+  run holds at its max: Hot Cell and Jackpot Cell have no max, Zigzag Lines is offered while a row
+  pair is free, every other power is held once at most. With premium cells off, Hot Cell and
+  Jackpot Cell are not offered. Each card sells once a stock, at the power's cost.
 - **Add Reel**, always on sale: a new reel with its own strip joins on the right. It costs 3
   tokens, then 1 more for each reel bought this run (3, 4, 5, …), up to 12 reels.
+- **Add Row**, always on sale: every column grows by one tile from its strip, the cells are laid
+  again so the new row has its own, and the row is a new pay line. 8 tokens for the fourth row,
+  12 for the fifth, up to 5 rows. Config: `maxRows` (5) and `addRowCosts` ([8, 12]).
 - **Reroll**: a fresh set of 3 power cards. It costs 1 token, then 1 more for each reroll in this
   shop (1, 2, 3, …); the next shop starts again at 1.
+
+Records count the powers discovered out of the 11 and ignore ids no longer in the pool.
 
 The shop's cards come from the run's seed, so leaving and reopening the game shows the same
 cards. Leaving the shop starts the next round; holds are cleared and the Extra Spin is on offer
@@ -182,7 +192,8 @@ again.
 Measured with `pnpm --filter @wordpoker/game-rules exec tsx scripts/probe-slot-speller.ts [firstSeed] [runs] [all|runs|powers|min]`
 (STO-1165). The bot is greedy: each step it tries every nudge and swap (swaps sampled to 200 on
 wide grids), takes the best grid total, and pays when nothing improves. **These numbers were
-measured before premium cells (STO-1180), with DL/TL tiles on the strips; STO-1188 re-runs
+measured before premium cells (STO-1180), with DL/TL tiles on the strips, and on the old pool
+(Extra Row and Split Tiles, no Hot or Jackpot Cell, Zigzag paying every pair); STO-1188 re-runs
 them.** It holds the best
 word's reels, as many as it may, and buys the Extra Spin when short. People find much less
 than this bot (maybe 30–50% of it), so these numbers are a ceiling, not a target.

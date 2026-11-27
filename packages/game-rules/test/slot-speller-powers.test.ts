@@ -1,27 +1,27 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { ChoiceTile, Tile } from "@wordpoker/contracts";
+import type { Tile } from "@wordpoker/contracts";
 
 import {
   DEFAULT_SLOT_SPELLER_CONFIG,
-  DEFAULT_SPECIAL_TILES,
-  LETTER_VALUES,
   SLOT_POWERS,
   addWildBlanks,
   buildStrip,
   buyPower,
   buyReel,
+  buyRow,
+  cellAt,
   canHold,
   createSlotRun,
   holdLimit,
   nextRound,
   pay,
+  payLines,
   spin,
   stripTileId,
   toggleHold,
   windowAt,
-  type Letter,
   type SlotActionResult,
   type SlotPayResult,
   type SlotPowerId,
@@ -30,7 +30,7 @@ import {
 import { testDictionary } from "./fixtures";
 import { tile } from "./slot-speller-fixtures";
 
-// Extra Row, Wave, Zigzag and Extra Move are covered in slot-speller-reels/run tests; Long Haul,
+// Add Row, Wave, Zigzag and Extra Move are covered in slot-speller-reels/run tests; Long Haul,
 // Action, Heavy and Twins (and their order) in slot-speller-scoring. This file covers the rest.
 
 const empty = testDictionary([]);
@@ -58,10 +58,6 @@ function inShop(seed: string, stock: SlotPowerId[]): SlotSpellerState {
   const shop = ok(pay(ok(spin(run)), empty));
   assert.equal(shop.phase, "shop");
   return { ...shop, tokens: 100, shop: { stock, sold: [], rerolls: 0, earned: 0 } };
-}
-
-function isChoiceTile(t: Tile): t is ChoiceTile {
-  return "alternativeLetter" in t;
 }
 
 describe("Slot Speller power pool", () => {
@@ -154,53 +150,6 @@ describe("Slot Speller holds and Big Hold", () => {
   });
 });
 
-describe("Slot Speller Split Tiles", () => {
-  it("gives exactly 2 grid tiles a second face each spin, with the right partner", () => {
-    for (let i = 0; i < 25; i += 1) {
-      const run = { ...createSlotRun(`split-${i}`), powers: { split: 1 } };
-      const state = ok(spin(run));
-      const split: [Tile, ChoiceTile][] = [];
-      state.grid.forEach((column, reel) =>
-        column.forEach((t, row) => {
-          const landed = windowAt(state.strips[reel] ?? [], state.top[reel] ?? 0, 3)[row];
-          assert.ok(landed);
-          if (isChoiceTile(t)) split.push([landed, t]);
-          else assert.deepEqual(t, landed);
-        }),
-      );
-      assert.equal(split.length, 2);
-      for (const [landed, t] of split) {
-        assert.equal(t.id, landed.id);
-        assert.equal(t.letter, landed.letter);
-        assert.equal(t.multiplier, landed.multiplier);
-        const pair = DEFAULT_SPECIAL_TILES.choicePairs.find((p) => p.includes(landed.letter));
-        if (pair) assert.equal(t.alternativeLetter, pair[0] === landed.letter ? pair[1] : pair[0]);
-        else assert.ok("AEIORSTN".includes(t.alternativeLetter) && t.alternativeLetter !== landed.letter);
-        assert.equal(t.alternativePoints, LETTER_VALUES[t.alternativeLetter as Letter]);
-      }
-    }
-  });
-
-  it("is deterministic per seed and leaves the strips alone", () => {
-    const run = { ...createSlotRun("split"), powers: { split: 1 } };
-    const a = ok(spin(run));
-    assert.deepEqual(ok(spin(JSON.parse(JSON.stringify(run)) as SlotSpellerState)), a);
-    assert.deepEqual(a.strips, run.strips);
-    assert.equal(ok(spin({ ...createSlotRun("split") })).grid.flat().some(isChoiceTile), false);
-  });
-
-  it("never splits a blank, a choice tile or a tile on a held reel", () => {
-    const base = between("split-skip", { split: 1 });
-    const blankStrip = base.strips[3]?.map((t) => tile("?", t.id)) ?? [];
-    const choiceStrip = base.strips[4]?.map((t) => tile("K/Q", t.id)) ?? [];
-    const state = { ...base, strips: [...base.strips.slice(0, 3), blankStrip, choiceStrip], holds: [0, 1, 2] };
-    const next = ok(spin(state));
-    for (const reel of [0, 1, 2]) assert.deepEqual(next.grid[reel], state.grid[reel]);
-    assert.ok(next.grid[3]?.every((t) => "blank" in t && t.blank));
-    assert.ok(next.grid[4]?.every((t) => isChoiceTile(t) && t.letter === "K" && t.alternativeLetter === "Q"));
-  });
-});
-
 describe("Slot Speller Wild Reel", () => {
   function blanks(strip: readonly Tile[]): number[] {
     return strip.flatMap((t, position) => ("blank" in t && t.blank ? [position] : []));
@@ -241,5 +190,63 @@ describe("Slot Speller Wild Reel", () => {
     assert.deepEqual(strip, addWildBlanks(buildStrip("wild", reel, state.config), "wild", reel, state.config));
     const plain = ok(buyReel(inShop("wild", ["wild"])));
     assert.deepEqual(plain.strips[reel], buildStrip("wild", reel, plain.config));
+  });
+});
+
+describe("Slot Speller Hot Cell and Jackpot Cell", () => {
+  it("lays a permanent triple cell on a plain cell, the same one for the same seed", () => {
+    const shop = inShop("hot", ["hot", "jackpot"]);
+    const hot = ok(buyPower(shop, "hot"));
+    const added = hot.cells.filter((cell) => cell.permanent);
+    assert.equal(added.length, 1);
+    const [cell] = added;
+    assert.ok(cell);
+    assert.deepEqual({ kind: cell.kind, multiplier: cell.multiplier }, { kind: "letter", multiplier: 3 });
+    assert.equal(cellAt(shop.cells, [cell.reel, cell.row]), undefined);
+    assert.equal(hot.tokens, 100 - 4);
+    assert.deepEqual(ok(buyPower(JSON.parse(JSON.stringify(shop)) as SlotSpellerState, "hot")).cells, hot.cells);
+
+    const jackpot = ok(buyPower(hot, "jackpot"));
+    const word = jackpot.cells.filter((c) => c.permanent && c.kind === "word");
+    assert.deepEqual(word.map((c) => c.multiplier), [3]);
+    assert.equal(jackpot.tokens, 100 - 4 - 7);
+  });
+
+  it("can be bought again, each copy on a new plain cell", () => {
+    let state = inShop("hot-again", ["hot"]);
+    for (let i = 0; i < 3; i += 1) state = ok(buyPower({ ...state, shop: { stock: ["hot"], sold: [], rerolls: 0, earned: 0 } }, "hot"));
+    const permanent = state.cells.filter((cell) => cell.permanent);
+    assert.equal(permanent.length, 3);
+    assert.equal(new Set(permanent.map((c) => `${c.reel},${c.row}`)).size, 3);
+    assert.equal(state.powers.hot, 3);
+  });
+
+  it("stays put through spins, Add Reel and Add Row, and rolled cells never land on it", () => {
+    let state = ok(buyPower(inShop("pinned", ["jackpot"]), "jackpot"));
+    const pinned = state.cells.find((cell) => cell.permanent);
+    assert.ok(pinned);
+    state = ok(buyRow(ok(buyReel(state))));
+    for (let i = 0; i < 3; i += 1) {
+      state = ok(spin(ok(nextRound(state))));
+      const here: SlotSpellerState["cells"] = state.cells.filter((cell) => cell.reel === pinned.reel && cell.row === pinned.row);
+      assert.deepEqual(here, [pinned]);
+      state = ok(pay(state, empty));
+    }
+  });
+});
+
+describe("Slot Speller Zigzag Lines by row pair", () => {
+  it("pays only the pair bought, and refuses a missing or taken pair", () => {
+    const shop = inShop("zig", ["zigzag"]);
+    assert.equal(reason(buyPower(shop, "zigzag")), "out-of-range");
+    assert.equal(reason(buyPower(shop, "zigzag", 2)), "out-of-range");
+    const bought = ok(buyPower(shop, "zigzag", 1));
+    assert.deepEqual(bought.zigzagPairs, [1]);
+    assert.equal(bought.powers.zigzag, 1);
+    const names = payLines(bought.reels, 3, bought.powers, bought.zigzagPairs).map((line) => line.name);
+    assert.deepEqual(names.slice(3), ["Zigzag 2-3", "Zigzag 2-3 alt"]);
+    const again = { ...bought, shop: { stock: ["zigzag" as const], sold: [], rerolls: 0, earned: 0 } };
+    assert.equal(reason(buyPower(again, "zigzag", 1)), "out-of-range");
+    assert.deepEqual(ok(buyPower(again, "zigzag", 0)).zigzagPairs, [0, 1]);
   });
 });

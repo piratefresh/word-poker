@@ -61,7 +61,7 @@ export function RunOverPanel({ state, records, onReplay, onNewRun }: RunOverPane
         label="Best word"
         value={state.bestWord === null ? "–" : `${state.bestWord.word} · ${state.bestWord.score}`}
       />
-      <Stat label="Build" value={`${state.reels} reels × ${rowCount(state.config, state.powers)} rows`} />
+      <Stat label="Build" value={`${state.reels} reels × ${rowCount(state)} rows`} />
       <Stat label="Powers" value={held.length === 0 ? "None" : held.join(", ")} />
       <View style={styles.actions}>
         <GameButton label={`Replay seed ${state.seed}`} variant="dark" onPress={onReplay} testID="slot-replay-seed" />

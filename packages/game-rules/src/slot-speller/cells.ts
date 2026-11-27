@@ -13,6 +13,8 @@ export interface SlotPremiumCell {
   readonly row: number;
   readonly kind: SlotCellKind;
   readonly multiplier: number;
+  /** Bought with Hot Cell or Jackpot Cell: it never moves, and rolled cells never land on it. */
+  readonly permanent?: true;
 }
 
 /**
@@ -38,10 +40,11 @@ export function patternCell(
 }
 
 /**
- * Lays the premium cells of a `reels` × `rows` grid. Each row holds the cells the pattern draws
- * on that part of the board. When cells move, each lands on a random reel of its row that is not
- * held, from the run's next cell generator; a held reel (`state.holds`) keeps the cells it has.
- * Returns the cells and the advanced roll counter.
+ * Lays the premium cells of a `reels` × `rows` grid. Permanent cells stay where they are. Each row
+ * holds the cells the pattern draws on that part of the board. When cells move, each lands on a
+ * random reel of its row that is not held and has no permanent cell, from the run's next cell
+ * generator; a held reel (`state.holds`) keeps the cells it has. Fixed cells the pattern draws
+ * under a permanent cell give way to it. Returns the cells and the advanced roll counter.
  */
 export function rollCells(
   state: Pick<SlotSpellerState, "seed" | "config" | "holds" | "cells" | "cellRolls">,
@@ -49,8 +52,9 @@ export function rollCells(
   rows: number,
 ): { cells: SlotPremiumCell[]; cellRolls: number } {
   const { layout, moving } = state.config.cells;
-  const cells: SlotPremiumCell[] = [];
+  const cells: SlotPremiumCell[] = state.cells.filter((cell) => cell.permanent === true);
   if (layout === "none") return { cells, cellRolls: state.cellRolls };
+  const pinned = (reel: number, row: number): boolean => cells.some((cell) => cell.permanent && cell.reel === reel && cell.row === row);
 
   const rng = slotRng(state.seed, "cells", state.cellRolls);
   for (let row = 0; row < rows; row += 1) {
@@ -59,18 +63,20 @@ export function rollCells(
       const drawn = patternCell(state.config, reel, row);
       if (drawn === null) continue;
       if (moving) need.push(drawn);
-      else cells.push({ reel, row, ...drawn });
+      else if (!pinned(reel, row)) cells.push({ reel, row, ...drawn });
     }
 
     for (const held of state.cells) {
-      if (held.row !== row || held.reel >= reels || !state.holds.includes(held.reel)) continue;
+      if (held.permanent || held.row !== row || held.reel >= reels || !state.holds.includes(held.reel)) continue;
       const match = need.findIndex((cell) => cell.kind === held.kind && cell.multiplier === held.multiplier);
       if (match < 0) continue;
       need.splice(match, 1);
       cells.push(held);
     }
 
-    const free = Array.from({ length: reels }, (_, reel) => reel).filter((reel) => !state.holds.includes(reel));
+    const free = Array.from({ length: reels }, (_, reel) => reel).filter(
+      (reel) => !state.holds.includes(reel) && !pinned(reel, row),
+    );
     for (const cell of need) {
       const [reel] = free.splice(Math.floor(rng() * free.length), 1);
       if (reel === undefined) break;
@@ -79,6 +85,28 @@ export function rollCells(
   }
 
   return { cells, cellRolls: state.cellRolls + 1 };
+}
+
+/**
+ * Hot Cell and Jackpot Cell: a permanent `kind` cell on a random plain cell of the grid, from the
+ * run's premium generator (indexed by the permanent cells already placed). No plain cell, no change.
+ */
+export function addPermanentCell(
+  state: Pick<SlotSpellerState, "seed" | "cells" | "reels">,
+  rows: number,
+  kind: SlotCellKind,
+  multiplier: number,
+): SlotPremiumCell[] {
+  const plain: SlotCell[] = [];
+  for (let reel = 0; reel < state.reels; reel += 1) {
+    for (let row = 0; row < rows; row += 1) {
+      if (cellAt(state.cells, [reel, row]) === undefined) plain.push([reel, row]);
+    }
+  }
+  const placed = state.cells.filter((cell) => cell.permanent).length;
+  const picked = plain[Math.floor(slotRng(state.seed, "premium", placed)() * plain.length)];
+  if (picked === undefined) return [...state.cells];
+  return [...state.cells, { reel: picked[0], row: picked[1], kind, multiplier, permanent: true }];
 }
 
 export function cellAt(cells: readonly SlotPremiumCell[], [reel, row]: SlotCell): SlotPremiumCell | undefined {
