@@ -173,3 +173,37 @@ export {
   skipDraft,
 } from "./story/chapter-run";
 export type { ChapterRecord, HandOutcome, RecordedHand, StoryNodeState, StoryProgress } from "./story/chapter-run";
+export { DEFAULT_SLOT_SPELLER_CONFIG, roundTarget } from "./slot-speller/config";
+export type { LengthMultiplier, SlotCellConfig, SlotSpellerConfig, SlotTileRates } from "./slot-speller/config";
+export { SLOT_POWERS, hasPower, powerCount } from "./slot-speller/powers";
+export type { SlotPower, SlotPowerCounts, SlotPowerId, SlotPowerType } from "./slot-speller/powers";
+export { hashSeed, slotRng } from "./slot-speller/seed";
+export type { SlotSeedStream } from "./slot-speller/seed";
+export { addWildBlanks, buildStrip, rowCount, stripTileId, windowAt } from "./slot-speller/reels";
+export { addPermanentCell, cellAt, isSwapLocked, patternCell, rollCells } from "./slot-speller/cells";
+export type { SlotCellKind, SlotPremiumCell } from "./slot-speller/cells";
+export { createSlotRun } from "./slot-speller/state";
+export type { SlotBestWord, SlotCell, SlotPhase, SlotShop, SlotSpellerState } from "./slot-speller/state";
+export { canHold, holdLimit, movesPerSpin, nudge, spin, swap, toggleHold } from "./slot-speller/actions";
+export type { NudgeDirection, SlotActionResult, SlotRejectionReason } from "./slot-speller/actions";
+export { payLines } from "./slot-speller/lines";
+export type { PayLine } from "./slot-speller/lines";
+export { payLine } from "./slot-speller/pay-line";
+export type { PayLineContext, SlotWord } from "./slot-speller/pay-line";
+export { scoreSlotWord } from "./slot-speller/word-score";
+export type { PlayedFace, SlotLetterScore, SlotWordBreakdown } from "./slot-speller/word-score";
+export { evaluateSlotGrid, slotLines } from "./slot-speller/evaluate";
+export type { SlotEvaluation } from "./slot-speller/evaluate";
+export { buyExtraSpin, endRun, nextRound, pay } from "./slot-speller/run";
+export type { SlotPayResult } from "./slot-speller/run";
+export {
+  addReelPrice,
+  addRowPrice,
+  buyPower,
+  buyReel,
+  buyRow,
+  freeZigzagPairs,
+  rerollPrice,
+  rerollShop,
+  rollShopStock,
+} from "./slot-speller/shop";

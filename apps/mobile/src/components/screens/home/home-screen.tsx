@@ -36,6 +36,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { authClient } from "@/auth/client/auth-client";
+import { useFlagEnabled } from "@/lib/analytics/posthog";
 import {
   MenuSlab,
   type MenuSlabProps,
@@ -128,12 +129,15 @@ const SLABS: readonly Slab[] = [
     tilt: 0.8,
     href: "/tutorial",
   },
-  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: -0.8 },
+  // The solo endless slot run (STO-1159), in-process like Offline. Behind the `slot-speller` flag.
+  { key: "slot-speller", label: "Slot Speller", letter: "R", width: 170, tilt: -0.8, href: "/slot-speller" },
+  { key: "offline", label: "Offline", letter: "B", width: 164, tilt: 0.8 },
 ];
 const SLAB_MAX_WIDTH = Math.max(...SLABS.map((slab) => slab.width));
 
 export function HomeScreen() {
   const { data: session } = authClient.useSession();
+  const slotSpeller = useFlagEnabled("slot-speller");
   const { streakBanner, dismissStreakBanner, levelUp, dismissLevelUp } =
     useQuests();
   const insets = useSafeAreaInsets();
@@ -340,7 +344,7 @@ export function HomeScreen() {
 
           {/* A short phone (375×667) closes the stack up so Offline clears the rack. */}
           <View style={[styles.slabs, { marginLeft: slabsX, gap: box.height < 700 ? 8 : 14 }, storeOpen && styles.underStore]}>
-            {SLABS.map(({ key, href, online, ...slab }) => (
+            {SLABS.filter((slab) => slab.key !== "slot-speller" || slotSpeller).map(({ key, href, online, ...slab }) => (
               <MenuSlab
                 key={key}
                 {...slab}

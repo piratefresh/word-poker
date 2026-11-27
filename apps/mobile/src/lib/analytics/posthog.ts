@@ -1,4 +1,5 @@
 import PostHog from "posthog-react-native";
+import { useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 const projectToken = process.env.EXPO_PUBLIC_POSTHOG_PROJECT_TOKEN;
@@ -33,3 +34,16 @@ export const posthog = projectToken && host
       },
     })
   : null;
+
+function subscribeToFlags(onChange: () => void): () => void {
+  return __DEV__ || !posthog ? () => {} : posthog.onFeatureFlags(onChange);
+}
+
+/**
+ * Whether PostHog flag `key` is on for this person, updating when flags load or reload (sign-in
+ * reloads them). Off until PostHog answers. Development builds always see it, so a mode behind a
+ * flag stays reachable locally and in tests without PostHog.
+ */
+export function useFlagEnabled(key: string): boolean {
+  return useSyncExternalStore(subscribeToFlags, () => __DEV__ || posthog?.isFeatureEnabled(key) === true);
+}
