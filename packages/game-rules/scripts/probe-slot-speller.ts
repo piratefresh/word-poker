@@ -15,6 +15,7 @@ import type { Tile } from "@wordpoker/contracts";
 import { loadDictionary, type Dictionary } from "../src/words/dictionary";
 import { DEFAULT_SLOT_SPELLER_CONFIG, roundTarget, type SlotSpellerConfig } from "../src/slot-speller/config";
 import { canLock, nudge, spin, swap, toggleLock } from "../src/slot-speller/actions";
+import { cellAt } from "../src/slot-speller/cells";
 import { slotLines } from "../src/slot-speller/evaluate";
 import { payLine } from "../src/slot-speller/pay-line";
 import { SLOT_POWERS, type SlotPowerCounts, type SlotPowerId } from "../src/slot-speller/powers";
@@ -53,10 +54,17 @@ function cacheFor(state: SlotSpellerState): Map<string, number> {
 type Line = ReturnType<typeof slotLines>[number];
 
 function lineScore(cache: Map<string, number>, tiles: readonly Tile[], line: Line, state: SlotSpellerState, dict: Dictionary): number {
-  const key = tiles.map(tileKey).join(",");
+  // Premium cells count on rows only, so only a row's key carries them.
+  const cells = line.premium
+    ? line.cells.map((cell) => {
+        const premium = cellAt(state.cells, cell);
+        return premium ? `${premium.kind[0]}${premium.multiplier}` : "";
+      })
+    : [];
+  const key = `${tiles.map(tileKey).join(",")}|${cells.join(",")}`;
   let score = cache.get(key);
   if (score === undefined) {
-    const context = { dictionary: dict, config: state.config, powers: state.powers };
+    const context = { dictionary: dict, config: state.config, powers: state.powers, cells: state.cells };
     score = payLine(tiles, line, context).reduce((sum, word) => sum + word.breakdown.score, 0);
     cache.set(key, score);
   }
@@ -154,7 +162,7 @@ function playSpin(start: SlotSpellerState): { state: SlotSpellerState; score: nu
 
 /** The two reels of the grid's best-scoring word (for Reel Lock). */
 function bestLineWords(state: SlotSpellerState): number[] {
-  const context = { dictionary, config: state.config, powers: state.powers };
+  const context = { dictionary, config: state.config, powers: state.powers, cells: state.cells };
   let best: { score: number; reels: number[] } = { score: 0, reels: [] };
   for (const line of slotLines(state)) {
     for (const word of payLine(line.cells.map(([r, w]) => state.grid[r]![w]!), line, context)) {

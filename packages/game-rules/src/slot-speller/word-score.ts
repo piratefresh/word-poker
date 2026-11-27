@@ -1,7 +1,8 @@
-/** One Slot Speller word's score (§48, Word scoring): base × length mult × Scoring powers. */
+/** One Slot Speller word's score (§48, Word score): base × word cells × length mult × Scoring powers. */
 
 import type { Tile } from "@wordpoker/contracts";
 
+import type { SlotPremiumCell } from "./cells";
 import { tierMultiplier, type SlotSpellerConfig } from "./config";
 import { hasPower, type SlotPowerCounts, type SlotPowerId } from "./powers";
 
@@ -12,13 +13,31 @@ export interface PlayedFace {
   readonly points: number;
 }
 
+/** One letter of a word's working: `points × tileMult × cellMult` joins the base. */
+export interface SlotLetterScore {
+  readonly letter: string;
+  /** The played face's printed value; 0 for a blank. */
+  readonly points: number;
+  /** 2 or 3 on a Double or Triple Letter tile, else 1. */
+  readonly tileMult: number;
+  /** The letter cell under the tile, else 1. */
+  readonly cellMult: number;
+}
+
+/** Everything needed to print a word's working, e.g. `C4 + A1×3L + T2 = 9 · ×2W · ×½ length = 9`. */
 export interface SlotWordBreakdown {
+  /** The word's letters in order. */
+  readonly letters: readonly SlotLetterScore[];
   readonly base: number;
+  /** The multiplier of each word cell the word covers, left to right. */
+  readonly wordCells: readonly number[];
   readonly lengthMult: number;
   /** What a reader needs to check the base: multiplier tiles, choice faces, blanks. */
   readonly notes: readonly string[];
   /** The Scoring powers that multiplied this word, in rule order. */
   readonly triggered: readonly SlotPowerId[];
+  /** The score before rounding; it differs from `score` only when a half was rounded. */
+  readonly exact: number;
   readonly score: number;
 }
 
@@ -37,25 +56,38 @@ const SCORING_POWERS: readonly (readonly [SlotPowerId, (word: string) => boolean
   ["twins", (word) => /(.)\1/.test(word)],
 ];
 
+/**
+ * Scores the word `faces` spell. `premiums[i]` is the premium cell under `faces[i]`, when the
+ * line counts cells: a letter cell multiplies its tile, a word cell the whole word (a blank on
+ * one still counts), and cells apply before the length multiplier and the powers.
+ */
 export function scoreSlotWord(
   faces: readonly PlayedFace[],
   config: SlotSpellerConfig,
   powers: SlotPowerCounts,
+  premiums: readonly (SlotPremiumCell | undefined)[] = [],
 ): SlotWordBreakdown {
   const word = faces.map((face) => face.letter).join("");
   const notes: string[] = [];
+  const letters: SlotLetterScore[] = [];
+  const wordCells: number[] = [];
   let base = 0;
 
-  for (const { tile, letter, points } of faces) {
+  faces.forEach(({ tile, letter, points }, index) => {
+    const premium = premiums[index];
+    if (premium?.kind === "word") wordCells.push(premium.multiplier);
+    const cellMult = premium?.kind === "letter" ? premium.multiplier : 1;
     if (isBlank(tile)) {
       notes.push(`? as ${letter}`);
-      continue;
+      letters.push({ letter, points: 0, tileMult: 1, cellMult });
+      return;
     }
     if (isChoice(tile)) notes.push(`${tile.letter}/${tile.alternativeLetter} as ${letter}`);
-    const factor = tile.multiplier === "triple-letter" ? 3 : tile.multiplier === "double-letter" ? 2 : 1;
-    if (factor > 1) notes.push(`${factor === 3 ? "TL" : "DL"} ${letter} ${points}×${factor}`);
-    base += points * factor;
-  }
+    const tileMult = tile.multiplier === "triple-letter" ? 3 : tile.multiplier === "double-letter" ? 2 : 1;
+    if (tileMult > 1) notes.push(`${tileMult === 3 ? "TL" : "DL"} ${letter} ${points}×${tileMult}`);
+    letters.push({ letter, points, tileMult, cellMult });
+    base += points * tileMult * cellMult;
+  });
 
   let lengthMult = tierMultiplier(config.lengthMultipliers, word.length);
   if (hasPower(powers, "longHaul")) {
@@ -65,5 +97,7 @@ export function scoreSlotWord(
   const triggered = SCORING_POWERS.filter(([id, test]) => hasPower(powers, id) && test(word)).map(([id]) => id);
   const powerMult = config.scoringPowerMultiplier ** triggered.length;
 
-  return { base, lengthMult, notes, triggered, score: Math.round(base * lengthMult * powerMult) };
+  const exact = wordCells.reduce((total, multiplier) => total * multiplier, base) * lengthMult * powerMult;
+
+  return { letters, base, wordCells, lengthMult, notes, triggered, exact, score: Math.round(exact) };
 }

@@ -19,7 +19,7 @@ export function slotLines(state: SlotSpellerState): PayLine[] {
 }
 
 export function evaluateSlotGrid(state: SlotSpellerState, dictionary: Dictionary): SlotEvaluation {
-  const context = { dictionary, config: state.config, powers: state.powers };
+  const context = { dictionary, config: state.config, powers: state.powers, cells: state.cells };
   const words: SlotWord[] = [];
 
   for (const line of slotLines(state)) {

@@ -5,6 +5,7 @@ import type { Tile } from "@wordpoker/contracts";
 import { weightedSampleWithoutReplacement } from "../core/sample";
 import { LETTER_VALUES, type Letter } from "../tiles/letters";
 import { DEFAULT_SPECIAL_TILES } from "../tiles/special-tiles";
+import { isSwapLocked, rollCells } from "./cells";
 import { hasPower, powerCount } from "./powers";
 import { rowCount, stripAt, windowAt, wrap } from "./reels";
 import { slotRng } from "./seed";
@@ -17,6 +18,7 @@ export type SlotRejectionReason =
   | "no-moves"
   | "out-of-range"
   | "same-cell"
+  | "cell-locked"
   | "not-enough-tokens"
   | "not-on-sale"
   | "sold"
@@ -45,7 +47,8 @@ export function movesPerSpin(state: SlotSpellerState): number {
 
 /**
  * Spins every unlocked reel to a new random top and refills its column from the strip; a locked
- * reel keeps its column (unless the row count changed under it). Only from `ready` or `between`.
+ * reel keeps its column (unless the row count changed under it) and its premium cells; the rest
+ * of each row's cells land on new reels. Only from `ready` or `between`.
  * Consumes the locks and a spin, and opens `moving` with a fresh set of moves. With Split Tiles,
  * the landed grid then gains its second faces.
  */
@@ -77,6 +80,7 @@ export function spin(state: SlotSpellerState): SlotActionResult {
       ...state,
       top,
       grid: hasPower(state.powers, "split") ? splitTiles(state, grid) : grid,
+      ...rollCells(state, state.reels, rows),
       locks: [],
       lockUsed: state.lockUsed || state.locks.length > 0,
       phase: "moving",
@@ -179,7 +183,7 @@ function cellTile(state: SlotSpellerState, [reel, row]: SlotCell): Tile | undefi
   return state.grid[reel]?.[row];
 }
 
-/** Exchanges any two grid cells; the strips are untouched. */
+/** Exchanges any two grid cells; the strips are untouched. A tile on a swap-locked cell stays put. */
 export function swap(state: SlotSpellerState, a: SlotCell, b: SlotCell): SlotActionResult {
   const refusal = moveRefusal(state);
   if (refusal !== null) return refuse(state, refusal);
@@ -187,6 +191,7 @@ export function swap(state: SlotSpellerState, a: SlotCell, b: SlotCell): SlotAct
   const second = cellTile(state, b);
   if (first === undefined || second === undefined) return refuse(state, "out-of-range");
   if (a[0] === b[0] && a[1] === b[1]) return refuse(state, "same-cell");
+  if (isSwapLocked(state, a) || isSwapLocked(state, b)) return refuse(state, "cell-locked");
 
   const grid = state.grid.map((column) => [...column]);
   const columnA = grid[a[0]];

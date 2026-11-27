@@ -7,6 +7,8 @@ export interface PayLine {
   readonly name: string;
   /** One cell per reel, left to right. */
   readonly cells: readonly SlotCell[];
+  /** Whether premium cells count on this line: rows only. */
+  readonly premium: boolean;
 }
 
 /** The lines a `reels` × `rows` grid pays with these powers. */
@@ -15,7 +17,7 @@ export function payLines(reels: number, rows: number, powers: SlotPowerCounts): 
   const lines: PayLine[] = [];
 
   for (let row = 0; row < rows; row += 1) {
-    lines.push({ name: `Row ${row + 1}`, cells: columns.map((reel): SlotCell => [reel, row]) });
+    lines.push({ name: `Row ${row + 1}`, premium: true, cells: columns.map((reel): SlotCell => [reel, row]) });
   }
 
   if (rows < 2) return lines;
@@ -26,14 +28,15 @@ export function payLines(reels: number, rows: number, powers: SlotPowerCounts): 
       const k = reel % span;
       return k < rows ? k : span - k;
     };
-    lines.push({ name: "Wave", cells: columns.map((reel): SlotCell => [reel, wave(reel)]) });
-    lines.push({ name: "Wave mirror", cells: columns.map((reel): SlotCell => [reel, rows - 1 - wave(reel)]) });
+    lines.push({ name: "Wave", premium: false, cells: columns.map((reel): SlotCell => [reel, wave(reel)]) });
+    lines.push({ name: "Wave mirror", premium: false, cells: columns.map((reel): SlotCell => [reel, rows - 1 - wave(reel)]) });
   }
 
   if (hasPower(powers, "zigzag")) {
     for (let pair = 0; pair < rows - 1; pair += 1) {
       for (const phase of [0, 1]) {
         lines.push({
+          premium: false,
           name: `Zigzag ${pair + 1}-${pair + 2}${phase === 0 ? "" : " alt"}`,
           cells: columns.map((reel): SlotCell => [reel, pair + ((reel + phase) % 2)]),
         });
