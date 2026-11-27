@@ -1,4 +1,4 @@
-/** The pay lines across the grid (§47, Pay lines): every row, plus the Wave and Zigzag shapes. */
+/** The pay lines across the grid (§48, Pay lines): every row, plus the Wave and Zigzag shapes. */
 
 import { hasPower, type SlotPowerCounts } from "./powers";
 import type { SlotCell } from "./state";

@@ -1,4 +1,4 @@
-/** One Slot Speller word's score (§47, Word scoring): base × length mult × Scoring powers. */
+/** One Slot Speller word's score (§48, Word scoring): base × length mult × Scoring powers. */
 
 import type { Tile } from "@wordpoker/contracts";
 

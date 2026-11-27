@@ -4,7 +4,7 @@ Part of the [Word Poker rules](../FINAL_RULES.md).
 
 ---
 
-# 47. Slot Speller
+# 48. Slot Speller
 
 Slot Speller is a solo, endless slot-machine word mode. There is no table, no betting and no
 bots: the player spins a grid of letter reels, rearranges it with a few moves, and every word

@@ -1,5 +1,5 @@
 /**
- * The Slot Speller screen's model (§47): the engine's run state plus the UI state around it — the
+ * The Slot Speller screen's model (§48): the engine's run state plus the UI state around it — the
  * swap selection, the last payout and how far its reveal has got. Every rule is the engine's; this
  * only routes taps to its actions and keeps a refused action from changing anything.
  */

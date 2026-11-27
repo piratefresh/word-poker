@@ -1,5 +1,5 @@
 /**
- * The whole of a Slot Speller run as plain JSON (§47). No live generator rides in it: randomness
+ * The whole of a Slot Speller run as plain JSON (§48). No live generator rides in it: randomness
  * comes from `slotRng(seed, stream, counter)`, so `JSON.parse(JSON.stringify(state))` continues
  * exactly as the original would.
  */

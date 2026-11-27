@@ -56,7 +56,7 @@ export interface SlotSpellerScreenProps {
   onChange?: (state: SlotSpellerState, previous: SlotSpellerState) => void;
 }
 
-/** Slot Speller (§47): one solo run on the engine, in-process, held until the dictionary loads. */
+/** Slot Speller (§48): one solo run on the engine, in-process, held until the dictionary loads. */
 export function SlotSpellerScreen({
   initialState,
   onChange,

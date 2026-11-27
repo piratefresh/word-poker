@@ -1,4 +1,4 @@
-/** The shop a cleared round opens (§47, Shop): power cards, Add Reel and rerolls, paid in tokens. */
+/** The shop a cleared round opens (§48, Shop): power cards, Add Reel and rerolls, paid in tokens. */
 
 import { weightedSampleWithoutReplacement } from "../core/sample";
 import { refuse, type SlotActionResult } from "./actions";

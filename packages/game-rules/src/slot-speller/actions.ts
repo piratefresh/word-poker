@@ -1,4 +1,4 @@
-/** The player's grid actions — spin, nudge, swap (§47, Spins and moves) — each refused with a reason, nothing changed. */
+/** The player's grid actions — spin, nudge, swap (§48, Spins and moves) — each refused with a reason, nothing changed. */
 
 import type { Tile } from "@wordpoker/contracts";
 

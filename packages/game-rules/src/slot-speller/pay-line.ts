@@ -1,5 +1,5 @@
 /**
- * Paying one line (§47, Paying a line): find the best word every span of the line can spell,
+ * Paying one line (§48, Paying a line): find the best word every span of the line can spell,
  * then pick the best-scoring set of non-overlapping words.
  */
 

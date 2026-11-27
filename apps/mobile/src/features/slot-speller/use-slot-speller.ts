@@ -1,5 +1,5 @@
 /**
- * One Slot Speller run on screen (§47), in-process on the engine. Holds the model, runs the
+ * One Slot Speller run on screen (§48), in-process on the engine. Holds the model, runs the
  * payout reveal's timer, and reports every run-state change through `onChange` — the seam a saved
  * run (and records) hang off.
  */

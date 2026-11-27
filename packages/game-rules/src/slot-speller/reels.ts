@@ -1,4 +1,4 @@
-/** Strips and the windows the grid shows of them (§47, Strips and grid). */
+/** Strips and the windows the grid shows of them (§48, Strips and grid). */
 
 import type { Tile } from "@wordpoker/contracts";
 

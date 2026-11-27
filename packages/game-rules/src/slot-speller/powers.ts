@@ -1,4 +1,4 @@
-/** Slot Speller's power pool (§47, Powers): data only; each effect lives where it applies. */
+/** Slot Speller's power pool (§48, Powers): data only; each effect lives where it applies. */
 
 export type SlotPowerId =
   | "extraRow"

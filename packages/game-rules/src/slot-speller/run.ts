@@ -1,4 +1,4 @@
-/** The run machine (§47, Rounds and the run): paying a spin, the Extra Spin, ending the run, the next round. */
+/** The run machine (§48, Rounds and the run): paying a spin, the Extra Spin, ending the run, the next round. */
 
 import type { Dictionary } from "../words/dictionary";
 import { refuse, type SlotActionResult, type SlotRejectionReason } from "./actions";

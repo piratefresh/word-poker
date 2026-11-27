@@ -1,4 +1,4 @@
-/** What the grid pays right now (§47): every pay line's words and their total. Also the live preview. */
+/** What the grid pays right now (§48): every pay line's words and their total. Also the live preview. */
 
 import type { Tile } from "@wordpoker/contracts";
 

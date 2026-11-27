@@ -1,5 +1,5 @@
 /**
- * Every number Slot Speller plays by (docs/rules/slot-speller.md §47). The web prototype is the
+ * Every number Slot Speller plays by (docs/rules/slot-speller.md §48). The web prototype is the
  * source of truth for the defaults; all of them are config so they can be tuned after playtesting.
  */
 
