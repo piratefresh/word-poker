@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { LinearGradient } from "expo-linear-gradient";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
+import Animated, { LinearTransition, useReducedMotion } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
 
 import {
   canHold,
@@ -22,16 +24,43 @@ import { webTestID } from "@/lib/ui/web-id";
 
 import { SlotReelRoll } from "./slot-reel-roll";
 
+/** A box in device px. */
+export interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 /**
- * The painted reel window on the G1 art, in artboard px (390 × 844): five columns of 68.5 and three
- * rows of 82.5, a 58 × 72 tile centred in each, nudge arrows painted above and below.
+ * The reel window's chrome in artboard px, drawn to match G1's painted 5 × 3 window: a green panel
+ * with gold corners, a band of nudge arrows above and below, and the felt inside a gold rim.
  */
-export const REEL_WINDOW = { left: 24.4, top: 291.9, column: 68.5, row: 82.5, reels: 5, rows: 3 } as const;
+const FRAME = { band: 40, side: 7, rim: 3, pad: 2, radius: 12, corner: 24, arrow: 30 } as const;
+/** The window's chrome across, both sides, in artboard px: what the reels' columns don't get. */
+export const FRAME_ACROSS = 2 * (FRAME.side + FRAME.rim + FRAME.pad);
+/** A tile fills this much of its row's pitch (G1: 72 of 82.5) and at most this much of its column. */
+const PITCH_FILL = 72 / 82.5;
+const COLUMN_FILL = 0.84;
+/** The tile's height at G1's 5 × 3, in artboard px: cell plates are measured against it. */
 const TILE_HEIGHT = 72;
-/** The painted arrows' tops, from the window's top. */
-const ARROW_UP = 255 - REEL_WINDOW.top;
-const ARROW_DOWN = 542 - REEL_WINDOW.top;
-const ARROW_HEIGHT = 30;
+const FRAME_GOLD = "#eaa93b";
+const FRAME_GOLD_DARK = "#a8661a";
+
+/** Where the felt, the columns and the tiles fall inside a window `box` for this many reels and rows. */
+export function reelWindowGeometry(box: Pick<Box, "width" | "height">, unit: number, reels: number, rows: number) {
+  const band = FRAME.band * unit;
+  const side = FRAME.side * unit;
+  const inset = (FRAME.rim + FRAME.pad) * unit;
+  const felt = { left: side, top: band, width: box.width - 2 * side, height: box.height - 2 * band };
+  const inner = { left: felt.left + inset, top: felt.top + inset, width: felt.width - 2 * inset, height: felt.height - 2 * inset };
+  const column = inner.width / reels;
+  const pitch = inner.height / rows;
+  const aspect = TILE_METRICS.large.height / TILE_METRICS.large.width;
+  const tileHeight = Math.min(pitch * PITCH_FILL, column * COLUMN_FILL * aspect);
+  return { band, felt, inner, column, pitch, tileHeight, tileWidth: tileHeight / aspect, scale: tileHeight / TILE_METRICS.large.height };
+}
+
 /** Every control is at least this tall to the finger. */
 const MIN_TARGET = 44;
 
@@ -71,7 +100,9 @@ interface SpinRoll {
 
 export interface SlotGridProps {
   state: SlotSpellerState;
-  /** Artboard px to device px. */
+  /** The window's box on the stage, in device px. */
+  box: Box;
+  /** Artboard px to device px, for the window's chrome. */
   unit: number;
   /** Words whose tiles wear an outline: the live preview while moving. */
   outlined: readonly SlotWord[];
@@ -106,12 +137,13 @@ function facesByCell(words: readonly SlotWord[]): Map<string, string> {
 }
 
 /**
- * The reels inside the painted window: one column each, hit targets over the painted nudge arrows,
- * tap two tiles to swap them. A grid past 5 × 3 shrinks to fit the same window until STO-1184
- * grows it.
+ * The reel window and the reels inside it: one column each, a nudge arrow above and below, tap two
+ * tiles to swap them. The window keeps its box; its columns and tiles size to the reels and rows,
+ * and slide to their new places when a reel or row is bought.
  */
 export function SlotGrid({
   state,
+  box,
   unit,
   outlined,
   lit,
@@ -126,17 +158,12 @@ export function SlotGrid({
 }: SlotGridProps): ReactElement {
   const reduceMotion = useReducedMotion();
   const { reels, grid, phase, moves, spinCount, holds, strips, top } = state;
-  const rows = grid[0]?.length ?? REEL_WINDOW.rows;
+  const rows = grid[0]?.length ?? 3;
   const canMove = phase === "moving" && moves > 0;
   const lockable = canHold(state);
   const holdsFull = holds.length >= holdLimit(state);
 
-  const column = (REEL_WINDOW.column * REEL_WINDOW.reels * unit) / Math.max(reels, REEL_WINDOW.reels);
-  const pitch = (REEL_WINDOW.row * REEL_WINDOW.rows * unit) / Math.max(rows, REEL_WINDOW.rows);
-  const fit = Math.min(column / (REEL_WINDOW.column * unit), pitch / (REEL_WINDOW.row * unit));
-  const scale = (TILE_HEIGHT * unit * fit) / TILE_METRICS.large.height;
-  const tileWidth = TILE_METRICS.large.width * scale;
-  const tileHeight = TILE_METRICS.large.height * scale;
+  const { band, inner, column, pitch, tileWidth, tileHeight, scale } = reelWindowGeometry(box, unit, reels, rows);
   const gap = pitch - tileHeight;
 
   const outlinedFaces = facesByCell(outlined);
@@ -171,44 +198,43 @@ export function SlotGrid({
     if (!anyRolling) onSpinLanded?.(spinCount);
   }, [anyRolling, spinCount, onSpinLanded]);
 
-  const targetHeight = Math.max(ARROW_HEIGHT * unit, MIN_TARGET);
-  const arrowTop = (paintedTop: number): number => paintedTop * unit + (ARROW_HEIGHT * unit - targetHeight) / 2;
+  const targetHeight = Math.max(band, MIN_TARGET);
+  const upTop = (band - targetHeight) / 2;
+  const downTop = box.height - band + (band - targetHeight) / 2;
+  const arrowSize = Math.min(FRAME.arrow * unit, column * 0.62);
+  const layout = reduceMotion ? undefined : LinearTransition.duration(320);
 
   return (
     <Pressable
       accessible={false}
       disabled={!revealing}
       onPress={onSkipReveal}
-      style={[
-        styles.window,
-        {
-          left: REEL_WINDOW.left * unit,
-          top: REEL_WINDOW.top * unit,
-          width: column * reels,
-          height: pitch * rows,
-        },
-      ]}
+      style={[styles.window, box]}
+      testID="slot-window"
     >
+      <ReelWindowFrame box={box} unit={unit} reels={reels} layout={layout} />
       {grid.map((tiles, reel) => {
         const locked = holds.includes(reel);
         const rolling = roll !== null && roll.rolling.includes(reel);
-        const left = reel * column;
+        const left = inner.left + reel * column;
         const tileLeft = (column - tileWidth) / 2;
+        const tilesTop = inner.top + gap / 2;
         return (
-          <View key={reel} pointerEvents="box-none" style={[styles.reel, { left, width: column, height: pitch * rows }]}>
+          <Animated.View key={reel} layout={layout} pointerEvents="box-none" style={[styles.reel, { left, width: column, height: box.height }]}>
             <NudgeTarget
               direction={-1}
               reel={reel}
               disabled={!canMove || rolling}
               onNudge={onNudge}
-              style={{ top: arrowTop(ARROW_UP), height: targetHeight, width: column }}
+              arrowSize={arrowSize}
+              style={{ top: upTop, height: targetHeight, width: column }}
             />
             <View
               pointerEvents={rolling ? "none" : "box-none"}
               // The real tiles wait under the roll, hidden, and show the moment it lands on them.
               style={[
                 styles.column,
-                { left: tileLeft - 3, top: gap / 2 - 3, width: tileWidth + 6, height: pitch * rows - gap + 6 },
+                { left: tileLeft - 3, top: tilesTop - 3, width: tileWidth + 6, height: pitch * rows - gap + 6 },
                 locked && styles.locked,
                 rolling && styles.hidden,
               ]}
@@ -264,7 +290,7 @@ export function SlotGrid({
               })}
             </View>
             {rolling ? (
-              <View pointerEvents="none" style={[styles.roll, { left: tileLeft, top: gap / 2 }]}>
+              <View pointerEvents="none" style={[styles.roll, { left: tileLeft, top: tilesTop }]}>
                 <SlotReelRoll
                   // A new spin starts a fresh roll from the letters the last one left.
                   key={roll.spin}
@@ -287,7 +313,7 @@ export function SlotGrid({
                 disabled={!locked && holdsFull}
                 onToggle={onToggleLock}
                 unit={unit}
-                style={{ top: arrowTop(ARROW_DOWN), height: targetHeight, width: column }}
+                style={{ top: downTop, height: targetHeight, width: column }}
               />
             ) : (
               <NudgeTarget
@@ -295,10 +321,11 @@ export function SlotGrid({
                 reel={reel}
                 disabled={!canMove}
                 onNudge={onNudge}
-                style={{ top: arrowTop(ARROW_DOWN), height: targetHeight, width: column }}
+                arrowSize={arrowSize}
+                style={{ top: downTop, height: targetHeight, width: column }}
               />
             )}
-          </View>
+          </Animated.View>
         );
       })}
     </Pressable>
@@ -315,12 +342,13 @@ interface NudgeTargetProps {
   direction: NudgeDirection;
   reel: number;
   disabled: boolean;
+  arrowSize: number;
   onNudge: (reel: number, direction: NudgeDirection) => void;
   style: TargetStyle;
 }
 
-/** A hit target over a painted nudge arrow; the art draws the arrow. */
-function NudgeTarget({ direction, reel, disabled, onNudge, style }: NudgeTargetProps): ReactElement {
+/** A reel's nudge arrow and its hit target, in the window's band above or below the reel. */
+function NudgeTarget({ direction, reel, disabled, arrowSize, onNudge, style }: NudgeTargetProps): ReactElement {
   const testID = `slot-nudge-${direction === -1 ? "up" : "down"}-${reel}`;
   return (
     <Pressable
@@ -330,9 +358,72 @@ function NudgeTarget({ direction, reel, disabled, onNudge, style }: NudgeTargetP
       disabled={disabled}
       id={webTestID(testID)}
       onPress={() => onNudge(reel, direction)}
-      style={({ pressed }) => [styles.target, style, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.target, styles.centred, style, pressed && styles.pressed]}
       testID={testID}
-    />
+    >
+      <NudgeArrow size={arrowSize} direction={direction} />
+    </Pressable>
+  );
+}
+
+/** G1's gold arrow: a chunky up arrow with an orange outline, turned over for down. */
+function NudgeArrow({ size, direction }: { size: number; direction: NudgeDirection }): ReactElement {
+  return (
+    <Svg aria-hidden height={size} style={direction === 1 ? styles.flipped : undefined} viewBox="0 0 30 30" width={size}>
+      <Path d="M15 2.5 L28 15.5 H20.5 V27 H9.5 V15.5 H2 Z" fill="#c46a12" stroke="#7a3d08" strokeLinejoin="round" strokeWidth={2} />
+      <Path d="M15 4.5 L25 14 H18.8 V24.5 H11.2 V14 H5 Z" fill="#ffc93c" />
+      <Path d="M15 6.5 L21.5 12.5 H17 V16 H13 V12.5 H8.5 Z" fill="#fff0a8" />
+    </Svg>
+  );
+}
+
+interface ReelWindowFrameProps {
+  box: Box;
+  unit: number;
+  reels: number;
+  layout: LinearTransition | undefined;
+}
+
+/** The window's chrome: the green panel, its gold corners, the felt in its gold rim, and a gold rule between reels. */
+function ReelWindowFrame({ box, unit, reels, layout }: ReelWindowFrameProps): ReactElement {
+  const { felt, inner, column } = reelWindowGeometry(box, unit, reels, 1);
+  const corner = FRAME.corner * unit;
+  const rule = Math.max(1, 1.5 * unit);
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={["#2a7d52", "#1d6040", "#1a5638"]}
+        style={[StyleSheet.absoluteFill, { borderRadius: FRAME.radius * unit, borderWidth: 2 * unit, borderColor: "#0e3423" }]}
+      />
+      <LinearGradient
+        colors={["#1a3526", "#284f39", "#1a3526"]}
+        end={{ x: 1, y: 0.5 }}
+        start={{ x: 0, y: 0.5 }}
+        style={[styles.felt, felt, { borderRadius: 9 * unit, borderWidth: FRAME.rim * unit }]}
+      />
+      {Array.from({ length: reels - 1 }, (_, index) => (
+        <Animated.View
+          key={index}
+          layout={layout}
+          style={[styles.rule, { left: inner.left + (index + 1) * column - rule / 2, top: felt.top + FRAME.rim * unit, width: rule, height: felt.height - 2 * FRAME.rim * unit }]}
+        />
+      ))}
+      {([[0, 0], [1, 0], [1, 1], [0, 1]] as const).map(([right, bottom]) => (
+        <Svg
+          key={`${right}${bottom}`}
+          aria-hidden
+          height={corner}
+          style={[
+            styles.corner,
+            { left: right ? box.width - corner : 0, top: bottom ? box.height - corner : 0, transform: [{ scaleX: right ? -1 : 1 }, { scaleY: bottom ? -1 : 1 }] },
+          ]}
+          viewBox="0 0 24 24"
+          width={corner}
+        >
+          <Path d="M2 22 V8 Q2 2 8 2 H22 L18 7 H10 Q7 7 7 10 V18 Z" fill={FRAME_GOLD} stroke={FRAME_GOLD_DARK} strokeLinejoin="round" strokeWidth={1.4} />
+        </Svg>
+      ))}
+    </View>
   );
 }
 
@@ -346,7 +437,10 @@ interface LockToggleProps {
   style: TargetStyle;
 }
 
-/** A reel's Hold / Held switch between spins, over its painted down arrow. */
+/** Narrower than this, a reel's hold pill drops its word and keeps the padlock. */
+const LOCK_WORD_WIDTH = 60;
+
+/** A reel's Hold / Held switch between spins, in place of its down arrow. */
 function LockToggle({ reel, locked, disabled, onToggle, unit, style }: LockToggleProps): ReactElement {
   const testID = `slot-lock-${reel}`;
   return (
@@ -369,12 +463,14 @@ function LockToggle({ reel, locked, disabled, onToggle, unit, style }: LockToggl
         ]}
       >
         <Ionicons name={locked ? "lock-closed" : "lock-open"} size={12 * unit} color={locked ? "#5a3004" : "#fffaf0"} />
+        {style.width < LOCK_WORD_WIDTH * unit ? null : (
         <Text
           maxFontSizeMultiplier={1}
           style={[styles.lockText, { fontSize: 11 * unit }, locked && styles.lockTextOn, disabled && styles.lockTextFull]}
         >
           {locked ? "HELD" : "HOLD"}
         </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -454,13 +550,12 @@ function CellBadge({ cell, scale }: { cell: SlotPremiumCell; scale: number }): R
 export interface SlotCellKeyProps {
   state: SlotSpellerState;
   unit: number;
-  /** Where the key's top sits, in artboard px. */
-  top: number;
-  width: number;
+  /** The key's line on the stage, in device px. */
+  box: Box;
 }
 
 /** The cell kinds in play, one chip each, under the reels; swap-locked kinds say `nudge only`. */
-export function SlotCellKey({ state, unit, top, width }: SlotCellKeyProps): ReactElement | null {
+export function SlotCellKey({ state, unit, box }: SlotCellKeyProps): ReactElement | null {
   const kinds = new Map<string, SlotPremiumCell>();
   for (const cell of state.cells) {
     if (cell.reel >= state.reels) continue;
@@ -476,7 +571,7 @@ export function SlotCellKey({ state, unit, top, width }: SlotCellKeyProps): Reac
   const note =
     lockedKinds.size === 0 ? null : lockedKinds.size === 2 ? "all cells: nudge only" : `${[...lockedKinds][0]} cells: nudge only`;
   return (
-    <View pointerEvents="none" style={[styles.key, { top: top * unit, width, gap: 4 * unit }]} testID="slot-cell-key">
+    <View pointerEvents="none" style={[styles.key, { left: box.left, top: box.top, width: box.width, gap: 4 * unit }]} testID="slot-cell-key">
       {order.map((cell) => {
         const { fill, ink } = cellColours(cell);
         const locked = isSwapLocked(state, [cell.reel, cell.row]);
@@ -502,6 +597,11 @@ export function SlotCellKey({ state, unit, top, width }: SlotCellKeyProps): Reac
 
 const styles = StyleSheet.create({
   window: { position: "absolute" },
+  felt: { position: "absolute", borderColor: FRAME_GOLD },
+  rule: { position: "absolute", backgroundColor: "rgba(234,169,59,0.55)" },
+  corner: { position: "absolute" },
+  centred: { alignItems: "center", justifyContent: "center" },
+  flipped: { transform: [{ rotate: "180deg" }] },
   reel: { position: "absolute", top: 0 },
   column: {
     position: "absolute",
@@ -526,7 +626,6 @@ const styles = StyleSheet.create({
     borderColor: "#fffaf0",
   },
   lockOn: { backgroundColor: "#ffd25a" },
-  // Solid, not see-through: the painted arrow under it must not show.
   lockFull: { backgroundColor: "#5e3a17", borderColor: "#a98a6a" },
   lockText: { color: "#fffaf0", fontWeight: "800", letterSpacing: 0.5 },
   lockTextOn: { color: "#5a3004" },
@@ -534,7 +633,7 @@ const styles = StyleSheet.create({
   plate: { position: "absolute" },
   badgeRow: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   badge: { fontWeight: "800", overflow: "hidden", letterSpacing: 0.3 },
-  key: { position: "absolute", left: 0, flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  key: { position: "absolute", flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center" },
   keyBadge: { fontWeight: "800", overflow: "hidden" },
   keyText: { color: "#fffaf0", fontWeight: "600" },
 });
