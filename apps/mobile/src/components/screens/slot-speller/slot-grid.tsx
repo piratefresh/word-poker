@@ -238,6 +238,9 @@ export function SlotGrid({
                       outlinedFace !== undefined && styles.outlined,
                     ]}
                   >
+                    {premium !== undefined ? (
+                      <CellPlate cell={premium} swapLocked={swapLocked} scale={scale} reel={reel} row={row} />
+                    ) : null}
                     <Tile
                       tile={tile}
                       side="front"
@@ -254,7 +257,7 @@ export function SlotGrid({
                       testID={`slot-tile-${reel}-${row}`}
                     />
                     {premium !== undefined ? (
-                      <CellMarking cell={premium} swapLocked={swapLocked} scale={scale} reel={reel} row={row} />
+                      <CellBadge cell={premium} scale={scale} />
                     ) : null}
                   </View>
                 );
@@ -377,37 +380,56 @@ function LockToggle({ reel, locked, disabled, onToggle, unit, style }: LockToggl
   );
 }
 
-interface CellMarkingProps {
+/** How far a cell's plate reaches past its tile, in artboard px at full size: most of the gap between tiles. */
+const PLATE_REACH = 4.5;
+
+interface CellPlateProps {
   cell: SlotPremiumCell;
   swapLocked: boolean;
-  /** The tile's scale, so the border and badge shrink with it. */
+  /** The tile's scale, so the plate shrinks with it. */
   scale: number;
   reel: number;
   row: number;
 }
 
 /**
- * A premium cell drawn over its tile: a border in the cell's colour (dashed when it refuses swaps,
- * thicker when permanent) and a badge in the top-right corner. It belongs to the grid position, so
- * a nudge or swap slides letters under it.
+ * A premium cell as a square of the board: a tinted plate behind the tile that shows as a coloured
+ * rim around it. The rim is dashed when the cell refuses swaps and thicker when it is permanent. It
+ * belongs to the grid position, so a nudge or swap slides letters over it.
  */
-function CellMarking({ cell, swapLocked, scale, reel, row }: CellMarkingProps): ReactElement {
+function CellPlate({ cell, swapLocked, scale, reel, row }: CellPlateProps): ReactElement {
+  const { fill } = cellColours(cell);
+  const reach = PLATE_REACH * (scale / (TILE_HEIGHT / TILE_METRICS.large.height));
+  return (
+    <View
+      pointerEvents="none"
+      testID={`slot-cell-${reel}-${row}`}
+      style={[
+        styles.plate,
+        {
+          top: -reach,
+          left: -reach,
+          right: -reach,
+          bottom: -reach,
+          borderRadius: radius.md * scale + reach,
+          borderColor: fill,
+          borderWidth: Math.max(2, reach * (cell.permanent ? 0.75 : 0.5)),
+          borderStyle: swapLocked ? "dashed" : "solid",
+          backgroundColor: `${fill}59`,
+        },
+      ]}
+    />
+  );
+}
+
+/** The cell's tab on the top edge of its plate: `2L`, `◆ 3W`. */
+function CellBadge({ cell, scale }: { cell: SlotPremiumCell; scale: number }): ReactElement {
   const { fill, ink } = cellColours(cell);
   const size = TILE_METRICS.large.width * scale;
+  const height = size * 0.24;
+  const reach = PLATE_REACH * (scale / (TILE_HEIGHT / TILE_METRICS.large.height));
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`slot-cell-${reel}-${row}`}>
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            margin: 2,
-            borderColor: fill,
-            borderRadius: radius.md * scale,
-            borderWidth: size * (cell.permanent ? 0.11 : 0.06),
-            borderStyle: swapLocked ? "dashed" : "solid",
-          },
-        ]}
-      />
+    <View pointerEvents="none" style={[styles.badgeRow, { top: -reach - height / 2 }]}>
       <Text
         maxFontSizeMultiplier={1}
         style={[
@@ -415,12 +437,11 @@ function CellMarking({ cell, swapLocked, scale, reel, row }: CellMarkingProps): 
           {
             backgroundColor: fill,
             color: ink,
-            top: 2 + size * 0.06,
-            right: 2 + size * 0.07,
             fontSize: size * 0.17,
-            lineHeight: size * 0.2,
-            paddingHorizontal: size * 0.05,
-            borderRadius: size * 0.05,
+            lineHeight: height,
+            height,
+            paddingHorizontal: size * 0.07,
+            borderRadius: height / 2,
           },
         ]}
       >
@@ -510,7 +531,9 @@ const styles = StyleSheet.create({
   lockText: { color: "#fffaf0", fontWeight: "800", letterSpacing: 0.5 },
   lockTextOn: { color: "#5a3004" },
   lockTextFull: { color: "#a98a6a" },
-  badge: { position: "absolute", fontWeight: "800", overflow: "hidden" },
+  plate: { position: "absolute" },
+  badgeRow: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  badge: { fontWeight: "800", overflow: "hidden", letterSpacing: 0.3 },
   key: { position: "absolute", left: 0, flexDirection: "row", alignItems: "center", justifyContent: "center" },
   keyBadge: { fontWeight: "800", overflow: "hidden" },
   keyText: { color: "#fffaf0", fontWeight: "600" },
