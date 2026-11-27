@@ -1,4 +1,4 @@
-import { createSlotRun, type SlotSpellerState } from "@wordpoker/game-rules";
+import { createSlotRun, isSwapLocked, type SlotCell, type SlotSpellerState } from "@wordpoker/game-rules";
 
 import { testDictionary } from "@/test-support/dictionary-fixtures";
 
@@ -50,6 +50,24 @@ describe("reduceSlotSpeller", () => {
     expect(model.state.moves).toBe(3);
     expect(model.state.grid[0]?.[0]).toEqual(second);
     expect(model.state.grid[1]?.[2]).toEqual(first);
+  });
+
+  it("refuses a tile on a swap-locked cell without spending a move", () => {
+    let model = reduceSlotSpeller(createSlotModel(createSlotRun("TEST02")), { type: "spin" }, empty);
+    const word = model.state.cells.find((cell) => isSwapLocked(model.state, [cell.reel, cell.row]));
+    if (word === undefined) throw new Error("the starting grid has a word cell");
+    const locked: SlotCell = [word.reel, word.row];
+    const plain: SlotCell = [(word.reel + 1) % model.state.reels, (word.row + 1) % 3];
+    expect(isSwapLocked(model.state, plain)).toBe(false);
+
+    model = reduceSlotSpeller(model, { type: "tapCell", cell: plain }, empty);
+    model = reduceSlotSpeller(model, { type: "tapCell", cell: locked }, empty);
+    expect(model.refusedCell).toEqual(locked);
+    expect(model.selected).toEqual(plain);
+    expect(model.state.moves).toBe(4);
+
+    model = reduceSlotSpeller(model, { type: "nudge", reel: 0, direction: 1 }, empty);
+    expect(model.refusedCell).toBeNull();
   });
 
   it("hands back the same model when the engine refuses", () => {
