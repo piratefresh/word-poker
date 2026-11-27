@@ -71,8 +71,10 @@ export interface SlotSpellerConfig {
   readonly wildBlanksPerStrip: number;
   /** Grid tiles Split Tiles gives a second face each spin. */
   readonly splitTilesPerSpin: number;
-  /** Reels Reel Lock can hold for the next spin. */
-  readonly lockReels: number;
+  /** Reels every run may hold between spins. */
+  readonly freeHolds: number;
+  /** Reels Big Hold adds to `freeHolds`. */
+  readonly bigHoldBonus: number;
   /** A span with more blanks than this spells nothing. */
   readonly maxBlanksPerWord: number;
   readonly tileRates: SlotTileRates;
@@ -110,7 +112,8 @@ export const DEFAULT_SLOT_SPELLER_CONFIG: SlotSpellerConfig = {
   shopOfferCount: 3,
   wildBlanksPerStrip: 2,
   splitTilesPerSpin: 2,
-  lockReels: 2,
+  freeHolds: 1,
+  bigHoldBonus: 2,
   maxBlanksPerWord: 2,
   tileRates: { doubleLetterChance: 0, tripleLetterChance: 0, highValueDoubleBonus: 0 },
   cells: {

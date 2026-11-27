@@ -14,7 +14,7 @@ import { performance } from "node:perf_hooks";
 import type { Tile } from "@wordpoker/contracts";
 import { loadDictionary, type Dictionary } from "../src/words/dictionary";
 import { DEFAULT_SLOT_SPELLER_CONFIG, roundTarget, type SlotSpellerConfig } from "../src/slot-speller/config";
-import { canLock, nudge, spin, swap, toggleLock } from "../src/slot-speller/actions";
+import { canHold, holdLimit, nudge, spin, swap, toggleHold } from "../src/slot-speller/actions";
 import { cellAt } from "../src/slot-speller/cells";
 import { slotLines } from "../src/slot-speller/evaluate";
 import { payLine } from "../src/slot-speller/pay-line";
@@ -135,13 +135,13 @@ function bestMove(state: SlotSpellerState, current: number): { state: SlotSpelle
   return best;
 }
 
-/** Spins (using Reel Lock on the best word's first two reels when it can), plays greedily, pays. */
+/** Spins (holding the best word's first reels when it can), plays greedily, pays. */
 function playSpin(start: SlotSpellerState): { state: SlotSpellerState; score: number } {
   let state = start;
-  if (canLock(state) && state.bestWord !== null) {
+  if (canHold(state) && state.bestWord !== null) {
     const words = bestLineWords(state);
     for (const reel of words) {
-      const locked = toggleLock(state, reel);
+      const locked = toggleHold(state, reel);
       if (locked.ok) state = locked.state;
     }
   }
@@ -160,7 +160,7 @@ function playSpin(start: SlotSpellerState): { state: SlotSpellerState; score: nu
   return { state: paid.state, score: paid.payout.total };
 }
 
-/** The two reels of the grid's best-scoring word (for Reel Lock). */
+/** The reels of the grid's best-scoring word the run may hold. */
 function bestLineWords(state: SlotSpellerState): number[] {
   const context = { dictionary, config: state.config, powers: state.powers, cells: state.cells };
   let best: { score: number; reels: number[] } = { score: 0, reels: [] };
@@ -169,13 +169,13 @@ function bestLineWords(state: SlotSpellerState): number[] {
       if (word.breakdown.score > best.score) best = { score: word.breakdown.score, reels: word.cells.map(([r]) => r) };
     }
   }
-  return best.reels.slice(0, state.config.lockReels);
+  return best.reels.slice(0, holdLimit(state));
 }
 
 // ---------------------------------------------------------------- shop policies
 
 const PRIORITY: readonly SlotPowerId[] = [
-  "zigzag", "wave", "twins", "extraRow", "heavy", "action", "extraMove", "wild", "longHaul", "split", "lock",
+  "zigzag", "wave", "twins", "extraRow", "heavy", "action", "extraMove", "wild", "longHaul", "split", "bigHold",
 ];
 const cost = (id: SlotPowerId): number => SLOT_POWERS.find((power) => power.id === id)!.cost;
 
@@ -309,7 +309,7 @@ function build(seed: number, reels: number, powers: SlotPowerCounts, config: Slo
   return { ...base, powers, reels, strips, top: strips.map(() => 0), grid: strips.map((strip) => windowAt(strip, 0, rows)), target: Number.POSITIVE_INFINITY };
 }
 
-/** Mean spin score over `runs` seeds × a 3-spin round (so Reel Lock gets used). */
+/** Mean spin score over `runs` seeds × a 3-spin round (so holds get used). */
 function meanSpin(reels: number, powers: SlotPowerCounts, config = DEFAULT_SLOT_SPELLER_CONFIG): number {
   const scores: number[] = [];
   for (let seed = firstSeed; seed < firstSeed + runs; seed += 1) {

@@ -16,7 +16,7 @@ import {
   rerollShop,
   spin,
   swap,
-  toggleLock,
+  toggleHold,
   type Dictionary,
   type NudgeDirection,
   type SlotActionResult,
@@ -34,7 +34,7 @@ export interface SlotSpellerModel {
   readonly payout: SlotEvaluation | null;
   /** How many of `payoutRows(payout)` are on screen. */
   readonly revealStep: number;
-  /** Reels Reel Lock held through the last spin: they stay still instead of stopping in. */
+  /** Reels held through the last spin: they stay still instead of stopping in. */
   readonly held: readonly number[];
 }
 
@@ -110,7 +110,7 @@ export function reduceSlotSpeller(
   switch (action.type) {
     case "spin": {
       const result = spin(state);
-      return result.ok ? { ...createSlotModel(result.state), held: state.locks } : model;
+      return result.ok ? { ...createSlotModel(result.state), held: state.holds } : model;
     }
     case "nudge": {
       const next = applied(model, nudge(state, action.reel, action.direction));
@@ -141,7 +141,7 @@ export function reduceSlotSpeller(
     case "reroll":
       return applied(model, rerollShop(state));
     case "toggleLock":
-      return applied(model, toggleLock(state, action.reel));
+      return applied(model, toggleHold(state, action.reel));
     case "newRun":
       return createSlotModel(createSlotRun(action.seed));
     case "revealNext":

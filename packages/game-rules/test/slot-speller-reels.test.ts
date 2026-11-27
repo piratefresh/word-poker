@@ -84,13 +84,13 @@ describe("Slot Speller reels", () => {
     assert.equal(ok(spin({ ...run, powers: { extraMove: 1 } })).moves, 6);
   });
 
-  it("keeps a locked reel's column through a spin and consumes the lock", () => {
-    let state = ok(spin(createSlotRun("lock")));
+  it("keeps a held reel's column through a spin and consumes the hold", () => {
+    let state = ok(spin(createSlotRun("hold")));
     state = ok(swap(state, [1, 0], [3, 0]));
     const held = state.grid[1];
-    const next = ok(spin({ ...state, phase: "between", locks: [1] }));
+    const next = ok(spin({ ...state, phase: "between", holds: [1] }));
     assert.deepEqual(next.grid[1], held);
-    assert.deepEqual(next.locks, []);
+    assert.deepEqual(next.holds, []);
   });
 
   it("refuses illegal actions with the state unchanged and a reason", () => {

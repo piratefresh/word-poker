@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 
 import {
-  canLock,
+  canHold,
   type NudgeDirection,
   type SlotCell,
   type SlotSpellerState,
@@ -46,7 +46,7 @@ export interface SlotGridProps {
   revealing: boolean;
   onTapCell: (cell: SlotCell) => void;
   onNudge: (reel: number, direction: NudgeDirection) => void;
-  /** Reel Lock: hold or release a reel for the next spin. */
+  /** Hold or release a reel for the next spin. */
   onToggleLock: (reel: number) => void;
   onSkipReveal: () => void;
   /** Called with the spin's number once every reel of that spin has landed (at once when none roll). */
@@ -85,9 +85,9 @@ export function SlotGrid({
   const [width, setWidth] = useState(windowWidth - spacing.gutter * 2);
   const reduceMotion = useReducedMotion();
 
-  const { reels, grid, phase, moves, spinCount, locks, strips, top } = state;
+  const { reels, grid, phase, moves, spinCount, holds, strips, top } = state;
   const canMove = phase === "moving" && moves > 0;
-  const lockable = canLock(state);
+  const lockable = canHold(state);
   const gap = reels > WIDE_REELS ? WIDE_GAP : GAP;
   const scale = Math.min(1, (width - gap * (reels - 1)) / reels / TILE.width);
   const tileWidth = TILE.width * scale;
@@ -135,7 +135,7 @@ export function SlotGrid({
       style={[styles.grid, { gap }]}
     >
       {grid.map((column, reel) => {
-        const locked = locks.includes(reel);
+        const locked = holds.includes(reel);
         const rolling = roll !== null && roll.rolling.includes(reel);
         return (
           <View key={reel} style={[styles.reel, { width: tileWidth }]}>
@@ -269,7 +269,7 @@ interface LockToggleProps {
   onToggle: (reel: number) => void;
 }
 
-/** Reel Lock's hold/held switch, in the down arrow's place while a lock can be set. */
+/** A reel's hold/held switch, in the down arrow's place between spins. */
 function LockToggle({ reel, locked, onToggle }: LockToggleProps): ReactElement {
   const testID = `slot-lock-${reel}`;
   return (

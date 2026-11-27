@@ -95,7 +95,7 @@ describe("Slot Speller premium cells", () => {
     const base = createSlotRun("cells", { ...CONFIG, reels: 9 });
     const cells = [premium(0, 0, "2L"), premium(8, 0, "3L"), premium(0, 1, "2W"), premium(1, 1, "2W"), premium(0, 2, "2L"), premium(1, 2, "3L")];
     for (let roll = 0; roll < 20; roll += 1) {
-      const rolled = rollCells({ ...base, cells, locks: [0], cellRolls: roll }, 9, 3).cells;
+      const rolled = rollCells({ ...base, cells, holds: [0], cellRolls: roll }, 9, 3).cells;
       assert.deepEqual(perRow(rolled, 3), [["2L", "3L"], ["2W", "2W"], ["2L", "3L"]]);
       assert.deepEqual(rolled.filter((cell) => cell.reel === 0), [premium(0, 0, "2L"), premium(0, 1, "2W"), premium(0, 2, "2L")]);
     }

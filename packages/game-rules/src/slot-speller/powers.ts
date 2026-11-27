@@ -5,7 +5,7 @@ export type SlotPowerId =
   | "wave"
   | "zigzag"
   | "extraMove"
-  | "lock"
+  | "bigHold"
   | "split"
   | "wild"
   | "action"
@@ -35,7 +35,7 @@ export const SLOT_POWERS: readonly SlotPower[] = [
   { id: "wave", name: "Wave Lines", type: "Lines", cost: 6, max: 1, glyph: "≈", description: "Two weaving lines, and their mirror, pay." },
   { id: "zigzag", name: "Zigzag Lines", type: "Lines", cost: 6, max: 1, glyph: "ZZ", description: "Lines alternating between neighbouring rows pay." },
   { id: "extraMove", name: "Extra Move", type: "Moves", cost: 5, max: 1, glyph: "+2", description: "+2 moves every spin." },
-  { id: "lock", name: "Reel Lock", type: "Moves", cost: 5, max: 1, glyph: "LK", description: "Once a round, hold up to two reels for the next spin." },
+  { id: "bigHold", name: "Big Hold", type: "Moves", cost: 5, max: 1, glyph: "H3", description: "Hold up to 3 reels between spins instead of 1." },
   { id: "split", name: "Split Tiles", type: "Tiles", cost: 5, max: 1, glyph: "A/E", description: "Each spin, 2 tiles gain a second face and play as the better word." },
   { id: "wild", name: "Wild Reel", type: "Tiles", cost: 5, max: 1, glyph: "?", description: "Blanks on the strips: any letter, scores 0." },
   { id: "action", name: "Action", type: "Scoring", cost: 4, max: 1, glyph: "ING", description: "Words ending ING or ED score ×2." },

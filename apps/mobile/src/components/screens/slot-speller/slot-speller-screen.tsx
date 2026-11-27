@@ -5,7 +5,8 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  canLock,
+  canHold,
+  holdLimit,
   type Dictionary,
   type SlotPhase,
   type SlotSpellerState,
@@ -288,10 +289,10 @@ function SlotActions({
           <Text
             style={styles.hint}
           >{`${toGo} to go · ${state.spinsLeft} ${state.spinsLeft === 1 ? "spin" : "spins"} left`}</Text>
-          {canLock(state) ? (
+          {canHold(state) ? (
             <Text
               style={styles.hint}
-            >{`Reel Lock: hold up to ${state.config.lockReels} reels through the next spin.`}</Text>
+            >{`Hold up to ${holdLimit(state)} ${holdLimit(state) === 1 ? "reel" : "reels"} through the next spin.`}</Text>
           ) : null}
           {spinButton}
         </View>

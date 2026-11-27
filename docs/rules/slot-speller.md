@@ -62,8 +62,17 @@ multiplier.
 
 **Spins.** A spin is allowed at the start of a round or between spins, while spins are left. A
 spin sends every reel to a new random place on its strip and refills its column. A
-reel held by Reel Lock keeps its column, and the lock is spent. A round has 3 spins; each spin
+held reel keeps its column (Holds, below). A round has 3 spins; each spin
 grants 4 moves (6 with Extra Move).
+
+**Holds.** As on a fruit machine, between the spins of a round the player may hold 1 reel for
+free (3 with Big Hold); tapping a held reel releases it. Holding costs no move and no token.
+The next spin leaves a held reel's column as it is, swapped tiles included, and its premium
+cells where they are; the row's other cells land on the reels that spin. The spin clears the
+holds, so the player chooses again before the spin after it, and a new round starts with none.
+Holding is refused outside the between-spins phase (so not before a round's first spin), for a
+reel off the grid, and for one more reel than the limit. An Extra Spin is a spin like any
+other: reels can be held for it. Config: `freeHolds` (1) and `bigHoldBonus` (2).
 
 **Moves.** Each move costs one:
 
@@ -117,7 +126,7 @@ multiplier, the powers and the unrounded score.
 | Wave Lines | Lines | 6 | Two weaving lines, and their mirror, pay |
 | Zigzag Lines | Lines | 6 | Lines alternating between neighbouring rows pay |
 | Extra Move | Moves | 5 | +2 moves every spin |
-| Reel Lock | Moves | 5 | Once a round, hold up to two reels for the next spin |
+| Big Hold | Moves | 5 | Hold up to 3 reels between spins instead of 1 |
 | Split Tiles | Tiles | 5 | Each spin, 2 tiles gain a second face and play as the better word |
 | Wild Reel | Tiles | 5 | Blanks on the strips: any letter, scores 0 |
 | Action | Scoring | 4 | Words ending ING or ED ×2 |
@@ -125,15 +134,12 @@ multiplier, the powers and the unrounded score.
 | Twins | Scoring | 4 | Words with a double letter ×2 |
 | Long Haul | Scoring | 4 | Length mult ×2 at 6 letters, ×3 at 7+ |
 
-**Reel Lock.** Once a round, between spins, the player may hold up to 2 reels; tapping a held
-reel releases it. The next spin leaves held reels' columns and premium cells as they are,
-swapped tiles included, and spends the lock for the round, even if the player held only one reel. A spin with no reel
-held does not spend it. Holding is refused outside the between-spins phase, without the power,
-after this round's lock is spent, or for a third reel. The next round brings the lock back.
+**Big Hold.** Adds 2 reels to the free hold (Holds, above), so up to 3 reels can be held
+between spins, every spin of every round.
 
 **Split Tiles.** After every spin lands, 2 random tiles in the grid gain a second face and
 become choice tiles, playing either face (Paying a line, above). Only plain tiles qualify: not
-a blank, not already a choice tile, and not on a reel Reel Lock held. The second face is the
+a blank, not already a choice tile, and not on a held reel. The second face is the
 letter's partner in the first choice pair holding it (§10: A/E, E/I, O/U, A/I, T/S, R/N, D/T,
 S/L, Q/K, Z/X, J/H, so A gains E and T gains S); a letter in no pair gains a random one of A,
 E, I, O, R, S, T, N. The tile keeps its multiplier. Only the grid changes, never the strips, so
@@ -168,7 +174,7 @@ grants one more spin. Otherwise the run is **over**. A new run starts again from
   shop (1, 2, 3, …); the next shop starts again at 1.
 
 The shop's cards come from the run's seed, so leaving and reopening the game shows the same
-cards. Leaving the shop starts the next round; locks are cleared and the Extra Spin is on offer
+cards. Leaving the shop starts the next round; holds are cleared and the Extra Spin is on offer
 again.
 
 ## Tuning
@@ -177,8 +183,8 @@ Measured with `pnpm --filter @wordpoker/game-rules exec tsx scripts/probe-slot-s
 (STO-1165). The bot is greedy: each step it tries every nudge and swap (swaps sampled to 200 on
 wide grids), takes the best grid total, and pays when nothing improves. **These numbers were
 measured before premium cells (STO-1180), with DL/TL tiles on the strips; STO-1188 re-runs
-them.** It locks the best
-word's reels when it holds Reel Lock and buys the Extra Spin when short. People find much less
+them.** It holds the best
+word's reels, as many as it may, and buys the Extra Spin when short. People find much less
 than this bot (maybe 30–50% of it), so these numbers are a ceiling, not a target.
 
 **Starting 5×3 grid**, 200 seeds × 3 spins:
@@ -207,10 +213,10 @@ This confirms the prototype's "about 31 a spin (24 with 4+ only)".
 | Wild Reel | 50.0 | +5.9 | 1.2 |
 | Long Haul | 47.3 | +3.1 | 0.8 |
 | Split Tiles | 46.9 | +2.7 | 0.5 |
-| Reel Lock | 45.1 | +1.0 | 0.2 |
+| Reel Lock (now Big Hold) | 45.1 | +1.0 | 0.2 |
 
-Long Haul grows with grid width (more 6–7 letter words); Reel Lock is weak for a bot that
-replays greedily but may matter more to people. Zigzag is the standout; it stays as is.
+Long Haul grows with grid width (more 6–7 letter words); Reel Lock (once a round, 2 reels; replaced by the free hold and Big Hold in STO-1182) was weak
+for a bot that replays greedily but may matter more to people. Zigzag is the standout; it stays as is.
 
 **Whole runs**, 200 seeds, shop policy "power" (buy offered powers in the order of the table
 above, then reels with what is left):

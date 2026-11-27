@@ -40,11 +40,11 @@ export function patternCell(
 /**
  * Lays the premium cells of a `reels` × `rows` grid. Each row holds the cells the pattern draws
  * on that part of the board. When cells move, each lands on a random reel of its row that is not
- * held, from the run's next cell generator; a held reel (`state.locks`) keeps the cells it has.
+ * held, from the run's next cell generator; a held reel (`state.holds`) keeps the cells it has.
  * Returns the cells and the advanced roll counter.
  */
 export function rollCells(
-  state: Pick<SlotSpellerState, "seed" | "config" | "locks" | "cells" | "cellRolls">,
+  state: Pick<SlotSpellerState, "seed" | "config" | "holds" | "cells" | "cellRolls">,
   reels: number,
   rows: number,
 ): { cells: SlotPremiumCell[]; cellRolls: number } {
@@ -63,14 +63,14 @@ export function rollCells(
     }
 
     for (const held of state.cells) {
-      if (held.row !== row || held.reel >= reels || !state.locks.includes(held.reel)) continue;
+      if (held.row !== row || held.reel >= reels || !state.holds.includes(held.reel)) continue;
       const match = need.findIndex((cell) => cell.kind === held.kind && cell.multiplier === held.multiplier);
       if (match < 0) continue;
       need.splice(match, 1);
       cells.push(held);
     }
 
-    const free = Array.from({ length: reels }, (_, reel) => reel).filter((reel) => !state.locks.includes(reel));
+    const free = Array.from({ length: reels }, (_, reel) => reel).filter((reel) => !state.holds.includes(reel));
     for (const cell of need) {
       const [reel] = free.splice(Math.floor(rng() * free.length), 1);
       if (reel === undefined) break;
