@@ -8,6 +8,7 @@ import {
   buyExtraSpin,
   buyPower,
   buyReel,
+  buyRow,
   createSlotRun,
   endRun,
   nextRound,
@@ -46,8 +47,9 @@ export type SlotSpellerAction =
   | { readonly type: "extraSpin" }
   | { readonly type: "endRun" }
   | { readonly type: "nextRound" }
-  | { readonly type: "buyPower"; readonly power: SlotPowerId }
+  | { readonly type: "buyPower"; readonly power: SlotPowerId; readonly pair?: number }
   | { readonly type: "buyReel" }
+  | { readonly type: "buyRow" }
   | { readonly type: "reroll" }
   | { readonly type: "toggleLock"; readonly reel: number }
   | { readonly type: "newRun"; readonly seed: string }
@@ -135,9 +137,11 @@ export function reduceSlotSpeller(
       return result.ok ? createSlotModel(result.state) : model;
     }
     case "buyPower":
-      return applied(model, buyPower(state, action.power));
+      return applied(model, buyPower(state, action.power, action.pair));
     case "buyReel":
       return applied(model, buyReel(state));
+    case "buyRow":
+      return applied(model, buyRow(state));
     case "reroll":
       return applied(model, rerollShop(state));
     case "toggleLock":

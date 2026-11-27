@@ -68,6 +68,10 @@ export interface SlotSpellerState {
   readonly shopRolls: number;
   /** Reels bought with Add Reel; sets its price. */
   readonly reelsBought: number;
+  /** Rows bought with Add Row; sets the row count and Add Row's price. */
+  readonly rowsBought: number;
+  /** The row pairs Zigzag Lines pays, each the upper row's index (0 = rows 1 and 2), one per purchase. */
+  readonly zigzagPairs: readonly number[];
   readonly bestWord: SlotBestWord | null;
 }
 
@@ -75,7 +79,7 @@ export interface SlotSpellerState {
 export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_SLOT_SPELLER_CONFIG): SlotSpellerState {
   const powers: SlotPowerCounts = {};
   const strips = Array.from({ length: config.reels }, (_, reel) => buildStrip(seed, reel, config));
-  const rows = rowCount(config, powers);
+  const rows = rowCount({ config, rowsBought: 0 });
   const top = strips.map(() => 0);
 
   return {
@@ -100,6 +104,8 @@ export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_
     shop: null,
     shopRolls: 0,
     reelsBought: 0,
+    rowsBought: 0,
+    zigzagPairs: [],
     bestWord: null,
   };
 }

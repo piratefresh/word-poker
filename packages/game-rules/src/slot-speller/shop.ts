@@ -2,18 +2,30 @@
 
 import { weightedSampleWithoutReplacement } from "../core/sample";
 import { refuse, type SlotActionResult } from "./actions";
-import { rollCells } from "./cells";
+import { addPermanentCell, rollCells } from "./cells";
 import { SLOT_POWERS, hasPower, type SlotPowerId } from "./powers";
 import { addWildBlanks, buildStrip, rowCount, windowAt } from "./reels";
 import { slotRng } from "./seed";
 import type { SlotSpellerState } from "./state";
 
+/** Row pairs Zigzag Lines does not pay yet, each the upper row's index. */
+export function freeZigzagPairs(state: SlotSpellerState): number[] {
+  return Array.from({ length: rowCount(state) - 1 }, (_, pair) => pair).filter((pair) => !state.zigzagPairs.includes(pair));
+}
+
+/** Whether `id` can still be offered: under its max, Zigzag with a free pair, the cell powers only with cells on. */
+function offerable(state: SlotSpellerState, id: SlotPowerId, max: number): boolean {
+  if (id === "zigzag") return freeZigzagPairs(state).length > 0;
+  if ((id === "hot" || id === "jackpot") && state.config.cells.layout === "none") return false;
+  return (state.powers[id] ?? 0) < max;
+}
+
 /**
- * Rolls a fresh stock: `shopOfferCount` powers the run does not already hold at their max, from
- * the run's next shop generator. Returns the stock and the advanced roll counter.
+ * Rolls a fresh stock: `shopOfferCount` powers the run can still take, from the run's next shop
+ * generator. Returns the stock and the advanced roll counter.
  */
 export function rollShopStock(state: SlotSpellerState): { stock: SlotPowerId[]; shopRolls: number } {
-  const pool = SLOT_POWERS.filter((power) => (state.powers[power.id] ?? 0) < power.max).map((power) => power.id);
+  const pool = SLOT_POWERS.filter((power) => offerable(state, power.id, power.max)).map((power) => power.id);
   const rng = slotRng(state.seed, "shop", state.shopRolls);
   return {
     stock: weightedSampleWithoutReplacement(pool, () => 1, state.config.shopOfferCount, rng),
@@ -31,27 +43,38 @@ export function rerollPrice(state: SlotSpellerState): number {
   return state.config.rerollBaseCost + (state.shop?.rerolls ?? 0);
 }
 
+/** Add Row's price: `addRowCosts` by rows already bought, holding at its last price. */
+export function addRowPrice(state: SlotSpellerState): number {
+  const costs = state.config.addRowCosts;
+  return costs[Math.min(state.rowsBought, costs.length - 1)] ?? 0;
+}
+
 /**
- * Buys one stock card: the power's count goes up and the card is sold. Extra Row refills every
- * column from its strip at its current top, so the grid stays one row taller everywhere, and lays
- * the cells again so the new row has its own. Wild
- * Reel writes its blanks onto every strip, then refreshes the columns the same way so they show.
+ * Buys one stock card: the power's count goes up and the card is sold. Zigzag Lines takes the row
+ * pair it pays (`pair`, the upper row's index), which must be free. Hot Cell and Jackpot Cell lay
+ * a permanent triple cell on a plain cell. Wild Reel writes its blanks onto every strip, then
+ * refreshes every column from its strip at its current top so they show.
  */
-export function buyPower(state: SlotSpellerState, id: SlotPowerId): SlotActionResult {
+export function buyPower(state: SlotSpellerState, id: SlotPowerId, pair?: number): SlotActionResult {
   const shop = state.shop;
   if (state.phase !== "shop" || shop === null) return refuse(state, "wrong-phase");
   const power = SLOT_POWERS.find((entry) => entry.id === id);
   if (power === undefined || !shop.stock.includes(id)) return refuse(state, "not-on-sale");
   if (shop.sold.includes(id)) return refuse(state, "sold");
   if (state.tokens < power.cost) return refuse(state, "not-enough-tokens");
+  if (id === "zigzag" && (pair === undefined || !freeZigzagPairs(state).includes(pair))) return refuse(state, "out-of-range");
 
   const powers = { ...state.powers, [id]: (state.powers[id] ?? 0) + 1 };
-  const rows = rowCount(state.config, powers);
+  const rows = rowCount(state);
   const strips = id === "wild" ? state.strips.map((strip, reel) => addWildBlanks(strip, state.seed, reel, state.config)) : state.strips;
-  const grid =
-    id === "extraRow" || id === "wild"
-      ? strips.map((strip, reel) => windowAt(strip, state.top[reel] ?? 0, rows))
-      : state.grid;
+  const grid = id === "wild" ? strips.map((strip, reel) => windowAt(strip, state.top[reel] ?? 0, rows)) : state.grid;
+  const { tripleLetterMultiplier, tripleWordMultiplier } = state.config.cells;
+  const cells =
+    id === "hot"
+      ? addPermanentCell(state, rows, "letter", tripleLetterMultiplier)
+      : id === "jackpot"
+        ? addPermanentCell(state, rows, "word", tripleWordMultiplier)
+        : state.cells;
 
   return {
     ok: true,
@@ -60,7 +83,8 @@ export function buyPower(state: SlotSpellerState, id: SlotPowerId): SlotActionRe
       powers,
       strips,
       grid,
-      ...(id === "extraRow" ? rollCells(state, state.reels, rows) : {}),
+      cells,
+      zigzagPairs: id === "zigzag" && pair !== undefined ? [...state.zigzagPairs, pair].sort((a, b) => a - b) : state.zigzagPairs,
       tokens: state.tokens - power.cost,
       shop: { ...shop, sold: [...shop.sold, id] },
     },
@@ -86,10 +110,34 @@ export function buyReel(state: SlotSpellerState): SlotActionResult {
       ...state,
       strips: [...state.strips, strip],
       top: [...state.top, 0],
-      grid: [...state.grid, windowAt(strip, 0, rowCount(state.config, state.powers))],
+      grid: [...state.grid, windowAt(strip, 0, rowCount(state))],
       reels: state.reels + 1,
-      ...rollCells(state, state.reels + 1, rowCount(state.config, state.powers)),
+      ...rollCells(state, state.reels + 1, rowCount(state)),
       reelsBought: state.reelsBought + 1,
+      tokens: state.tokens - price,
+    },
+  };
+}
+
+/**
+ * Buys a row: every column refills from its strip at its current top, one tile taller, and the
+ * cells are laid again so the new row has its own. The new row is a new paying line. Always on
+ * sale, up to `maxRows`.
+ */
+export function buyRow(state: SlotSpellerState): SlotActionResult {
+  if (state.phase !== "shop") return refuse(state, "wrong-phase");
+  if (rowCount(state) >= state.config.maxRows) return refuse(state, "max-rows");
+  const price = addRowPrice(state);
+  if (state.tokens < price) return refuse(state, "not-enough-tokens");
+
+  const rows = rowCount(state) + 1;
+  return {
+    ok: true,
+    state: {
+      ...state,
+      grid: state.strips.map((strip, reel) => windowAt(strip, state.top[reel] ?? 0, rows)),
+      ...rollCells(state, state.reels, rows),
+      rowsBought: state.rowsBought + 1,
       tokens: state.tokens - price,
     },
   };

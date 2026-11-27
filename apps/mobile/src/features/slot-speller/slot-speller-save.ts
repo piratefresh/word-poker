@@ -17,7 +17,8 @@ const RECORDS_KEY = "slot-speller-records";
 // 2: the run config gained the `targets` table (STO-1165); a version-1 save has none and crashes the shop.
 // 3: the run gained premium cells (`cells`, `cellRolls`, `config.cells`) (STO-1180).
 // 4: holds are free (`holds` replaced `locks`/`lockUsed`) and Big Hold replaced Reel Lock (STO-1182).
-const SAVE_VERSION = 4;
+// 5: Add Row (`rowsBought`), Zigzag by row pair (`zigzagPairs`), Hot/Jackpot Cell; Extra Row and Split Tiles are gone (STO-1186).
+const SAVE_VERSION = 5;
 
 export interface SlotRecords {
   /** The furthest round any run has cleared. */
@@ -95,7 +96,10 @@ function loadRecords(): SlotRecords {
   try {
     const parsed: unknown = JSON.parse(readItem(RECORDS_KEY) ?? "null");
     if (isObject(parsed) && typeof parsed.furthestRound === "number" && Array.isArray(parsed.discovered)) {
-      return parsed as unknown as SlotRecords;
+      const records = parsed as unknown as SlotRecords;
+      // A power since removed from the pool (Extra Row, Split Tiles) no longer counts as discovered.
+      const known = new Set<string>(SLOT_POWERS.map((power) => power.id));
+      return { ...records, discovered: records.discovered.filter((id) => known.has(id)) };
     }
   } catch {
     // fall through

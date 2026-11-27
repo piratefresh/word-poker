@@ -1,10 +1,13 @@
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import {
   SLOT_POWERS,
   addReelPrice,
+  addRowPrice,
+  freeZigzagPairs,
   rerollPrice,
+  rowCount,
   roundTarget,
   type SlotPower,
   type SlotPowerId,
@@ -40,15 +43,24 @@ export function PowerGlyph({ power }: { power: SlotPower }): ReactElement {
 
 export interface SlotShopPanelProps {
   state: SlotSpellerState;
-  onBuyPower: (power: SlotPowerId) => void;
+  /** `pair` is the row pair Zigzag Lines pays: the upper row's index. */
+  onBuyPower: (power: SlotPowerId, pair?: number) => void;
   onBuyReel: () => void;
+  onBuyRow: () => void;
   onReroll: () => void;
   onNextRound: () => void;
 }
 
-/** The shop a cleared round opens: three power cards, Add Reel, a reroll, and on to the next round. */
-export function SlotShopPanel({ state, onBuyPower, onBuyReel, onReroll, onNextRound }: SlotShopPanelProps): ReactElement {
+/**
+ * The shop a cleared round opens: three power cards, Add Reel, Add Row, a reroll, and on to the
+ * next round. Zigzag Lines asks which pair of rows before it is bought.
+ */
+export function SlotShopPanel({ state, onBuyPower, onBuyReel, onBuyRow, onReroll, onNextRound }: SlotShopPanelProps): ReactElement {
   const { shop, tokens, config, reels, round } = state;
+  const [pickingPair, setPickingPair] = useState(false);
+  const rows = rowCount(state);
+  const rowPrice = addRowPrice(state);
+  const rowsAtMax = rows >= config.maxRows;
   const stock = (shop?.stock ?? []).flatMap((id) => SLOT_POWERS.filter((power) => power.id === id));
   const reelPrice = addReelPrice(state);
   const atMax = reels >= config.maxReels;
@@ -69,6 +81,32 @@ export function SlotShopPanel({ state, onBuyPower, onBuyReel, onReroll, onNextRo
       ) : (
         stock.map((power) => {
           const sold = shop?.sold.includes(power.id) ?? false;
+          if (power.id === "zigzag" && pickingPair && !sold) {
+            return (
+              <View key={power.id} style={styles.card}>
+                <PowerGlyph power={power} />
+                <View style={styles.cardText}>
+                  <Text style={styles.name}>{`${power.name}: which rows?`}</Text>
+                  <View style={styles.pairs}>
+                    {freeZigzagPairs(state).map((pair) => (
+                      <GameButton
+                        key={pair}
+                        label={`Rows ${pair + 1}–${pair + 2}`}
+                        variant="gold"
+                        compact
+                        onPress={() => {
+                          setPickingPair(false);
+                          onBuyPower(power.id, pair);
+                        }}
+                        testID={`slot-shop-zigzag-${pair}`}
+                      />
+                    ))}
+                    <GameButton label="Cancel" variant="dark" compact onPress={() => setPickingPair(false)} testID="slot-shop-zigzag-cancel" />
+                  </View>
+                </View>
+              </View>
+            );
+          }
           return (
             <ShopCard
               key={power.id}
@@ -77,7 +115,7 @@ export function SlotShopPanel({ state, onBuyPower, onBuyReel, onReroll, onNextRo
               description={power.description}
               label={sold ? "Bought" : `Buy · ${power.cost}`}
               disabled={sold || tokens < power.cost}
-              onPress={() => onBuyPower(power.id)}
+              onPress={() => (power.id === "zigzag" ? setPickingPair(true) : onBuyPower(power.id))}
               testID={`slot-shop-buy-${power.id}`}
             />
           );
@@ -98,12 +136,29 @@ export function SlotShopPanel({ state, onBuyPower, onBuyReel, onReroll, onNextRo
         testID="slot-shop-reel"
       />
 
+      <ShopCard
+        glyph={
+          <View style={[styles.glyph, { borderColor: colors.goldHi }]}>
+            <Text style={[styles.glyphText, { color: colors.goldHi }]}>R+</Text>
+          </View>
+        }
+        name="Add Row"
+        description={`A new row, and a new paying line. ${rows} of ${config.maxRows}.`}
+        label={rowsAtMax ? "Max" : `Buy · ${rowPrice}`}
+        disabled={rowsAtMax || tokens < rowPrice}
+        onPress={onBuyRow}
+        testID="slot-shop-row"
+      />
+
       <View style={styles.actions}>
         <GameButton
           label={`Reroll · ${reroll}`}
           variant="dark"
           disabled={tokens < reroll}
-          onPress={onReroll}
+          onPress={() => {
+            setPickingPair(false);
+            onReroll();
+          }}
           style={styles.action}
           testID="slot-shop-reroll"
         />
@@ -162,6 +217,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
   },
   glyphText: { fontFamily: fonts.ui, fontSize: fontSize.body, paddingHorizontal: 2 },
+  pairs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.xs },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   action: { flex: 1 },
 });

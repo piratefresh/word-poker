@@ -40,8 +40,12 @@ export interface SlotCellConfig {
 export interface SlotSpellerConfig {
   /** Reels a run starts with. */
   readonly reels: number;
-  /** Rows a run starts with, before Extra Row. */
+  /** Rows a run starts with, before Add Row. */
   readonly rows: number;
+  /** The most rows Add Row can reach. */
+  readonly maxRows: number;
+  /** Add Row's price for each row bought, in order; past the list, its last price. */
+  readonly addRowCosts: readonly number[];
   /** The most reels Add Reel can reach. */
   readonly maxReels: number;
   /** Tiles on each reel's strip. */
@@ -69,8 +73,6 @@ export interface SlotSpellerConfig {
   readonly shopOfferCount: number;
   /** Blanks Wild Reel puts on each strip. */
   readonly wildBlanksPerStrip: number;
-  /** Grid tiles Split Tiles gives a second face each spin. */
-  readonly splitTilesPerSpin: number;
   /** Reels every run may hold between spins. */
   readonly freeHolds: number;
   /** Reels Big Hold adds to `freeHolds`. */
@@ -84,6 +86,8 @@ export interface SlotSpellerConfig {
 export const DEFAULT_SLOT_SPELLER_CONFIG: SlotSpellerConfig = {
   reels: 5,
   rows: 3,
+  maxRows: 5,
+  addRowCosts: [8, 12],
   maxReels: 12,
   stripLength: 30,
   movesPerSpin: 4,
@@ -111,7 +115,6 @@ export const DEFAULT_SLOT_SPELLER_CONFIG: SlotSpellerConfig = {
   rerollBaseCost: 1,
   shopOfferCount: 3,
   wildBlanksPerStrip: 2,
-  splitTilesPerSpin: 2,
   freeHolds: 1,
   bigHoldBonus: 2,
   maxBlanksPerWord: 2,

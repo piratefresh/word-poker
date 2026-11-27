@@ -1,12 +1,12 @@
 /** Slot Speller's power pool (§48, Powers): data only; each effect lives where it applies. */
 
 export type SlotPowerId =
-  | "extraRow"
+  | "hot"
+  | "jackpot"
   | "wave"
   | "zigzag"
   | "extraMove"
   | "bigHold"
-  | "split"
   | "wild"
   | "action"
   | "heavy"
@@ -21,7 +21,7 @@ export interface SlotPower {
   readonly type: SlotPowerType;
   /** Shop price in tokens. */
   readonly cost: number;
-  /** The most copies a run can hold. */
+  /** The most copies a run can hold; Zigzag Lines is capped by the free row pairs instead. */
   readonly max: number;
   readonly glyph: string;
   readonly description: string;
@@ -31,12 +31,12 @@ export interface SlotPower {
 export type SlotPowerCounts = Partial<Record<SlotPowerId, number>>;
 
 export const SLOT_POWERS: readonly SlotPower[] = [
-  { id: "extraRow", name: "Extra Row", type: "Grid", cost: 8, max: 2, glyph: "R+", description: "+1 row and paying line. Max 2." },
+  { id: "hot", name: "Hot Cell", type: "Grid", cost: 4, max: Infinity, glyph: "3L", description: "Adds a permanent triple-letter cell that stays put. Can be bought again." },
+  { id: "jackpot", name: "Jackpot Cell", type: "Grid", cost: 7, max: Infinity, glyph: "3W", description: "Adds a permanent triple-word cell that stays put. Can be bought again." },
   { id: "wave", name: "Wave Lines", type: "Lines", cost: 6, max: 1, glyph: "≈", description: "Two weaving lines, and their mirror, pay." },
-  { id: "zigzag", name: "Zigzag Lines", type: "Lines", cost: 6, max: 1, glyph: "ZZ", description: "Lines alternating between neighbouring rows pay." },
+  { id: "zigzag", name: "Zigzag Lines", type: "Lines", cost: 6, max: Infinity, glyph: "ZZ", description: "Pick two neighbouring rows: the two lines zigzagging between them pay. Buy again for another pair." },
   { id: "extraMove", name: "Extra Move", type: "Moves", cost: 5, max: 1, glyph: "+2", description: "+2 moves every spin." },
   { id: "bigHold", name: "Big Hold", type: "Moves", cost: 5, max: 1, glyph: "H3", description: "Hold up to 3 reels between spins instead of 1." },
-  { id: "split", name: "Split Tiles", type: "Tiles", cost: 5, max: 1, glyph: "A/E", description: "Each spin, 2 tiles gain a second face and play as the better word." },
   { id: "wild", name: "Wild Reel", type: "Tiles", cost: 5, max: 1, glyph: "?", description: "Blanks on the strips: any letter, scores 0." },
   { id: "action", name: "Action", type: "Scoring", cost: 4, max: 1, glyph: "ING", description: "Words ending ING or ED score ×2." },
   { id: "heavy", name: "Heavy", type: "Scoring", cost: 4, max: 1, glyph: "JQ", description: "Words with J, Q, X or Z score ×2." },

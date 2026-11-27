@@ -5,7 +5,6 @@ import type { Tile } from "@wordpoker/contracts";
 import { HIGH_VALUE_POINTS } from "../tiles/special-tiles";
 import { createTileBag } from "../tiles/tiles";
 import type { SlotSpellerConfig } from "./config";
-import { powerCount, type SlotPowerCounts } from "./powers";
 import { slotRng } from "./seed";
 
 /** The bag's letters, one entry per copy: drawing an index uniformly draws by the bag's distribution. */
@@ -14,9 +13,9 @@ const BAG_LETTERS: readonly { letter: string; points: number }[] = createTileBag
   points,
 }));
 
-/** Rows the grid shows: the config's plus one per Extra Row held. */
-export function rowCount(config: SlotSpellerConfig, powers: SlotPowerCounts): number {
-  return config.rows + powerCount(powers, "extraRow");
+/** Rows the grid shows: the config's plus one per row bought with Add Row. */
+export function rowCount(state: { readonly config: SlotSpellerConfig; readonly rowsBought: number }): number {
+  return state.config.rows + state.rowsBought;
 }
 
 /** A strip tile's id: unique per reel and strip position. */

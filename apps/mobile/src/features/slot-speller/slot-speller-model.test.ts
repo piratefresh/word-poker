@@ -69,18 +69,24 @@ describe("the shop and holds", () => {
       ...state,
       phase: "shop",
       tokens,
-      shop: { stock: ["bigHold", "extraRow", "heavy"], sold: [], rerolls: 0, earned: tokens },
+      shop: { stock: ["bigHold", "zigzag", "heavy"], sold: [], rerolls: 0, earned: tokens },
     });
   }
 
-  it("buys a power, marks it sold, and grows the grid for Extra Row", () => {
-    let model = reduceSlotSpeller(shopModel(20), { type: "buyPower", power: "extraRow" }, empty);
-    expect(model.state.tokens).toBe(12);
-    expect(model.state.shop?.sold).toEqual(["extraRow"]);
-    expect(model.state.grid[0]).toHaveLength(4);
+  it("buys Zigzag for a row pair and marks it sold", () => {
+    let model = reduceSlotSpeller(shopModel(20), { type: "buyPower", power: "zigzag", pair: 1 }, empty);
+    expect(model.state.tokens).toBe(14);
+    expect(model.state.shop?.sold).toEqual(["zigzag"]);
+    expect(model.state.zigzagPairs).toEqual([1]);
     const bought = model;
-    model = reduceSlotSpeller(model, { type: "buyPower", power: "extraRow" }, empty);
+    model = reduceSlotSpeller(model, { type: "buyPower", power: "zigzag", pair: 0 }, empty);
     expect(model).toBe(bought);
+  });
+
+  it("buys a row, growing the grid", () => {
+    const model = reduceSlotSpeller(shopModel(20), { type: "buyRow" }, empty);
+    expect(model.state.tokens).toBe(12);
+    expect(model.state.grid[0]).toHaveLength(4);
   });
 
   it("refuses what the tokens do not cover", () => {

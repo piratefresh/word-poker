@@ -5,9 +5,11 @@ import {
   DEFAULT_SLOT_SPELLER_CONFIG,
   SLOT_POWERS,
   addReelPrice,
+  addRowPrice,
   buyExtraSpin,
   buyPower,
   buyReel,
+  buyRow,
   createSlotRun,
   endRun,
   nextRound,
@@ -16,6 +18,7 @@ import {
   rerollPrice,
   rerollShop,
   roundTarget,
+  slotLines,
   spin,
   windowAt,
   type SlotActionResult,
@@ -137,21 +140,26 @@ describe("Slot Speller shop", () => {
     assert.ok(stocks.size > 1);
   });
 
-  it("leaves powers held at their max out of the stock", () => {
-    const allButTwo = Object.fromEntries(
-      SLOT_POWERS.filter((p) => p.id !== "extraRow" && p.id !== "wave").map((p) => [p.id, p.max]),
+  it("leaves powers held at their max, and Zigzag with no free pair, out of the stock", () => {
+    const capped = Object.fromEntries(
+      SLOT_POWERS.filter((p) => Number.isFinite(p.max) && p.id !== "wave").map((p) => [p.id, p.max]),
     );
     const base = inShop();
-    let state: SlotSpellerState = { ...base, powers: { ...allButTwo, extraRow: 1 } };
+    let state: SlotSpellerState = { ...base, powers: capped, zigzagPairs: [0] };
     state = ok(rerollShop(state));
-    assert.deepEqual([...(state.shop?.stock ?? [])].sort(), ["extraRow", "wave"]);
-    state = ok(rerollShop({ ...state, powers: { ...state.powers, extraRow: 2 } }));
-    assert.deepEqual(state.shop?.stock, ["wave"]);
+    assert.equal(state.shop?.stock.length, 3);
+    for (const id of state.shop?.stock ?? []) assert.ok(["hot", "jackpot", "wave", "zigzag"].includes(id), id);
+    for (let i = 0; i < 20; i += 1) {
+      state = ok(rerollShop({ ...state, tokens: 100, zigzagPairs: [0, 1] }));
+      assert.ok(!state.shop?.stock.includes("zigzag"));
+    }
+    const noCells = { ...state, tokens: 100, config: { ...state.config, cells: { ...state.config.cells, layout: "none" as const } } };
+    assert.deepEqual(ok(rerollShop(noCells)).shop?.stock, ["wave"]);
   });
 
   it("sells each stock card once, for its cost", () => {
     const shop = inShop();
-    const id = shop.shop?.stock[0];
+    const id = shop.shop?.stock.find((entry) => entry !== "zigzag");
     assert.ok(id !== undefined);
     const cost = SLOT_POWERS.find((p) => p.id === id)?.cost ?? 0;
     const bought = ok(buyPower(shop, id));
@@ -165,13 +173,21 @@ describe("Slot Speller shop", () => {
     assert.equal(reason(buyPower({ ...shop, phase: "between" }, id)), "wrong-phase");
   });
 
-  it("grows every column by a row when Extra Row is bought", () => {
-    const base = inShop();
-    const shop = { ...base, shop: { stock: ["extraRow" as const], sold: [], rerolls: 0, earned: 0 } };
-    const bought = ok(buyPower(shop, "extraRow"));
-    bought.grid.forEach((column, reel) => {
-      assert.deepEqual(column, windowAt(bought.strips[reel] ?? [], bought.top[reel] ?? 0, 4));
-    });
+  it("sells Add Row for 8 then 12, up to 5 rows, growing every column and adding a line", () => {
+    let state = { ...inShop(), tokens: 30 };
+    assert.equal(addRowPrice(state), 8);
+    state = ok(buyRow(state));
+    assert.equal(state.tokens, 22);
+    assert.equal(addRowPrice(state), 12);
+    state.grid.forEach((column, reel) => assert.deepEqual(column, windowAt(state.strips[reel] ?? [], state.top[reel] ?? 0, 4)));
+    assert.equal(slotLines(state).length, 4);
+    assert.ok(state.cells.some((cell) => cell.row === 3));
+    state = ok(buyRow(state));
+    assert.equal(state.tokens, 10);
+    assert.equal(state.grid[0]?.length, 5);
+    assert.equal(reason(buyRow({ ...state, tokens: 100 })), "max-rows");
+    assert.equal(reason(buyRow({ ...inShop(), tokens: 7 })), "not-enough-tokens");
+    assert.equal(reason(buyRow({ ...inShop(), phase: "between" })), "wrong-phase");
   });
 
   it("prices Add Reel 3, 4, 5… and caps it at 12 reels", () => {

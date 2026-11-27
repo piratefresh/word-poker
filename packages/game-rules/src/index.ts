@@ -180,7 +180,7 @@ export type { SlotPower, SlotPowerCounts, SlotPowerId, SlotPowerType } from "./s
 export { hashSeed, slotRng } from "./slot-speller/seed";
 export type { SlotSeedStream } from "./slot-speller/seed";
 export { addWildBlanks, buildStrip, rowCount, stripTileId, windowAt } from "./slot-speller/reels";
-export { cellAt, isSwapLocked, patternCell, rollCells } from "./slot-speller/cells";
+export { addPermanentCell, cellAt, isSwapLocked, patternCell, rollCells } from "./slot-speller/cells";
 export type { SlotCellKind, SlotPremiumCell } from "./slot-speller/cells";
 export { createSlotRun } from "./slot-speller/state";
 export type { SlotBestWord, SlotCell, SlotPhase, SlotShop, SlotSpellerState } from "./slot-speller/state";
@@ -196,4 +196,14 @@ export { evaluateSlotGrid, slotLines } from "./slot-speller/evaluate";
 export type { SlotEvaluation } from "./slot-speller/evaluate";
 export { buyExtraSpin, endRun, nextRound, pay } from "./slot-speller/run";
 export type { SlotPayResult } from "./slot-speller/run";
-export { addReelPrice, buyPower, buyReel, rerollPrice, rerollShop, rollShopStock } from "./slot-speller/shop";
+export {
+  addReelPrice,
+  addRowPrice,
+  buyPower,
+  buyReel,
+  buyRow,
+  freeZigzagPairs,
+  rerollPrice,
+  rerollShop,
+  rollShopStock,
+} from "./slot-speller/shop";

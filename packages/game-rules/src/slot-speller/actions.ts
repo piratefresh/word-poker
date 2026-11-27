@@ -2,15 +2,11 @@
 
 import type { Tile } from "@wordpoker/contracts";
 
-import { weightedSampleWithoutReplacement } from "../core/sample";
-import { LETTER_VALUES, type Letter } from "../tiles/letters";
-import { DEFAULT_SPECIAL_TILES } from "../tiles/special-tiles";
 import { isSwapLocked, rollCells } from "./cells";
-import { hasPower, powerCount } from "./powers";
+import { powerCount } from "./powers";
 import { rowCount, stripAt, windowAt, wrap } from "./reels";
 import { slotRng } from "./seed";
 import type { SlotCell, SlotSpellerState } from "./state";
-import { isBlank, isChoice } from "./word-score";
 
 export type SlotRejectionReason =
   | "wrong-phase"
@@ -24,7 +20,8 @@ export type SlotRejectionReason =
   | "sold"
   | "max-reels"
   | "extra-spin-used"
-  | "hold-full";
+  | "hold-full"
+  | "max-rows";
 
 /** Either the next state, or the reason the action was refused with the state handed back unchanged. */
 export type SlotActionResult =
@@ -47,15 +44,14 @@ export function movesPerSpin(state: SlotSpellerState): number {
  * Spins every reel that is not held to a new random top and refills its column from the strip; a
  * held reel keeps its column (unless the row count changed under it) and its premium cells; the
  * rest of each row's cells land on reels that spin. Only from `ready` or `between`.
- * Consumes the holds and a spin, and opens `moving` with a fresh set of moves. With Split Tiles,
- * the landed grid then gains its second faces.
+ * Consumes the holds and a spin, and opens `moving` with a fresh set of moves.
  */
 export function spin(state: SlotSpellerState): SlotActionResult {
   if (state.phase !== "ready" && state.phase !== "between") return refuse(state, "wrong-phase");
   if (state.spinsLeft <= 0) return refuse(state, "no-spins");
 
   const rng = slotRng(state.seed, "spin", state.spinCount);
-  const rows = rowCount(state.config, state.powers);
+  const rows = rowCount(state);
   const top: number[] = [];
   const grid: Tile[][] = [];
 
@@ -77,7 +73,7 @@ export function spin(state: SlotSpellerState): SlotActionResult {
     state: {
       ...state,
       top,
-      grid: hasPower(state.powers, "split") ? splitTiles(state, grid) : grid,
+      grid,
       ...rollCells(state, state.reels, rows),
       holds: [],
       phase: "moving",
@@ -86,41 +82,6 @@ export function spin(state: SlotSpellerState): SlotActionResult {
       spinCount: state.spinCount + 1,
     },
   };
-}
-
-/** Letters Split Tiles picks from for a letter in no choice pair. */
-const SPLIT_FALLBACK_LETTERS = ["A", "E", "I", "O", "R", "S", "T", "N"] as const;
-
-/**
- * Split Tiles: `splitTilesPerSpin` random plain grid tiles (not blank, not already a choice tile,
- * not on a held reel) gain a second face — the letter's partner in the first choice pair
- * holding it, else a random one of `SPLIT_FALLBACK_LETTERS` other than itself. Grid only.
- */
-function splitTiles(state: SlotSpellerState, grid: Tile[][]): Tile[][] {
-  const rng = slotRng(state.seed, "split", state.spinCount);
-  const eligible: SlotCell[] = [];
-  grid.forEach((column, reel) => {
-    if (state.holds.includes(reel)) return;
-    column.forEach((tile, row) => {
-      if (!isBlank(tile) && !isChoice(tile)) eligible.push([reel, row]);
-    });
-  });
-
-  const next = grid.map((column) => [...column]);
-  for (const [reel, row] of weightedSampleWithoutReplacement(eligible, () => 1, state.config.splitTilesPerSpin, rng)) {
-    const column = next[reel];
-    const tile = column?.[row];
-    if (column === undefined || tile === undefined) continue;
-    const pair = DEFAULT_SPECIAL_TILES.choicePairs.find((entry) => entry.includes(tile.letter));
-    const others = SPLIT_FALLBACK_LETTERS.filter((letter) => letter !== tile.letter);
-    const alternative = pair
-      ? pair[0] === tile.letter
-        ? pair[1]
-        : pair[0]
-      : (others[Math.floor(rng() * others.length)] ?? "E");
-    column[row] = { ...tile, alternativeLetter: alternative, alternativePoints: LETTER_VALUES[alternative as Letter] ?? 0 };
-  }
-  return next;
 }
 
 /** Reels the player may hold through the next spin: the free holds, plus Big Hold's bonus. */
