@@ -19,7 +19,7 @@ beforeEach(() => mockKv.clear());
 
 /** A run standing in a freshly opened shop, as a clear leaves it. */
 function inShop(state: SlotSpellerState, round = state.round): SlotSpellerState {
-  return { ...state, round, phase: "shop", tokens: 9, shop: { stock: ["wave", "lock", "heavy"], sold: [], rerolls: 0, earned: 9 } };
+  return { ...state, round, phase: "shop", tokens: 9, shop: { stock: ["wave", "bigHold", "heavy"], sold: [], rerolls: 0, earned: 9 } };
 }
 
 describe("the saved run", () => {
@@ -54,7 +54,7 @@ describe("updateRecords", () => {
     const shop = inShop(start, 3);
     const records = updateRecords(EMPTY_SLOT_RECORDS, start, shop);
     expect(records.furthestRound).toBe(3);
-    expect(records.discovered).toEqual(["wave", "lock", "heavy"]);
+    expect(records.discovered).toEqual(["wave", "bigHold", "heavy"]);
   });
 
   it("keeps the further round and orders discoveries by the pool", () => {
@@ -63,7 +63,7 @@ describe("updateRecords", () => {
     expect(updateRecords(records, start, shop)).toEqual({
       furthestRound: 5,
       bestWord: null,
-      discovered: ["extraRow", "wave", "lock", "heavy"],
+      discovered: ["extraRow", "wave", "bigHold", "heavy"],
     });
   });
 

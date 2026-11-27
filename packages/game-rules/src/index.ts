@@ -184,7 +184,7 @@ export { cellAt, isSwapLocked, patternCell, rollCells } from "./slot-speller/cel
 export type { SlotCellKind, SlotPremiumCell } from "./slot-speller/cells";
 export { createSlotRun } from "./slot-speller/state";
 export type { SlotBestWord, SlotCell, SlotPhase, SlotShop, SlotSpellerState } from "./slot-speller/state";
-export { canLock, movesPerSpin, nudge, spin, swap, toggleLock } from "./slot-speller/actions";
+export { canHold, holdLimit, movesPerSpin, nudge, spin, swap, toggleHold } from "./slot-speller/actions";
 export type { NudgeDirection, SlotActionResult, SlotRejectionReason } from "./slot-speller/actions";
 export { payLines } from "./slot-speller/lines";
 export type { PayLine } from "./slot-speller/lines";

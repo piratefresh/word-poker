@@ -56,10 +56,8 @@ export interface SlotSpellerState {
   readonly roundScore: number;
   readonly spinsLeft: number;
   readonly tokens: number;
-  /** Reels held through the next spin (Reel Lock); the spin consumes them. */
-  readonly locks: readonly number[];
-  /** Whether this round's Reel Lock has been spent (a spin held at least one reel). */
-  readonly lockUsed: boolean;
+  /** Reels held through the next spin, chosen between spins; the spin consumes them. */
+  readonly holds: readonly number[];
   /** Every spin of the run so far: the index of the next spin's generator. */
   readonly spinCount: number;
   /** Whether this round's one Extra Spin has been bought. */
@@ -88,7 +86,7 @@ export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_
     top,
     grid: strips.map((strip) => windowAt(strip, 0, rows)),
     reels: config.reels,
-    ...rollCells({ seed, config, locks: [], cells: [], cellRolls: 0 }, config.reels, rows),
+    ...rollCells({ seed, config, holds: [], cells: [], cellRolls: 0 }, config.reels, rows),
     phase: "ready",
     moves: 0,
     round: 1,
@@ -96,8 +94,7 @@ export function createSlotRun(seed: string, config: SlotSpellerConfig = DEFAULT_
     roundScore: 0,
     spinsLeft: config.spinsPerRound,
     tokens: 0,
-    locks: [],
-    lockUsed: false,
+    holds: [],
     spinCount: 0,
     extraSpinUsed: false,
     shop: null,

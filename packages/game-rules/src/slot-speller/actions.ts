@@ -1,4 +1,4 @@
-/** The player's grid actions — spin, nudge, swap (§48, Spins and moves) — each refused with a reason, nothing changed. */
+/** The player's grid actions — spin, hold, nudge, swap (§48, Spins and moves) — each refused with a reason, nothing changed. */
 
 import type { Tile } from "@wordpoker/contracts";
 
@@ -24,9 +24,7 @@ export type SlotRejectionReason =
   | "sold"
   | "max-reels"
   | "extra-spin-used"
-  | "no-power"
-  | "lock-used"
-  | "lock-full";
+  | "hold-full";
 
 /** Either the next state, or the reason the action was refused with the state handed back unchanged. */
 export type SlotActionResult =
@@ -46,10 +44,10 @@ export function movesPerSpin(state: SlotSpellerState): number {
 }
 
 /**
- * Spins every unlocked reel to a new random top and refills its column from the strip; a locked
- * reel keeps its column (unless the row count changed under it) and its premium cells; the rest
- * of each row's cells land on new reels. Only from `ready` or `between`.
- * Consumes the locks and a spin, and opens `moving` with a fresh set of moves. With Split Tiles,
+ * Spins every reel that is not held to a new random top and refills its column from the strip; a
+ * held reel keeps its column (unless the row count changed under it) and its premium cells; the
+ * rest of each row's cells land on reels that spin. Only from `ready` or `between`.
+ * Consumes the holds and a spin, and opens `moving` with a fresh set of moves. With Split Tiles,
  * the landed grid then gains its second faces.
  */
 export function spin(state: SlotSpellerState): SlotActionResult {
@@ -65,7 +63,7 @@ export function spin(state: SlotSpellerState): SlotActionResult {
     const strip = state.strips[reel] ?? [];
     const kept = state.grid[reel];
     const nextTop = Math.floor(rng() * strip.length);
-    if (state.locks.includes(reel) && kept !== undefined && kept.length === rows) {
+    if (state.holds.includes(reel) && kept !== undefined && kept.length === rows) {
       top.push(state.top[reel] ?? 0);
       grid.push([...kept]);
     } else {
@@ -81,8 +79,7 @@ export function spin(state: SlotSpellerState): SlotActionResult {
       top,
       grid: hasPower(state.powers, "split") ? splitTiles(state, grid) : grid,
       ...rollCells(state, state.reels, rows),
-      locks: [],
-      lockUsed: state.lockUsed || state.locks.length > 0,
+      holds: [],
       phase: "moving",
       moves: movesPerSpin(state),
       spinsLeft: state.spinsLeft - 1,
@@ -96,14 +93,14 @@ const SPLIT_FALLBACK_LETTERS = ["A", "E", "I", "O", "R", "S", "T", "N"] as const
 
 /**
  * Split Tiles: `splitTilesPerSpin` random plain grid tiles (not blank, not already a choice tile,
- * not on a locked reel) gain a second face — the letter's partner in the first choice pair
+ * not on a held reel) gain a second face — the letter's partner in the first choice pair
  * holding it, else a random one of `SPLIT_FALLBACK_LETTERS` other than itself. Grid only.
  */
 function splitTiles(state: SlotSpellerState, grid: Tile[][]): Tile[][] {
   const rng = slotRng(state.seed, "split", state.spinCount);
   const eligible: SlotCell[] = [];
   grid.forEach((column, reel) => {
-    if (state.locks.includes(reel)) return;
+    if (state.holds.includes(reel)) return;
     column.forEach((tile, row) => {
       if (!isBlank(tile) && !isChoice(tile)) eligible.push([reel, row]);
     });
@@ -126,22 +123,25 @@ function splitTiles(state: SlotSpellerState, grid: Tile[][]): Tile[][] {
   return next;
 }
 
-/** Whether Reel Lock can hold reels now: between spins, with the power, not yet spent this round. */
-export function canLock(state: SlotSpellerState): boolean {
-  return state.phase === "between" && hasPower(state.powers, "lock") && !state.lockUsed;
+/** Reels the player may hold through the next spin: the free holds, plus Big Hold's bonus. */
+export function holdLimit(state: Pick<SlotSpellerState, "config" | "powers">): number {
+  return state.config.freeHolds + powerCount(state.powers, "bigHold") * state.config.bigHoldBonus;
 }
 
-/** Reel Lock: holds or releases `reel` for the next spin, up to `lockReels` reels. */
-export function toggleLock(state: SlotSpellerState, reel: number): SlotActionResult {
+/** Whether reels can be held now: between spins, with at least one hold to place. */
+export function canHold(state: SlotSpellerState): boolean {
+  return state.phase === "between" && holdLimit(state) > 0;
+}
+
+/** Holds or releases `reel` for the next spin, up to `holdLimit` reels. Free: it costs no move. */
+export function toggleHold(state: SlotSpellerState, reel: number): SlotActionResult {
   if (state.phase !== "between") return refuse(state, "wrong-phase");
-  if (!hasPower(state.powers, "lock")) return refuse(state, "no-power");
-  if (state.lockUsed) return refuse(state, "lock-used");
   if (!Number.isInteger(reel) || reel < 0 || reel >= state.reels) return refuse(state, "out-of-range");
-  if (state.locks.includes(reel)) {
-    return { ok: true, state: { ...state, locks: state.locks.filter((held) => held !== reel) } };
+  if (state.holds.includes(reel)) {
+    return { ok: true, state: { ...state, holds: state.holds.filter((held) => held !== reel) } };
   }
-  if (state.locks.length >= state.config.lockReels) return refuse(state, "lock-full");
-  return { ok: true, state: { ...state, locks: [...state.locks, reel] } };
+  if (state.holds.length >= holdLimit(state)) return refuse(state, "hold-full");
+  return { ok: true, state: { ...state, holds: [...state.holds, reel] } };
 }
 
 function moveRefusal(state: SlotSpellerState): SlotRejectionReason | null {

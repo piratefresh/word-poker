@@ -16,7 +16,8 @@ const RECORDS_KEY = "slot-speller-records";
 /** Bumped when a saved run's shape stops matching the engine's; an older save starts a new run. */
 // 2: the run config gained the `targets` table (STO-1165); a version-1 save has none and crashes the shop.
 // 3: the run gained premium cells (`cells`, `cellRolls`, `config.cells`) (STO-1180).
-const SAVE_VERSION = 3;
+// 4: holds are free (`holds` replaced `locks`/`lockUsed`) and Big Hold replaced Reel Lock (STO-1182).
+const SAVE_VERSION = 4;
 
 export interface SlotRecords {
   /** The furthest round any run has cleared. */
@@ -45,7 +46,7 @@ function isRunState(value: unknown): value is SlotSpellerState {
     Array.isArray(value.strips) &&
     Array.isArray(value.grid) &&
     Array.isArray(value.top) &&
-    Array.isArray(value.locks) &&
+    Array.isArray(value.holds) &&
     Array.isArray(value.cells)
   );
 }

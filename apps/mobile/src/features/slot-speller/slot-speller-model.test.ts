@@ -60,7 +60,7 @@ describe("reduceSlotSpeller", () => {
   });
 });
 
-describe("the shop and Reel Lock", () => {
+describe("the shop and holds", () => {
   const empty = testDictionary([]);
   /** A run standing in a freshly opened shop with tokens to spend. */
   function shopModel(tokens: number) {
@@ -69,7 +69,7 @@ describe("the shop and Reel Lock", () => {
       ...state,
       phase: "shop",
       tokens,
-      shop: { stock: ["lock", "extraRow", "heavy"], sold: [], rerolls: 0, earned: tokens },
+      shop: { stock: ["bigHold", "extraRow", "heavy"], sold: [], rerolls: 0, earned: tokens },
     });
   }
 
@@ -85,7 +85,7 @@ describe("the shop and Reel Lock", () => {
 
   it("refuses what the tokens do not cover", () => {
     const model = shopModel(2);
-    expect(reduceSlotSpeller(model, { type: "buyPower", power: "lock" }, empty)).toBe(model);
+    expect(reduceSlotSpeller(model, { type: "buyPower", power: "bigHold" }, empty)).toBe(model);
     expect(reduceSlotSpeller(model, { type: "buyReel" }, empty)).toBe(model);
   });
 
@@ -99,15 +99,15 @@ describe("the shop and Reel Lock", () => {
     expect(model.state.shop?.rerolls).toBe(1);
   });
 
-  it("holds a locked reel through the next spin and remembers it was held", () => {
-    let model = reduceSlotSpeller(shopModel(20), { type: "buyPower", power: "lock" }, empty);
+  it("holds a reel through the next spin and remembers it was held", () => {
+    let model = reduceSlotSpeller(shopModel(20), { type: "buyPower", power: "bigHold" }, empty);
     model = reduceSlotSpeller(model, { type: "nextRound" }, empty);
     model = reduceSlotSpeller(model, { type: "spin" }, empty);
     model = reduceSlotSpeller(model, { type: "pay" }, empty);
     expect(model.state.phase).toBe("between");
 
     model = reduceSlotSpeller(model, { type: "toggleLock", reel: 2 }, empty);
-    expect(model.state.locks).toEqual([2]);
+    expect(model.state.holds).toEqual([2]);
     const kept = model.state.grid[2];
     model = reduceSlotSpeller(model, { type: "spin" }, empty);
     expect(model.held).toEqual([2]);

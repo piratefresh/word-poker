@@ -12,13 +12,14 @@ import {
   buildStrip,
   buyPower,
   buyReel,
-  canLock,
+  canHold,
   createSlotRun,
+  holdLimit,
   nextRound,
   pay,
   spin,
   stripTileId,
-  toggleLock,
+  toggleHold,
   windowAt,
   type Letter,
   type SlotActionResult,
@@ -75,53 +76,81 @@ describe("Slot Speller power pool", () => {
   });
 });
 
-describe("Slot Speller Reel Lock", () => {
-  it("holds the chosen reels through the next spin and spends the lock", () => {
-    let state = between("lock", { lock: 1 });
-    assert.equal(canLock(state), true);
-    state = ok(toggleLock(state, 1));
-    state = ok(toggleLock(state, 3));
-    assert.deepEqual(state.locks, [1, 3]);
-    const next = ok(spin(state));
-    assert.deepEqual(next.grid[1], state.grid[1]);
-    assert.deepEqual(next.grid[3], state.grid[3]);
-    assert.deepEqual(next.locks, []);
-    assert.equal(next.lockUsed, true);
+describe("Slot Speller holds and Big Hold", () => {
+  it("holds one reel for free: its letters and premium cells stay through the next spin", () => {
+    for (let i = 0; i < 20; i += 1) {
+      const start = between(`hold-${i}`, {});
+      assert.equal(canHold(start), true);
+      assert.equal(holdLimit(start), 1);
+      const reel = start.cells[0]?.reel ?? 0;
+      const state = ok(toggleHold(start, reel));
+      assert.deepEqual(state.holds, [reel]);
+      assert.equal(state.moves, start.moves);
+
+      const next = ok(spin(state));
+      assert.deepEqual(next.grid[reel], state.grid[reel]);
+      assert.equal(next.top[reel], state.top[reel]);
+      const onReel = (cells: SlotSpellerState["cells"]) => cells.filter((cell) => cell.reel === reel);
+      assert.ok(onReel(state.cells).length > 0);
+      for (const cell of onReel(state.cells)) assert.ok(next.cells.some((kept) => JSON.stringify(kept) === JSON.stringify(cell)));
+      assert.equal(next.cells.length, state.cells.length);
+    }
   });
 
   it("releases a held reel when toggled again", () => {
-    const state = ok(toggleLock(ok(toggleLock(between("lock", { lock: 1 }), 2)), 2));
-    assert.deepEqual(state.locks, []);
-    assert.equal(state.lockUsed, false);
+    const state = ok(toggleHold(ok(toggleHold(between("hold", {}), 2)), 2));
+    assert.deepEqual(state.holds, []);
+    assert.deepEqual(ok(toggleHold(state, 4)).holds, [4]);
   });
 
-  it("refuses outside between, without the power, a third reel and off the grid", () => {
-    const moving = ok(spin({ ...createSlotRun("lock"), powers: { lock: 1 } }));
-    assert.equal(reason(toggleLock(moving, 0)), "wrong-phase");
-    assert.equal(canLock(moving), false);
-    assert.equal(reason(toggleLock(between("lock", {}), 0)), "no-power");
-    const two = ok(toggleLock(ok(toggleLock(between("lock", { lock: 1 }), 0)), 1));
-    const third = toggleLock(two, 2);
-    assert.equal(reason(third), "lock-full");
-    assert.equal(third.state, two);
-    assert.equal(reason(toggleLock(two, 9)), "out-of-range");
+  it("refuses a second reel without Big Hold, and a fourth with it", () => {
+    const one = ok(toggleHold(between("hold", {}), 0));
+    const second = toggleHold(one, 1);
+    assert.equal(reason(second), "hold-full");
+    assert.equal(second.state, one);
+
+    let state = between("hold", { bigHold: 1 });
+    assert.equal(holdLimit(state), 3);
+    for (const reel of [0, 2, 4]) state = ok(toggleHold(state, reel));
+    assert.deepEqual(state.holds, [0, 2, 4]);
+    assert.equal(reason(toggleHold(state, 1)), "hold-full");
+    const next = ok(spin(state));
+    for (const reel of [0, 2, 4]) assert.deepEqual(next.grid[reel], state.grid[reel]);
   });
 
-  it("is used once a round and available again next round", () => {
-    const spent = ok(pay(ok(spin(ok(toggleLock(between("lock", { lock: 1 }), 0)))), empty));
-    assert.equal(spent.phase, "between");
-    assert.equal(canLock(spent), false);
-    assert.equal(reason(toggleLock(spent, 1)), "lock-used");
-
-    const shop = { ...spent, phase: "shop" as const, shop: { stock: [], sold: [], rerolls: 0, earned: 0 } };
-    const fresh = ok(pay(ok(spin(ok(nextRound(shop)))), empty));
-    assert.equal(fresh.lockUsed, false);
-    assert.equal(canLock(fresh), true);
+  it("refuses outside between and off the grid", () => {
+    const ready = createSlotRun("hold");
+    assert.equal(canHold(ready), false);
+    assert.equal(reason(toggleHold(ready, 0)), "wrong-phase");
+    const moving = ok(spin(ready));
+    assert.equal(canHold(moving), false);
+    assert.equal(reason(toggleHold(moving, 0)), "wrong-phase");
+    assert.equal(reason(toggleHold(between("hold", {}), 9)), "out-of-range");
+    assert.equal(reason(toggleHold(between("hold", {}), 0.5)), "out-of-range");
   });
 
-  it("is not spent by a spin with no reel held", () => {
-    const state = ok(pay(ok(spin(between("lock", { lock: 1 }))), empty));
-    assert.equal(canLock(state), true);
+  it("clears the holds after the spin, with no once-a-round limit", () => {
+    const spun = ok(spin(ok(toggleHold(between("hold", {}), 0))));
+    assert.deepEqual(spun.holds, []);
+    const again = ok(pay(spun, empty));
+    assert.equal(again.phase, "between");
+    assert.equal(canHold(again), true);
+    assert.deepEqual(ok(toggleHold(again, 1)).holds, [1]);
+  });
+
+  it("starts the next round with no holds", () => {
+    const held = ok(toggleHold(between("hold", {}), 3));
+    const shop = { ...held, phase: "shop" as const, shop: { stock: [], sold: [], rerolls: 0, earned: 0 } };
+    const fresh = ok(nextRound(shop));
+    assert.deepEqual(fresh.holds, []);
+    assert.equal(canHold(fresh), false);
+  });
+
+  it("takes the hold counts from config", () => {
+    const none = { ...between("hold", {}), config: { ...DEFAULT_SLOT_SPELLER_CONFIG, freeHolds: 0 } };
+    assert.equal(canHold(none), false);
+    assert.equal(reason(toggleHold(none, 0)), "hold-full");
+    assert.equal(holdLimit({ ...none, powers: { bigHold: 1 } }), 2);
   });
 });
 
@@ -160,11 +189,11 @@ describe("Slot Speller Split Tiles", () => {
     assert.equal(ok(spin({ ...createSlotRun("split") })).grid.flat().some(isChoiceTile), false);
   });
 
-  it("never splits a blank, a choice tile or a tile on a locked reel", () => {
+  it("never splits a blank, a choice tile or a tile on a held reel", () => {
     const base = between("split-skip", { split: 1 });
     const blankStrip = base.strips[3]?.map((t) => tile("?", t.id)) ?? [];
     const choiceStrip = base.strips[4]?.map((t) => tile("K/Q", t.id)) ?? [];
-    const state = { ...base, strips: [...base.strips.slice(0, 3), blankStrip, choiceStrip], locks: [0, 1, 2] };
+    const state = { ...base, strips: [...base.strips.slice(0, 3), blankStrip, choiceStrip], holds: [0, 1, 2] };
     const next = ok(spin(state));
     for (const reel of [0, 1, 2]) assert.deepEqual(next.grid[reel], state.grid[reel]);
     assert.ok(next.grid[3]?.every((t) => "blank" in t && t.blank));
