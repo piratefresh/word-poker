@@ -1,13 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
-import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
+import { useReducedMotion } from "react-native-reanimated";
 
-import { canLock, type NudgeDirection, type SlotCell, type SlotSpellerState, type SlotWord } from "@wordpoker/game-rules";
+import {
+  canLock,
+  type NudgeDirection,
+  type SlotCell,
+  type SlotSpellerState,
+  type SlotWord,
+} from "@wordpoker/game-rules";
 
 import { Tile, TILE_METRICS } from "@/components/game/word-tile";
+import { haptic } from "@/components/word-builder/haptics";
 import { colors, opacity, radius, spacing } from "@/constants/theme";
 import { webTestID } from "@/lib/ui/web-id";
+
+import { SlotReelRoll } from "./slot-reel-roll";
 
 /** The large tile at full size; a wide grid scales it down to fit. */
 const TILE = TILE_METRICS.large;
@@ -16,8 +25,13 @@ const GAP = 4;
 const WIDE_REELS = 8;
 const WIDE_GAP = 2;
 const ARROW = 28;
-const REEL_STAGGER_MS = 90;
-const REEL_STOP_MS = 260;
+
+/** A spin being rolled on screen: the grid it left, and the reels still rolling. */
+interface SpinRoll {
+  spin: number;
+  from: SlotSpellerState["grid"];
+  rolling: readonly number[];
+}
 
 export interface SlotGridProps {
   state: SlotSpellerState;
@@ -35,6 +49,8 @@ export interface SlotGridProps {
   /** Reel Lock: hold or release a reel for the next spin. */
   onToggleLock: (reel: number) => void;
   onSkipReveal: () => void;
+  /** Called with the spin's number once every reel of that spin has landed (at once when none roll). */
+  onSpinLanded?: (spinCount: number) => void;
 }
 
 const cellKey = (reel: number, row: number): string => `${reel}:${row}`;
@@ -63,12 +79,13 @@ export function SlotGrid({
   onNudge,
   onToggleLock,
   onSkipReveal,
+  onSpinLanded,
 }: SlotGridProps): ReactElement {
   const { width: windowWidth } = useWindowDimensions();
   const [width, setWidth] = useState(windowWidth - spacing.gutter * 2);
   const reduceMotion = useReducedMotion();
 
-  const { reels, grid, phase, moves, spinCount, locks } = state;
+  const { reels, grid, phase, moves, spinCount, locks, strips, top } = state;
   const canMove = phase === "moving" && moves > 0;
   const lockable = canLock(state);
   const gap = reels > WIDE_REELS ? WIDE_GAP : GAP;
@@ -77,7 +94,37 @@ export function SlotGrid({
 
   const outlinedFaces = facesByCell(outlined);
   const litFaces = facesByCell(lit);
-  const animateSpin = !reduceMotion && spinCount > 0;
+
+  // The grid as last drawn, so a new spin knows the letters it rolls away from. Adjusted while
+  // rendering (not in an effect) so the dealt tiles never flash before their reel starts rolling.
+  const [seen, setSeen] = useState({ spin: spinCount, grid });
+  const [roll, setRoll] = useState<SpinRoll | null>(null);
+  if (seen.spin !== spinCount) {
+    setSeen({ spin: spinCount, grid });
+    const rolling = grid
+      .map((_, reel) => reel)
+      .filter((reel) => !held.includes(reel));
+    setRoll(
+      !reduceMotion && spinCount > 0 && seen.grid.length === grid.length
+        ? { spin: spinCount, from: seen.grid, rolling }
+        : null,
+    );
+  } else if (seen.grid !== grid) {
+    setSeen({ spin: spinCount, grid });
+  }
+  const onLanded = useCallback((reel: number) => {
+    haptic("settle");
+    setRoll((current) => {
+      if (current === null) return null;
+      const rolling = current.rolling.filter((each) => each !== reel);
+      return rolling.length === 0 ? null : { ...current, rolling };
+    });
+  }, []);
+  // Keyed on the spin too: a spin that rolls nothing (reduced motion, every reel held) still reports.
+  const anyRolling = roll !== null;
+  useEffect(() => {
+    if (!anyRolling) onSpinLanded?.(spinCount);
+  }, [anyRolling, spinCount, onSpinLanded]);
 
   return (
     <Pressable
@@ -89,50 +136,86 @@ export function SlotGrid({
     >
       {grid.map((column, reel) => {
         const locked = locks.includes(reel);
+        const rolling = roll !== null && roll.rolling.includes(reel);
         return (
           <View key={reel} style={[styles.reel, { width: tileWidth }]}>
-            <NudgeArrow direction={-1} reel={reel} disabled={!canMove} onNudge={onNudge} />
-            <Animated.View
-              // A new spin remounts each column, so it stops in again, left to right.
-              key={spinCount}
-              // A reel Reel Lock held stays still.
-              entering={
-                animateSpin && !held.includes(reel)
-                  ? FadeInDown.delay(reel * REEL_STAGGER_MS).duration(REEL_STOP_MS)
-                  : undefined
-              }
-              style={[styles.column, { gap }, locked && styles.locked]}
-            >
-              {column.map((tile, row) => {
-                const key = cellKey(reel, row);
-                const litFace = litFaces.get(key);
-                const outlinedFace = outlinedFaces.get(key);
-                const isSelected = selected !== null && selected[0] === reel && selected[1] === row;
-                return (
-                  // Keyed by position: a swap and a nudge can put two copies of one tile id on screen.
-                  <View key={key} style={[styles.cell, outlinedFace !== undefined && styles.outlined]}>
-                    <Tile
-                      tile={tile}
-                      side="front"
-                      size="large"
-                      scale={scale}
-                      animation="none"
-                      shadow={false}
-                      chosenFace={litFace ?? outlinedFace}
-                      fill={litFace !== undefined ? "gold" : "ivory"}
-                      selected={isSelected}
-                      interactive={canMove}
-                      onPress={() => onTapCell([reel, row])}
-                      testID={`slot-tile-${reel}-${row}`}
-                    />
-                  </View>
-                );
-              })}
-            </Animated.View>
+            <NudgeArrow
+              direction={-1}
+              reel={reel}
+              disabled={!canMove || rolling}
+              onNudge={onNudge}
+            />
+            <View>
+              <View
+                pointerEvents={rolling ? "none" : "auto"}
+                // The real tiles wait under the roll, hidden, and show the moment it lands on them.
+                style={[
+                  styles.column,
+                  { gap },
+                  locked && styles.locked,
+                  rolling && styles.hidden,
+                ]}
+              >
+                {column.map((tile, row) => {
+                  const key = cellKey(reel, row);
+                  const litFace = litFaces.get(key);
+                  const outlinedFace = outlinedFaces.get(key);
+                  const isSelected =
+                    selected !== null &&
+                    selected[0] === reel &&
+                    selected[1] === row;
+                  return (
+                    // Keyed by position: a swap and a nudge can put two copies of one tile id on screen.
+                    <View
+                      key={key}
+                      style={[
+                        styles.cell,
+                        outlinedFace !== undefined && styles.outlined,
+                      ]}
+                    >
+                      <Tile
+                        tile={tile}
+                        side="front"
+                        size="large"
+                        scale={scale}
+                        animation="none"
+                        shadow={false}
+                        chosenFace={litFace ?? outlinedFace}
+                        fill={litFace !== undefined ? "gold" : "ivory"}
+                        selected={isSelected}
+                        interactive={canMove}
+                        onPress={() => onTapCell([reel, row])}
+                        testID={`slot-tile-${reel}-${row}`}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+              {rolling ? (
+                <SlotReelRoll
+                  // A new spin starts a fresh roll from the letters the last one left.
+                  key={roll.spin}
+                  reel={reel}
+                  reels={reels}
+                  from={roll.from[reel] ?? column}
+                  to={column}
+                  strip={strips[reel] ?? column}
+                  top={top[reel] ?? 0}
+                  scale={scale}
+                  gap={gap}
+                  onLanded={onLanded}
+                />
+              ) : null}
+            </View>
             {lockable ? (
               <LockToggle reel={reel} locked={locked} onToggle={onToggleLock} />
             ) : (
-              <NudgeArrow direction={1} reel={reel} disabled={!canMove} onNudge={onNudge} />
+              <NudgeArrow
+                direction={1}
+                reel={reel}
+                disabled={!canMove}
+                onNudge={onNudge}
+              />
             )}
           </View>
         );
@@ -148,7 +231,12 @@ interface NudgeArrowProps {
   onNudge: (reel: number, direction: NudgeDirection) => void;
 }
 
-function NudgeArrow({ direction, reel, disabled, onNudge }: NudgeArrowProps): ReactElement {
+function NudgeArrow({
+  direction,
+  reel,
+  disabled,
+  onNudge,
+}: NudgeArrowProps): ReactElement {
   const testID = `slot-nudge-${direction === -1 ? "up" : "down"}-${reel}`;
   return (
     <Pressable
@@ -159,10 +247,18 @@ function NudgeArrow({ direction, reel, disabled, onNudge }: NudgeArrowProps): Re
       hitSlop={6}
       id={webTestID(testID)}
       onPress={() => onNudge(reel, direction)}
-      style={({ pressed }) => [styles.arrow, disabled && styles.arrowDisabled, pressed && styles.arrowPressed]}
+      style={({ pressed }) => [
+        styles.arrow,
+        disabled && styles.arrowDisabled,
+        pressed && styles.arrowPressed,
+      ]}
       testID={testID}
     >
-      <Ionicons name={direction === -1 ? "chevron-up" : "chevron-down"} size={20} color={colors.gold} />
+      <Ionicons
+        name={direction === -1 ? "chevron-up" : "chevron-down"}
+        size={20}
+        color={colors.gold}
+      />
     </Pressable>
   );
 }
@@ -184,10 +280,18 @@ function LockToggle({ reel, locked, onToggle }: LockToggleProps): ReactElement {
       hitSlop={6}
       id={webTestID(testID)}
       onPress={() => onToggle(reel)}
-      style={({ pressed }) => [styles.arrow, locked && styles.lockOn, pressed && styles.arrowPressed]}
+      style={({ pressed }) => [
+        styles.arrow,
+        locked && styles.lockOn,
+        pressed && styles.arrowPressed,
+      ]}
       testID={testID}
     >
-      <Ionicons name={locked ? "lock-closed" : "lock-open-outline"} size={18} color={locked ? colors.onGold : colors.gold} />
+      <Ionicons
+        name={locked ? "lock-closed" : "lock-open-outline"}
+        size={18}
+        color={locked ? colors.onGold : colors.gold}
+      />
     </Pressable>
   );
 }
@@ -195,9 +299,20 @@ function LockToggle({ reel, locked, onToggle }: LockToggleProps): ReactElement {
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", justifyContent: "center" },
   reel: { alignItems: "center", gap: spacing.xs },
-  column: { borderRadius: radius.md, borderWidth: 2, borderColor: "transparent", margin: -2 },
+  column: {
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: "transparent",
+    margin: -2,
+  },
   locked: { borderColor: colors.gold },
-  cell: { borderRadius: radius.md, borderWidth: 2, borderColor: "transparent", margin: -2 },
+  hidden: { opacity: 0 },
+  cell: {
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: "transparent",
+    margin: -2,
+  },
   outlined: { borderColor: colors.successHi },
   arrow: {
     width: "100%",

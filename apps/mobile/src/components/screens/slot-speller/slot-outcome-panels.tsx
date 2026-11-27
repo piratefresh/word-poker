@@ -4,9 +4,9 @@ import { StyleSheet, Text, View } from "react-native";
 import { SLOT_POWERS, powerCount, rowCount, type SlotSpellerState } from "@wordpoker/game-rules";
 
 import { GameButton } from "@/components/ui/game-button";
-import { colors, fonts, fontSize, radius, spacing, type } from "@/constants/theme";
+import { colors, fonts, fontSize, spacing, type } from "@/constants/theme";
 
-/** The shared card the end-of-spin panels sit in. */
+/** The shared title-and-body the end-of-round panels lay out in, inside the round sheet. */
 export function OutcomeCard({ title, children }: { title: string; children: ReactNode }): ReactElement {
   return (
     <View accessibilityLiveRegion="polite" style={styles.card}>
@@ -30,7 +30,6 @@ export function OutOfSpinsPanel({ state, onExtraSpin, onEndRun }: OutOfSpinsPane
   const canBuy = !state.extraSpinUsed && state.tokens >= cost;
   return (
     <OutcomeCard title="Out of spins">
-      <Text style={styles.body}>{`${state.roundScore} of ${state.target} points.`}</Text>
       <View style={styles.actions}>
         {canBuy ? (
           <GameButton label={`Extra spin · ${cost}`} variant="gold" onPress={onExtraSpin} testID="slot-extra-spin" />
@@ -83,15 +82,8 @@ function Stat({ label, value }: { label: string; value: string }): ReactElement 
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceStrong,
-  },
-  title: { fontFamily: fonts.slab, fontSize: fontSize.title, color: colors.gold },
+  card: { gap: spacing.sm },
+  title: { fontFamily: fonts.slab, fontSize: fontSize.title, color: colors.gold, textAlign: "center" },
   body: { ...type.body },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   stat: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
