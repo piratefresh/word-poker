@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { palette, type } from "@/constants/theme";
-import type { MapNode } from "@/features/story/kitchen-table-map";
+import type { ChapterMap, MapNode } from "@/features/story/chapter-map";
 import { useDictionary } from "@/features/table/use-dictionary";
 
 import { StoryTable } from "./components/story-hand/story-table";
@@ -13,7 +13,7 @@ import { StoryTable } from "./components/story-hand/story-table";
  * boss hand dealt again. Every rule here is game-rules' `chapter-run.ts`; this screen plays the
  * hand and saves what the run says.
  */
-export function StoryHandScreen({ node, onLeave }: { node: MapNode; onLeave: () => void }): ReactElement {
+export function StoryHandScreen({ map, node, onLeave }: { map: ChapterMap; node: MapNode; onLeave: () => void }): ReactElement {
   const dictionary = useDictionary();
   return (
     <View style={styles.screen}>
@@ -22,7 +22,7 @@ export function StoryHandScreen({ node, onLeave }: { node: MapNode; onLeave: () 
           <Text style={type.bodyDim}>Setting the table…</Text>
         </View>
       ) : (
-        <StoryTable dictionary={dictionary} node={node} onLeave={onLeave} />
+        <StoryTable dictionary={dictionary} map={map} node={node} onLeave={onLeave} />
       )}
     </View>
   );

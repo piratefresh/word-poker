@@ -22,7 +22,7 @@ import {
 
 import { randomSeed } from "@/features/offline/offline-seed";
 import { bossName } from "@/features/story/bosses";
-import { FRIENDS, type FriendId, type MapNode } from "@/features/story/kitchen-table-map";
+import { FRIENDS, type FriendId, type MapNode } from "@/features/story/chapter-map";
 import { nextCpuMove, type OfflineSession } from "@/features/offline/use-offline-game";
 
 export interface Challenge {

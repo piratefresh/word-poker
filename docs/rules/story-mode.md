@@ -38,6 +38,16 @@ score, so a fold with no word judged earns 1). Anything else records nothing and
 kept. After 2 boss losses in a row the coach offers a hint about the boss's tell. The first win
 pays the chapter's coins and XP; later wins pay stars only.
 
+**Badges.** Beating a boss wins that boss's badge; beating The Dealer also wins **Story Mode
+Champion**. A badge is the save's record that the boss was beaten: it is never lost, and a replay
+does not win it twice. The six badges show on every chapter's badge shelf and on the Account sheet.
+
+**The first-clear reward.** The coins and XP are the Wallet's, so the server pays them: once per
+player per chapter, in chapter order, at the amounts in the chapter config. The run is saved on the
+device and can be played signed out or offline, so a boss may be beaten before the reward can be
+paid. The app claims it as the boss hand settles and again each time the map opens, until every
+beaten chapter is paid. Only a signed-in player with a verified email is paid.
+
 **The power draft.** After each hand won (not a lost hand, the bonus or the boss), the run offers up to 3 powers
 from the chapter's pool that it does not already hold, drawn evenly. The player takes one: the draft is the
 hand's reward, so the screen asks for a pick (the engine still lets a draft be skipped). The run holds up to 3 drafted powers for the whole chapter; at 3, a new pick replaces a held

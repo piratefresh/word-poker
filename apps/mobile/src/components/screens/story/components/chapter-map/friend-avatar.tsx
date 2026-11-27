@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 import { AvatarArt } from "@/components/ui/avatar-art";
-import { FRIENDS, type Expression, type FriendId } from "@/features/story/kitchen-table-map";
+import { FRIENDS, type Expression, type FriendId } from "@/features/story/chapter-map";
 
 import { ink, lilita } from "./chapter-map-ink";
 

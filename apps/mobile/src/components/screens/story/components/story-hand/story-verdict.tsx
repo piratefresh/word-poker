@@ -8,8 +8,11 @@ import { useReduceMotion } from "@/components/hud/use-reduce-motion";
 import type { ResultsSeat } from "@/components/screens/results/results-types";
 import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
-import { KITCHEN_TABLE, type MapNode } from "@/features/story/kitchen-table-map";
+import type { ChapterMap, MapNode } from "@/features/story/chapter-map";
+import { chapterBadges } from "@/features/story/story-badges";
+import type { StoryPayout } from "@/features/story/story-reward";
 
+import { BadgeMedal } from "../chapter-map/badge-medal";
 import { gradient, ink, lilita } from "../chapter-map/chapter-map-ink";
 import { StoryDraft } from "./story-draft";
 import { StoryReveal, type StoryRevealProps } from "./story-reveal";
@@ -24,7 +27,7 @@ export interface BuiltWord {
 }
 
 export interface StoryVerdictProps {
-  chapterId: string;
+  map: ChapterMap;
   node: MapNode;
   verdict: RecordedHand;
   hero: ResultsSeat | null;
@@ -37,9 +40,18 @@ export interface StoryVerdictProps {
   into: string;
   /** The coach's hint about the boss's tell, shown after two boss losses in a row. */
   hint: string | null;
+  /** Where a first clear's coins and XP stand; `null` while the claim is out, or with nothing to claim. */
+  payout: StoryPayout | null;
   onReplay: () => void;
   onLeave: () => void;
 }
+
+/** What the reward line adds when the coins are not in the Wallet yet. */
+const PAYOUT_NOTE: Record<StoryPayout, string | null> = {
+  paid: null,
+  "sign-in": "Sign in with a verified email to collect. It’ll be paid when you open the map.",
+  later: "Couldn’t reach the bank. It’ll be paid when you next open the map.",
+};
 
 /** One star every beat, so the goals read against the stars the hand earned. */
 function useFilledStars(total: number): number {
@@ -55,26 +67,28 @@ function useFilledStars(total: number): number {
 
 /** The run's verdict on a settled hand: a loss is revealed and dealt again; a win fills its stars and pays a power. */
 export function StoryVerdict(props: StoryVerdictProps): ReactElement {
-  const { node, verdict, hero, winner, teach, onReplay, onLeave } = props;
+  const { map, node, verdict, hero, winner, teach, onReplay, onLeave } = props;
   const won = hero?.takesPot ?? false;
   if (!won) {
-    return <StoryReveal hero={hero} hint={verdict.coachHint ? (props.hint ?? undefined) : undefined} node={node} onLeave={onLeave} onReplay={onReplay} teach={teach} winner={winner} />;
+    return <StoryReveal map={map} hero={hero} hint={verdict.coachHint ? (props.hint ?? undefined) : undefined} node={node} onLeave={onLeave} onReplay={onReplay} teach={teach} winner={winner} />;
   }
   return <StoryResult {...props} />;
 }
 
-function StoryResult({ chapterId, node, verdict, hero, built, into, hint, onReplay, onLeave }: StoryVerdictProps): ReactElement {
+function StoryResult({ map, node, verdict, hero, built, into, hint, payout, onReplay, onLeave }: StoryVerdictProps): ReactElement {
   // The draft waits in the save, so it survives leaving here; taking one settles it and goes back.
   const { draft } = verdict;
   const filled = useFilledStars(verdict.replayBoss ? 0 : verdict.stars);
-  const title = verdict.bossBeaten ? `${KITCHEN_TABLE.boss.toUpperCase()} BEATEN` : verdict.replayBoss ? "NOT THIS TIME" : `${node.title.toUpperCase()} · WON`;
+  const title = verdict.bossBeaten ? `${map.boss.toUpperCase()} BEATEN` : verdict.replayBoss ? "NOT THIS TIME" : `${node.title.toUpperCase()} · WON`;
   const chips = hero?.net ?? 0;
+  const badges = verdict.bossBeaten ? chapterBadges(map, true) : [];
+  const note = payout === null ? null : PAYOUT_NOTE[payout];
   // A fold-out submits no word: show the one the player had built, if it was a real word.
   const folded = hero?.word == null;
   const shown = hero?.word != null ? { word: hero.word, score: hero.total, tiles: hero.tiles } : built;
 
   return (
-    <StoryStage dim={0.45} room={node.room}>
+    <StoryStage dim={0.45} map={map} room={node.room}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.card, gradient("radial-gradient(ellipse at 50% 0%, #2f4a3c, #18231e 70%)")]} testID="story-verdict">
           <Text style={styles.kicker}>{title}</Text>
@@ -96,9 +110,26 @@ function StoryResult({ chapterId, node, verdict, hero, built, into, hint, onRepl
           )}
           {folded ? <Text style={styles.folded}>{`${node.opponent} folded`}</Text> : null}
           {verdict.coachHint && hint !== null ? <Text style={styles.hint}>{hint}</Text> : null}
+          {badges.length === 0 ? null : (
+            <View style={styles.badges}>
+              {badges.map((badge) => (
+                <View key={badge.id} style={styles.badge}>
+                  <BadgeMedal badge={badge} size={52} />
+                  <Text style={styles.badgeName}>{badge.name.toUpperCase()}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {verdict.reward === null ? null : (
+            <View style={styles.reward} testID="story-reward">
+              <Text style={styles.kicker}>FIRST CLEAR</Text>
+              <Text style={styles.result}>{`+${verdict.reward.coins.toLocaleString("en-US")} COINS · +${verdict.reward.xp} XP`}</Text>
+              {note === null ? null : <Text style={styles.folded}>{note}</Text>}
+            </View>
+          )}
           <View style={styles.rule} />
           {draft !== null ? (
-            <StoryDraft chapterId={chapterId} into={into} offers={draft} onSettled={onLeave} />
+            <StoryDraft chapterId={map.chapter.id} into={into} offers={draft} onSettled={onLeave} />
           ) : verdict.replayBoss ? (
             <>
               <GameButton label="PLAY AGAIN" onPress={onReplay} testID="story-replay" variant="gold" />
@@ -121,8 +152,12 @@ const styles = StyleSheet.create({
   starOn: { color: ink.gold, textShadowColor: "#8a4e10", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
   starOff: { color: "rgba(255,246,226,0.45)" },
   result: { color: ink.parchment, fontFamily: lilita, fontSize: 20 },
-  folded: { color: "#b9c3b4", fontFamily: fonts.rubikMedium, fontSize: 13 },
+  folded: { color: "#b9c3b4", fontFamily: fonts.rubikMedium, fontSize: 13, textAlign: "center" },
   chips: { color: ink.gold },
+  badges: { flexDirection: "row", gap: 22, justifyContent: "center" },
+  badge: { alignItems: "center", gap: 6 },
+  badgeName: { color: ink.cream, fontFamily: lilita, fontSize: 12, letterSpacing: 0.7 },
+  reward: { alignItems: "center", gap: 4 },
   hint: { color: ink.cream, fontFamily: fonts.rubikSemiBold, fontSize: 15, textAlign: "center" },
   rule: { backgroundColor: "rgba(247,231,181,0.14)", height: 2, marginVertical: 4, width: "100%" },
 });

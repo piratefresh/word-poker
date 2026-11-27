@@ -1,79 +1,48 @@
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { FRIENDS, KITCHEN_TABLE } from "@/features/story/kitchen-table-map";
+import type { StoryBadge } from "@/features/story/story-badges";
 
-import { gradient, ink, lilita } from "./chapter-map-ink";
+import { BadgeMedal } from "./badge-medal";
+import { ink, lilita } from "./chapter-map-ink";
 
-/** One slot per boss; Chapter 1 has the Professor's. Fixed to the corner, over the scroll. */
-export function BadgeShelf({ won, bottom }: { won: boolean; bottom: number }): ReactElement {
+/** The campaign's badge shelf (STO-1129): Story Mode Champion on top, a slot per boss below. Fixed to the corner, over the scroll. */
+export function BadgeShelf({ badges, bottom }: { badges: readonly StoryBadge[]; bottom: number }): ReactElement {
+  const won = badges.filter((badge) => badge.won);
+  const champion = badges.at(-1)!;
   return (
     <View
-      accessibilityLabel={won ? `Badge shelf: ${KITCHEN_TABLE.badge}` : "Badge shelf, empty"}
+      accessibilityLabel={won.length === 0 ? "Badge shelf, empty" : `Badge shelf: ${won.map((badge) => badge.name).join(", ")}`}
       pointerEvents="none"
       style={[styles.shelf, { bottom }]}
       testID="story-badge-shelf"
     >
-      <View style={styles.slot}>
-        {won ? (
-          <View style={styles.badge}>
-            <View style={[styles.ribbon, { left: 12, backgroundColor: FRIENDS.jay.color, transform: [{ skewX: "12deg" }] }]} />
-            <View style={[styles.ribbon, { right: 12, backgroundColor: FRIENDS.ellis.color, transform: [{ skewX: "-12deg" }] }]} />
-            <View style={[styles.medal, gradient("radial-gradient(circle at 35% 30%, #ffe9a0, #e0a23a 65%, #b57a22)")]}>
-              <Text style={styles.medalLetter}>P</Text>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.empty}>
-            <View style={styles.emptyRing} />
-          </View>
-        )}
+      <BadgeMedal badge={champion} size={38} />
+      <View style={[styles.board, styles.topBoard]} />
+      <View style={styles.row}>
+        {badges.slice(0, -1).map((badge) => (
+          <BadgeMedal key={badge.id} badge={badge} size={22} />
+        ))}
       </View>
       <View style={styles.board} />
-      <Text numberOfLines={1} style={styles.label}>{won ? KITCHEN_TABLE.badge.toUpperCase() : "BADGE SHELF"}</Text>
+      <Text numberOfLines={1} style={styles.label}>{`BADGES ${won.length}/${badges.length}`}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shelf: { position: "absolute", right: 6, width: 124, zIndex: 10, alignItems: "center" },
-  slot: { width: 64, height: 58, alignItems: "center", justifyContent: "flex-end" },
-  empty: {
-    width: 56,
-    height: 54,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: "rgba(247,231,181,0.55)",
-    backgroundColor: "rgba(8,12,28,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyRing: { width: 26, height: 26, borderRadius: 13, borderWidth: 3, borderColor: ink.slateLight, opacity: 0.5 },
-  badge: { width: 50, height: 56, boxShadow: "0px 0px 14px rgba(255,210,110,0.7)", borderRadius: 25 },
-  ribbon: { position: "absolute", top: 0, width: 10, height: 18 },
-  medal: {
-    position: "absolute",
-    left: 3,
-    top: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 3,
-    borderColor: "#fff1c0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  medalLetter: { fontFamily: lilita, fontSize: 22, color: "#7a4a10" },
+  shelf: { position: "absolute", right: 6, width: 140, zIndex: 10, alignItems: "center" },
+  row: { flexDirection: "row", gap: 4, marginTop: 6 },
   board: {
-    width: 104,
-    height: 12,
+    width: 136,
+    height: 10,
     borderRadius: 3,
     backgroundColor: "#8f5530",
     boxShadow: "0px 4px 0px #3a1c0c, 0px 8px 12px rgba(0,0,0,0.45)",
   },
+  topBoard: { width: 64 },
   label: {
-    marginTop: 8,
+    marginTop: 10,
     fontFamily: lilita,
     fontSize: 11,
     letterSpacing: 0.7,

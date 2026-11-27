@@ -8,12 +8,12 @@ import {
   nodeStarGoals,
   nodeStars,
   recordHand,
-  storyChapter,
   storyNode,
   type Dictionary,
   type RecordedHand,
 } from "@wordpoker/game-rules";
 
+import { authClient } from "@/auth/client/auth-client";
 import { PowerDrawReveal, PowerHeldChip, PowerUsePrompt, PowerUsedCard, swapFlipOf, usePowerTargeting } from "@/components/powers";
 import { FREE_PLAY, PHASE_LABEL } from "@/components/hud";
 import { GameScreen } from "@/components/screens/game/game-screen";
@@ -23,16 +23,16 @@ import { useOfflineGame } from "@/features/offline/use-offline-game";
 import { BOSS_COPY, bossCoachLine } from "@/features/story/bosses";
 import { challengeById, storySession, storyTable } from "@/features/story/challenges";
 import { bestUnusedTile, storyCoachLine } from "@/features/story/story-coach";
-import { FRIENDS, KITCHEN_TABLE, type Expression, type FriendId, type MapNode } from "@/features/story/kitchen-table-map";
+import { FRIENDS, type ChapterMap, type Expression, type FriendId, type MapNode } from "@/features/story/chapter-map";
 import { saveStoryProgress, storyProgress } from "@/features/story/story-progress";
+import { settleStoryRewards, type StoryPayout } from "@/features/story/story-reward";
+import { useQuests } from "@/lib/quests/quests-provider";
 
 import { StoryMeter } from "./story-meter";
 import { StoryRoom } from "./story-room";
 import { StorySpeech } from "./story-speech";
 import { StoryVerdict, type BuiltWord } from "./story-verdict";
 import { BossTell } from "./boss-tell";
-
-const CHAPTER = storyChapter("kitchen-table");
 
 /** Which face the opponent wears: determined when betting, thinking while the player builds a word, and a smile or a wink at the end. */
 function expressionAt({ status, phase, building, heroWon }: { status: string; phase: string; building: boolean; heroWon: boolean | null }): Expression {
@@ -44,15 +44,17 @@ function expressionAt({ status, phase, building, heroWon }: { status: string; ph
 const COACH_TOP = 115;
 
 export interface StoryTableProps {
+  map: ChapterMap;
   node: MapNode;
   dictionary: Dictionary;
   onLeave: () => void;
 }
 
 /** The offline table at a map node, with the node's coach line over the felt, and the run's verdict once it settles. */
-export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): ReactElement {
+export function StoryTable({ map, node, dictionary, onLeave }: StoryTableProps): ReactElement {
+  const { chapter } = map;
   // The powers the hand opens with are the run's as the hand is dealt; a boss replay keeps them.
-  const [powersHeld] = useState(() => chapterRecord(storyProgress(), CHAPTER.id).powers);
+  const [powersHeld] = useState(() => chapterRecord(storyProgress(), chapter.id).powers);
   const session = useMemo(() => storySession(storyTable(node), dictionary, powersHeld), [node, dictionary, powersHeld]);
   const offline = useOfflineGame({ seed: 0, dictionary, session });
   const { game, words, results, powers, bossTells } = offline;
@@ -72,24 +74,39 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   // The word on the rack as the hand ended: a fold-out has no submitted word, but the player still built one.
   const builtRef = useRef<BuiltWord | null>(null);
   const [built, setBuilt] = useState<BuiltWord | null>(null);
-  const recorded = useRef<typeof results>(null);
+  // Once per hand, not per `results`: the snapshot is rebuilt as the payout's chips land, and a second
+  // record would count a boss loss twice and find a first clear already spent.
+  const recorded = useRef(false);
+  // A first clear's coins and XP are claimed as the hand settles (STO-1129); the map retries one that did not land.
+  const [payout, setPayout] = useState<StoryPayout | null>(null);
+  const userId = authClient.useSession().data?.user.id;
+  const { refresh, refreshCoins } = useQuests();
   useEffect(() => {
-    if (results === null || recorded.current === results) return;
-    recorded.current = results;
+    if (results === null || recorded.current) return;
+    recorded.current = true;
     const hero = results.seats.find((seat) => seat.isYou);
     const won = hero?.takesPot ?? false;
     // Every rival folded: no showdown judged a word, and a boss folding concedes the hand (STO-1107).
     const byFold = won && game.players.every((player) => player === null || player.isHero || player.status === "fold" || player.status === "busted");
     const outcome = { won, score: hero?.total ?? 0, byFold };
-    const next = recordHand(storyProgress(), CHAPTER.id, node.id, outcome, randomSeed());
+    const next = recordHand(storyProgress(), chapter.id, node.id, outcome, randomSeed());
     saveStoryProgress(next.progress);
     setBuilt(builtRef.current);
     setVerdict(next);
-    // game.players is read as the hand settles, alongside results.
+    if (next.reward !== null) {
+      void settleStoryRewards(next.progress, userId).then(({ status, fresh }) => {
+        setPayout(status);
+        if (!fresh) return;
+        refresh();
+        void refreshCoins();
+      });
+    }
+    // game.players and the session are read as the hand settles, alongside results.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node.id, results]);
+  }, [chapter.id, node.id, results]);
 
   const replay = () => {
+    recorded.current = false;
     setVerdict(null);
     setBuilt(null);
     builtRef.current = null;
@@ -97,7 +114,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
   };
 
   const challenge = challengeById(node.challengeId);
-  const goals = nodeStarGoals(CHAPTER, storyNode(CHAPTER, node.id));
+  const goals = nodeStarGoals(chapter, storyNode(chapter, node.id));
   // The coach reads the word on the rack; the authored line for the street is what it says before there is one.
   const handTiles = [...game.privateTiles, ...game.community.filter((tile) => tile !== null)];
   const wordIsReal = dictionary.isWord(words?.word ?? "");
@@ -143,9 +160,9 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     // handTiles is rebuilt each render from the same settled hand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, dictionary, goals.two, challenge?.teachWord]);
-  const hands = KITCHEN_TABLE.nodes.filter((entry) => entry.kind === "hand");
+  const hands = map.nodes.filter((entry) => entry.kind === "hand");
   const following = hands[hands.indexOf(node) + 1];
-  const into = following === undefined ? KITCHEN_TABLE.boss : `Hand ${hands.indexOf(following) + 1}`;
+  const into = following === undefined ? map.boss : `Hand ${hands.indexOf(following) + 1}`;
 
   // A friend with art shows it in their seat, in the face the moment calls for.
   const players = game.players.map((player) => {
@@ -173,7 +190,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
     >
       <View style={styles.table}>
         <GameScreen
-          backdrop={<StoryRoom room={node.room} />}
+          backdrop={<StoryRoom map={map} room={node.room} />}
           balance={FREE_PLAY}
           lesson={{ stamp: `${PHASE_LABEL[game.phase]} · ${node.title.toUpperCase()}` }}
           game={{ ...game, players }}
@@ -223,7 +240,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
       </View>
       {game.phase === "payout" && results !== null && verdict !== null ? (
         <StoryVerdict
-          chapterId={CHAPTER.id}
+          map={map}
           node={node}
           hero={hero}
           built={built}
@@ -232,6 +249,7 @@ export function StoryTable({ node, dictionary, onLeave }: StoryTableProps): Reac
           verdict={verdict}
           winner={winner}
           hint={hint}
+          payout={payout}
           onReplay={replay}
           onLeave={onLeave}
         />

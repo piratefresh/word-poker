@@ -4,18 +4,20 @@ import type { ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
-import { KITCHEN_TABLE } from "@/features/story/kitchen-table-map";
+import type { ChapterMap } from "@/features/story/chapter-map";
 
 import { ink, lilita } from "./chapter-map-ink";
 
 export interface ChapterMapHeaderProps {
+  map: ChapterMap;
   stars: number;
+  maxStars: number;
   topInset: number;
   onBack: () => void;
 }
 
 /** Back button, chapter title, and star total, fading into the map below. */
-export function ChapterMapHeader({ stars, topInset, onBack }: ChapterMapHeaderProps): ReactElement {
+export function ChapterMapHeader({ map, stars, maxStars, topInset, onBack }: ChapterMapHeaderProps): ReactElement {
   return (
     <LinearGradient
       colors={["rgba(6,8,22,0.94)", "rgba(6,8,22,0.78)", "rgba(6,8,22,0)"]}
@@ -26,15 +28,15 @@ export function ChapterMapHeader({ stars, topInset, onBack }: ChapterMapHeaderPr
       <Pressable accessibilityLabel="Back" accessibilityRole="button" onPress={onBack} style={styles.back} testID="story-back">
         <Ionicons name="chevron-back" size={24} color={ink.cream} />
       </Pressable>
-      <View accessibilityLabel={`Chapter ${KITCHEN_TABLE.number}, ${KITCHEN_TABLE.title}`} accessibilityRole="header" style={styles.titleBlock}>
-        <Text style={styles.kicker}>{`CHAPTER ${KITCHEN_TABLE.number}`}</Text>
+      <View accessibilityLabel={`Chapter ${map.chapter.number}, ${map.chapter.venue}`} accessibilityRole="header" style={styles.titleBlock}>
+        <Text style={styles.kicker}>{`CHAPTER ${map.chapter.number}`}</Text>
         <Text numberOfLines={1} style={styles.title}>
-          {KITCHEN_TABLE.title}
+          {map.chapter.venue}
         </Text>
       </View>
-      <View accessibilityLabel={`${stars} of ${KITCHEN_TABLE.maxStars} stars`} style={styles.starTotal}>
+      <View accessibilityLabel={`${stars} of ${maxStars} stars`} style={styles.starTotal}>
         <Text style={styles.starIcon}>★</Text>
-        <Text style={styles.starText}>{`${stars}/${KITCHEN_TABLE.maxStars}`}</Text>
+        <Text style={styles.starText}>{`${stars}/${maxStars}`}</Text>
       </View>
     </LinearGradient>
   );

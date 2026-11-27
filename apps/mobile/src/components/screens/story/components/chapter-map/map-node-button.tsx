@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { fonts } from "@/constants/theme";
-import { KITCHEN_TABLE, discSize, type MapNode, type MapNodeState } from "@/features/story/kitchen-table-map";
+import { discSize, type MapNode, type MapNodeState } from "@/features/story/chapter-map";
 
 import { NODE_COLUMN, gradient, ink, lilita } from "./chapter-map-ink";
 import { NodePulse } from "./node-pulse";
@@ -19,11 +19,13 @@ export interface MapNodeButtonProps {
   node: MapNode;
   state: MapNodeState;
   stars: number;
+  /** The word score the boss hand asks for, shown over a boss's disc. */
+  threshold: number;
   onPress: (node: MapNode) => void;
 }
 
 /** A node's disc, stars, name plate, and PLAY button; each state carries a shape cue, never colour alone. */
-export function MapNodeButton({ node, state, stars, onPress }: MapNodeButtonProps): ReactElement {
+export function MapNodeButton({ node, state, stars, threshold, onPress }: MapNodeButtonProps): ReactElement {
   const size = discSize(node);
   const look = LOOKS[state];
   const locked = state === "locked";
@@ -42,7 +44,7 @@ export function MapNodeButton({ node, state, stars, onPress }: MapNodeButtonProp
     >
       {node.kind === "boss" ? (
         <View style={[styles.threshold, { borderColor: locked ? "#9aa0b4" : ink.gold }]}>
-          <Text style={[styles.thresholdText, { color: locked ? "#9aa0b4" : ink.gold }]}>{`BEAT ${KITCHEN_TABLE.threshold} PTS`}</Text>
+          <Text style={[styles.thresholdText, { color: locked ? "#9aa0b4" : ink.gold }]}>{`BEAT ${threshold} PTS`}</Text>
         </View>
       ) : null}
       {available ? <NodePulse size={size} /> : null}
