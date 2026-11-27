@@ -1,17 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 
 import {
   canHold,
+  cellAt,
+  holdLimit,
+  isSwapLocked,
   type NudgeDirection,
+  type SlotPremiumCell,
   type SlotCell,
   type SlotSpellerState,
   type SlotWord,
 } from "@wordpoker/game-rules";
 
-import { Tile, TILE_METRICS } from "@/components/game/word-tile";
+import { getTileAccessibilityLabel, Tile, TILE_METRICS } from "@/components/game/word-tile";
 import { haptic } from "@/components/word-builder/haptics";
 import { colors, radius } from "@/constants/theme";
 import { webTestID } from "@/lib/ui/web-id";
@@ -30,6 +34,33 @@ const ARROW_DOWN = 542 - REEL_WINDOW.top;
 const ARROW_HEIGHT = 30;
 /** Every control is at least this tall to the finger. */
 const MIN_TARGET = 44;
+
+/**
+ * A premium cell's marking, from the playable build: the two letter cells are blues and the two
+ * word cells pink and red, and the pair in each differ in lightness too, so they read without hue.
+ */
+const CELL_COLOURS = {
+  "letter-2": { fill: "#7fb7e8", ink: "#2a1d22" },
+  "letter-3": { fill: "#2b63b0", ink: "#ffffff" },
+  "word-2": { fill: "#e88fb4", ink: "#2a1d22" },
+  "word-3": { fill: "#c23a30", ink: "#ffffff" },
+} as const;
+
+function cellColours(cell: Pick<SlotPremiumCell, "kind" | "multiplier">): { fill: string; ink: string } {
+  const key = `${cell.kind}-${cell.multiplier >= 3 ? 3 : 2}` as keyof typeof CELL_COLOURS;
+  return CELL_COLOURS[key];
+}
+
+/** The badge's text: `2L`, `3W`, with a diamond on a permanent cell. */
+function cellBadge(cell: SlotPremiumCell): string {
+  return `${cell.permanent ? "◆ " : ""}${cell.multiplier}${cell.kind === "letter" ? "L" : "W"}`;
+}
+
+/** How a screen reader names a cell: `on a double word cell`. */
+function cellPhrase(cell: Pick<SlotPremiumCell, "kind" | "multiplier" | "permanent">): string {
+  const times = cell.multiplier === 2 ? "double" : cell.multiplier === 3 ? "triple" : `${cell.multiplier}×`;
+  return `${cell.permanent ? "permanent " : ""}${times} ${cell.kind} cell`;
+}
 
 /** A spin being rolled on screen: the grid it left, and the reels still rolling. */
 interface SpinRoll {
@@ -98,6 +129,7 @@ export function SlotGrid({
   const rows = grid[0]?.length ?? REEL_WINDOW.rows;
   const canMove = phase === "moving" && moves > 0;
   const lockable = canHold(state);
+  const holdsFull = holds.length >= holdLimit(state);
 
   const column = (REEL_WINDOW.column * REEL_WINDOW.reels * unit) / Math.max(reels, REEL_WINDOW.reels);
   const pitch = (REEL_WINDOW.row * REEL_WINDOW.rows * unit) / Math.max(rows, REEL_WINDOW.rows);
@@ -186,6 +218,16 @@ export function SlotGrid({
                 const litFace = litFaces.get(key);
                 const outlinedFace = outlinedFaces.get(key);
                 const isSelected = selected !== null && selected[0] === reel && selected[1] === row;
+                const premium = cellAt(state.cells, [reel, row]);
+                const swapLocked = premium !== undefined && isSwapLocked(state, [reel, row]);
+                const label = [
+                  getTileAccessibilityLabel(tile),
+                  premium !== undefined ? `on a ${cellPhrase(premium)}` : null,
+                  swapLocked ? "nudge only" : null,
+                  locked ? "reel held" : null,
+                ]
+                  .filter((part) => part !== null)
+                  .join(", ");
                 return (
                   // Keyed by position: a swap and a nudge can put two copies of one tile id on screen.
                   <View
@@ -208,8 +250,12 @@ export function SlotGrid({
                       selected={isSelected}
                       interactive={canMove}
                       onPress={() => onTapCell([reel, row])}
+                      accessibilityLabel={label}
                       testID={`slot-tile-${reel}-${row}`}
                     />
+                    {premium !== undefined ? (
+                      <CellMarking cell={premium} swapLocked={swapLocked} scale={scale} reel={reel} row={row} />
+                    ) : null}
                   </View>
                 );
               })}
@@ -235,6 +281,7 @@ export function SlotGrid({
               <LockToggle
                 reel={reel}
                 locked={locked}
+                disabled={!locked && holdsFull}
                 onToggle={onToggleLock}
                 unit={unit}
                 style={{ top: arrowTop(ARROW_DOWN), height: targetHeight, width: column }}
@@ -289,29 +336,146 @@ function NudgeTarget({ direction, reel, disabled, onNudge, style }: NudgeTargetP
 interface LockToggleProps {
   reel: number;
   locked: boolean;
+  /** Every hold is in use on other reels. */
+  disabled: boolean;
   onToggle: (reel: number) => void;
   unit: number;
   style: TargetStyle;
 }
 
-/** A reel's hold switch between spins, a padlock over its painted down arrow. */
-function LockToggle({ reel, locked, onToggle, unit, style }: LockToggleProps): ReactElement {
+/** A reel's Hold / Held switch between spins, over its painted down arrow. */
+function LockToggle({ reel, locked, disabled, onToggle, unit, style }: LockToggleProps): ReactElement {
   const testID = `slot-lock-${reel}`;
-  const size = 30 * unit;
   return (
     <Pressable
-      accessibilityLabel={`${locked ? "Release" : "Hold"} reel ${reel + 1}`}
+      accessibilityLabel={locked ? `Reel ${reel + 1} held` : `Hold reel ${reel + 1}`}
       accessibilityRole="switch"
-      accessibilityState={{ checked: locked }}
+      accessibilityState={{ checked: locked, disabled }}
+      disabled={disabled}
       id={webTestID(testID)}
       onPress={() => onToggle(reel)}
       style={({ pressed }) => [styles.target, styles.lockTarget, style, pressed && styles.pressed]}
       testID={testID}
     >
-      <View style={[styles.lock, { width: size, height: size, borderRadius: size / 2 }, locked && styles.lockOn]}>
-        <Ionicons name={locked ? "lock-closed" : "lock-open"} size={16 * unit} color={locked ? "#5a3004" : "#fffaf0"} />
+      <View
+        style={[
+          styles.lock,
+          { height: 26 * unit, paddingHorizontal: 7 * unit, gap: 3 * unit, borderRadius: 13 * unit },
+          locked && styles.lockOn,
+          disabled && styles.lockFull,
+        ]}
+      >
+        <Ionicons name={locked ? "lock-closed" : "lock-open"} size={12 * unit} color={locked ? "#5a3004" : "#fffaf0"} />
+        <Text
+          maxFontSizeMultiplier={1}
+          style={[styles.lockText, { fontSize: 11 * unit }, locked && styles.lockTextOn, disabled && styles.lockTextFull]}
+        >
+          {locked ? "HELD" : "HOLD"}
+        </Text>
       </View>
     </Pressable>
+  );
+}
+
+interface CellMarkingProps {
+  cell: SlotPremiumCell;
+  swapLocked: boolean;
+  /** The tile's scale, so the border and badge shrink with it. */
+  scale: number;
+  reel: number;
+  row: number;
+}
+
+/**
+ * A premium cell drawn over its tile: a border in the cell's colour (dashed when it refuses swaps,
+ * thicker when permanent) and a badge in the top-right corner. It belongs to the grid position, so
+ * a nudge or swap slides letters under it.
+ */
+function CellMarking({ cell, swapLocked, scale, reel, row }: CellMarkingProps): ReactElement {
+  const { fill, ink } = cellColours(cell);
+  const size = TILE_METRICS.large.width * scale;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`slot-cell-${reel}-${row}`}>
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            margin: 2,
+            borderColor: fill,
+            borderRadius: radius.md * scale,
+            borderWidth: size * (cell.permanent ? 0.11 : 0.06),
+            borderStyle: swapLocked ? "dashed" : "solid",
+          },
+        ]}
+      />
+      <Text
+        maxFontSizeMultiplier={1}
+        style={[
+          styles.badge,
+          {
+            backgroundColor: fill,
+            color: ink,
+            top: 2 + size * 0.06,
+            right: 2 + size * 0.07,
+            fontSize: size * 0.17,
+            lineHeight: size * 0.2,
+            paddingHorizontal: size * 0.05,
+            borderRadius: size * 0.05,
+          },
+        ]}
+      >
+        {cellBadge(cell)}
+      </Text>
+    </View>
+  );
+}
+
+export interface SlotCellKeyProps {
+  state: SlotSpellerState;
+  unit: number;
+  /** Where the key's top sits, in artboard px. */
+  top: number;
+  width: number;
+}
+
+/** The cell kinds in play, one chip each, under the reels; swap-locked kinds say `nudge only`. */
+export function SlotCellKey({ state, unit, top, width }: SlotCellKeyProps): ReactElement | null {
+  const kinds = new Map<string, SlotPremiumCell>();
+  for (const cell of state.cells) {
+    if (cell.reel >= state.reels) continue;
+    kinds.set(cellBadge(cell), cell);
+  }
+  if (kinds.size === 0) return null;
+  const order = [...kinds.values()].sort(
+    (a, b) => Number(a.permanent ?? false) - Number(b.permanent ?? false) || a.kind.localeCompare(b.kind) || a.multiplier - b.multiplier,
+  );
+  // Badges only, so even six kinds fit one line between the hint and the deck; the note names
+  // the kinds that refuse swaps.
+  const lockedKinds = new Set(order.filter((cell) => isSwapLocked(state, [cell.reel, cell.row])).map((cell) => cell.kind));
+  const note =
+    lockedKinds.size === 0 ? null : lockedKinds.size === 2 ? "all cells: nudge only" : `${[...lockedKinds][0]} cells: nudge only`;
+  return (
+    <View pointerEvents="none" style={[styles.key, { top: top * unit, width, gap: 4 * unit }]} testID="slot-cell-key">
+      {order.map((cell) => {
+        const { fill, ink } = cellColours(cell);
+        const locked = isSwapLocked(state, [cell.reel, cell.row]);
+        return (
+          <Text
+            key={cellBadge(cell)}
+            accessibilityLabel={`${cellBadge(cell).replace("◆ ", "")}: ${cellPhrase(cell)}${locked ? ", nudge only" : ""}`}
+            maxFontSizeMultiplier={1}
+            style={[styles.keyBadge, { backgroundColor: fill, color: ink, fontSize: 9 * unit, paddingHorizontal: 3 * unit, borderRadius: 3 * unit }]}
+          >
+            {cellBadge(cell)}
+          </Text>
+        );
+      })}
+      {note !== null ? (
+        <Text maxFontSizeMultiplier={1.2} style={[styles.keyText, { fontSize: 10 * unit, marginLeft: 2 * unit }]}>
+          {note}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -333,6 +497,7 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: "rgba(255,250,240,0.18)", borderRadius: radius.md },
   lockTarget: { alignItems: "center", justifyContent: "center" },
   lock: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#8a4b12",
@@ -340,4 +505,13 @@ const styles = StyleSheet.create({
     borderColor: "#fffaf0",
   },
   lockOn: { backgroundColor: "#ffd25a" },
+  // Solid, not see-through: the painted arrow under it must not show.
+  lockFull: { backgroundColor: "#5e3a17", borderColor: "#a98a6a" },
+  lockText: { color: "#fffaf0", fontWeight: "800", letterSpacing: 0.5 },
+  lockTextOn: { color: "#5a3004" },
+  lockTextFull: { color: "#a98a6a" },
+  badge: { position: "absolute", fontWeight: "800", overflow: "hidden" },
+  key: { position: "absolute", left: 0, flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  keyBadge: { fontWeight: "800", overflow: "hidden" },
+  keyText: { color: "#fffaf0", fontWeight: "600" },
 });

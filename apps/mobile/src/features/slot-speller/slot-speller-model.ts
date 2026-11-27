@@ -11,6 +11,7 @@ import {
   buyRow,
   createSlotRun,
   endRun,
+  isSwapLocked,
   nextRound,
   nudge,
   pay,
@@ -37,6 +38,8 @@ export interface SlotSpellerModel {
   readonly revealStep: number;
   /** Reels held through the last spin: they stay still instead of stopping in. */
   readonly held: readonly number[];
+  /** The last tap was refused: it hit a tile on a swap-locked cell. Cleared by the next action. */
+  readonly refusedCell: SlotCell | null;
 }
 
 export type SlotSpellerAction =
@@ -75,7 +78,7 @@ export function randomSlotSeed(random: () => number = Math.random): string {
 }
 
 export function createSlotModel(state: SlotSpellerState): SlotSpellerModel {
-  return { state, selected: null, payout: null, revealStep: 0, held: [] };
+  return { state, selected: null, payout: null, revealStep: 0, held: [], refusedCell: null };
 }
 
 export function payoutRows(payout: SlotEvaluation | null): SlotPayoutRow[] {
@@ -108,6 +111,12 @@ export function reduceSlotSpeller(
   action: SlotSpellerAction,
   dictionary: Dictionary,
 ): SlotSpellerModel {
+  const next = reduce(model, action, dictionary);
+  // A refusal's notice lasts until the next thing the player does.
+  return next === model || next.refusedCell === null || action.type === "tapCell" ? next : { ...next, refusedCell: null };
+}
+
+function reduce(model: SlotSpellerModel, action: SlotSpellerAction, dictionary: Dictionary): SlotSpellerModel {
   const { state } = model;
   switch (action.type) {
     case "spin": {
@@ -120,9 +129,11 @@ export function reduceSlotSpeller(
     }
     case "tapCell": {
       if (state.phase !== "moving" || state.moves <= 0) return model;
-      if (model.selected === null) return { ...model, selected: action.cell };
-      if (sameCell(model.selected, action.cell)) return { ...model, selected: null };
-      return { ...applied(model, swap(state, model.selected, action.cell)), selected: null };
+      // A tile on a swap-locked cell never joins a swap; the pick waiting for a partner stays.
+      if (isSwapLocked(state, action.cell)) return { ...model, refusedCell: action.cell };
+      if (model.selected === null) return { ...model, selected: action.cell, refusedCell: null };
+      if (sameCell(model.selected, action.cell)) return { ...model, selected: null, refusedCell: null };
+      return { ...applied(model, swap(state, model.selected, action.cell)), selected: null, refusedCell: null };
     }
     case "pay": {
       const result = pay(state, dictionary);

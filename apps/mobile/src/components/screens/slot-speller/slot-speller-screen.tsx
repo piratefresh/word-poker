@@ -39,7 +39,7 @@ import {
   SlotPowerShelf,
   type SlotDeckProps,
 } from "./slot-cabinet";
-import { SlotGrid } from "./slot-grid";
+import { SlotCellKey, SlotGrid } from "./slot-grid";
 import { OutOfSpinsPanel, RunOverPanel } from "./slot-outcome-panels";
 import { SlotPayoutList } from "./slot-payout-list";
 import { SlotRoundSheet } from "./slot-round-sheet";
@@ -219,6 +219,7 @@ function SlotSpellerTable({
           onSpinLanded={setLandedSpin}
         />
         <SlotHint unit={unit}>{hintFor(game, rolling)}</SlotHint>
+        <SlotCellKey state={state} unit={unit} top={CELL_KEY_TOP} width={ARTBOARD.width * unit} />
         <SlotDeck
           unit={unit}
           moves={state.phase === "moving" ? state.moves : null}
@@ -267,9 +268,16 @@ function SlotSpellerTable({
   );
 }
 
+/** The cell key's top, in artboard px: between the hint line and the control deck. */
+const CELL_KEY_TOP = 603;
+
 /** The line under the reels, by phase. */
-function hintFor({ state, revealing }: SlotSpeller, rolling: boolean): string {
+function hintFor({ state, revealing, refusedCell }: SlotSpeller, rolling: boolean): string {
   if (revealing) return "Paying out · tap the reels to skip";
+  if (refusedCell !== null && state.phase === "moving") {
+    const cell = state.config.cells.swapLock === "all" ? "premium" : "word";
+    return `A tile on a ${cell} cell can't be swapped · nudge its reel`;
+  }
   const toGo = Math.max(state.target - state.roundScore, 0);
   switch (state.phase) {
     case "ready":
