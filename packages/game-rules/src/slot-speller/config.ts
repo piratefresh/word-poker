@@ -106,8 +106,8 @@ export const DEFAULT_SLOT_SPELLER_CONFIG: SlotSpellerConfig = {
   ],
   scoringPowerMultiplier: 2,
   // Tuned with scripts/probe-slot-speller.ts (docs/rules/slot-speller.md, Tuning).
-  targets: [20, 40, 70, 110, 160, 230, 320, 450, 620, 820],
-  targetGrowth: 0.2,
+  targets: [45, 65, 95, 130, 170, 220, 290, 400, 550, 760],
+  targetGrowth: 0.25,
   clearTokens: 5,
   tokensPerUnusedSpin: 2,
   extraSpinCost: 3,

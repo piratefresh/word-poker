@@ -15,7 +15,7 @@ import type { Tile } from "@wordpoker/contracts";
 import { loadDictionary, type Dictionary } from "../src/words/dictionary";
 import { DEFAULT_SLOT_SPELLER_CONFIG, roundTarget, type SlotSpellerConfig } from "../src/slot-speller/config";
 import { canHold, holdLimit, nudge, spin, swap, toggleHold } from "../src/slot-speller/actions";
-import { cellAt } from "../src/slot-speller/cells";
+import { addPermanentCell, cellAt } from "../src/slot-speller/cells";
 import { slotLines } from "../src/slot-speller/evaluate";
 import { payLine } from "../src/slot-speller/pay-line";
 import { SLOT_POWERS, type SlotPowerCounts, type SlotPowerId } from "../src/slot-speller/powers";
@@ -174,8 +174,9 @@ function bestLineWords(state: SlotSpellerState): number[] {
 
 // ---------------------------------------------------------------- shop policies
 
+/** By measured points per token (the "powers" section, STO-1188). */
 const PRIORITY: readonly SlotPowerId[] = [
-  "zigzag", "wave", "jackpot", "twins", "hot", "heavy", "action", "extraMove", "wild", "longHaul", "bigHold",
+  "jackpot", "twins", "wild", "heavy", "action", "extraMove", "zigzag", "wave", "hot", "longHaul", "bigHold",
 ];
 const cost = (id: SlotPowerId): number => SLOT_POWERS.find((power) => power.id === id)!.cost;
 
@@ -304,7 +305,15 @@ function build(seed: number, reels: number, powers: SlotPowerCounts, config: Slo
     const strip = buildStrip(base.seed, reel, config);
     return powers.wild ? addWildBlanks(strip, base.seed, reel, config) : strip;
   });
-  return { ...base, powers, reels, strips, top: strips.map(() => 0), grid: strips.map((strip) => windowAt(strip, 0, rows)), target: Number.POSITIVE_INFINITY };
+  let state: SlotSpellerState = {
+    ...base, powers, reels, strips, top: strips.map(() => 0), grid: strips.map((strip) => windowAt(strip, 0, rows)),
+    target: Number.POSITIVE_INFINITY, zigzagPairs: Array.from({ length: powers.zigzag ?? 0 }, (_, pair) => pair),
+  };
+  // What buyPower does for the cell powers: a permanent triple cell each (spins keep permanent cells).
+  const { tripleLetterMultiplier, tripleWordMultiplier } = config.cells;
+  for (let i = 0; i < (powers.hot ?? 0); i += 1) state = { ...state, cells: addPermanentCell(state, rows, "letter", tripleLetterMultiplier) };
+  for (let i = 0; i < (powers.jackpot ?? 0); i += 1) state = { ...state, cells: addPermanentCell(state, rows, "word", tripleWordMultiplier) };
+  return state;
 }
 
 /** Mean spin score over `runs` seeds × a 3-spin round (so holds get used). */
@@ -348,12 +357,25 @@ function reportMinLength(): void {
   console.log(` 3-letter words at ×0.5 (shipped): ${fmt(meanSpin(5, {}, config))} a spin`);
   console.log(` 4+ letters only:                  ${fmt(meanSpin(5, {}, fourPlus))} a spin`);
   console.log(` 3-letter words at ×1:             ${fmt(meanSpin(5, {}, { ...config, lengthMultipliers: [{ minLength: 3, multiplier: 1 }, ...config.lengthMultipliers.slice(1)] }))} a spin`);
+  // The playable build's bot: 35.5 start, 61.5 with a fourth row, 44.6 with Wave, 45.8 with one Zigzag pair.
+  console.log(` no premium cells:                 ${fmt(meanSpin(5, {}, { ...config, cells: { ...config.cells, layout: "none" } }))} a spin`);
+  console.log(` + a fourth row:                   ${fmt(meanSpin(5, {}, { ...config, rows: config.rows + 1 }))} a spin`);
+  console.log(` + Wave Lines:                     ${fmt(meanSpin(5, { wave: 1 }))} a spin`);
+  console.log(` + one Zigzag pair:                ${fmt(meanSpin(5, { zigzag: 1 }))} a spin`);
   console.log(` (${fmt((performance.now() - t0) / 1000)}s)`);
 }
 
-const targets = Array.from({ length: 20 }, (_, i) => roundTarget(DEFAULT_SLOT_SPELLER_CONFIG, i + 1));
+// Try a curve or prices without editing config: PROBE_TARGETS=30,60,… PROBE_GROWTH=0.25 PROBE_ROW_COSTS=10,15
+const list = (name: string): number[] | undefined => process.env[name]?.split(",").map(Number);
+const runConfig: SlotSpellerConfig = {
+  ...DEFAULT_SLOT_SPELLER_CONFIG,
+  targets: list("PROBE_TARGETS") ?? DEFAULT_SLOT_SPELLER_CONFIG.targets,
+  targetGrowth: Number(process.env.PROBE_GROWTH ?? DEFAULT_SLOT_SPELLER_CONFIG.targetGrowth),
+  addRowCosts: list("PROBE_ROW_COSTS") ?? DEFAULT_SLOT_SPELLER_CONFIG.addRowCosts,
+};
+const targets = Array.from({ length: 20 }, (_, i) => roundTarget(runConfig, i + 1));
 console.log(`targets r1-20: ${targets.join(" ")}`);
 if (section === "all" || section === "min") reportMinLength();
 if (section === "all" || section === "powers") reportPowers();
-if (section === "all" || section === "runs") for (const name of Object.keys(POLICIES)) reportRuns(name, DEFAULT_SLOT_SPELLER_CONFIG);
-if (section in POLICIES) reportRuns(section, DEFAULT_SLOT_SPELLER_CONFIG);
+if (section === "all" || section === "runs") for (const name of Object.keys(POLICIES)) reportRuns(name, runConfig);
+if (section in POLICIES) reportRuns(section, runConfig);
