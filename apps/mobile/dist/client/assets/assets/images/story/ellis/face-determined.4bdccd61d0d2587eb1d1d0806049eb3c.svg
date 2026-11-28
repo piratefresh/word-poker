@@ -1,0 +1,122 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="565" viewBox="295 5 500 565" version="1.1"><title>Ellis expression determined</title><g id="head" data-part="Head, pivot at neck">
+      <g id="hair_cap" data-part="Rear head hair">
+        <path d="M384 321 Q359 269 394 209 Q382 167 425 145 L463 114 493 124 513 92 556 100 587 83 620 113 655 110 686 146 Q723 164 707 202 750 223 716 261 L713 323 681 371 643 384 607 318 421 367Z" fill="#8D301F"/>
+        <polygon points="397,201 430,156 462,128 489,150 459,209" fill="#C94724"/>
+        <polygon points="482,123 508,98 543,123 529,181 482,168" fill="#F37136"/>
+        <polygon points="547,99 586,82 617,117 591,161 550,154" fill="#C94724"/>
+        <polygon points="630,125 667,126 704,179 682,213 639,190" fill="#F37136"/>
+        <polygon points="692,214 733,249 687,302 650,268" fill="#C94724"/>
+      </g>
+      <g id="hair_bun" data-part="Hair bun">
+        <path d="M456 156 Q423 135 448 99 L476 87 478 56 514 54 531 30 565 56 606 39 625 70 659 72 662 105 687 122 662 151 611 169 543 176 485 177Z" fill="#8D301F"/>
+        <polygon points="455,126 467,92 503,79 507,132 481,163" fill="#F37136"/>
+        <polygon points="490,65 529,42 552,72 542,120 505,116" fill="#C94724"/>
+        <polygon points="551,65 608,44 624,77 590,111 548,105" fill="#F37136"/>
+        <polygon points="621,79 655,76 671,122 632,143 596,109" fill="#C94724"/>
+        <polygon points="456,128 489,108 536,137 514,169 481,160" fill="#C94724"/>
+        <polygon points="545,113 585,98 626,132 594,169 550,163" fill="#F37136"/>
+        <polygon points="600,126 637,104 650,141 622,164 591,168" fill="#FF984D"/>
+        <polygon points="511,79 525,48 550,73 536,98" fill="#FF984D"/>
+        <polygon points="590,59 604,50 620,77 596,88" fill="#FF984D"/>
+      </g>
+      <g id="face" data-part="Head and facial shading">
+        <path d="M407 346 Q381 323 388 358 Q392 406 430 412 L438 366Z" fill="#D77D58"/>
+        <path d="M668 346 Q694 323 703 353 Q710 398 673 413 L661 365Z" fill="#D77D58"/>
+        <path d="M413 287 Q418 227 481 211 Q549 190 623 224 Q666 234 678 297 L676 398 Q669 455 630 485 Q597 516 553 520 Q492 520 447 474 Q408 439 408 371Z" fill="#D77D58"/>
+        <path d="M421 284 Q441 227 493 221 Q559 198 625 229 Q663 256 666 303 L661 397 Q655 447 621 475 Q580 500 541 503 Q488 501 452 465 Q420 432 419 370Z" fill="#F6A16D"/>
+        <polygon points="430,289 463,245 496,230 467,338 425,370" fill="#FFC28E"/>
+        <polygon points="611,237 642,264 657,304 653,380 626,361" fill="#FFC28E"/>
+        <polygon points="423,386 455,430 483,457 470,465 441,449" fill="#D77D58"/>
+        <polygon points="620,454 653,401 641,439 618,475 577,493" fill="#D77D58"/>
+        <polygon points="483,474 535,498 588,492 553,507 504,497" fill="#FFC28E"/>
+        <ellipse cx="447" cy="415" rx="38" ry="17" fill="#E97D60" opacity="0.33"/>
+        <ellipse cx="635" cy="411" rx="36" ry="18" fill="#E97D60" opacity="0.30"/>
+      </g>
+      <g id="freckles" data-part="Freckles">
+        <ellipse cx="425" cy="397" rx="2.4" ry="2.4" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="439" cy="390" rx="2.4" ry="2.4" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="449" cy="399" rx="2.1" ry="2.1" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="458" cy="392" rx="2.3" ry="2.3" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="468" cy="401" rx="1.8" ry="1.8" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="475" cy="394" rx="1.7" ry="1.7" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="609" cy="391" rx="2.2" ry="2.2" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="619" cy="401" rx="2.1" ry="2.1" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="630" cy="390" rx="2.7" ry="2.7" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="640" cy="395" rx="2.0" ry="2.0" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="652" cy="393" rx="1.9" ry="1.9" fill="#CC7154" opacity="0.70"/>
+        <ellipse cx="627" cy="412" rx="1.6" ry="1.6" fill="#CC7154" opacity="0.70"/>
+      </g>
+      <g id="eye_right" data-part="Character right eye (viewer left)">
+        <path d="M435 355 Q459 322 498 340 Q521 350 513 370 Q490 396 459 391 Q437 385 435 355Z" fill="#502C1E"/>
+        <path d="M440 354 Q458 337 487 341 Q511 346 509 365 Q496 389 471 388 Q449 386 440 369Z" fill="#FFFBF0"/>
+        <ellipse cx="484" cy="363" rx="23" ry="30" fill="#6A3522"/>
+        <ellipse cx="483" cy="361" rx="19" ry="26" fill="#995D2A"/>
+        <ellipse cx="483" cy="366" rx="12" ry="20" fill="#241B18"/>
+        <ellipse cx="493" cy="351" rx="7" ry="7" fill="#FFFBF0"/>
+        <ellipse cx="473" cy="377" rx="3" ry="3" fill="#FFFBF0"/>
+        <path d="M434 356 Q456 322 488 337 Q506 340 516 352" fill="none" stroke="#502C1E" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M439 353 L430 342 M445 344 L438 334 M453 340 L451 332" fill="none" stroke="#502C1E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g id="eye_left" data-part="Character left eye (viewer right)">
+        <path d="M567 347 Q591 323 622 335 Q646 342 653 363 Q643 391 609 391 Q581 390 567 373Z" fill="#502C1E"/>
+        <path d="M572 352 Q590 337 613 339 Q640 343 648 361 Q642 386 611 386 Q585 384 572 366Z" fill="#FFFBF0"/>
+        <ellipse cx="611" cy="363" rx="22" ry="30" fill="#6A3522"/>
+        <ellipse cx="611" cy="361" rx="18" ry="26" fill="#995D2A"/>
+        <ellipse cx="612" cy="365" rx="12" ry="20" fill="#241B18"/>
+        <ellipse cx="621" cy="351" rx="7" ry="7" fill="#FFFBF0"/>
+        <ellipse cx="601" cy="377" rx="3" ry="3" fill="#FFFBF0"/>
+        <path d="M566 350 Q591 324 622 335 Q642 339 652 360" fill="none" stroke="#502C1E" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M642 346 L651 335 M647 352 L660 343" fill="none" stroke="#502C1E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g id="brow_right" data-part="Character right eyebrow (viewer left)" transform="rotate(12 461 313) translate(0,6)">
+        <path d="M429 313 Q458 293 500 310 Q509 317 500 322 Q461 307 437 326Z" fill="#6A3522"/>
+        <polygon points="444,310 472,303 502,317 467,317" fill="#8B4730"/>
+      </g>
+      <g id="brow_left" data-part="Character left eyebrow (viewer right)" transform="rotate(-12 605 316) translate(0,6)">
+        <path d="M570 311 Q601 291 636 309 Q645 315 640 322 Q611 307 579 323Z" fill="#6A3522"/>
+        <polygon points="585,309 612,305 636,316 605,316" fill="#8B4730"/>
+      </g>
+      <g id="nose" data-part="Nose">
+        <path d="M548 368 Q547 390 537 406 Q546 419 561 409" fill="none" stroke="#D77D58" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="547,384 538,404 553,409 562,404" fill="#FFC28E"/>
+        <ellipse cx="551" cy="412" rx="12" ry="4" fill="#C66D51" opacity="0.55"/>
+      </g>
+      <g id="mouth_smile" data-part="Smile mouth">
+        <path d="M521 463 Q553 449 590 463" fill="none" stroke="#893B34" stroke-width="6" stroke-linecap="round"/><path d="M530 465 Q550 459 577 463" fill="none" stroke="#CC775C" stroke-width="2" stroke-linecap="round"/></g>
+      <g id="earrings" data-part="Gold hoop earrings">
+        <path d="M401 388 Q393 413 404 428 Q419 434 426 414" fill="none" stroke="#A97720" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M404 391 Q396 415 407 423 Q415 423 418 414" fill="none" stroke="#E0A331" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M684 387 Q699 414 686 428 Q670 429 668 412" fill="none" stroke="#A97720" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M681 389 Q691 411 684 422 Q674 422 674 412" fill="none" stroke="#E0A331" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g id="hair_bangs" data-part="Front hair bangs">
+        <path d="M383 292 Q366 232 402 199 L430 157 467 174 500 141 Q528 162 561 141 L600 158 625 142 Q660 153 686 196 Q691 228 674 270 Q644 255 611 252 Q591 246 565 266 Q529 239 495 274 L456 304 431 333Z" fill="#8D301F"/>
+        <polygon points="394,222 435,171 472,190 458,239 420,286" fill="#F37136"/>
+        <polygon points="433,208 476,174 513,200 481,265 437,289" fill="#C94724"/>
+        <polygon points="478,197 520,155 565,181 528,240 489,264" fill="#F37136"/>
+        <polygon points="535,191 580,162 610,182 574,236 528,245" fill="#C94724"/>
+        <polygon points="594,186 628,157 666,184 674,241 637,251" fill="#F37136"/>
+        <polygon points="402,246 388,293 422,331 450,285" fill="#C94724"/>
+        <polygon points="466,237 498,205 525,229 490,266" fill="#FF984D"/>
+        <polygon points="555,204 583,172 609,193 576,224" fill="#FF984D"/>
+        <polygon points="627,184 654,184 667,232 649,223" fill="#FF984D"/>
+      </g>
+      <g id="curl_right" data-part="Character right hanging curls (viewer left)">
+        <path d="M422 237 Q382 265 386 313 Q371 336 382 363 Q355 385 376 408 Q395 430 368 462 Q344 478 365 504" fill="none" stroke="#8D301F" stroke-width="21" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M420 236 Q387 267 393 310 Q380 334 392 354" fill="none" stroke="#F37136" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M373 411 Q393 431 370 464 Q349 482 370 498" fill="none" stroke="#C94724" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M424 264 Q408 300 416 335 Q426 347 416 370" fill="none" stroke="#F37136" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g id="curl_left" data-part="Character left hanging curls (viewer right)">
+        <path d="M661 228 Q699 248 695 303 Q706 329 690 365 Q720 399 697 437 Q686 453 708 473" fill="none" stroke="#8D301F" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M661 228 Q686 260 680 300 Q690 323 682 345" fill="none" stroke="#F37136" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M697 384 Q716 401 692 445 Q683 460 708 472" fill="none" stroke="#C94724" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M651 261 Q670 293 660 326 Q645 348 664 370" fill="none" stroke="#F37136" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g id="hair_flyaways" data-part="Flyaway curls">
+        <path d="M436 147 Q409 125 424 105 M664 158 Q699 145 683 124 M587 80 Q580 51 597 37 M478 104 Q457 75 481 63" fill="none" stroke="#F37136" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M699 242 Q728 226 718 202" fill="none" stroke="#C94724" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+    </svg>
