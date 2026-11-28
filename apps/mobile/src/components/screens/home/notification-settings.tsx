@@ -14,6 +14,7 @@ import { Linking, StyleSheet, Text, View } from "react-native";
 import { authClient } from "@/auth/client/auth-client";
 import { paper } from "@/components/screens/auth/auth-shell";
 import { fonts } from "@/constants/theme";
+import { setStreakReminderOn, streakReminderOn } from "@/lib/quests/streak-reminder";
 
 import { CardSwitch, Panel, Row, SectionLabel } from "./account-card";
 
@@ -31,6 +32,8 @@ export function NotificationSettings({ onSaved }: { onSaved: () => void }) {
   const [denied, setDenied] = useState(false);
   const [saved, setSaved] = useState<Partial<Record<Key, boolean>>>({});
   const [error, setError] = useState(false);
+  // Local, not the account's: the reminder is this device's own notification (STO-1191).
+  const [streak, setStreak] = useState(streakReminderOn);
 
   useEffect(() => {
     void Notifications.getPermissionsAsync()
@@ -70,6 +73,22 @@ export function NotificationSettings({ onSaved }: { onSaved: () => void }) {
             title={label}
           />
         ))}
+        <Row
+          caption="The evening before your login streak ends"
+          end={
+            <CardSwitch
+              label="Streak reminder"
+              onChange={(value) => {
+                setStreak(value);
+                setStreakReminderOn(value);
+                onSaved();
+              }}
+              testID="notify-streak-reminder"
+              value={streak}
+            />
+          }
+          title="Streak reminder"
+        />
       </Panel>
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>Couldn’t save that. Try again.</Text> : null}
       {denied ? (

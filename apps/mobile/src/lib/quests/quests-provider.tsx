@@ -42,6 +42,7 @@ import { isAccountEligible, type QuestHandFacts, type QuestId, type QuestStateRe
 import { levelReward, vipTierRewards, xpForHand } from "@wordpoker/game-rules";
 
 import { authClient } from "@/auth/client/auth-client";
+import { scheduleStreakReminder } from "@/lib/quests/streak-reminder";
 import { readItem, writeItem } from "@/lib/storage/claim-store";
 import { fetchQuestState, fetchWallet, QuestClaimRejectedError, sendQuestHandClaim } from "@/lib/wallet/wallet-client";
 
@@ -227,6 +228,8 @@ export function QuestsProvider({ children }: { children: ReactNode }): ReactElem
         levelRef.current = next.level;
         setState(next);
         seeVip(next.vip);
+        // Today is credited, so the reminder moves to tomorrow (STO-1191).
+        scheduleStreakReminder(next.streak.current).catch(() => {});
         if (next.streak.creditedToday !== null) {
           setStreakBanner({ day: next.streak.current, reward: next.streak.creditedToday });
         }

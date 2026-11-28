@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 
 import { registerPushToken, unregisterPushToken } from "@/lib/friends/friends-client";
+import { cancelStreakReminder } from "@/lib/quests/streak-reminder";
 
 /**
  * Shows pushes that arrive while the app is open; without a handler, expo-notifications drops
@@ -57,8 +58,9 @@ export function usePushRegistration(account: boolean): void {
   }, [account]);
 }
 
-/** Sign-out: stop pushes to this device. Call it before the session goes, the API needs it. */
+/** Sign-out: stop pushes (and the local streak reminder) to this device. Call it before the session goes, the API needs it. */
 export async function unregisterPush(): Promise<void> {
+  await cancelStreakReminder();
   await pending;
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
   if (token === null) return;

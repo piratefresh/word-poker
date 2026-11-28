@@ -72,6 +72,10 @@ describe("a link's destination", () => {
     });
   });
 
+  test("opens Home for the streak reminder's link", () => {
+    expect(destinationFromURL("wordpoker://home")).toEqual({ pathname: "/" });
+  });
+
   test("is nothing at all for a link this app does not serve", () => {
     expect(destinationFromURL("wordpoker://offline?seed=20260919")).toBeNull();
     expect(destinationFromURL("wordpoker://online/../sign-in")).toBeNull();

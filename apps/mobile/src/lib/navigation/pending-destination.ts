@@ -25,6 +25,7 @@ const ROOM_PARAM = "room";
  * a nested route this app does not have, while `/online?room=<id>` stays the lobby with an arrival.
  */
 export type Destination =
+  | { readonly pathname: "/" }
   | { readonly pathname: "/friends"; readonly params?: { readonly add: string } | { readonly tab: "requests" } }
   | { readonly pathname: "/online" }
   | {
@@ -160,6 +161,8 @@ export function destinationFromURL(
           }
         : null;
     }
+    // `wordpoker://home`: the streak reminder (STO-1191).
+    if (parsed.protocol === "wordpoker:" && parsed.hostname === "home") return { pathname: "/" };
     const friendSegments =
       parsed.protocol === "wordpoker:" && parsed.hostname === "friend"
         ? ["friend", ...segments]
