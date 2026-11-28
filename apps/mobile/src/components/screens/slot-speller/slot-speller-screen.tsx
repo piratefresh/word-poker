@@ -4,13 +4,14 @@ import { router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   canHold,
   holdLimit,
   type Dictionary,
+  type SlotEvaluation,
   type SlotPhase,
   type SlotSpellerState,
   type SlotWord,
@@ -18,6 +19,7 @@ import {
 
 import { palette, spacing } from "@/constants/theme";
 import {
+  payBeat,
   payoutRows,
   randomSlotSeed,
 } from "@/features/slot-speller/slot-speller-model";
@@ -41,9 +43,9 @@ import {
   type CabinetLayout,
   type SlotDeckProps,
 } from "./slot-cabinet";
-import { SlotCellKey, SlotGrid } from "./slot-grid";
+import { cellCentre, lineColour, SlotCellKey, SlotGrid } from "./slot-grid";
 import { SlotPayoutList } from "./slot-payout-list";
-import { SlotRoundSheet } from "./slot-round-sheet";
+import { SlotPayoutSheet, SlotRoundSheet } from "./slot-round-sheet";
 import {
   SlotLineChips,
   SlotPowersPanel,
@@ -220,15 +222,22 @@ function SlotSpellerTable({
   // The last spin whose reels have all landed; a newer spin is still rolling in.
   const [landedSpin, setLandedSpin] = useState(state.spinCount);
   const rolling = state.spinCount !== landedSpin;
-  const livePreview =
-    state.phase === "moving" && !rolling ? (preview?.total ?? 0) : 0;
+  // The payout the sheet was opened for: a later pay or a new run never reopens it.
+  const [payoutShown, setPayoutShown] = useState<SlotEvaluation | null>(null);
+  const reduceMotion = useReducedMotion();
+  const live = state.phase === "moving" && !rolling;
+  const livePreview = live ? (preview?.total ?? 0) : 0;
 
-  const shown = payoutRows(payout).slice(0, revealStep);
-  const lit: SlotWord[] = [];
-  for (const row of shown) {
-    const word = row.kind === "word" ? payout?.words[row.index] : undefined;
-    if (word !== undefined) lit.push(word);
-  }
+  // The bars: the live preview while moving, the paid spin after a pay. The pay sequence and the
+  // list both read the engine's payout, so all three totals are its `evaluate`.
+  const beat = payout === null ? null : payBeat(payout, revealStep);
+  const words = payout?.words ?? (live ? (preview?.words ?? []) : []);
+  // The engine banks the whole payout at once; the meter fills word by word as the sequence pays.
+  const meterScore =
+    payout === null || beat === null ? state.roundScore : state.roundScore - payout.total + beat.paid;
+  // A word's score flies to the meter on its beat (not on its powers' beats).
+  const flyingIndex = beat !== null && beat.power === null && !reduceMotion ? beat.current : null;
+  const flying = flyingIndex === null ? undefined : payout?.words[flyingIndex];
 
   const newRun = (seed: string): void => {
     setMenuOpen(false);
@@ -241,7 +250,9 @@ function SlotSpellerTable({
         <SlotHeader
           layout={layout}
           state={state}
+          score={meterScore}
           preview={livePreview}
+          onPayout={payout !== null && !revealing ? () => setPayoutShown(payout) : undefined}
           onBack={goBack}
           onMenu={() => setMenuOpen(true)}
         />
@@ -250,8 +261,8 @@ function SlotSpellerTable({
           state={state}
           box={layout.window}
           unit={unit}
-          outlined={preview?.words ?? []}
-          lit={lit}
+          words={words}
+          beat={beat}
           selected={selected}
           held={held}
           revealing={revealing}
@@ -263,6 +274,16 @@ function SlotSpellerTable({
           onSkipReveal={() => dispatch({ type: "skipReveal" })}
           onSpinLanded={setLandedSpin}
         />
+        {flying !== undefined ? (
+          <ScoreFly
+            // One flight per word's beat.
+            key={`${state.spinCount}:${flyingIndex}`}
+            layout={layout}
+            state={state}
+            word={flying}
+            landsAt={Math.min(meterScore / state.target, 1)}
+          />
+        ) : null}
         <SlotHint layout={layout}>{hintFor(game, rolling)}</SlotHint>
         <SlotCellKey state={state} unit={unit} box={layout.cellKey} />
         <SlotDeck
@@ -282,6 +303,10 @@ function SlotSpellerTable({
         dispatch={dispatch}
         onDismiss={sheet.dismiss}
       />
+      {/* The spin's payout, checkable: every word with the engine's working, its powers, the total. */}
+      {payout !== null && payoutShown === payout ? (
+        <SlotPayoutSheet state={state} payout={payout} onDismiss={() => setPayoutShown(null)} />
+      ) : null}
       {/* The run's details, plainly, until the run menu gets its own design (STO-1190). */}
       <BottomSheet
         containerColor={palette.felt800}
@@ -310,6 +335,66 @@ function SlotSpellerTable({
         </RNHostView>
       </BottomSheet>
     </>
+  );
+}
+
+/** How long a word's points take to fly into the meter; the meter's fill waits about this long to grow. */
+const FLY_MS = 380;
+
+interface ScoreFlyProps {
+  layout: CabinetLayout;
+  state: SlotSpellerState;
+  word: SlotWord;
+  /** How full the meter is once these points land, 0 to 1: where they fly to. */
+  landsAt: number;
+}
+
+/** A paid word turning into points: its `+score` lifts off the middle of its bar and pours into the meter's fill. */
+function ScoreFly({ layout, state, word, landsAt }: ScoreFlyProps): ReactElement | null {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: FLY_MS, easing: Easing.in(Easing.cubic) });
+  }, [progress]);
+  const first = word.cells[0];
+  const last = word.cells.at(-1);
+  const rows = state.grid[0]?.length ?? 3;
+  const { window, meter, unit } = layout;
+  const a = first === undefined ? { x: 0, y: 0 } : cellCentre(window, unit, state.reels, rows, first);
+  const b = last === undefined ? a : cellCentre(window, unit, state.reels, rows, last);
+  const from = { x: window.left + (a.x + b.x) / 2, y: window.top + (a.y + b.y) / 2 };
+  const to = { x: meter.left + meter.width * landsAt, y: meter.top + meter.height / 2 };
+  const animated = useAnimatedStyle(() => ({
+    opacity: progress.value < 0.85 ? 1 : (1 - progress.value) / 0.15,
+    transform: [
+      { translateX: (to.x - from.x) * progress.value },
+      // A slight lift before the dive, so the points read as leaving the word.
+      { translateY: (to.y - from.y) * progress.value - 24 * unit * Math.sin(Math.PI * progress.value) },
+      { scale: 1.5 - 1.1 * progress.value },
+    ],
+  }));
+  if (first === undefined) return null;
+  const fontSize = 18 * unit;
+  return (
+    <Animated.Text
+      aria-hidden
+      maxFontSizeMultiplier={1}
+      style={[
+        styles.fly,
+        {
+          // Centred on the tile by a fixed box: the text is short, and the box keeps the maths plain.
+          left: from.x - 40 * unit,
+          top: from.y - fontSize,
+          width: 80 * unit,
+          fontSize,
+          lineHeight: fontSize * 1.3,
+          backgroundColor: lineColour(word.line),
+          borderRadius: fontSize,
+        },
+        animated,
+      ]}
+    >
+      {`+${word.breakdown.score}`}
+    </Animated.Text>
   );
 }
 
@@ -431,6 +516,16 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: CABINET_GROUND },
   stage: { position: "absolute", overflow: "hidden" },
   dim: { backgroundColor: "rgba(10,30,18,0.35)" },
+  fly: {
+    position: "absolute",
+    overflow: "hidden",
+    textAlign: "center",
+    color: "#ffffff",
+    fontWeight: "800",
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
+  },
   menu: {
     alignSelf: "stretch",
     width: "100%",

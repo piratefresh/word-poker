@@ -30,10 +30,12 @@ import {
 import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
 import { newBests, type SlotRecords } from "@/features/slot-speller/slot-speller-save";
-import { randomSlotSeed } from "@/features/slot-speller/slot-speller-model";
+import { payoutRows, randomSlotSeed } from "@/features/slot-speller/slot-speller-model";
 import type { SlotSpeller } from "@/features/slot-speller/use-slot-speller";
 import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { webTestID } from "@/lib/ui/web-id";
+
+import { SlotPayoutList } from "./slot-payout-list";
 
 /** G1's cream ink and gold. */
 const CREAM = "#fff6e2";
@@ -103,6 +105,54 @@ export function SlotRoundSheet({ open, state, payout, records, dispatch, onDismi
     default:
       return null;
   }
+}
+
+export interface SlotPayoutSheetProps {
+  state: SlotSpellerState;
+  payout: SlotEvaluation;
+  onDismiss: () => void;
+}
+
+/**
+ * The last spin's payout (STO-1183), opened from the meter: the round sheets' frame round the spin
+ * total, each word's card with the engine's working, and the way back to the reels.
+ */
+export function SlotPayoutSheet({ state, payout, onDismiss }: SlotPayoutSheetProps): ReactElement {
+  const count = payout.words.length;
+  const powers = payout.words.reduce((sum, word) => sum + word.breakdown.triggered.length, 0);
+  const rows = payoutRows(payout).filter((row) => row.kind !== "total");
+  return (
+    <SheetFrame title="LAST SPIN" tone="win" onDismiss={onDismiss}>
+      <View accessibilityLabel={`The last spin paid ${payout.total} points`} accessible style={styles.result}>
+        <Text style={styles.score} testID="slot-payout-total">{`+${payout.total}`}</Text>
+        <Text style={styles.dim}>
+          {`Round score `}
+          <Text style={styles.gold}>{`${state.roundScore} / ${state.target}`}</Text>
+        </Text>
+      </View>
+      <View style={styles.chips}>
+        <Text style={styles.chip}>{count === 1 ? "1 word" : `${count} words`}</Text>
+        {powers > 0 ? <Text style={styles.chip}>{powers === 1 ? "1 power" : `${powers} powers`}</Text> : null}
+      </View>
+      <Divider label={count === 0 ? "NO WORDS THIS SPIN" : "HOW IT PAID"} />
+      {count === 0 ? (
+        <Text style={[styles.dim, styles.center]}>No line spelled a word of three letters or more.</Text>
+      ) : (
+        <SlotPayoutList payout={payout} rows={rows} powerMultiplier={state.config.scoringPowerMultiplier} />
+      )}
+      <View style={styles.footer}>
+        <GameButton
+          label="BACK TO THE REELS"
+          variant="green"
+          scale={FOOTER_SCALE}
+          onPress={onDismiss}
+          style={styles.grow}
+          labelStyle={styles.bigLabel}
+          testID="slot-payout-close"
+        />
+      </View>
+    </SheetFrame>
+  );
 }
 
 /** The shared frame: scrim, the gold rim, the felt (green, or wine when short) and the banner. */

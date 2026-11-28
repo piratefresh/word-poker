@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { LinearGradient } from "expo-linear-gradient";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, { LinearTransition, useReducedMotion } from "react-native-reanimated";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import Animated, { LinearTransition, useAnimatedStyle, useReducedMotion, withSpring } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
 import {
@@ -19,7 +19,8 @@ import {
 
 import { getTileAccessibilityLabel, Tile, TILE_METRICS } from "@/components/game/word-tile";
 import { haptic } from "@/components/word-builder/haptics";
-import { colors, radius } from "@/constants/theme";
+import { radius } from "@/constants/theme";
+import { powerName, type PayBeat } from "@/features/slot-speller/slot-speller-model";
 import { webTestID } from "@/lib/ui/web-id";
 
 import { SlotReelRoll } from "./slot-reel-roll";
@@ -75,7 +76,7 @@ const CELL_COLOURS = {
   "word-3": { fill: "#c23a30", ink: "#ffffff" },
 } as const;
 
-function cellColours(cell: Pick<SlotPremiumCell, "kind" | "multiplier">): { fill: string; ink: string } {
+export function cellColours(cell: Pick<SlotPremiumCell, "kind" | "multiplier">): { fill: string; ink: string } {
   const key = `${cell.kind}-${cell.multiplier >= 3 ? 3 : 2}` as keyof typeof CELL_COLOURS;
   return CELL_COLOURS[key];
 }
@@ -104,10 +105,10 @@ export interface SlotGridProps {
   box: Box;
   /** Artboard px to device px, for the window's chrome. */
   unit: number;
-  /** Words whose tiles wear an outline: the live preview while moving. */
-  outlined: readonly SlotWord[];
-  /** Words whose tiles light gold: the payout revealed so far. */
-  lit: readonly SlotWord[];
+  /** The words on bars: the live preview while moving, the paid spin after a pay. */
+  words: readonly SlotWord[];
+  /** How far the pay sequence has got over `words`; `null` while they are a live preview. */
+  beat: PayBeat | null;
   selected: SlotCell | null;
   /** Reels held through the last spin: they stay still rather than stop in again. */
   held: readonly number[];
@@ -145,8 +146,8 @@ export function SlotGrid({
   state,
   box,
   unit,
-  outlined,
-  lit,
+  words,
+  beat,
   selected,
   held,
   revealing,
@@ -166,8 +167,14 @@ export function SlotGrid({
   const { band, inner, column, pitch, tileWidth, tileHeight, scale } = reelWindowGeometry(box, unit, reels, rows);
   const gap = pitch - tileHeight;
 
-  const outlinedFaces = facesByCell(outlined);
-  const litFaces = facesByCell(lit);
+  const faces = facesByCell(words);
+  // Paid words light gold; while paying, the current word pops and every tile not yet paid dims.
+  const paidWords = beat === null ? [] : words.slice(0, beat.shown);
+  const litFaces = facesByCell(paidWords);
+  const current = beat?.current ?? null;
+  const popped = new Set(
+    current === null ? [] : (words[current]?.cells ?? []).map(([reel, row]) => cellKey(reel, row)),
+  );
 
   // The grid as last drawn, so a new spin knows the letters it rolls away from. Adjusted while
   // rendering (not in an effect) so the dealt tiles never flash before their reel starts rolling.
@@ -213,6 +220,7 @@ export function SlotGrid({
       testID="slot-window"
     >
       <ReelWindowFrame box={box} unit={unit} reels={reels} layout={layout} />
+      <WinBars box={box} unit={unit} reels={reels} rows={rows} words={words} beat={beat} />
       {grid.map((tiles, reel) => {
         const locked = holds.includes(reel);
         const rolling = roll !== null && roll.rolling.includes(reel);
@@ -242,7 +250,7 @@ export function SlotGrid({
               {tiles.map((tile, row) => {
                 const key = cellKey(reel, row);
                 const litFace = litFaces.get(key);
-                const outlinedFace = outlinedFaces.get(key);
+                const dimmed = revealing && litFace === undefined;
                 const isSelected = selected !== null && selected[0] === reel && selected[1] === row;
                 const premium = cellAt(state.cells, [reel, row]);
                 const swapLocked = premium !== undefined && isSwapLocked(state, [reel, row]);
@@ -256,13 +264,10 @@ export function SlotGrid({
                   .join(", ");
                 return (
                   // Keyed by position: a swap and a nudge can put two copies of one tile id on screen.
-                  <View
+                  <PopCell
                     key={key}
-                    style={[
-                      styles.cell,
-                      { top: row * pitch, borderRadius: radius.md * scale },
-                      outlinedFace !== undefined && styles.outlined,
-                    ]}
+                    popped={popped.has(key) && !reduceMotion}
+                    style={[styles.cell, { top: row * pitch }, dimmed && styles.dimmed]}
                   >
                     {premium !== undefined ? (
                       <CellPlate cell={premium} swapLocked={swapLocked} scale={scale} reel={reel} row={row} />
@@ -274,7 +279,7 @@ export function SlotGrid({
                       scale={scale}
                       animation="none"
                       shadow={false}
-                      chosenFace={litFace ?? outlinedFace}
+                      chosenFace={faces.get(key)}
                       fill={litFace !== undefined ? "gold" : "ivory"}
                       selected={isSelected}
                       interactive={canMove}
@@ -285,7 +290,7 @@ export function SlotGrid({
                     {premium !== undefined ? (
                       <CellBadge cell={premium} scale={scale} />
                     ) : null}
-                  </View>
+                  </PopCell>
                 );
               })}
             </View>
@@ -328,8 +333,153 @@ export function SlotGrid({
           </Animated.View>
         );
       })}
+      <WinChips
+        box={box}
+        unit={unit}
+        reels={reels}
+        rows={rows}
+        words={words}
+        beat={beat}
+        powerMultiplier={state.config.scoringPowerMultiplier}
+      />
     </Pressable>
   );
+}
+
+/**
+ * Each pay line's bar colour, by line: one per row, as the playable build lights its rows, and one
+ * each for the Wave and Zigzag families, so a weaving word never reads as a row's.
+ */
+const ROW_COLOURS = ["#4fc3ff", "#ff5fa2", "#ffb347", "#b48cff", "#7ee787"] as const;
+const WAVE_COLOUR = "#3ee0d0";
+const ZIGZAG_COLOUR = "#d4f04a";
+
+export function lineColour(line: string): string {
+  if (line.startsWith("Wave")) return WAVE_COLOUR;
+  if (line.startsWith("Zigzag")) return ZIGZAG_COLOUR;
+  const row = Number(line.replace("Row ", "")) - 1;
+  return ROW_COLOURS[row % ROW_COLOURS.length] ?? ROW_COLOURS[0];
+}
+
+/** A cell's centre inside a window `box`, in device px from the box's top left. */
+export function cellCentre(box: Pick<Box, "width" | "height">, unit: number, reels: number, rows: number, [reel, row]: SlotCell) {
+  const { inner, column, pitch } = reelWindowGeometry(box, unit, reels, rows);
+  return { x: inner.left + (reel + 0.5) * column, y: inner.top + (row + 0.5) * pitch };
+}
+
+/** Where a word sits on the pay sequence. */
+type BarState = "live" | "pending" | "current" | "done";
+
+function barState(beat: PayBeat | null, index: number): BarState {
+  if (beat === null) return "live";
+  if (beat.current === index) return "current";
+  return index < beat.shown ? "done" : "pending";
+}
+
+const BAR_OPACITY: Record<BarState, number> = { live: 0.38, pending: 0.12, current: 0.9, done: 0.55 };
+
+interface WinLayerProps {
+  box: Box;
+  unit: number;
+  reels: number;
+  rows: number;
+  words: readonly SlotWord[];
+  beat: PayBeat | null;
+}
+
+/**
+ * The soft bar under each paying word, in its line's colour: a thick round-capped stroke through its
+ * tiles' centres, so a row word is a pill and a Wave or Zigzag word a ribbon down the same cells.
+ */
+function WinBars({ box, unit, reels, rows, words, beat }: WinLayerProps): ReactElement | null {
+  if (words.length === 0) return null;
+  const { tileWidth, tileHeight } = reelWindowGeometry(box, unit, reels, rows);
+  const width = tileHeight + 8 * unit;
+  // The round cap reaches half the stroke past each end: pull the ends in so the bar ends just past the tile.
+  const reach = tileWidth / 2 + 4 * unit - width / 2;
+  return (
+    <Svg aria-hidden height={box.height} pointerEvents="none" style={StyleSheet.absoluteFill} width={box.width}>
+      {words.map((word, index) => {
+        const points = word.cells.map((cell) => cellCentre(box, unit, reels, rows, cell));
+        const first = points[0];
+        const second = points[1];
+        const last = points.at(-1);
+        const beforeLast = points.at(-2);
+        if (first === undefined || second === undefined || last === undefined || beforeLast === undefined) return null;
+        const ends = [outward(first, second, reach), ...points.slice(1, -1), outward(last, beforeLast, reach)];
+        const d = ends.map(({ x, y }, at) => `${at === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+        const state = barState(beat, index);
+        const colour = lineColour(word.line);
+        return (
+          <Fragment key={`${word.line}:${index}`}>
+            {state === "current" ? (
+              <Path d={d} fill="none" stroke={colour} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.3} strokeWidth={width + 12 * unit} />
+            ) : null}
+            <Path d={d} fill="none" stroke={colour} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={BAR_OPACITY[state]} strokeWidth={width} />
+          </Fragment>
+        );
+      })}
+    </Svg>
+  );
+}
+
+/** `point` moved `by` px away from `toward`. */
+function outward(point: { x: number; y: number }, toward: { x: number; y: number }, by: number) {
+  const dx = point.x - toward.x;
+  const dy = point.y - toward.y;
+  const length = Math.hypot(dx, dy) || 1;
+  return { x: point.x + (dx / length) * by, y: point.y + (dy / length) * by };
+}
+
+/** The `+score` chip at each word's end; on its beat it names the word, then each power it triggered. */
+function WinChips({ box, unit, reels, rows, words, beat, powerMultiplier }: WinLayerProps & { powerMultiplier: number }): ReactElement | null {
+  if (words.length === 0) return null;
+  const { tileWidth, tileHeight } = reelWindowGeometry(box, unit, reels, rows);
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {words.map((word, index) => {
+        const state = barState(beat, index);
+        const last = word.cells.at(-1);
+        if (state === "pending" || last === undefined) return null;
+        const { x, y } = cellCentre(box, unit, reels, rows, last);
+        const big = state === "current";
+        const power = beat?.power ?? null;
+        // The word's own points fly to the meter on its beat; the chip names a power on that power's beat.
+        const text = big && power !== null ? `⚡ ${powerName(power)} ×${powerMultiplier}` : `+${word.breakdown.score}`;
+        const fontSize = (big ? 15 : 11) * unit;
+        return (
+          <Text
+            key={`${word.line}:${index}`}
+            maxFontSizeMultiplier={1}
+            style={[
+              styles.chip,
+              {
+                right: box.width - (x + tileWidth / 2 + 4 * unit),
+                top: y - tileHeight / 2 - fontSize * 0.9,
+                backgroundColor: lineColour(word.line),
+                fontSize,
+                lineHeight: fontSize * 1.25,
+                paddingHorizontal: (big ? 8 : 5) * unit,
+                borderRadius: fontSize,
+              },
+            ]}
+            testID={`slot-win-chip-${index}`}
+          >
+            {text}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+/** A grid cell that lifts and grows while its word is being paid. */
+function PopCell({ popped, style, children }: { popped: boolean; style: StyleProp<ViewStyle>; children: ReactNode }): ReactElement {
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ translateY: withSpring(popped ? -3 : 0) }, { scale: withSpring(popped ? 1.08 : 1) }],
+    zIndex: popped ? 2 : 0,
+  }));
+  return <Animated.View style={[style, animated]}>{children}</Animated.View>;
 }
 
 interface TargetStyle {
@@ -611,8 +761,17 @@ const styles = StyleSheet.create({
   },
   locked: { borderColor: "#ffd25a", backgroundColor: "rgba(255,210,90,0.18)" },
   hidden: { opacity: 0 },
-  cell: { position: "absolute", left: 0, borderWidth: 2, borderColor: "transparent", margin: -2 },
-  outlined: { borderColor: colors.successHi },
+  cell: { position: "absolute", left: 0 },
+  dimmed: { opacity: 0.5 },
+  chip: {
+    position: "absolute",
+    overflow: "hidden",
+    color: "#ffffff",
+    fontWeight: "800",
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
+  },
   roll: { position: "absolute" },
   target: { position: "absolute", left: 0 },
   pressed: { backgroundColor: "rgba(255,250,240,0.18)", borderRadius: radius.md },
