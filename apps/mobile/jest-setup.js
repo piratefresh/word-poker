@@ -7,13 +7,18 @@
  */
 jest.mock("react-native-reanimated", () => require("./jest-reanimated"));
 
-jest.mock("expo-audio", () => ({
-  useAudioPlayer: () => ({
+jest.mock("expo-audio", () => {
+  const player = () => ({
     play: jest.fn(),
+    pause: jest.fn(),
     seekTo: jest.fn(async () => {}),
+    setPlaybackRate: jest.fn(),
     volume: 1,
-  }),
-}));
+    loop: false,
+    shouldCorrectPitch: true,
+  });
+  return { useAudioPlayer: player, createAudioPlayer: jest.fn(player) };
+});
 
 // The tabletop backdrop is drink and coin-bowl art that animates natively, which a test renderer doesn't
 // run; it is decoration only, so tests draw nothing in its place.

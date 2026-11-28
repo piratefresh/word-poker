@@ -31,6 +31,7 @@ import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
 import { newBests, type SlotRecords } from "@/features/slot-speller/slot-speller-save";
 import { payoutRows, randomSlotSeed } from "@/features/slot-speller/slot-speller-model";
+import { playSlotSound } from "@/features/slot-speller/slot-speller-sound";
 import type { SlotSpeller } from "@/features/slot-speller/use-slot-speller";
 import { MODAL_ORIENTATIONS } from "@/lib/ui/modal-orientations";
 import { webTestID } from "@/lib/ui/web-id";
@@ -419,9 +420,13 @@ function CountUp({ from, to }: { from: number; to: number }): ReactElement {
   const [value, setValue] = useState(from);
   useEffect(() => {
     if (value === to) return;
-    const timer = setTimeout(() => setValue(value + Math.sign(to - value)), COUNT_STEP_MS);
+    const timer = setTimeout(() => {
+      // A coin ticks for each token counted in (not for a buy's count down, nor a count not shown).
+      if (to > value && !reduceMotion) playSlotSound("coin");
+      setValue(value + Math.sign(to - value));
+    }, COUNT_STEP_MS);
     return () => clearTimeout(timer);
-  }, [value, to]);
+  }, [value, to, reduceMotion]);
   return <Text style={styles.tokenChipText}>{reduceMotion ? to : value}</Text>;
 }
 
