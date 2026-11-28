@@ -153,8 +153,8 @@ row bought later makes a new pair to buy.
 land on the same position, leaving one blank), and the grid refreshes to show them. A reel
 bought afterwards gets its 2 blanks too. Where the blanks land comes from the run's seed.
 
-**Rounds.** Rounds 1–10 have fixed targets: 20, 40, 70, 110, 160, 230, 320, 450, 620, 820.
-From round 11 each target is 20% above the last, rounded (984, 1181, 1417, …). A round starts
+**Rounds.** Rounds 1–10 have fixed targets: 45, 65, 95, 130, 170, 220, 290, 400, 550, 760.
+From round 11 each target is 25% above the last, rounded (950, 1188, 1484, …). A round starts
 with 0 points and 3 spins. After each payout:
 
 - the round score reaches the target: the round is **cleared** and the shop opens;
@@ -190,69 +190,75 @@ again.
 ## Tuning
 
 Measured with `pnpm --filter @wordpoker/game-rules exec tsx scripts/probe-slot-speller.ts [firstSeed] [runs] [all|runs|powers|min]`
-(STO-1165). The bot is greedy: each step it tries every nudge and swap (swaps sampled to 200 on
-wide grids), takes the best grid total, and pays when nothing improves. **These numbers were
-measured before premium cells (STO-1180), with DL/TL tiles on the strips, and on the old pool
-(Extra Row and Split Tiles, no Hot or Jackpot Cell, Zigzag paying every pair); STO-1188 re-runs
-them.** It holds the best
-word's reels, as many as it may, and buys the Extra Spin when short. People find much less
-than this bot (maybe 30–50% of it), so these numbers are a ceiling, not a target.
+(STO-1165, re-run on the current rules in STO-1188). `PROBE_TARGETS=45,65,…`, `PROBE_GROWTH=0.25`
+and `PROBE_ROW_COSTS=8,12` try a curve or prices without editing config. The bot is greedy: each
+step it tries every nudge and swap the cells allow (swaps sampled to 200 on wide grids), takes
+the best grid total with premium cells applied, and pays when nothing improves. Between spins it
+holds the best word's reels, as many as it may (1, or 3 with Big Hold), and it buys the Extra
+Spin when short. People find much less than this bot (maybe 30–50% of it), so these numbers are
+a ceiling, not a target. 200 seeds throughout.
 
-**Starting 5×3 grid**, 200 seeds × 3 spins:
+**Starting 5×3 grid**, 3 spins a seed. The playable build's bot gave 35.5, 61.5 with a fourth
+row, 44.6 with Wave and 45.8 with one Zigzag pair; this bot agrees within a few points.
 
-| Word rule | Mean spin |
-| --------- | --------- |
-| 3-letter words at ×0.5 (shipped) | 30.6 |
-| 4+ letters only | 23.7 |
-| 3-letter words at ×1 | 35.6 |
+| Grid | Mean spin |
+| ---- | --------- |
+| Shipped (3-letter words ×0.5, premium cells) | 34.3 |
+| No premium cells | 24.5 |
+| 4+ letters only | 24.6 |
+| 3-letter words at ×1 | 41.4 |
+| + a fourth row | 56.3 |
+| + Wave Lines | 42.0 |
+| + one Zigzag pair | 42.9 |
 
-This confirms the prototype's "about 31 a spin (24 with 4+ only)".
-
-**Each power alone** on a 7×3 grid (baseline 44.2 a spin), 200 seeds × a 3-spin round:
+**Each power alone** on a 7×3 grid (baseline 61.4 a spin), a 3-spin round a seed:
 
 | Power | Spin | Δ | Δ per token |
 | ----- | ---- | - | ----------- |
-| Zigzag Lines | 73.4 | +29.2 | 4.9 |
-| Wave Lines | 60.0 | +15.8 | 2.6 |
-| Twins | 55.7 | +11.6 | 2.9 |
-| Extra Row | 55.3 | +11.2 | 1.4 |
-| Extra Row ×2 | 62.8 | +18.6 | 1.2 |
-| Heavy | 54.2 | +10.1 | 2.5 |
-| Action | 50.8 | +6.6 | 1.7 |
-| +1 reel (3 tokens) | 50.6 | +6.5 | 2.2 |
-| Extra Move | 50.1 | +5.9 | 1.2 |
-| Wild Reel | 50.0 | +5.9 | 1.2 |
-| Long Haul | 47.3 | +3.1 | 0.8 |
-| Split Tiles | 46.9 | +2.7 | 0.5 |
-| Reel Lock (now Big Hold) | 45.1 | +1.0 | 0.2 |
+| Jackpot Cell | 88.7 | +27.3 | 3.90 |
+| Twins | 74.7 | +13.3 | 3.32 |
+| Wild Reel | 75.3 | +13.9 | 2.77 |
+| Heavy | 72.0 | +10.6 | 2.64 |
+| +1 reel (3 tokens) | 68.2 | +6.8 | 2.27 |
+| +1 row (8 tokens) | 79.4 | +18.0 | 2.24 |
+| Action | 69.8 | +8.3 | 2.08 |
+| Extra Move | 70.0 | +8.6 | 1.71 |
+| Zigzag Lines (one pair) | 71.0 | +9.5 | 1.59 |
+| Wave Lines | 70.2 | +8.7 | 1.46 |
+| Hot Cell | 66.4 | +4.9 | 1.24 |
+| Long Haul | 66.1 | +4.7 | 1.17 |
+| Big Hold | 66.1 | +4.6 | 0.93 |
 
-Long Haul grows with grid width (more 6–7 letter words); Reel Lock (once a round, 2 reels; replaced by the free hold and Big Hold in STO-1182) was weak
-for a bot that replays greedily but may matter more to people. Zigzag is the standout; it stays as is.
+Jackpot Cell is the standout: a permanent triple-word cell on a row line. Zigzag, which paid
+every pair before STO-1186, now buys one pair and drops from first to mid-table. Big Hold stays
+weak for a bot that replays greedily.
 
-**Whole runs**, 200 seeds, shop policy "power" (buy offered powers in the order of the table
-above, then reels with what is left):
+**Whole runs**, shop policy "power" (buy offered powers in the order of the table above, then
+reels with what is left):
 
-| Round | Target | Reached | Clear % | Mean spin | Tokens earned | Reels | Rows |
-| ----- | ------ | ------- | ------- | --------- | ------------- | ----- | ---- |
-| 1 | 20 | 200 | 100 | 30 | 8.8 | 5.0 | 3.0 |
-| 3 | 70 | 200 | 100 | 64 | 7.7 | 5.8 | 3.3 |
-| 5 | 160 | 200 | 100 | 118 | 7.2 | 6.0 | 3.6 |
-| 7 | 320 | 196 | 96 | 199 | 6.7 | 6.2 | 4.1 |
-| 9 | 620 | 183 | 91 | 297 | 5.9 | 6.3 | 4.8 |
-| 10 | 820 | 167 | 85 | 361 | 5.8 | 6.5 | 4.9 |
-| 11 | 984 | 142 | 79 | 422 | 5.9 | 7.2 | 4.9 |
-| 13 | 1417 | 92 | 75 | 530 | 5.5 | 9.0 | 5.0 |
-| 15 | 2040 | 45 | 56 | 596 | 5.0 | 10.5 | 5.0 |
-| 17 | 2938 | 9 | 22 | 688 | 5.0 | 11.4 | 5.0 |
+| Round | Target | Reached | Clear % | Mean spin | Tokens earned | Reels |
+| ----- | ------ | ------- | ------- | --------- | ------------- | ----- |
+| 1 | 45 | 200 | 100 | 33 | 7.1 | 5.0 |
+| 3 | 95 | 199 | 99 | 61 | 6.8 | 5.6 |
+| 5 | 170 | 192 | 95 | 112 | 6.9 | 5.8 |
+| 7 | 290 | 175 | 97 | 201 | 6.8 | 6.0 |
+| 9 | 550 | 159 | 91 | 324 | 6.3 | 6.1 |
+| 10 | 760 | 144 | 76 | 414 | 6.6 | 6.1 |
+| 11 | 950 | 109 | 78 | 524 | 6.5 | 6.2 |
+| 13 | 1484 | 63 | 67 | 755 | 6.5 | 6.4 |
+| 15 | 2319 | 33 | 73 | 1518 | 7.3 | 6.4 |
+| 17 | 3624 | 17 | 76 | 2878 | 7.3 | 6.5 |
 
-The bot's runs end in round 12 at the median (10th percentile 9, 90th 16). Other policies die
-sooner: "reel" (reels first) median 7, "row" (save for Extra Row) median 8 — Add Reel buys
-fewer points per token than the line and Scoring powers. The bot holds 1–2 tokens after each
-shop and owns every power by about round 10, so the shop is neither buy-everything early nor
-buy-nothing; prices and token income are unchanged.
+The bot's runs end in round 11 at the median (10th percentile 6, 90th 16). Jackpot Cell is held
+by half the runs by round 3 and nearly all by round 9; Twins, Heavy, Wild Reel and Action follow.
+Other policies die sooner: "reel" (reels first) median 9, "row" (Add Row whenever it can) median
+7. The power-first bot never has 8 tokens left for Add Row, and buying rows first costs it four
+rounds, so Add Row is not underpriced and keeps 8, then 12. The bot holds about 1 token after
+each shop and owns most of the pool by round 12: neither buy-everything nor buy-nothing, so token
+income is unchanged.
 
-**Why this curve.** The table rises about as fast as the bot's build adds points (its mean
-spin roughly doubles every three rounds through round 10), asking for a growing share of the
-bot's three spins: ~0.2× in round 1, ~0.75× by round 10. Past round 10 a full build plateaus
-near 600 a spin, so +20% a round turns a finished build into a few more rounds rather than a
-wall.
+**Why this curve.** Round 1's 45 takes about two average spins (the old 20 fell to one). Through
+round 9 the table rises as fast as the bot's build adds points (its mean spin roughly doubles
+every three rounds) and the bot clears 91% or more; round 10's 760 is the first steep step, and
+past it +25% a round outpaces a finished build within a few rounds. The previous curve (20 … 820,
+then +20%) let this bot's 90th-percentile run reach round 21.

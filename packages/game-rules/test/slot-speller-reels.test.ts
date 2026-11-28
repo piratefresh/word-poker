@@ -36,7 +36,7 @@ describe("Slot Speller reels", () => {
     assert.equal(new Set(ids).size, ids.length);
     assert.equal(run.phase, "ready");
     assert.equal(run.round, 1);
-    assert.equal(run.target, 20);
+    assert.equal(run.target, DEFAULT_SLOT_SPELLER_CONFIG.targets[0]);
     assert.equal(run.grid.length, 5);
     assert.equal(run.grid[0]?.length, 3);
   });
