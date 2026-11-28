@@ -3,6 +3,7 @@ import { createSlotRun, nextRound, type SlotSpellerState } from "@wordpoker/game
 import {
   EMPTY_SLOT_RECORDS,
   loadSlotRun,
+  newBests,
   persistSlotChange,
   saveSlotRun,
   slotRecords,
@@ -78,6 +79,27 @@ describe("updateRecords", () => {
     const shop = inShop(start);
     const records = updateRecords(EMPTY_SLOT_RECORDS, start, shop);
     expect(updateRecords(records, shop, { ...shop, tokens: 1 })).toBe(records);
+  });
+});
+
+describe("newBests", () => {
+  it("flags only the records this run beat, from the mark a new run sets", () => {
+    const old = { furthestRound: 2, bestWord: { word: "CAT", score: 20 }, discovered: ["hot"] as const };
+    const played = { ...createSlotRun("NEW001"), round: 3, spinCount: 9 };
+    const fresh = updateRecords(old, played, createSlotRun("NEW002"));
+    expect(newBests(fresh)).toEqual({ furthestRound: false, bestWord: false, discovered: false });
+
+    const run = createSlotRun("NEW002");
+    const cleared = updateRecords(fresh, run, inShop(run, 3));
+    expect(newBests(cleared)).toEqual({ furthestRound: true, bestWord: false, discovered: true });
+  });
+
+  it("flags nothing on records saved before the mark existed", () => {
+    expect(newBests({ furthestRound: 4, bestWord: null, discovered: [] })).toEqual({
+      furthestRound: false,
+      bestWord: false,
+      discovered: false,
+    });
   });
 });
 
