@@ -2,13 +2,32 @@ import * as Clipboard from "expo-clipboard";
 import { useState, type ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { SLOT_POWERS, powerCount, slotLines, type SlotSpellerState } from "@wordpoker/game-rules";
+import { SLOT_POWERS, powerCount, slotLines, type SlotPower, type SlotPowerType, type SlotSpellerState } from "@wordpoker/game-rules";
 
 import { colors, fonts, fontSize, opacity, radius, spacing, type } from "@/constants/theme";
 import type { SlotRecords } from "@/features/slot-speller/slot-speller-save";
 import { webTestID } from "@/lib/ui/web-id";
 
-import { PowerGlyph } from "./slot-shop-panel";
+/** Each power type's glyph colour, so a power reads as Grid, Lines, Moves, Tiles or Scoring at a glance. */
+const TYPE_COLORS: Record<SlotPowerType, string> = {
+  Grid: colors.info,
+  Lines: colors.successHi,
+  Moves: colors.gold,
+  Tiles: colors.warning,
+  Scoring: colors.danger,
+};
+
+/** A power's glyph in its type's colour. */
+function PowerGlyph({ power }: { power: SlotPower }): ReactElement {
+  const color = TYPE_COLORS[power.type];
+  return (
+    <View style={[styles.glyph, { borderColor: color }]}>
+      <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.glyphText, { color }]}>
+        {power.glyph}
+      </Text>
+    </View>
+  );
+}
 
 /** The lines the grid pays right now, as chips. */
 export function SlotLineChips({ state }: { state: SlotSpellerState }): ReactElement {
@@ -136,6 +155,16 @@ const styles = StyleSheet.create({
   heading: { ...type.label, fontSize: fontSize.micro },
   power: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   powerText: { flex: 1, minWidth: 0 },
+  glyph: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    backgroundColor: colors.surfaceStrong,
+  },
+  glyphText: { fontFamily: fonts.ui, fontSize: fontSize.body, paddingHorizontal: 2 },
   name: { fontFamily: fonts.ui, fontSize: fontSize.body, color: colors.textBright },
   dim: { ...type.bodyDim, fontSize: fontSize.small },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },

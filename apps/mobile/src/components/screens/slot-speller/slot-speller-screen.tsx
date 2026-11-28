@@ -21,10 +21,7 @@ import {
   payoutRows,
   randomSlotSeed,
 } from "@/features/slot-speller/slot-speller-model";
-import {
-  useSlotRecords,
-  type SlotRecords,
-} from "@/features/slot-speller/slot-speller-save";
+import { useSlotRecords } from "@/features/slot-speller/slot-speller-save";
 import {
   useSlotSpeller,
   type SlotSpeller,
@@ -45,7 +42,6 @@ import {
   type SlotDeckProps,
 } from "./slot-cabinet";
 import { SlotCellKey, SlotGrid } from "./slot-grid";
-import { OutOfSpinsPanel, RunOverPanel } from "./slot-outcome-panels";
 import { SlotPayoutList } from "./slot-payout-list";
 import { SlotRoundSheet } from "./slot-round-sheet";
 import {
@@ -54,7 +50,6 @@ import {
   SlotRecordsBlock,
   SlotSeedRow,
 } from "./slot-run-info";
-import { SlotShopPanel } from "./slot-shop-panel";
 
 /** G1 · Glossy reels: the cabinet frame, header buttons, meter, plaques, deck and shelf, painted. */
 const CABINET_ART = require("../../../../assets/images/slot-speller/glossy-reels.jpg");
@@ -283,10 +278,10 @@ function SlotSpellerTable({
         open={sheet.open}
         state={state}
         payout={payout}
+        records={records}
+        dispatch={dispatch}
         onDismiss={sheet.dismiss}
-      >
-        <RoundPanel state={state} dispatch={dispatch} records={records} />
-      </SlotRoundSheet>
+      />
       {/* The run's details, plainly, until the run menu gets its own design (STO-1190). */}
       <BottomSheet
         containerColor={palette.felt800}
@@ -406,7 +401,7 @@ const SHEET_DELAY_MS = 700;
 
 /**
  * Whether the round sheet is up: once a round ends (cleared, short, or run over) and the payout
- * reveal has had its beat. Swiping it away holds until the next round-end; `reopen` brings it back.
+ * reveal has had its beat. Tapping the scrim away holds until the next round-end; `reopen` brings it back.
  */
 function useRoundSheet(state: SlotSpellerState, revealing: boolean) {
   const key = SHEET_PHASES.has(state.phase)
@@ -430,56 +425,6 @@ function useRoundSheet(state: SlotSpellerState, revealing: boolean) {
     dismiss: () => setDismissed(key),
     reopen: () => setDismissed(null),
   };
-}
-
-/** The round sheet's body: the shop after a clear, the Extra Spin offer when short, or the run's summary. */
-function RoundPanel({
-  state,
-  dispatch,
-  records,
-}: {
-  state: SlotSpellerState;
-  dispatch: SlotSpeller["dispatch"];
-  records: SlotRecords;
-}): ReactElement | null {
-  switch (state.phase) {
-    case "short":
-      return (
-        <OutOfSpinsPanel
-          state={state}
-          onExtraSpin={() => dispatch({ type: "extraSpin" })}
-          onEndRun={() => dispatch({ type: "endRun" })}
-        />
-      );
-    case "over":
-      return (
-        <RunOverPanel
-          state={state}
-          records={<SlotRecordsBlock records={records} />}
-          onReplay={() => dispatch({ type: "newRun", seed: state.seed })}
-          onNewRun={() => dispatch({ type: "newRun", seed: randomSlotSeed() })}
-        />
-      );
-    case "shop":
-      return (
-        <SlotShopPanel
-          state={state}
-          onBuyPower={(power, pair) =>
-            dispatch(
-              pair === undefined
-                ? { type: "buyPower", power }
-                : { type: "buyPower", power, pair },
-            )
-          }
-          onBuyReel={() => dispatch({ type: "buyReel" })}
-          onBuyRow={() => dispatch({ type: "buyRow" })}
-          onReroll={() => dispatch({ type: "reroll" })}
-          onNextRound={() => dispatch({ type: "nextRound" })}
-        />
-      );
-    default:
-      return null;
-  }
 }
 
 const styles = StyleSheet.create({

@@ -26,9 +26,41 @@ export interface SlotRecords {
   readonly bestWord: SlotBestWord | null;
   /** Every power seen in a shop's stock, in pool order. */
   readonly discovered: readonly SlotPowerId[];
+  /** The records as the current run started, so Run over can flag what this run beat. Missing on a pre-STO-1189 save. */
+  readonly atRunStart?: SlotRecordsMark;
 }
 
-export const EMPTY_SLOT_RECORDS: SlotRecords = { furthestRound: 0, bestWord: null, discovered: [] };
+/** The three records as numbers, to compare against. */
+export interface SlotRecordsMark {
+  readonly furthestRound: number;
+  readonly bestScore: number;
+  readonly discovered: number;
+}
+
+export const EMPTY_SLOT_RECORDS: SlotRecords = {
+  furthestRound: 0,
+  bestWord: null,
+  discovered: [],
+  atRunStart: { furthestRound: 0, bestScore: 0, discovered: 0 },
+};
+
+const markOf = (records: SlotRecords): SlotRecordsMark => ({
+  furthestRound: records.furthestRound,
+  bestScore: records.bestWord?.score ?? 0,
+  discovered: records.discovered.length,
+});
+
+/** Which records the current run has set: each beats its value as the run started. */
+export function newBests(records: SlotRecords): { furthestRound: boolean; bestWord: boolean; discovered: boolean } {
+  // A save from before the mark has no start to compare with: flag nothing rather than guess.
+  const start = records.atRunStart ?? markOf(records);
+  const now = markOf(records);
+  return {
+    furthestRound: now.furthestRound > start.furthestRound,
+    bestWord: now.bestScore > start.bestScore,
+    discovered: now.discovered > start.discovered,
+  };
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -72,7 +104,12 @@ export function saveSlotRun(state: SlotSpellerState): void {
  * stock discovered, and a better best word replaces the old. Unchanged records come back as is.
  */
 export function updateRecords(records: SlotRecords, previous: SlotSpellerState, next: SlotSpellerState): SlotRecords {
-  let { furthestRound, bestWord, discovered } = records;
+  let { furthestRound, bestWord, discovered, atRunStart } = records;
+
+  // A new run (New run, Replay seed, Restart) marks where the records stood as it began.
+  if (next.round === 1 && next.spinCount === 0 && (previous.round > 1 || previous.spinCount > 0)) {
+    atRunStart = markOf(records);
+  }
 
   if (next.shop !== null && next.shop !== previous.shop) {
     furthestRound = Math.max(furthestRound, next.round);
@@ -83,10 +120,15 @@ export function updateRecords(records: SlotRecords, previous: SlotSpellerState, 
     bestWord = next.bestWord;
   }
 
-  if (furthestRound === records.furthestRound && bestWord === records.bestWord && discovered === records.discovered) {
+  if (
+    furthestRound === records.furthestRound &&
+    bestWord === records.bestWord &&
+    discovered === records.discovered &&
+    atRunStart === records.atRunStart
+  ) {
     return records;
   }
-  return { furthestRound, bestWord, discovered };
+  return { furthestRound, bestWord, discovered, atRunStart };
 }
 
 let current: SlotRecords | null = null;
