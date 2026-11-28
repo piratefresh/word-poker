@@ -20,6 +20,7 @@ import {
 import { spacing } from "@/constants/theme";
 import { payBeat } from "@/features/slot-speller/slot-speller-model";
 import { useSlotRecords } from "@/features/slot-speller/slot-speller-save";
+import { playSlotSound, type SlotSound } from "@/features/slot-speller/slot-speller-sound";
 import {
   useSlotSpeller,
   type SlotSpeller,
@@ -448,6 +449,8 @@ function deckButton(
 
 /** The phases whose panel rides in the round sheet. */
 const SHEET_PHASES: ReadonlySet<SlotPhase> = new Set(["shop", "short", "over"]);
+/** What each sheet sounds as it rises. */
+const SHEET_SOUND: Partial<Record<SlotPhase, SlotSound>> = { shop: "fanfare", short: "short", over: "over" };
 /** The beat between the payout total landing and the sheet rising over it. */
 const SHEET_DELAY_MS = 700;
 
@@ -461,16 +464,22 @@ function useRoundSheet(state: SlotSpellerState, revealing: boolean) {
     : null;
   const [ready, setReady] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
+  // A run resumed straight into its sheet already had its fanfare.
+  const [resumedKey] = useState(key);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (key === null || revealing) return;
     const timer = setTimeout(
-      () => setReady(key),
+      () => {
+        setReady(key);
+        const sound = SHEET_SOUND[state.phase];
+        if (key !== resumedKey && sound !== undefined) playSlotSound(sound);
+      },
       reduceMotion ? 0 : SHEET_DELAY_MS,
     );
     return () => clearTimeout(timer);
-  }, [key, revealing, reduceMotion]);
+  }, [key, revealing, reduceMotion, resumedKey, state.phase]);
 
   return {
     open: key !== null && ready === key && dismissed !== key,

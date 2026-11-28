@@ -22,6 +22,7 @@ import { GameButton } from "@/components/ui/game-button";
 import { fonts } from "@/constants/theme";
 import { randomSlotSeed } from "@/features/slot-speller/slot-speller-model";
 import type { SlotRecords } from "@/features/slot-speller/slot-speller-save";
+import { setSlotSoundOn, useSlotSoundOn } from "@/features/slot-speller/slot-speller-sound";
 
 import { cellBadge, cellColours, cellPhrase, lineColour } from "./slot-grid";
 import { CANDY, Divider, Orb, RecordTile, SheetFrame } from "./slot-round-sheet";
@@ -84,6 +85,7 @@ type Confirming = { label: string; seed: string } | null;
 export function SlotRunMenu({ state, records, onNewRun, onDismiss }: SlotRunMenuProps): ReactElement {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState<Confirming>(null);
+  const soundOn = useSlotSoundOn();
   // A run is in progress once it has spun, until it is over: only then is there something to lose.
   const inProgress = state.phase !== "over" && (state.round > 1 || state.spinCount > 0);
   const ask = (label: string, seed: string): void => (inProgress ? setConfirming({ label, seed }) : onNewRun(seed));
@@ -127,6 +129,15 @@ export function SlotRunMenu({ state, records, onNewRun, onDismiss }: SlotRunMenu
         </Text>
         <GameButton label={copied ? "Copied" : "Copy"} variant="dark" compact onPress={copy} testID="slot-copy-seed" />
       </View>
+
+      <Divider label="SOUND" />
+      <GameButton
+        label={soundOn ? "Sound on" : "Sound off"}
+        accessibilityLabel={soundOn ? "Sound on. Turn sound off" : "Sound off. Turn sound on"}
+        variant={soundOn ? "gold" : "dark"}
+        onPress={() => setSlotSoundOn(!soundOn)}
+        testID="slot-sound"
+      />
 
       {confirming === null ? (
         <View style={styles.buttons}>

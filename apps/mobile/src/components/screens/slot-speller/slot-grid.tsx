@@ -21,6 +21,7 @@ import { getTileAccessibilityLabel, Tile, TILE_METRICS } from "@/components/game
 import { haptic } from "@/components/word-builder/haptics";
 import { radius } from "@/constants/theme";
 import { powerName, type PayBeat } from "@/features/slot-speller/slot-speller-model";
+import { playSlotSound, stopSpinLoop } from "@/features/slot-speller/slot-speller-sound";
 import { webTestID } from "@/lib/ui/web-id";
 
 import { SlotReelRoll } from "./slot-reel-roll";
@@ -193,6 +194,7 @@ export function SlotGrid({
   }
   const onLanded = useCallback((reel: number) => {
     haptic("settle");
+    playSlotSound("stop");
     setRoll((current) => {
       if (current === null) return null;
       const rolling = current.rolling.filter((each) => each !== reel);
@@ -201,9 +203,13 @@ export function SlotGrid({
   }, []);
   // Keyed on the spin too: a spin that rolls nothing (reduced motion, every reel held) still reports.
   const anyRolling = roll !== null;
+  // The spin loop runs until the last reel lands, and never outlives the grid.
   useEffect(() => {
-    if (!anyRolling) onSpinLanded?.(spinCount);
+    if (anyRolling) return;
+    stopSpinLoop();
+    onSpinLanded?.(spinCount);
   }, [anyRolling, spinCount, onSpinLanded]);
+  useEffect(() => stopSpinLoop, []);
 
   const targetHeight = Math.max(band, MIN_TARGET);
   const upTop = (band - targetHeight) / 2;
