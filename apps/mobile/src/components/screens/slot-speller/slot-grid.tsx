@@ -82,12 +82,12 @@ export function cellColours(cell: Pick<SlotPremiumCell, "kind" | "multiplier">):
 }
 
 /** The badge's text: `2L`, `3W`, with a diamond on a permanent cell. */
-function cellBadge(cell: SlotPremiumCell): string {
+export function cellBadge(cell: SlotPremiumCell): string {
   return `${cell.permanent ? "◆ " : ""}${cell.multiplier}${cell.kind === "letter" ? "L" : "W"}`;
 }
 
 /** How a screen reader names a cell: `on a double word cell`. */
-function cellPhrase(cell: Pick<SlotPremiumCell, "kind" | "multiplier" | "permanent">): string {
+export function cellPhrase(cell: Pick<SlotPremiumCell, "kind" | "multiplier" | "permanent">): string {
   const times = cell.multiplier === 2 ? "double" : cell.multiplier === 3 ? "triple" : `${cell.multiplier}×`;
   return `${cell.permanent ? "permanent " : ""}${times} ${cell.kind} cell`;
 }

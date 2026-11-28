@@ -52,13 +52,13 @@ const FOOTER_SCALE = 1.3;
 const COUNT_STEP_MS = 60;
 
 /** A card's glossy candy: body top to foot, the lip under it, the orb's light. */
-interface Candy {
+export interface Candy {
   body: readonly [string, string, string];
   lip: string;
   orb: string;
 }
 
-const CANDY: Record<SlotPowerType | "upgrade", Candy> = {
+export const CANDY: Record<SlotPowerType | "upgrade", Candy> = {
   Grid: { body: ["#7ec4ff", "#2f74c8", "#1e4689"], lip: "#0b2550", orb: "#bfe3ff" },
   Lines: { body: ["#7ee8e0", "#1f9e9a", "#0f5f63"], lip: "#062f33", orb: "#c8fbf6" },
   Moves: { body: ["#ffd36a", "#e69a1e", "#b0650c"], lip: "#5a3006", orb: "#fff0c2" },
@@ -156,7 +156,7 @@ export function SlotPayoutSheet({ state, payout, onDismiss }: SlotPayoutSheetPro
 }
 
 /** The shared frame: scrim, the gold rim, the felt (green, or wine when short) and the banner. */
-function SheetFrame({ title, tone, onDismiss, children }: { title: string; tone: "win" | "short"; onDismiss: () => void; children: ReactNode }): ReactElement {
+export function SheetFrame({ title, tone, onDismiss, children }: { title: string; tone: "win" | "short"; onDismiss: () => void; children: ReactNode }): ReactElement {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const short = tone === "short";
@@ -392,7 +392,7 @@ function ShopCard({ candy, glyph, name, description, price, sold = false, disabl
 }
 
 /** A glossy orb with a glyph in it: a power's face on a card or a build pill. */
-function Orb({ candy, glyph, size }: { candy: Candy; glyph: string; size: number }): ReactElement {
+export function Orb({ candy, glyph, size }: { candy: Candy; glyph: string; size: number }): ReactElement {
   return (
     <LinearGradient colors={["#ffffff", candy.orb]} end={{ x: 0.7, y: 0.8 }} start={{ x: 0.3, y: 0.2 }} style={[styles.orb, { width: size, height: size, borderRadius: size / 2 }]}>
       <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.orbGlyph, { color: candy.lip, fontSize: size * 0.4 }]}>
@@ -425,7 +425,7 @@ function CountUp({ from, to }: { from: number; to: number }): ReactElement {
   return <Text style={styles.tokenChipText}>{reduceMotion ? to : value}</Text>;
 }
 
-function Divider({ label }: { label: string }): ReactElement {
+export function Divider({ label }: { label: string }): ReactElement {
   return (
     <View style={styles.divider}>
       <LinearGradient colors={["transparent", "rgba(247,223,122,0.6)"]} end={{ x: 1, y: 0 }} start={{ x: 0, y: 0 }} style={styles.rule} />
@@ -533,7 +533,7 @@ function PowerPill({ power, count }: { power: SlotPower; count: number }): React
   );
 }
 
-function RecordTile({ value, label, isNew }: { value: string; label: string; isNew: boolean }): ReactElement {
+export function RecordTile({ value, label, isNew }: { value: string; label: string; isNew: boolean }): ReactElement {
   return (
     <View accessibilityLabel={`${label}: ${value}${isNew ? ", new best" : ""}`} style={styles.record}>
       <Text style={styles.recordValue}>{value}</Text>

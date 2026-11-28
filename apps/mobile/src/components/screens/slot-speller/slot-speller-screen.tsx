@@ -1,4 +1,3 @@
-import { BottomSheet, RNHostView } from "@expo/ui";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -13,16 +12,13 @@ import {
   type Dictionary,
   type SlotEvaluation,
   type SlotPhase,
+  type SlotPower,
   type SlotSpellerState,
   type SlotWord,
 } from "@wordpoker/game-rules";
 
-import { palette, spacing } from "@/constants/theme";
-import {
-  payBeat,
-  payoutRows,
-  randomSlotSeed,
-} from "@/features/slot-speller/slot-speller-model";
+import { spacing } from "@/constants/theme";
+import { payBeat } from "@/features/slot-speller/slot-speller-model";
 import { useSlotRecords } from "@/features/slot-speller/slot-speller-save";
 import {
   useSlotSpeller,
@@ -44,14 +40,8 @@ import {
   type SlotDeckProps,
 } from "./slot-cabinet";
 import { cellCentre, lineColour, SlotCellKey, SlotGrid } from "./slot-grid";
-import { SlotPayoutList } from "./slot-payout-list";
 import { SlotPayoutSheet, SlotRoundSheet } from "./slot-round-sheet";
-import {
-  SlotLineChips,
-  SlotPowersPanel,
-  SlotRecordsBlock,
-  SlotSeedRow,
-} from "./slot-run-info";
+import { SlotPowerSheet, SlotRunMenu } from "./slot-run-menu";
 
 /** G1 · Glossy reels: the cabinet frame, header buttons, meter, plaques, deck and shelf, painted. */
 const CABINET_ART = require("../../../../assets/images/slot-speller/glossy-reels.jpg");
@@ -219,6 +209,8 @@ function SlotSpellerTable({
   const records = useSlotRecords();
   const sheet = useRoundSheet(state, revealing);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The socket opened on the power shelf: its power, or the rest past the shelf for `+n`.
+  const [shelfOpen, setShelfOpen] = useState<readonly SlotPower[] | null>(null);
   // The last spin whose reels have all landed; a newer spin is still rolling in.
   const [landedSpin, setLandedSpin] = useState(state.spinCount);
   const rolling = state.spinCount !== landedSpin;
@@ -292,7 +284,7 @@ function SlotSpellerTable({
           tokens={state.tokens}
           {...deckButton(game, rolling, sheet.reopen)}
         />
-        <SlotPowerShelf layout={layout} state={state} />
+        <SlotPowerShelf layout={layout} state={state} onOpen={setShelfOpen} />
       </CabinetStage>
       {/* The sheets sit outside the clipped, fixed-size stage so they measure against the screen. */}
       <SlotRoundSheet
@@ -307,33 +299,8 @@ function SlotSpellerTable({
       {payout !== null && payoutShown === payout ? (
         <SlotPayoutSheet state={state} payout={payout} onDismiss={() => setPayoutShown(null)} />
       ) : null}
-      {/* The run's details, plainly, until the run menu gets its own design (STO-1190). */}
-      <BottomSheet
-        containerColor={palette.felt800}
-        isPresented={menuOpen}
-        onDismiss={() => setMenuOpen(false)}
-        testID="slot-run-menu"
-      >
-        <RNHostView matchContents>
-          <View style={styles.menu}>
-            <SlotSeedRow
-              seed={state.seed}
-              onRestart={() => newRun(state.seed)}
-              onNewRun={() => newRun(randomSlotSeed())}
-            />
-            <SlotLineChips state={state} />
-            {payout !== null ? (
-              <SlotPayoutList
-                payout={payout}
-                rows={payoutRows(payout)}
-                powerMultiplier={state.config.scoringPowerMultiplier}
-              />
-            ) : null}
-            <SlotPowersPanel state={state} />
-            <SlotRecordsBlock records={records} />
-          </View>
-        </RNHostView>
-      </BottomSheet>
+      {shelfOpen !== null ? <SlotPowerSheet state={state} powers={shelfOpen} onDismiss={() => setShelfOpen(null)} /> : null}
+      {menuOpen ? <SlotRunMenu state={state} records={records} onNewRun={newRun} onDismiss={() => setMenuOpen(false)} /> : null}
     </>
   );
 }
@@ -525,13 +492,5 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.55)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
-  },
-  menu: {
-    alignSelf: "stretch",
-    width: "100%",
-    gap: spacing.lg,
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
   },
 });

@@ -3,14 +3,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
-import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 
-import { SLOT_POWERS, powerCount, type SlotSpellerState } from "@wordpoker/game-rules";
+import { powerCount, type SlotPower, type SlotSpellerState } from "@wordpoker/game-rules";
 
 import { fonts } from "@/constants/theme";
 import { webTestID } from "@/lib/ui/web-id";
 
 import { FRAME_ACROSS, type Box } from "./slot-grid";
+import { CANDY, Orb } from "./slot-round-sheet";
+import { heldPowers } from "./slot-run-menu";
 
 /**
  * The G1 cabinet's live layer. In portrait it sits on the painted art (`glossy-reels.jpg`) and every
@@ -421,25 +423,56 @@ export function SlotDeck({ layout, moves, tokens, label, accessibilityLabel, dis
   );
 }
 
-/** The power shelf's four sockets: a held power's orb, or the lock on an empty socket. */
-export function SlotPowerShelf({ layout, state }: { layout: CabinetLayout; state: SlotSpellerState }): ReactElement {
+/**
+ * The power shelf's four sockets: a held power's orb in its type's candy, or the lock on an empty
+ * socket. Past four powers the fourth socket shows `+n` for the rest. Tapping a held socket opens it.
+ */
+export function SlotPowerShelf({
+  layout,
+  state,
+  onOpen,
+}: {
+  layout: CabinetLayout;
+  state: SlotSpellerState;
+  onOpen: (powers: readonly SlotPower[]) => void;
+}): ReactElement {
   const { unit, painted } = layout;
-  const held = SLOT_POWERS.filter((power) => powerCount(state.powers, power.id) > 0);
+  const held = heldPowers(state);
+  const sockets = layout.sockets.length;
+  const overflow = held.length > sockets ? held.slice(sockets - 1) : [];
   return (
     <>
       {layout.sockets.map((socket, index) => {
+        const more = overflow.length > 0 && index === sockets - 1;
         const power = held[index];
+        const opens = more ? overflow : power === undefined ? null : [power];
+        const size = socket.width * 0.9;
         return (
           <Pressable
             key={index}
-            accessibilityLabel={power === undefined ? `Locked power slot ${index + 1}` : `${power.name} power, ready`}
+            accessibilityLabel={
+              more
+                ? `${overflow.length} more powers`
+                : power === undefined
+                  ? `Empty power slot ${index + 1}`
+                  : `${power.name} power${powerCount(state.powers, power.id) > 1 ? ` ×${powerCount(state.powers, power.id)}` : ""}`
+            }
             accessibilityRole="button"
+            accessibilityState={{ disabled: opens === null }}
+            disabled={opens === null}
             id={webTestID(`slot-socket-${index}`)}
-            style={[at(hitBox(socket)), styles.socket]}
+            onPress={opens === null ? undefined : () => onOpen(opens)}
+            style={({ pressed }) => [at(hitBox(socket)), styles.socket, pressed && styles.pressed]}
             testID={`slot-socket-${index}`}
           >
             <View style={[styles.centred, { width: socket.width, height: socket.height, borderRadius: socket.width / 2 }, !painted && [styles.socketWell, { borderWidth: 3 * unit }]]}>
-              {power === undefined ? <Padlock size={socket.width * 0.6} /> : <Orb size={socket.width * 0.9} />}
+              {more ? (
+                <Orb candy={CANDY.upgrade} glyph={`+${overflow.length}`} size={size} />
+              ) : power === undefined ? (
+                <Padlock size={socket.width * 0.6} />
+              ) : (
+                <Orb candy={CANDY[power.type]} glyph={power.glyph} size={size} />
+              )}
             </View>
           </Pressable>
         );
@@ -448,7 +481,7 @@ export function SlotPowerShelf({ layout, state }: { layout: CabinetLayout; state
         maxFontSizeMultiplier={1.2}
         style={[styles.caption, { left: layout.caption.left, top: layout.caption.top, width: layout.caption.width, fontSize: 14 * unit, lineHeight: 18 * unit }]}
       >
-        {`Powers · ${held.length} ready`}
+        {held.length === 0 ? "Powers · none yet" : `Powers · ${held.length} held · tap one`}
       </Text>
     </>
   );
@@ -481,23 +514,6 @@ function Coin({ size }: { size: number }): ReactElement {
     <Icon size={size} viewBox="0 0 16 16">
       <Circle cx={8} cy={8} fill="#f6c444" r={7} stroke="#9a6a12" strokeWidth={1.5} />
       <Path d="M8 4.2 L9.1 6.6 L11.7 6.9 L9.8 8.6 L10.3 11.2 L8 9.9 L5.7 11.2 L6.2 8.6 L4.3 6.9 L6.9 6.6 Z" fill="#fff1b8" />
-    </Icon>
-  );
-}
-
-function Orb({ size }: { size: number }): ReactElement {
-  return (
-    <Icon size={size} viewBox="0 0 38 38">
-      <Defs>
-        <RadialGradient cx="40%" cy="35%" id="slot-orb" r="65%">
-          <Stop offset="0" stopColor="#fff3b0" />
-          <Stop offset="0.55" stopColor="#f5bf3a" />
-          <Stop offset="1" stopColor="#b9761a" />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={19} cy={20} fill="url(#slot-orb)" r={15} stroke="#8a5410" strokeWidth={1.5} />
-      <Rect fill="#c98f1c" height={5} rx={1.5} stroke="#8a5410" strokeWidth={1.2} width={8} x={15} y={2.5} />
-      <Path d="M21 11 L13.5 21.5 H18.5 L16.5 29 L24.5 18 H19.5 Z" fill="#ffffff" stroke="#8a5410" strokeLinejoin="round" strokeWidth={1.2} />
     </Icon>
   );
 }
