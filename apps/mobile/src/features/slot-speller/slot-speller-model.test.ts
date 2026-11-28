@@ -1,8 +1,26 @@
-import { createSlotRun, isSwapLocked, type SlotCell, type SlotSpellerState } from "@wordpoker/game-rules";
+import type { Tile } from "@wordpoker/contracts";
+import {
+  createSlotRun,
+  evaluateSlotGrid,
+  isSwapLocked,
+  scoreSlotWord,
+  slotLines,
+  type SlotCell,
+  type SlotPremiumCell,
+  type SlotSpellerState,
+} from "@wordpoker/game-rules";
 
 import { testDictionary } from "@/test-support/dictionary-fixtures";
 
-import { createSlotModel, isRevealing, payoutRows, randomSlotSeed, reduceSlotSpeller } from "./slot-speller-model";
+import {
+  createSlotModel,
+  isRevealing,
+  payBeat,
+  payoutRows,
+  randomSlotSeed,
+  reduceSlotSpeller,
+  workingLine,
+} from "./slot-speller-model";
 
 /** The word row 0 spells across every reel, as printed. */
 function topRow(state: SlotSpellerState): string {
@@ -136,6 +154,61 @@ describe("the shop and holds", () => {
     model = reduceSlotSpeller(model, { type: "spin" }, empty);
     expect(model.held).toEqual([2]);
     expect(model.state.grid[2]).toEqual(kept);
+  });
+});
+
+/** The number a working line ends on: what the word scores. */
+function workedScore(line: string): number {
+  return Number(line.split(/ = | → /).at(-1));
+}
+
+describe("the pay sequence and the working lines", () => {
+  it("prints the rules' CAT example: a 3L cell, a half for length, rounded up", () => {
+    const run = createSlotRun("TEST05");
+    const faces = [
+      { letter: "C", points: 4 },
+      { letter: "A", points: 1 },
+      { letter: "T", points: 2 },
+    ].map(({ letter, points }) => ({ tile: { id: letter, letter, points } as Tile, letter, points }));
+    const premiums = [undefined, { kind: "letter", multiplier: 3, reel: 1, row: 0 } as SlotPremiumCell];
+    const breakdown = scoreSlotWord(faces, run.config, run.powers, premiums);
+    expect(workingLine(breakdown, run.config.scoringPowerMultiplier)).toBe("C4 + A1×3L + T2 = 9 · ×½ length = 4.5 → 5");
+  });
+
+  it("gives the preview, the pay sequence and the list one total, rows, wave and zigzag lines all paying", () => {
+    let model = reduceSlotSpeller(createSlotModel(createSlotRun("TEST06")), { type: "spin" }, testDictionary([]));
+    // Wave and a Zigzag pair on, so the grid pays on every kind of line.
+    model = { ...model, state: { ...model.state, powers: { ...model.state.powers, wave: 1 }, zigzagPairs: [0] } };
+    // Every three-letter span of every line is a word: plenty of words, some overlapping lines.
+    const spans = slotLines(model.state).flatMap((line) => {
+      const letters = line.cells.map(([reel, row]) => model.state.grid[reel]?.[row]?.letter.toUpperCase() ?? "").join("");
+      return Array.from({ length: letters.length - 2 }, (_, at) => letters.slice(at, at + 3));
+    });
+    const dictionary = testDictionary([...new Set(spans)]);
+
+    const preview = evaluateSlotGrid(model.state, dictionary);
+    expect(new Set(preview.words.map((word) => word.line.split(" ")[0]))).toEqual(new Set(["Row", "Wave", "Zigzag"]));
+
+    const before = model.state.roundScore;
+    model = reduceSlotSpeller(model, { type: "pay" }, dictionary);
+    const payout = model.payout;
+    if (payout === null) throw new Error("the pay was refused");
+    expect(payout.total).toBe(preview.total);
+
+    // Beat by beat the meter never runs ahead of the engine and ends on it.
+    let meter = before;
+    while (isRevealing(model)) {
+      model = reduceSlotSpeller(model, { type: "revealNext" }, dictionary);
+      const beat = payBeat(payout, model.revealStep);
+      const shown = model.state.roundScore - payout.total + beat.paid;
+      expect(shown).toBeGreaterThanOrEqual(meter);
+      meter = shown;
+    }
+    expect(payBeat(payout, model.revealStep)).toMatchObject({ shown: payout.words.length, current: null, paid: payout.total });
+    expect(meter).toBe(model.state.roundScore);
+
+    const listed = payout.words.map((word) => workedScore(workingLine(word.breakdown, model.state.config.scoringPowerMultiplier)));
+    expect(listed.reduce((sum, score) => sum + score, 0)).toBe(preview.total);
   });
 });
 

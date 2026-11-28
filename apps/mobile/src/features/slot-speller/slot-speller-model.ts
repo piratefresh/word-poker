@@ -19,6 +19,7 @@ import {
   spin,
   swap,
   toggleHold,
+  SLOT_POWERS,
   type Dictionary,
   type NudgeDirection,
   type SlotActionResult,
@@ -26,6 +27,7 @@ import {
   type SlotEvaluation,
   type SlotPowerId,
   type SlotSpellerState,
+  type SlotWordBreakdown,
 } from "@wordpoker/game-rules";
 
 export interface SlotSpellerModel {
@@ -90,6 +92,59 @@ export function payoutRows(payout: SlotEvaluation | null): SlotPayoutRow[] {
   });
   rows.push({ kind: "total", total: payout.total });
   return rows;
+}
+
+/** Where the pay sequence stands: one word per beat, then each power it triggered, then the total. */
+export interface PayBeat {
+  /** How many words have been paid (lit gold) so far. */
+  readonly shown: number;
+  /** The word whose beat it is, or `null` before the first word and once the total is up. */
+  readonly current: number | null;
+  /** The power being shown on the current word, on a power beat. */
+  readonly power: SlotPowerId | null;
+  /** The paid words' points so far: what the meter has filled by. */
+  readonly paid: number;
+}
+
+export function payBeat(payout: SlotEvaluation, revealStep: number): PayBeat {
+  const rows = payoutRows(payout).slice(0, revealStep);
+  const last = rows.at(-1);
+  const shown = rows.filter((row) => row.kind === "word").length;
+  const paid = payout.words.slice(0, shown).reduce((sum, word) => sum + word.breakdown.score, 0);
+  return {
+    shown,
+    current: last === undefined || last.kind === "total" ? null : last.index,
+    power: last?.kind === "power" ? last.power : null,
+    paid,
+  };
+}
+
+const MULTIPLIER_TEXT: Readonly<Record<number, string>> = { 0.5: "½", 1.5: "1½" };
+
+export function powerName(power: SlotPowerId): string {
+  return SLOT_POWERS.find((each) => each.id === power)?.name ?? power;
+}
+
+/**
+ * A word's working, as the engine scored it: `C4 + A1×3L + T2 = 9 · ×½ length = 4.5 → 5`. Letters
+ * show their tile (`×DL`) and letter cell (`×2L`) multipliers; word cells, length and powers follow.
+ */
+export function workingLine(breakdown: SlotWordBreakdown, powerMultiplier: number): string {
+  const letters = breakdown.letters
+    .map(({ letter, points, tileMult, cellMult }) =>
+      [`${letter}${points}`, tileMult > 1 ? `×${tileMult === 3 ? "TL" : "DL"}` : "", cellMult > 1 ? `×${cellMult}L` : ""].join(""),
+    )
+    .join(" + ");
+  const steps = [
+    ...breakdown.wordCells.map((multiplier) => `×${multiplier}W`),
+    ...(breakdown.lengthMult === 1 ? [] : [`×${MULTIPLIER_TEXT[breakdown.lengthMult] ?? breakdown.lengthMult} length`]),
+    ...breakdown.triggered.map((power) => `×${powerMultiplier} ${powerName(power)}`),
+  ];
+  const sum = `${letters} = ${breakdown.base}`;
+  if (steps.length === 0) return sum;
+  const exact = Number(breakdown.exact.toFixed(2));
+  const line = `${sum} · ${steps.join(" · ")} = ${exact}`;
+  return exact === breakdown.score ? line : `${line} → ${breakdown.score}`;
 }
 
 /** Whether the payout list is still revealing (the outcome waits for it). */

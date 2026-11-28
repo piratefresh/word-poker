@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type TextStyle } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 
 import { SLOT_POWERS, powerCount, type SlotSpellerState } from "@wordpoker/game-rules";
@@ -228,19 +229,40 @@ function HeaderButton({ box, layout, icon, label, onPress, testID }: HeaderButto
 export interface SlotHeaderProps {
   layout: CabinetLayout;
   state: SlotSpellerState;
+  /** The round score the meter shows: behind the engine's while a pay sequence fills it word by word. */
+  score: number;
   /** The live grid's total while moving: the meter's lighter fill and its `+n`. */
   preview: number;
+  /** After a pay, the meter opens that spin's payout; `undefined` before one. */
+  onPayout?: () => void;
   onBack: () => void;
   onMenu: () => void;
 }
 
+/** A pay's points land in the meter this long after their word's beat starts: the flight's length, near enough. */
+const FILL_DELAY_MS = 300;
+const FILL_MS = 260;
+
 /** Back, the round's title on the painted ribbon, the progress meter, and the Run menu. */
-export function SlotHeader({ layout, state, preview, onBack, onMenu }: SlotHeaderProps): ReactElement {
+export function SlotHeader({ layout, state, score: roundScore, preview, onPayout, onBack, onMenu }: SlotHeaderProps): ReactElement {
   const { unit } = layout;
-  const { round, roundScore, target } = state;
+  const { round, target } = state;
   const scoreFill = Math.min(roundScore / target, 1);
   const previewFill = Math.min((roundScore + preview) / target, 1);
   const meterWidth = layout.meter.width;
+  const reduceMotion = useReducedMotion();
+
+  // The fill grows as a pay's points land in it, and drops at once when a new round starts.
+  const fill = useSharedValue(scoreFill);
+  useEffect(() => {
+    fill.value =
+      reduceMotion || scoreFill < fill.value
+        ? scoreFill
+        : withDelay(FILL_DELAY_MS, withTiming(scoreFill, { duration: FILL_MS, easing: Easing.out(Easing.cubic) }));
+  }, [scoreFill, reduceMotion, fill]);
+  const fillStyle = useAnimatedStyle(() => ({ width: meterWidth * fill.value }));
+
+  const label = `${roundScore} of ${target} points`;
   return (
     <>
       <HeaderButton box={layout.back} layout={layout} icon="arrow-back" label="Back" onPress={onBack} testID="slot-back" />
@@ -252,27 +274,38 @@ export function SlotHeader({ layout, state, preview, onBack, onMenu }: SlotHeade
       >
         {`Round ${round}`}
       </Text>
-      <View
-        accessibilityLabel={`${roundScore} of ${target} points`}
-        accessibilityRole="progressbar"
+      <Pressable
+        accessibilityHint={onPayout === undefined ? undefined : "Shows the last spin's payout, word by word"}
+        accessibilityLabel={label}
+        accessibilityRole={onPayout === undefined ? "progressbar" : "button"}
         accessibilityValue={{ min: 0, max: target, now: Math.min(roundScore, target) }}
+        disabled={onPayout === undefined}
+        hitSlop={{ top: 12, bottom: 12 }}
+        id={webTestID("slot-meter")}
+        onPress={onPayout}
         style={[at(layout.meter), styles.meter, { borderRadius: 10 * unit }, !layout.painted && [styles.meterTrack, { borderWidth: 2 * unit }]]}
         testID="slot-meter"
       >
         {previewFill > scoreFill ? (
           <View style={[styles.fill, styles.previewFill, { width: meterWidth * previewFill, borderRadius: 9 * unit }]} />
         ) : null}
-        <LinearGradient
-          colors={["#8be36a", "#3fae3a", "#2d8a2c"]}
-          locations={[0, 0.55, 1]}
-          style={[styles.fill, { width: meterWidth * scoreFill, borderRadius: 9 * unit }]}
-        />
+        <Animated.View style={[styles.fill, { borderRadius: 9 * unit, overflow: "hidden" }, fillStyle]}>
+          <LinearGradient
+            colors={["#8be36a", "#3fae3a", "#2d8a2c"]}
+            locations={[0, 0.55, 1]}
+            style={[StyleSheet.absoluteFill, { width: meterWidth }]}
+          />
+        </Animated.View>
         <Text maxFontSizeMultiplier={1} style={[styles.meterText, { fontSize: 13 * unit, lineHeight: layout.meter.height - (layout.painted ? 0 : 4 * unit) }]} testID="slot-score">
           {`${roundScore}`}
           {preview > 0 ? <Text style={styles.meterPlus}>{` +${preview}`}</Text> : null}
           {` / ${target}`}
         </Text>
-      </View>
+        {/* After a pay the meter opens the payout: a small chevron says it can. */}
+        {onPayout !== undefined ? (
+          <Ionicons color="#ffffff" name="chevron-forward" size={12 * unit} style={[styles.meterMore, { right: 5 * unit }]} />
+        ) : null}
+      </Pressable>
     </>
   );
 }
@@ -494,6 +527,7 @@ const styles = StyleSheet.create({
   meter: { overflow: "hidden" },
   fill: { position: "absolute", left: 0, top: 1, bottom: 1 },
   previewFill: { backgroundColor: "rgba(139,227,106,0.45)" },
+  meterMore: { position: "absolute", top: "50%", marginTop: -6, opacity: 0.85 },
   meterText: {
     position: "absolute",
     left: 0,
