@@ -39,6 +39,12 @@ jest.mock("expo-notifications", () => ({
   getPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
 }));
 
+let mockReminderOn = true;
+jest.mock("@/lib/quests/streak-reminder", () => ({
+  streakReminderOn: () => mockReminderOn,
+  setStreakReminderOn: jest.fn((on: boolean) => { mockReminderOn = on; }),
+}));
+
 jest.mock("@/lib/quests/quests-provider", () => ({
   useQuests: () => ({ coins: 1250, state: { xp: 50 } }),
 }));
@@ -93,6 +99,15 @@ test("a notification switch saves to the account on tap", async () => {
   expect(authClient.updateUser).toHaveBeenCalledWith({ notifyFriendOnline: true });
   expect(onSaved).toHaveBeenCalledTimes(1);
   expect(view.getByTestId("notify-notifyFriendOnline").props.accessibilityState).toMatchObject({ checked: true });
+});
+
+test("the streak reminder switch is on by default and saves to the device", async () => {
+  const { setStreakReminderOn } = jest.requireMock<typeof import("@/lib/quests/streak-reminder")>("@/lib/quests/streak-reminder");
+  const view = await render(<NotificationSettings onSaved={jest.fn()} />);
+  expect(view.getByTestId("notify-streak-reminder").props.accessibilityState).toMatchObject({ checked: true });
+  await act(async () => { fireEvent.press(view.getByTestId("notify-streak-reminder")); });
+  expect(setStreakReminderOn).toHaveBeenCalledWith(false);
+  expect(view.getByTestId("notify-streak-reminder").props.accessibilityState).toMatchObject({ checked: false });
 });
 
 test("saves the display name on blur or Return, never while it is invalid", async () => {
